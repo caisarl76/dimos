@@ -30,6 +30,7 @@ from dimos.agents.annotation import skill
 from dimos.constants import DIMOS_PROJECT_ROOT
 from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
+from dimos.memory2.db_tf import TfGraphWriter
 from dimos.memory2.embed import EmbedImages
 from dimos.memory2.store.null import NullStore
 from dimos.memory2.store.sqlite import SqliteStore
@@ -40,6 +41,7 @@ from dimos.models.embedding.base import EmbeddingModel
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.msgs.sensor_msgs.Image import Image
 from dimos.msgs.tf2_msgs.TFMessage import TFMessage
+from dimos.protocol.pubsub.impl.lcmpubsub import Topic
 from dimos.utils.data import backup_file
 from dimos.utils.logging_config import setup_logger
 
@@ -452,7 +454,8 @@ class Recorder(MemoryModule):
         return setters
 
     def _record_tf(self) -> None:
-        """Record the live tf stream under "tf" (no-op without a pubsub tf)."""
+        """Record the live tf + static_tf streams under "tf", writing the topology
+        change-log (tf_graph) as we go (no-op without a pubsub tf)."""
         topic = getattr(self.tf.config, "topic", None)
         pubsub = getattr(self.tf, "pubsub", None)
         if not topic or pubsub is None:
@@ -460,12 +463,36 @@ class Recorder(MemoryModule):
             return
         tf_stream = self.store.stream("tf", TFMessage)
 
-        def on_tf(msg: TFMessage, _topic: Any) -> None:
-            try:
-                for transform in msg.transforms:
-                    tf_stream.append(TFMessage(transform), ts=transform.ts, pose=None)
-            except sqlite3.ProgrammingError:
-                # A late LCM callback raced teardown and hit the closed store.
-                pass
+        # Topology change-log (the "tf_graph" stream) written alongside the tf rows.
+        graph_writer = TfGraphWriter(self.store, "tf")
+        self.register_disposable(Disposable(graph_writer.close))
 
-        self.register_disposable(Disposable(pubsub.subscribe(topic, on_tf)))
+        def make_handler(is_static: bool) -> Any:
+            def on_tf(msg: TFMessage, _topic: Any) -> None:
+                try:
+                    for transform in msg.transforms:
+                        tf_stream.append(
+                            TFMessage(transform),
+                            ts=transform.ts,
+                            pose=None,
+                            tags={"child_frame": transform.child_frame_id},
+                        )
+                        if graph_writer is not None:
+                            graph_writer.record(
+                                transform.child_frame_id,
+                                transform.frame_id,
+                                is_static,
+                                transform.ts,
+                            )
+                except sqlite3.ProgrammingError:
+                    # A late LCM callback raced teardown and hit the closed store.
+                    pass
+
+            return on_tf
+
+        self.register_disposable(Disposable(pubsub.subscribe(topic, make_handler(False))))
+        # Also listen on the static_tf stream (nothing publishes it yet); these are
+        # recorded the same way but flagged static in the topology.
+        self.register_disposable(
+            Disposable(pubsub.subscribe(Topic("/tf_static", TFMessage), make_handler(True)))
+        )
