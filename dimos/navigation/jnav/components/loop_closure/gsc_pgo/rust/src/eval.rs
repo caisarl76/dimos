@@ -87,6 +87,7 @@ struct EvalConfig {
 
     loop_robust_kernel: bool,
     loop_robust_huber_k: f64,
+    strong_accept_range: f64,
     loop_gnc_final: bool,
     loop_gnc_var_scale: f64,
     loop_gnc_inlier_probability: f64,
@@ -143,6 +144,7 @@ impl Default for EvalConfig {
             scan_context_lidar_height_m: 2.0,
             loop_robust_kernel: true,
             loop_robust_huber_k: 1.345,
+            strong_accept_range: 0.0,
             loop_gnc_final: true,
             loop_gnc_var_scale: 10.0,
             loop_gnc_inlier_probability: 0.99,
@@ -185,6 +187,7 @@ impl EvalConfig {
             loop_buffer_min_agree: self.loop_buffer_min_agree,
             loop_robust_kernel: self.loop_robust_kernel,
             loop_robust_huber_k: self.loop_robust_huber_k,
+            strong_accept_range: self.strong_accept_range,
             loop_gnc_final: self.loop_gnc_final,
             loop_gnc_var_scale: self.loop_gnc_var_scale,
             loop_gnc_inlier_probability: self.loop_gnc_inlier_probability,
