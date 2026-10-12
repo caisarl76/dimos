@@ -277,9 +277,28 @@ fn warn_if_seed_starved(seed: &SeedState) {
     }
 }
 
+/// What the worker does on one pass of its loop.
+enum Turn {
+    Job(Job),
+    SeedTile,
+    Closed,
+}
+
+/// Queued jobs always go first. A load in progress gets one tile when none is
+/// waiting, and without a load the worker waits for a job.
+async fn next_turn(jobs: &mut mpsc::Receiver<Job>, loading: bool) -> Turn {
+    if !loading {
+        return jobs.recv().await.map_or(Turn::Closed, Turn::Job);
+    }
+    match jobs.try_recv() {
+        Ok(job) => Turn::Job(job),
+        Err(TryRecvError::Empty) => Turn::SeedTile,
+        Err(TryRecvError::Disconnected) => Turn::Closed,
+    }
+}
+
 /// Owns the mapper and does every map mutation and publish off the handle
-/// loop. Queued jobs always go first. A seed tile is applied only when none
-/// is waiting.
+/// loop.
 struct Worker {
     jobs: mpsc::Receiver<Job>,
     // Handed to the seed placement task so its result re-enters the queue.
@@ -305,24 +324,14 @@ impl Worker {
             viz: RegionSweep::default(),
         };
         loop {
-            let job = if matches!(state.seed, SeedState::Loading(_)) {
-                match self.jobs.try_recv() {
-                    Ok(job) => Some(job),
-                    Err(TryRecvError::Empty) => None,
-                    Err(TryRecvError::Disconnected) => return,
-                }
-            } else {
-                match self.jobs.recv().await {
-                    Some(job) => Some(job),
-                    None => return,
-                }
-            };
-            match job {
-                Some(job) => self.handle(&mut state, job).await,
-                None => {
+            let loading = matches!(state.seed, SeedState::Loading(_));
+            match next_turn(&mut self.jobs, loading).await {
+                Turn::Job(job) => self.handle(&mut state, job).await,
+                Turn::SeedTile => {
                     self.seed_step(&mut state).await;
                     tokio::task::yield_now().await;
                 }
+                Turn::Closed => return,
             }
         }
     }
@@ -880,6 +889,51 @@ mod tests {
         assert_eq!(second, Some(centers[1]));
         assert!(load.finished());
         assert_eq!((load.tiles_done, load.tile_count, load.created), (3, 3, 3));
+    }
+
+    fn lidar_job(seq: i32) -> Job {
+        let mut cloud = PointCloud2::default();
+        cloud.header.seq = seq;
+        Job::Lidar(cloud, Instant::now())
+    }
+
+    fn lidar_seq(turn: Turn) -> Option<i32> {
+        match turn {
+            Turn::Job(Job::Lidar(cloud, _)) => Some(cloud.header.seq),
+            _ => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn queued_jobs_go_ahead_of_seed_tiles() {
+        let (tx, mut rx) = mpsc::channel(JOB_QUEUE_CAPACITY);
+        tx.send(lidar_job(1)).await.unwrap();
+        tx.send(lidar_job(2)).await.unwrap();
+
+        assert_eq!(lidar_seq(next_turn(&mut rx, true).await), Some(1));
+        assert_eq!(lidar_seq(next_turn(&mut rx, true).await), Some(2));
+        assert!(matches!(next_turn(&mut rx, true).await, Turn::SeedTile));
+        assert!(matches!(next_turn(&mut rx, true).await, Turn::SeedTile));
+
+        tx.send(lidar_job(3)).await.unwrap();
+        assert_eq!(lidar_seq(next_turn(&mut rx, true).await), Some(3));
+        assert!(matches!(next_turn(&mut rx, true).await, Turn::SeedTile));
+
+        drop(tx);
+        assert!(matches!(next_turn(&mut rx, true).await, Turn::Closed));
+    }
+
+    #[tokio::test]
+    async fn a_worker_with_no_load_waits_for_a_job() {
+        let (tx, mut rx) = mpsc::channel(JOB_QUEUE_CAPACITY);
+        let waiting = tokio::time::timeout(Duration::from_millis(20), next_turn(&mut rx, false));
+        assert!(waiting.await.is_err());
+
+        tx.send(lidar_job(1)).await.unwrap();
+        assert_eq!(lidar_seq(next_turn(&mut rx, false).await), Some(1));
+
+        drop(tx);
+        assert!(matches!(next_turn(&mut rx, false).await, Turn::Closed));
     }
 
     #[test]
