@@ -267,3 +267,23 @@ def test_later_clock_sampling_uncertainty_counts_against_drift_limit(adapter, im
     module.handle_color_image(replace(image, ts=1000.15))
     assert module.get_observation_status()["state"] == "fault"
     assert outputs == []
+
+
+def test_typed_state_uncertainty_is_preserved_in_age_and_service_snapshot(adapter, image, state):
+    module, outputs = adapter
+    module.measured_state.transport.publish(
+        replace(state, acquisition_uncertainty_seconds=(0.001, 0.004, 0.001))
+    )
+    module.color_image.transport.publish(image)
+    wait_until(lambda: len(outputs) == 1, timeout=2)
+    assert outputs[0].observed_at == pytest.approx(9.966)
+    assert module.get_observation_status()["measured_state_age_s"] == pytest.approx(0.034)
+
+
+def test_invalid_state_uncertainty_rejected_without_unlocking_service(adapter, image, state):
+    module, outputs = adapter
+    module.handle_measured_state(replace(state, acquisition_uncertainty_seconds=(0, -1, 0)))
+    module.handle_color_image(image)
+    status = module.get_observation_status()
+    assert status["accepted_measured_states"] == 0 and status["rejected_states"] == 1
+    assert status["state"] == "waiting" and outputs == []

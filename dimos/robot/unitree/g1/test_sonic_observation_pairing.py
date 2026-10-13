@@ -165,3 +165,155 @@ def test_camera_uncertainty_is_included_in_age_skew_and_expiry(state, rgb):
     assert obs is not None and obs.observed_at == pytest.approx(9.995)
     with pytest.raises(ValueError, match="acquisition"):
         pairer.push_image(rgb, observed_at=10.2, uncertainty=0.01, now=10.395)
+
+
+def test_component_uncertainty_preserves_oldest_possible_time(state, rgb):
+    pairer = SonicObservationPairer(max_skew=0.04)
+    pairer.push_image(rgb, observed_at=10.015, uncertainty=0.002, now=10.04)
+    obs = pairer.push_state(
+        replace(state, acquisition_uncertainty_seconds=(0.003, 0.004, 0.006)), now=10.04
+    )
+    assert obs is not None and obs.observed_at == pytest.approx(9.994)
+    np.testing.assert_allclose(obs.state, np.arange(28) / 10)
+
+
+@pytest.mark.parametrize("component", range(3))
+@pytest.mark.parametrize("stamp,now", [(9.81, 10.0), (9.99, 10.0)])
+def test_any_component_interval_crossing_age_or_future_boundary_is_rejected(
+    state, component, stamp, now
+):
+    errors = [0.0, 0.0, 0.0]
+    errors[component] = 0.02
+    bounded = replace(
+        state,
+        body_observed_at=stamp,
+        left_hand_observed_at=stamp,
+        right_hand_observed_at=stamp,
+        acquisition_uncertainty_seconds=tuple(errors),
+    )
+    pairer = SonicObservationPairer(max_skew=0.03)
+    with pytest.raises(ValueError, match="acquisition"):
+        pairer.push_state(bounded, now=now)
+    assert pairer.buffered_states == 0
+
+
+@pytest.mark.parametrize(
+    "errors",
+    [
+        (-0.001, 0, 0),
+        (0, float("nan"), 0),
+        (0, 0, float("inf")),
+        (0, 0),
+        (0, 0, 0, 0),
+        (True, 0, 0),
+        ("unknown", 0, 0),
+    ],
+)
+def test_unknown_or_malformed_uncertainty_cannot_enter_pairer(state, errors):
+    pairer = SonicObservationPairer(max_skew=0.03)
+    with pytest.raises(ValueError, match="uncertainty"):
+        pairer.push_state(replace(state, acquisition_uncertainty_seconds=errors), now=10.05)
+    assert pairer.buffered_states == 0
+
+
+def test_intervals_must_fit_skew_even_when_all_nominal_times_match(state, rgb):
+    pairer = SonicObservationPairer(max_skew=0.03)
+    pairer.push_state(
+        replace(
+            state,
+            body_observed_at=10,
+            left_hand_observed_at=10,
+            right_hand_observed_at=10,
+            acquisition_uncertainty_seconds=(0, 0.016, 0),
+        ),
+        now=10.03,
+    )
+    assert pairer.push_image(rgb, observed_at=10, now=10.03) is None
+
+
+def test_expiry_removes_later_state_with_older_uncertain_lower_bound(state, rgb):
+    pairer = SonicObservationPairer(max_skew=0.19)
+    pairer.push_state(
+        replace(
+            state,
+            body_observed_at=10.10,
+            left_hand_observed_at=10.10,
+            right_hand_observed_at=10.10,
+        ),
+        now=10.15,
+    )
+    pairer.push_state(
+        replace(
+            state,
+            sequence=8,
+            body_observed_at=10.11,
+            left_hand_observed_at=10.11,
+            right_hand_observed_at=10.11,
+            acquisition_uncertainty_seconds=(0.08, 0, 0),
+        ),
+        now=10.20,
+    )
+    obs = pairer.push_image(rgb, observed_at=10.18, now=10.24)
+    assert pairer.buffered_states == 1
+    assert obs is not None and obs.observed_at == pytest.approx(10.10)
+
+
+def test_changing_error_bound_does_not_make_a_repeated_component_new(state):
+    pairer = SonicObservationPairer(max_skew=0.03)
+    pairer.push_state(state, now=10.03)
+    with pytest.raises(ValueError, match="newer"):
+        pairer.push_state(
+            replace(
+                state,
+                sequence=8,
+                body_observed_at=10.02,
+                left_hand_observed_at=10.03,
+                acquisition_uncertainty_seconds=(0.001, 0.001, 0.001),
+            ),
+            now=10.04,
+        )
+
+
+def test_uncertain_states_do_not_emit_observation_time_older_than_previous(state, rgb):
+    pairer = SonicObservationPairer(max_skew=0.1)
+    pairer.push_state(state, now=10.03)
+    assert pairer.push_image(rgb, observed_at=10.01, now=10.04) is not None
+    pairer.push_state(
+        replace(
+            state,
+            sequence=8,
+            body_observed_at=10.02,
+            left_hand_observed_at=10.03,
+            right_hand_observed_at=10.01,
+            acquisition_uncertainty_seconds=(0, 0, 0.02),
+        ),
+        now=10.05,
+    )
+    assert pairer.push_image(rgb, observed_at=10.02, now=10.05) is None
+
+
+def test_rejected_interval_does_not_consume_state_sequence(state):
+    pairer = SonicObservationPairer(max_skew=0.03)
+    with pytest.raises(ValueError):
+        pairer.push_state(replace(state, acquisition_uncertainty_seconds=(0, -1, 0)), now=10.03)
+    assert (
+        pairer.push_state(
+            replace(state, acquisition_uncertainty_seconds=(0.001, 0.001, 0.001)), now=10.04
+        )
+        is None
+    )
+    assert pairer.buffered_states == 1
+
+
+def test_overflowing_interval_endpoint_is_rejected(state):
+    pairer = SonicObservationPairer(max_skew=0.03)
+    with pytest.raises(ValueError, match="acquisition"):
+        pairer.push_state(
+            replace(
+                state,
+                body_observed_at=1.7e308,
+                acquisition_uncertainty_seconds=(1e308, 0, 0),
+            ),
+            now=1.7e308,
+        )
+    assert pairer.buffered_states == 0

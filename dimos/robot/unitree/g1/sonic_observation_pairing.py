@@ -17,6 +17,7 @@
 from collections import deque
 from dataclasses import dataclass
 import math
+from numbers import Real
 
 import numpy as np
 from numpy.typing import NDArray
@@ -26,11 +27,13 @@ from dimos.robot.unitree.g1.sonic_observation import SonicObservation, policy_jo
 
 @dataclass(frozen=True)
 class SonicMeasuredState:
-    """Acquisition times in the observation/session host's monotonic clock.
+    """Acquisition estimates in the observation/session host's monotonic clock.
 
-    The producer must supply actual body/left-hand/right-hand measurement
-    times. Telemetry publication, receipt and ROS clock samples are insufficient.
-    Each sequence and each component's acquisition time must advance.
+    Each body/left-hand/right-hand estimate has an absolute error bound, not
+    a standard deviation. Zero means an exact time, never an unknown bound.
+    Publication, receipt and ROS clock samples alone are insufficient.
+    Sequence and component estimates must advance; producers must preserve
+    estimates and bounds for cached measurements instead of restamping them.
     """
 
     sequence: int
@@ -38,10 +41,40 @@ class SonicMeasuredState:
     body_observed_at: float
     left_hand_observed_at: float
     right_hand_observed_at: float
+    acquisition_uncertainty_seconds: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
     @property
     def acquisition_times(self) -> tuple[float, float, float]:
         return self.body_observed_at, self.left_hand_observed_at, self.right_hand_observed_at
+
+    @property
+    def acquisition_bounds(self) -> tuple[tuple[float, float], ...]:
+        """Validated inclusive intervals, ordered body, left hand, right hand."""
+        errors = self.acquisition_uncertainty_seconds
+        if (
+            not isinstance(errors, tuple)
+            or len(errors) != 3
+            or not all(
+                isinstance(error, Real)
+                and not isinstance(error, bool)
+                and math.isfinite(error)
+                and error >= 0
+                for error in errors
+            )
+        ):
+            raise ValueError("acquisition uncertainty requires three finite nonnegative bounds")
+        times = self.acquisition_times
+        if not all(
+            isinstance(t, Real) and not isinstance(t, bool) and math.isfinite(t) for t in times
+        ):
+            raise ValueError("acquisition time invalid")
+        bounds = tuple(
+            (float(t) - float(error), float(t) + float(error))
+            for t, error in zip(times, errors, strict=True)
+        )
+        if not all(math.isfinite(endpoint) for interval in bounds for endpoint in interval):
+            raise ValueError("acquisition interval invalid")
+        return bounds
 
 
 class SonicObservationPairer:
@@ -61,7 +94,7 @@ class SonicObservationPairer:
         ):
             raise ValueError("finite pairing budgets and bounded capacity required")
         self._max_skew, self._max_age = max_skew, max_age
-        self._states: deque[tuple[int, tuple[float, float, float], NDArray[np.float32]]] = deque(
+        self._states: deque[tuple[int, tuple[float, ...], NDArray[np.float32]]] = deque(
             maxlen=capacity
         )
         self._image: tuple[float, float, NDArray[np.uint8]] | None = None
@@ -78,8 +111,11 @@ class SonicObservationPairer:
         if not math.isfinite(now) or now < self._last_now:
             raise ValueError("finite nondecreasing local monotonic time required")
         self._last_now = now
-        while self._states and now - min(self._states[0][1]) >= self._max_age:
-            self._states.popleft()
+        # Increasing estimates can have decreasing lower bounds as uncertainty changes.
+        self._states = deque(
+            (entry for entry in self._states if now - min(entry[1]) < self._max_age),
+            maxlen=self._states.maxlen,
+        )
         if self._image is not None and now - self._image[0] >= self._max_age:
             self._image = None
 
@@ -106,7 +142,8 @@ class SonicObservationPairer:
     def push_state(self, state: SonicMeasuredState, *, now: float) -> SonicObservation | None:
         self._expire(now)
         times = state.acquisition_times
-        self._fresh(times, now)
+        endpoints = tuple(t for interval in state.acquisition_bounds for t in interval)
+        self._fresh(endpoints, now)
         if type(state.sequence) is not int or state.sequence < 0:
             raise ValueError("measured-state sequence must be a nonnegative integer")
         if state.sequence <= self._last_state_sequence or any(
@@ -114,7 +151,7 @@ class SonicObservationPairer:
         ):
             raise ValueError("state sequence and all acquisition times must be newer")
         values = policy_joint_state(state.positions)
-        self._states.append((state.sequence, times, values))
+        self._states.append((state.sequence, endpoints, values))
         self._last_state_sequence, self._last_state_times = state.sequence, times
         return self._pair()
 

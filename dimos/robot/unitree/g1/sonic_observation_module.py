@@ -187,7 +187,7 @@ class SonicObservationModule(Module):
 
     @rpc
     async def handle_measured_state(self, state: SonicMeasuredState) -> None:
-        """Accept named joints with verified same-host acquisition timestamps."""
+        """Accept named joints with bounded same-host acquisition estimates."""
         with self._lock:
             if not self._running:
                 return
@@ -196,7 +196,7 @@ class SonicObservationModule(Module):
                 return
             try:
                 obs = self._pairer.push_state(state, now=now)
-                self._measured_at = min(state.acquisition_times)
+                self._measured_at = min(lower for lower, _ in state.acquisition_bounds)
                 self._states += 1
                 self._publish_observation(obs)
             except ValueError as exc:
