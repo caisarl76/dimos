@@ -40,6 +40,7 @@ from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.rpc_client import RPCClient
 from dimos.core.stream import In, Out
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.robot.unitree.g1.sonic_observation import SonicObservation
 from dimos.robot.unitree.g1.sonic_policy_client import SonicPolicyChunk, SonicPolicyClient
 from dimos.robot.unitree.g1.sonic_session import JsonlSessionJournal
@@ -54,6 +55,10 @@ _EXECUTION_METHODS = (
     "finish_task",
     "cancel_task",
     "fail_task",
+    "begin_navigation",
+    "end_navigation",
+    "get_navigation_status",
+    "set_navigation_goal",
 )
 
 
@@ -66,6 +71,10 @@ class SonicExecutionSpec(Spec, Protocol):
     def finish_task(self, task_id: str) -> dict[str, Any]: ...
     def cancel_task(self, task_id: str) -> dict[str, Any]: ...
     def fail_task(self, task_id: str, reason: str) -> dict[str, Any]: ...
+    def begin_navigation(self) -> dict[str, Any]: ...
+    def end_navigation(self) -> dict[str, Any]: ...
+    def get_navigation_status(self) -> dict[str, Any]: ...
+    def set_navigation_goal(self, request_id: str, goal: PoseStamped) -> bool: ...
 
 
 class SonicServiceConfig(ModuleConfig):
@@ -274,6 +283,32 @@ class SonicServiceModule(Module):
         self._publish()
         return copy.deepcopy(service)
 
+    @rpc
+    async def request_navigation(self, goal: PoseStamped) -> dict[str, Any]:
+        """Explicitly admit one navigation request and bind its peer goal."""
+        if self._error or not self._running or self._closing or self._busy:
+            raise RuntimeError("service is not accepting navigation requests")
+        if not isinstance(goal, PoseStamped):
+            raise ValueError("a PoseStamped goal is required")
+        self._busy = True
+        self._publish()
+        began = False
+        try:
+            status = await self._call(self._execution.begin_navigation)
+            began = True
+            if self._closing or not await self._call(
+                self._execution.set_navigation_goal, status["request_id"], goal
+            ):
+                raise RuntimeError("navigation goal rejected")
+            return status
+        except Exception:
+            if began:
+                await self._call(self._execution.end_navigation)
+            raise
+        finally:
+            self._busy = False
+            self._publish()
+
     def _require_service(self, service_id: str) -> dict[str, Any]:
         if self._service is None or self._service["service_id"] != service_id:
             raise ValueError("request belongs to another service")
@@ -369,6 +404,21 @@ class SonicServiceModule(Module):
             status = await self._call(self._execution.get_status)
             if self._preflight_cancelled():
                 return
+            if status.get("navigation_enabled"):
+                await self._call(self._execution.end_navigation)
+                deadline = time.monotonic() + self.config.recovery_timeout_seconds
+                while True:
+                    navigation = await self._call(self._execution.get_navigation_status)
+                    if navigation["pose_ready"] and not navigation["cancellation_pending"]:
+                        break
+                    if self._preflight_cancelled():
+                        return
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError(
+                            "navigation cancellation and measured settling unconfirmed"
+                        )
+                    await asyncio.sleep(0.02)
+                status = await self._call(self._execution.get_status)
             profile = status["profile"]
             if profile["name"] != self.config.execution_profile_name or not status["ready"]:
                 raise ValueError("ready execution with the configured profile required")

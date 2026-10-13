@@ -255,8 +255,8 @@ confirmed. Clear all old velocity targets on each transition. Resume IDLE; requi
 a new navigation request. Handback confirmation alone does not establish object
 retention, placement or physical settling.
 
-The cancel path is concrete: the execution owner gates the merged `cmd_vel`
-input first, then requests cancellation from the off-board navigation peer.
+The cancel path is concrete: the execution owner gates the atomic
+`NavigationInput` first, then requests cancellation from the off-board peer.
 That peer uses a typed locally injected navigation Spec to invoke the existing
 public `ReplanningAStarPlanner.cancel_goal()` RPC; it also returns fresh
 `get_state()` evidence. This calls `GlobalPlanner.cancel_goal()` and
@@ -265,6 +265,16 @@ public `ReplanningAStarPlanner.cancel_goal()` RPC; it also returns fresh
 failure leaves the velocity gate closed and records unresolved cancellation;
 it cannot authorize pose admission or a navigation resume. The gate covers
 MovementManager's teleop output as well as A* output.
+
+Cancellation returns promptly after fresh planner IDLE evidence. Separately,
+the peer derives measured planar speed and yaw rate from advancing PointLIO
+pose samples. Its correlated status proves both remain within 0.03 m/s and
+0.03 rad/s for at least 0.5 s; default zero odometry Twist and commanded zero
+velocity cannot prove settling. The relay converts proof age to a pc2-local
+deadline capped at 350 ms. The execution owner requires applied native IDLE,
+matching cancellation, and fresh measured settling before pose admission,
+and keeps polling that proof until pose begins. Its single outstanding peer
+control call runs outside the heartbeat loop with a 500 ms transport timeout.
 
 An **explicit navigation request** is the execution owner's `begin_navigation()`
 RPC after fresh feedback and peer/subscription readiness. It creates a new local

@@ -29,6 +29,7 @@ from dimos.core.coordination.module_coordinator import ModuleCoordinator
 from dimos.core.global_config import global_config
 from dimos.core.rpc_client import RPCClient
 from dimos.core.transport_factory import make_transport
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_observation import SonicObservation
 from dimos.robot.unitree.g1.sonic_policy_client import (
@@ -531,3 +532,49 @@ def test_worker_injected_rpc_uses_bounded_timeout(dimos_cluster, tmp_path):
         module.stop()
         missing.stop_rpc_client()
         transport.stop()
+
+
+def test_navigation_request_binds_goal_and_rejected_goal_closes_gate(service, execution, mocker):
+    native = execution[0]
+    begin_navigation = mocker.patch.object(
+        native, "begin_navigation", return_value={"request_id": "nav-1", "phase": "rearming"}
+    )
+    set_goal = mocker.patch.object(native, "set_navigation_goal", return_value=True)
+    end_navigation = mocker.patch.object(
+        native, "end_navigation", return_value={"phase": "stopping"}
+    )
+    goal = PoseStamped()
+    accepted = service.request_navigation(goal)
+    assert accepted["request_id"] == "nav-1"
+    begin_navigation.assert_called_once_with()
+    set_goal.assert_called_once_with("nav-1", goal)
+    end_navigation.assert_not_called()
+    set_goal.return_value = False
+    with pytest.raises(RuntimeError, match="goal"):
+        service.request_navigation(goal)
+    end_navigation.assert_called_once_with()
+
+
+def test_policy_info_waits_for_navigation_settling(service, execution, camera, policy, mocker):
+    native = execution[0]
+    get_status = native.get_status
+    mocker.patch.object(
+        native, "get_status", side_effect=lambda: {**get_status(), "navigation_enabled": True}
+    )
+    end_navigation = mocker.patch.object(
+        native, "end_navigation", return_value={"phase": "stopping"}
+    )
+    navigation_status = mocker.patch.object(
+        native,
+        "get_navigation_status",
+        return_value={"pose_ready": False, "cancellation_pending": True},
+    )
+    start_task = mocker.spy(native, "start_task")
+    request(service)
+    wait_until(lambda: end_navigation.called, timeout=1)
+    assert not policy[0].called
+    assert not start_task.called
+    navigation_status.return_value = {"pose_ready": True, "cancellation_pending": False}
+    done = terminal(service)
+    assert done["outcome"] == "finished"
+    assert policy[0].called and start_task.called

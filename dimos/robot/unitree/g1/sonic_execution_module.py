@@ -24,13 +24,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 import copy
 from dataclasses import asdict
 from pathlib import Path
 import threading
 import time
-from typing import Any
+from typing import Any, Protocol
 from uuid import uuid4
 
 from numpy.typing import NDArray
@@ -39,7 +40,9 @@ import zmq
 
 from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
-from dimos.core.stream import Out
+from dimos.core.rpc_client import RPCClient
+from dimos.core.stream import In, Out
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.robot.unitree.g1.sonic_feedback import (
     MAX_PACKET_BYTES,
     TOPIC,
@@ -47,6 +50,8 @@ from dimos.robot.unitree.g1.sonic_feedback import (
     SonicFeedback,
     decode_feedback,
 )
+from dimos.robot.unitree.g1.sonic_navigation import NavigationInput
+from dimos.robot.unitree.g1.sonic_navigation_session import NavigationPhase, SonicNavigationSession
 from dimos.robot.unitree.g1.sonic_session import (
     JsonlSessionJournal,
     SessionPhase,
@@ -54,6 +59,17 @@ from dimos.robot.unitree.g1.sonic_session import (
     SonicModelProfile,
     SonicTaskSession,
 )
+from dimos.spec.utils import Spec
+
+
+class SonicNavigationControlSpec(Spec, Protocol):
+    def cancel_navigation(self, request_id: str) -> dict[str, Any]: ...
+    def set_navigation_goal(self, request_id: str, goal: PoseStamped) -> bool: ...
+    def get_navigation_peer_status(self) -> dict[str, Any]: ...
+
+
+_NATIVE_TOPICS = {b"command", b"planner", b"pose"}
+_NAVIGATION_METHODS = ("cancel_navigation", "set_navigation_goal", "get_navigation_peer_status")
 
 
 class SonicExecutionConfig(ModuleConfig):
@@ -61,6 +77,8 @@ class SonicExecutionConfig(ModuleConfig):
     feedback_endpoint: str = Field(pattern=r"^tcp://", max_length=2048)
     profile: SonicModelProfile
     journal_dir: Path
+    navigation_enabled: bool = False
+    navigation_rpc_timeout_seconds: float = Field(default=0.5, gt=0, le=0.5, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def bounded_shutdown(self) -> SonicExecutionConfig:
@@ -80,6 +98,8 @@ class SonicExecutionModule(Module):
     config: SonicExecutionConfig
     feedback: Out[SonicFeedback]
     execution_status: Out[SessionStatus]
+    navigation_input: In[NavigationInput]
+    _navigation_control: SonicNavigationControlSpec | None = None
 
     def __init__(self, **kwargs: Any) -> None:
         self._lifecycle_lock = threading.Lock()
@@ -97,6 +117,17 @@ class SonicExecutionModule(Module):
         self._reference_endpoint = ""
         self._invalid_packets = 0
         self._published_status: SessionStatus | None = None
+        self._navigation = SonicNavigationSession(send=self._send)
+        self._navigation_input: NavigationInput | None = None
+        self._pending_navigation: NavigationInput | None = None
+        self._navigation_workers: ThreadPoolExecutor | None = None
+        self._peer_call: asyncio.Future[Any] | None = None
+        self._peer_call_kind = ""
+        self._goal_call_owned = False
+        self._peer_call_request: str | None = None
+        self._peer_call_deadline = 0.0
+        self._peer_cancel_confirmed = False
+        self._peer_retry_after = 0.0
         super().__init__(**kwargs)
         self._buffer = FeedbackBuffer(stale_after=self.config.profile.feedback_timeout)
         self._cache()
@@ -116,7 +147,12 @@ class SonicExecutionModule(Module):
                 "reference_endpoint": self._reference_endpoint,
                 "feedback_endpoint": self.config.feedback_endpoint,
                 "profile": asdict(self.config.profile),
-                "subscriptions_ready": {b"command", b"pose"}.issubset(self._subscriptions),
+                "subscriptions_ready": _NATIVE_TOPICS.issubset(self._subscriptions),
+                "navigation_enabled": self.config.navigation_enabled,
+                "navigation": {
+                    **asdict(self._navigation.status),
+                    "pose_ready": self._navigation.pose_ready(now=time.monotonic()),
+                },
                 "task": None if self._session is None else asdict(self._session.status),
                 "task_success": None,
                 "journal_path": None if self._journal_path is None else str(self._journal_path),
@@ -149,6 +185,16 @@ class SonicExecutionModule(Module):
                 and not guard.armed
                 and state is not None
                 and state.token_state is not None
+                and (
+                    not self.config.navigation_enabled
+                    or (
+                        result["navigation"]["pose_ready"]
+                        and state.planner_guard is not None
+                        and state.planner_guard.mode == 0
+                        and not state.planner_guard.lease_armed
+                        and not state.planner_guard.latched
+                    )
+                )
                 and (task is None or task["phase"] in (SessionPhase.IDLE, SessionPhase.DONE))
             ),
         )
@@ -179,6 +225,10 @@ class SonicExecutionModule(Module):
                 return
             try:
                 super().start()
+                if self.config.navigation_enabled:
+                    self.process_observable(
+                        self.navigation_input.pure_observable(), self._queue_navigation_input
+                    )
             except Exception as exc:
                 self._error = f"{type(exc).__name__}: {exc}"
                 self._cache()
@@ -192,6 +242,14 @@ class SonicExecutionModule(Module):
             super().stop()
 
     async def main(self) -> AsyncIterator[None]:
+        if self.config.navigation_enabled and self._navigation_control is None:
+            raise RuntimeError("navigation requires the local relay control Spec")
+        if self.config.navigation_enabled:
+            if self.navigation_input.transport is None:
+                raise RuntimeError("navigation requires a bound atomic input stream")
+        self._navigation_workers = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="sonic-navigation"
+        )
         self.config.journal_dir.mkdir(parents=True, exist_ok=True)
         with (
             zmq.Context() as context,
@@ -219,6 +277,10 @@ class SonicExecutionModule(Module):
                 self._closing = True
                 # Check pending faults before shutdown can label the task cancelled.
                 self._step()
+                if self.config.navigation_enabled:
+                    with suppress(Exception):
+                        self._navigation.end(now=time.monotonic())
+                        self._advance_peer(time.monotonic())
                 if self._active():
                     assert self._session is not None
                     try:
@@ -229,6 +291,158 @@ class SonicExecutionModule(Module):
                 self._running = False
                 self._publisher = self._subscriber = None
                 self._cache()
+                self._navigation_workers.shutdown(wait=False, cancel_futures=True)
+
+    @rpc
+    def set_module_ref(self, name: str, module_ref: RPCClient) -> None:
+        if name == "_navigation_control":
+            for method in _NAVIGATION_METHODS:
+                module_ref.rpc.rpc_timeouts[f"{module_ref.remote_name}/{method}"] = (
+                    self.config.navigation_rpc_timeout_seconds
+                )
+        super().set_module_ref(name, module_ref)
+
+    @rpc
+    async def queue_navigation_input(self, value: NavigationInput) -> None:
+        """Queue one owned atomic sample on the serialized module event loop."""
+        await self._queue_navigation_input(value)
+
+    async def _queue_navigation_input(self, value: NavigationInput) -> None:
+        if self.config.navigation_enabled:
+            owned = NavigationInput(
+                value.twist,
+                value.source_sequence,
+                value.velocity_deadline,
+                value.readiness_deadline,
+                value.ready,
+                value.fault,
+            )
+            previous = self._pending_navigation or self._navigation_input
+            if previous is None or owned.source_sequence >= previous.source_sequence:
+                self._pending_navigation = owned
+
+    @rpc
+    def get_navigation_status(self) -> dict[str, Any]:
+        """Return admission, cancellation and native IDLE acknowledgment state."""
+        return self.get_status()["navigation"]  # type: ignore[no-any-return]
+
+    @rpc
+    async def begin_navigation(self) -> dict[str, Any]:
+        """Explicitly rearm from fresh readiness and native planner feedback."""
+        self._request()
+        if not self.config.navigation_enabled:
+            raise RuntimeError("navigation is disabled")
+        if self._active():
+            raise RuntimeError("a pose execution task is active")
+        state = self.get_feedback()
+        if (
+            not _NATIVE_TOPICS.issubset(self._subscriptions)
+            or state is None
+            or self._navigation_input is None
+        ):
+            raise RuntimeError("fresh navigation input and all native subscriptions required")
+        guard = state.reference_guard
+        if guard is None or not guard.planner_confirmed or guard.armed:
+            raise RuntimeError("confirmed native planner handback required")
+        self._peer_cancel_confirmed = False
+        status = self._navigation.begin(state, self._navigation_input, now=time.monotonic())
+        self._cache()
+        return asdict(status)
+
+    @rpc
+    async def end_navigation(self) -> dict[str, Any]:
+        """Close admission before issuing asynchronous peer cancellation."""
+        self._request()
+        self._navigation.end(now=time.monotonic())
+        self._advance_peer(time.monotonic())
+        self._cache()
+        return asdict(self._navigation.status)
+
+    @rpc
+    async def set_navigation_goal(self, request_id: str, goal: PoseStamped) -> bool:
+        """Bind a peer goal to the current explicit navigation request."""
+        self._request()
+        if (
+            self._navigation.status.request_id != request_id
+            or self._navigation.status.phase
+            not in (NavigationPhase.REARMING, NavigationPhase.ACTIVE)
+        ):
+            raise ValueError("goal belongs to an inactive navigation request")
+        if self._peer_call is not None or self._navigation_control is None:
+            raise RuntimeError("navigation peer control is busy")
+        assert self._navigation_workers is not None
+        future = asyncio.get_running_loop().run_in_executor(
+            self._navigation_workers, self._navigation_control.set_navigation_goal, request_id, goal
+        )
+        self._peer_call, self._peer_call_kind = future, "goal"
+        self._goal_call_owned = True
+        self._peer_call_deadline = time.monotonic() + self.config.navigation_rpc_timeout_seconds
+        try:
+            accepted = await asyncio.wait_for(
+                asyncio.shield(future), timeout=self.config.navigation_rpc_timeout_seconds
+            )
+            if (
+                accepted is not True
+                or self._navigation.status.request_id != request_id
+                or self._navigation.status.phase
+                not in (NavigationPhase.REARMING, NavigationPhase.ACTIVE)
+            ):
+                raise RuntimeError("navigation goal rejected or admission closed")
+            return True
+        except Exception:
+            self._navigation.end(now=time.monotonic())
+            raise
+        finally:
+            self._goal_call_owned = False
+            if future.done():
+                self._peer_call = None
+            self._cache()
+
+    def _advance_peer(self, now: float) -> None:
+        """One bounded outstanding control call; it never owns the heartbeat loop."""
+        if self._peer_call is not None:
+            if self._goal_call_owned or not self._peer_call.done():
+                return
+            call, self._peer_call = self._peer_call, None
+            try:
+                reply = call.result()
+                if (
+                    now < self._peer_call_deadline
+                    and self._peer_call_request == self._navigation.status.request_id
+                    and isinstance(reply, dict)
+                ):
+                    if self._peer_call_kind == "cancel":
+                        self._peer_cancel_confirmed = self._navigation.confirm_cancel(
+                            reply, now=now
+                        )
+                    else:
+                        self._navigation.confirm_peer_status(reply, now=now)
+            except Exception:
+                pass  # No acknowledgment: admission remains closed, retry bounded RPC.
+            self._peer_retry_after = now + 0.05
+        if (
+            self._navigation.status.request_id is None
+            or self._navigation.status.phase
+            not in (NavigationPhase.STOPPING, NavigationPhase.FAULT, NavigationPhase.DISARMED)
+            or now < self._peer_retry_after
+            or self._navigation_control is None
+        ):
+            return
+        assert self._navigation_workers is not None
+        request = self._navigation.status.request_id
+        assert request is not None
+        self._peer_call_request = request
+        self._peer_call_deadline = now + self.config.navigation_rpc_timeout_seconds
+        if self._peer_cancel_confirmed:
+            self._peer_call_kind = "status"
+            self._peer_call = asyncio.get_running_loop().run_in_executor(
+                self._navigation_workers, self._navigation_control.get_navigation_peer_status
+            )
+        else:
+            self._peer_call_kind = "cancel"
+            self._peer_call = asyncio.get_running_loop().run_in_executor(
+                self._navigation_workers, self._navigation_control.cancel_navigation, request
+            )
 
     def _send(self, packet: bytes) -> None:
         if self._publisher is None:
@@ -238,6 +452,9 @@ class SonicExecutionModule(Module):
     def _fault(self, exc: Exception) -> None:
         if self._error is None:
             self._error = f"{type(exc).__name__}: {exc}"
+        if self.config.navigation_enabled:
+            with suppress(Exception):
+                self._navigation.fail("execution_fault", now=time.monotonic())
         if self._active():
             assert self._session is not None
             with suppress(Exception):
@@ -278,7 +495,7 @@ class SonicExecutionModule(Module):
         else:
             if self._subscriber.poll(0):
                 raise RuntimeError("feedback backlog exceeded receive budget")
-        if self._active() and not {b"command", b"pose"}.issubset(self._subscriptions):
+        if self._active() and not _NATIVE_TOPICS.issubset(self._subscriptions):
             raise RuntimeError("native reference subscriptions lost")
 
     def _step(self) -> None:
@@ -286,6 +503,31 @@ class SonicExecutionModule(Module):
             self._receive()
         except Exception as exc:
             self._fault(exc)
+        if self.config.navigation_enabled:
+            try:
+                now = time.monotonic()
+                if self._pending_navigation is not None:
+                    self._navigation_input, self._pending_navigation = (
+                        self._pending_navigation,
+                        None,
+                    )
+                    self._navigation.receive(self._navigation_input, now=now)
+                self._navigation.tick(
+                    self._buffer.latest(now=now),
+                    subscriptions_ready=_NATIVE_TOPICS.issubset(self._subscriptions),
+                    now=now,
+                )
+                self._advance_peer(now)
+                if (
+                    self._navigation.status.phase == NavigationPhase.POSE
+                    and self._session is not None
+                    and self._session.status.phase == SessionPhase.DONE
+                    and self._session.status.handback_confirmed
+                ):
+                    self._navigation.handback()
+                    self._navigation_input = self._pending_navigation = None
+            except Exception as exc:
+                self._fault(exc)
         if self._session is not None:
             try:
                 self._session.tick(now=time.monotonic())
@@ -319,7 +561,13 @@ class SonicExecutionModule(Module):
         if self._active():
             raise RuntimeError("an execution task is already active")
         if not self.get_status()["ready"]:
-            raise RuntimeError("fresh guarded planner and command/pose subscriptions required")
+            if self.config.navigation_enabled:
+                self._navigation.end(now=time.monotonic())
+                self._advance_peer(time.monotonic())
+                self._cache()
+            raise RuntimeError(
+                "fresh guarded planner, cancellation/settling and command/planner/pose subscriptions required"
+            )
         state = self.get_feedback()
         assert state is not None
         task_id = uuid4().hex
@@ -333,6 +581,8 @@ class SonicExecutionModule(Module):
         # No await between admission and session assignment: async RPCs serialize here.
         self._session, self._journal_path = session, journal_path
         try:
+            if self.config.navigation_enabled:
+                self._navigation.enter_pose(now=time.monotonic())
             session.start(state, now=time.monotonic())
         finally:
             self._cache()

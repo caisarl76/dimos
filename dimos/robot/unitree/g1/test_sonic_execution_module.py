@@ -17,16 +17,24 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
+import struct
 import threading
 import time
+from uuid import uuid4
 
 import msgpack
 import numpy as np
 import pytest
 import zmq
 
+from dimos.core.transport_factory import make_transport
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
+from dimos.msgs.geometry_msgs.Twist import Twist
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
+from dimos.robot.unitree.g1.sonic_navigation import NavigationInput
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
+from dimos.robot.unitree.g1.test_utils.sonic_planner_lease import PlannerLease, PlannerPacket
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -37,6 +45,8 @@ class ScriptedPeer:
         self.stopping = threading.Event()
         self.pause_feedback = threading.Event()
         self.drop_pose_subscription = threading.Event()
+        self.drop_planner_subscription = threading.Event()
+        self.drop_command_subscription = threading.Event()
         self.lock = threading.Lock()
         self.packets = []
         self.error = None
@@ -51,6 +61,7 @@ class ScriptedPeer:
                 sub.setsockopt(zmq.LINGER, 0)
                 sub.setsockopt(zmq.SUBSCRIBE, b"command")
                 sub.setsockopt(zmq.SUBSCRIBE, b"pose")
+                sub.setsockopt(zmq.SUBSCRIBE, b"planner")
                 port = pub.bind_to_random_port("tcp://127.0.0.1")
                 self.feedback_endpoint = f"tcp://127.0.0.1:{port}"
                 self.ready.set()
@@ -58,7 +69,14 @@ class ScriptedPeer:
                     return
                 sub.connect(self.reference_endpoint)
                 planner, epoch, accepted, index, next_feedback = True, 1, -1, 0, 0.0
+                lease = PlannerLease()
                 while not self.stopping.is_set():
+                    if self.drop_command_subscription.is_set():
+                        sub.setsockopt(zmq.UNSUBSCRIBE, b"command")
+                        self.drop_command_subscription.clear()
+                    if self.drop_planner_subscription.is_set():
+                        sub.setsockopt(zmq.UNSUBSCRIBE, b"planner")
+                        self.drop_planner_subscription.clear()
                     if self.drop_pose_subscription.is_set():
                         sub.setsockopt(zmq.UNSUBSCRIBE, b"pose")
                         self.drop_pose_subscription.clear()
@@ -67,13 +85,41 @@ class ScriptedPeer:
                         with self.lock:
                             self.packets.append(packet)
                         if packet.startswith(b"command"):
-                            selected = bool(packet[-1])
-                            if planner and not selected:
-                                epoch += 1
-                            planner = selected
+                            if len(packet) == 1310:
+                                action = struct.unpack("<i", packet[1290:1294])[0]
+                                seq, deadline = struct.unpack("<qd", packet[-16:])
+                                if action == 1:
+                                    lease.rearm(seq, deadline, time.monotonic())
+                                else:
+                                    lease.end(seq, deadline, time.monotonic())
+                                    lease.acknowledge_end()
+                            else:
+                                selected = bool(packet[-1])
+                                if planner and not selected:
+                                    epoch += 1
+                                    lease.enter_pose()
+                                if not planner and selected:
+                                    lease.handback(time.monotonic())
+                                planner = selected
+                        elif packet.startswith(b"planner"):
+                            values = struct.unpack("<i8fqd", packet[1287:])
+                            lease.accept(
+                                PlannerPacket(
+                                    values[0],
+                                    values[1:4],
+                                    values[4:7],
+                                    values[7],
+                                    values[8],
+                                    values[9],
+                                    values[10],
+                                ),
+                                time.monotonic(),
+                            )
+                            lease.install(time.monotonic())
                         elif not planner:
                             accepted = int(np.frombuffer(packet[1540:1548], dtype="<i8")[0])
                     now = time.monotonic()
+                    lease.tick(now)
                     if now >= next_feedback and not self.pause_feedback.is_set():
                         index += 1
                         pub.send(
@@ -89,6 +135,10 @@ class ScriptedPeer:
                                     "right_hand_q": [0.2] * 7,
                                     "right_hand_dq": [0.0] * 7,
                                     "token_state": [0.125] * 64,
+                                    "base_quat_measured": [1.0, 0.0, 0.0, 0.0],
+                                    "reference_heading_quat": [1.0, 0.0, 0.0, 0.0],
+                                    "planner_reference_active": [int(planner)],
+                                    "planner_guard": vars(lease.status),
                                     "reference_guard": {
                                         "armed": not planner,
                                         "expired": False,
@@ -156,7 +206,12 @@ def execution(peer, execution_config):
         module.start()
         peer.reference_endpoint = module.get_status()["reference_endpoint"]
         peer.connected.set()
-        wait_until(lambda: module.get_status()["ready"], timeout=3)
+        try:
+            wait_until(lambda: module.get_status()["ready"], timeout=3)
+        except TimeoutError:
+            pytest.fail(
+                f"startup: {module.get_status()}, subscriptions={module._subscriptions}, peer_error={peer.error}"
+            )
         yield module, peer
     finally:
         module.stop()
@@ -387,3 +442,232 @@ def test_receive_budget_boundary(execution_config, mocker, socket_name, extra_pa
         assert target.recv.call_count + target.recv_multipart.call_count == 64
     finally:
         module.stop()
+
+
+def test_atomic_navigation_requires_begin_and_shutdown_sends_end(execution_config, peer, mocker):
+    module = SonicExecutionModule(**execution_config, navigation_enabled=True)
+    module.set_transport(
+        "navigation_input", make_transport(f"/navigation-test/{uuid4().hex}", NavigationInput)
+    )
+    control = mocker.Mock()
+    control.cancel_navigation.side_effect = lambda request: {
+        "request_id": request,
+        "cancelled": True,
+        "state": "idle",
+    }
+    control.get_navigation_peer_status.return_value = {}
+    mocker.patch.object(module, "_navigation_control", control, create=True)
+
+    def source(seq, speed=0):
+        now = time.monotonic()
+        module.queue_navigation_input(
+            NavigationInput(
+                Twist(linear=Vector3(speed, 0, 0)), seq, now + 0.35, now + 0.35, True, None
+            )
+        )
+
+    try:
+        module.start()
+        peer.reference_endpoint = module.get_status()["reference_endpoint"]
+        peer.connected.set()
+        wait_until(
+            lambda: (
+                module.get_status()["subscriptions_ready"] and module.get_status()["feedback_fresh"]
+            ),
+            timeout=3,
+        )
+        source(1, 0.2)
+        assert peer.snapshot() == []
+        begin_status = module.begin_navigation()
+        wait_until(lambda: module.get_navigation_status()["phase"] == "active", timeout=1)
+        source(2, 0.2)
+        wait_until(
+            lambda: any(
+                p.startswith(b"planner") and struct.unpack("<i", p[1287:1291])[0] == 1
+                for p in peer.snapshot()
+            ),
+            timeout=1,
+        )
+        with pytest.raises(RuntimeError, match="active"):
+            module.begin_navigation()
+        module.stop()
+        wait_until(lambda: peer.snapshot()[-1].startswith(b"command"), timeout=1)
+        wait_until(lambda: control.cancel_navigation.called, timeout=1)
+        control.cancel_navigation.assert_called_with(begin_status["request_id"])
+        assert module.get_status()["state"] == "stopped"
+    finally:
+        module.stop()
+
+
+@pytest.fixture
+def navigating(execution_config, peer, mocker):
+    module = SonicExecutionModule(**execution_config, navigation_enabled=True)
+    transport = make_transport(f"/navigation-test/{uuid4().hex}", NavigationInput)
+    module.set_transport("navigation_input", transport)
+    control = mocker.Mock()
+    request_id = [None]
+    release_cancel = threading.Event()
+    release_cancel.set()
+
+    def cancel(request):
+        request_id[0] = request
+        release_cancel.wait(3)
+        return {"request_id": request, "cancelled": True, "state": "idle"}
+
+    control.cancel_navigation.side_effect = cancel
+    control.get_navigation_peer_status.side_effect = lambda: {
+        "request_id": request_id[0],
+        "cancelled": True,
+        "state": "idle",
+        "ready": True,
+        "readiness_deadline": time.monotonic() + 0.35,
+        "linear_speed_mps": 0.0,
+        "yaw_rate_radps": 0.0,
+        "settled_for_s": 0.5,
+    }
+    mocker.patch.object(module, "_navigation_control", control, create=True)
+    source_stop = threading.Event()
+    source_errors = []
+
+    def feed():
+        seq = 1
+        try:
+            while not source_stop.is_set():
+                now = time.monotonic()
+                transport.publish(
+                    NavigationInput(
+                        Twist(linear=Vector3(0.2, 0, 0)), seq, now + 0.35, now + 0.35, True, None
+                    )
+                )
+                seq += 1
+                source_stop.wait(0.05)
+        except Exception as exc:
+            source_errors.append(exc)
+
+    source_thread = threading.Thread(target=feed, daemon=True)
+    try:
+        transport.start()
+        module.start()
+        peer.reference_endpoint = module.get_status()["reference_endpoint"]
+        peer.connected.set()
+        wait_until(lambda: module.get_status()["ready"], timeout=3)
+        source_thread.start()
+        wait_until(lambda: module._navigation_input is not None, timeout=1)
+        module.begin_navigation()
+        wait_until(lambda: module.get_navigation_status()["phase"] == "active", timeout=1)
+        wait_until(lambda: module.get_feedback().planner_guard.mode == 1, timeout=1)
+        control.cancel_navigation.assert_not_called()
+        yield module, peer, control, release_cancel
+    finally:
+        release_cancel.set()
+        source_stop.set()
+        if source_thread.ident is not None:
+            source_thread.join(timeout=1)
+        module.stop()
+        transport.stop()
+        assert not source_errors
+
+
+def test_blocked_cancel_cannot_delay_native_idle_or_module_stop(navigating):
+    module, peer, control, release = navigating
+    release.clear()
+    module.end_navigation()
+    wait_until(lambda: control.cancel_navigation.called, timeout=1)
+    wait_until(
+        lambda: (
+            module.get_feedback().planner_guard.mode == 0
+            and not module.get_feedback().planner_guard.lease_armed
+        ),
+        timeout=1,
+    )
+    with pytest.raises(RuntimeError, match="settling"):
+        module.start_task()
+    assert not module.get_navigation_status()["pose_ready"]
+    started = time.monotonic()
+    module.stop()
+    assert time.monotonic() - started < 0.5
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+@pytest.mark.parametrize("topic", ["command", "planner", "pose"])
+def test_navigation_loses_any_required_subscription(navigating, topic):
+    module, peer, _, _ = navigating
+    getattr(peer, f"drop_{topic}_subscription").set()
+    wait_until(lambda: module.get_navigation_status()["phase"] == "fault", timeout=1)
+    assert module.get_navigation_status()["fault"] == "subscriptions_lost"
+    assert module.get_status()["error"] is None
+    assert not module.get_status()["subscriptions_ready"]
+
+
+def test_navigation_to_pose_settles_and_handback_drops_old_target(navigating):
+    module, peer, control, _ = navigating
+    module.end_navigation()
+    wait_until(lambda: module.get_navigation_status()["pose_ready"], timeout=2)
+    assert control.get_navigation_peer_status.called
+    task_id = begin(module)
+    submit(module, task_id)
+    wait_until(lambda: module.get_status()["task"]["last_frame_index"] > 20, timeout=2)
+    assert module.get_navigation_status()["phase"] == "pose"
+    packets = peer.snapshot()
+    switch = max(i for i, p in enumerate(packets) if p.startswith(b"command") and len(p) == 1290)
+    assert not any(p.startswith(b"planner") for p in packets[switch + 1 :])
+    module.finish_task(task_id)
+    wait_until(lambda: module.get_navigation_status()["phase"] == "disarmed", timeout=2)
+    assert module.get_feedback().planner_guard.lease_armed is False
+    assert module.get_navigation_status()["request_id"] is None
+
+
+def test_feedback_fault_recovers_only_after_explicit_navigation_begin(navigating):
+    module, peer, _, _ = navigating
+    peer.pause_feedback.set()
+    wait_until(lambda: module.get_navigation_status()["fault"] == "feedback_lost", timeout=1)
+    assert module.get_status()["error"] is None
+    peer.pause_feedback.clear()
+    wait_until(lambda: module.get_navigation_status()["pose_ready"], timeout=2)
+    assert module.get_navigation_status()["phase"] == "fault"
+    assert not module.get_feedback().planner_guard.lease_armed
+    module.begin_navigation()
+    wait_until(lambda: module.get_navigation_status()["phase"] == "active", timeout=1)
+
+
+def test_inflight_goal_cannot_reopen_gate_after_end(navigating):
+    module, _, control, _ = navigating
+    entered = threading.Event()
+    release = threading.Event()
+
+    def goal(request_id, pose):
+        entered.set()
+        release.wait(2)
+        return True
+
+    control.set_navigation_goal.side_effect = goal
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(
+                module.set_navigation_goal,
+                module.get_navigation_status()["request_id"],
+                PoseStamped(),
+            )
+            assert entered.wait(1)
+            module.end_navigation()
+            wait_until(lambda: module.get_feedback().planner_guard.mode == 0, timeout=1)
+            release.set()
+            with pytest.raises(RuntimeError, match="admission closed"):
+                pending.result(timeout=1)
+        assert module.get_navigation_status()["phase"] != "active"
+    finally:
+        release.set()
+
+
+def test_execution_fault_closes_navigation_before_peer_reply(navigating, mocker):
+    module, peer, _, release = navigating
+    release.clear()
+    count = len(peer.snapshot())
+    mocker.patch.object(module, "_receive", side_effect=RuntimeError("receive failed"))
+    wait_until(lambda: module.get_status()["state"] == "fault", timeout=1)
+    wait_until(lambda: any(p.startswith(b"command") for p in peer.snapshot()[count:]), timeout=1)
+    assert module.get_navigation_status()["phase"] == "fault"
+    assert all(
+        not p.startswith(b"planner") or struct.unpack("<i", p[1287:1291])[0] == 0
+        for p in peer.snapshot()[count:]
+    )

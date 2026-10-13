@@ -28,10 +28,70 @@ import struct
 from typing import Any, Literal
 
 from dimos.msgs.geometry_msgs.Twist import Twist
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 
 HEADER_SIZE = 1280
 Vector = tuple[float, float, float]
+
+
+@dataclass(frozen=True, init=False)
+class NavigationInput:
+    """Atomic input with an owned velocity snapshot and execution-host deadlines.
+
+    Twist messages are mutable. Store immutable numbers and return a fresh Twist
+    on access so neither a publisher nor a callback can mutate the queued intent.
+    """
+
+    _velocity: tuple[float, float, float, float, float, float]
+    source_sequence: int
+    velocity_deadline: float
+    readiness_deadline: float
+    ready: bool
+    fault: str | None
+
+    def __init__(
+        self,
+        twist: Twist,
+        source_sequence: int,
+        velocity_deadline: float,
+        readiness_deadline: float,
+        ready: bool,
+        fault: str | None,
+    ) -> None:
+        if not isinstance(twist, Twist):
+            raise ValueError("a Twist snapshot is required")
+        if type(source_sequence) is not int or not 0 <= source_sequence < 2**63:
+            raise ValueError("source_sequence must be a nonnegative int64")
+        if type(ready) is not bool or (
+            fault is not None and (not isinstance(fault, str) or len(fault) > 256)
+        ):
+            raise ValueError("typed readiness and bounded fault text required")
+        values = tuple(
+            _finite(v, "velocity")
+            for v in (
+                twist.linear.x,
+                twist.linear.y,
+                twist.linear.z,
+                twist.angular.x,
+                twist.angular.y,
+                twist.angular.z,
+            )
+        )
+        object.__setattr__(self, "_velocity", values)
+        object.__setattr__(self, "source_sequence", source_sequence)
+        object.__setattr__(
+            self, "velocity_deadline", _finite(velocity_deadline, "velocity_deadline")
+        )
+        object.__setattr__(
+            self, "readiness_deadline", _finite(readiness_deadline, "readiness_deadline")
+        )
+        object.__setattr__(self, "ready", ready)
+        object.__setattr__(self, "fault", fault)
+
+    @property
+    def twist(self) -> Twist:
+        return Twist(linear=Vector3(*self._velocity[:3]), angular=Vector3(*self._velocity[3:]))
 
 
 def _finite(value: Any, name: str) -> float:
