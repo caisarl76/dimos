@@ -33,6 +33,7 @@ def config():
     return dict(
         camera_frame_id="d435_color_optical_frame",
         max_skew_seconds=0.03,
+        camera_timestamp_error_seconds=0.0,
         left_hand_slot_names=POLICY_JOINT_NAMES[14:21],
         right_hand_slot_names=POLICY_JOINT_NAMES[21:28],
     )
@@ -233,3 +234,36 @@ def test_duplicate_start_preserves_pending_state(adapter, image, state):
     module.handle_color_image(image)
     wait_until(lambda: len(outputs) == 1, timeout=2)
     assert outputs[0].observed_at == pytest.approx(9.97)
+
+
+def test_clock_sampling_uncertainty_is_preserved_in_output(adapters, image, state, clock, mocker):
+    samples = iter([10.0, 10.008])
+    mocker.patch(
+        "dimos.robot.unitree.g1.sonic_observation_module.monotonic",
+        side_effect=lambda: next(samples, clock[1]),
+    )
+    clock[:] = [1000.004, 10.004]
+    module, outputs = adapters()
+    clock[:] = [1000.02, 10.02]
+    module.handle_measured_state(
+        replace(
+            state, body_observed_at=9.99, left_hand_observed_at=9.99, right_hand_observed_at=9.99
+        )
+    )
+    module.handle_color_image(replace(image, ts=999.99))
+    wait_until(lambda: len(outputs) == 1, timeout=2)
+    assert outputs[0].observed_at == pytest.approx(9.976)
+    assert module.get_observation_status()["clock_mapping_uncertainty_s"] == pytest.approx(0.004)
+
+
+def test_later_clock_sampling_uncertainty_counts_against_drift_limit(adapter, image, clock, mocker):
+    module, outputs = adapter
+    samples = iter([10.2, 10.208])
+    clock[:] = [1000.213, 10.208]
+    mocker.patch(
+        "dimos.robot.unitree.g1.sonic_observation_module.monotonic",
+        side_effect=lambda: next(samples, clock[1]),
+    )
+    module.handle_color_image(replace(image, ts=1000.15))
+    assert module.get_observation_status()["state"] == "fault"
+    assert outputs == []

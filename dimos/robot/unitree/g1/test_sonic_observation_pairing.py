@@ -156,3 +156,12 @@ def test_buffer_count_is_bounded(state):
 def test_invalid_pairing_budget_rejected(kwargs):
     with pytest.raises(ValueError):
         SonicObservationPairer(**kwargs)
+
+
+def test_camera_uncertainty_is_included_in_age_skew_and_expiry(state, rgb):
+    pairer = SonicObservationPairer(max_skew=0.03)
+    pairer.push_state(state, now=10.03)
+    obs = pairer.push_image(rgb, observed_at=10.005, uncertainty=0.01, now=10.03)
+    assert obs is not None and obs.observed_at == pytest.approx(9.995)
+    with pytest.raises(ValueError, match="acquisition"):
+        pairer.push_image(rgb, observed_at=10.2, uncertainty=0.01, now=10.395)

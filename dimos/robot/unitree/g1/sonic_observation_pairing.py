@@ -64,7 +64,7 @@ class SonicObservationPairer:
         self._states: deque[tuple[int, tuple[float, float, float], NDArray[np.float32]]] = deque(
             maxlen=capacity
         )
-        self._image: tuple[float, NDArray[np.uint8]] | None = None
+        self._image: tuple[float, float, NDArray[np.uint8]] | None = None
         self._last_image_time = self._last_observed_at = self._last_now = -math.inf
         self._last_state_times = (-math.inf, -math.inf, -math.inf)
         self._last_state_sequence = self._used_state_sequence = -1
@@ -88,15 +88,18 @@ class SonicObservationPairer:
             raise ValueError("acquisition time stale, future or invalid")
 
     def push_image(
-        self, rgb: NDArray[np.uint8], *, observed_at: float, now: float
+        self, rgb: NDArray[np.uint8], *, observed_at: float, now: float, uncertainty: float = 0.0
     ) -> SonicObservation | None:
         self._expire(now)
-        self._fresh((observed_at,), now)
+        if not math.isfinite(uncertainty) or uncertainty < 0:
+            raise ValueError("invalid camera acquisition uncertainty")
+        lower, upper = observed_at - uncertainty, observed_at + uncertainty
+        self._fresh((lower, upper), now)
         if observed_at <= self._last_image_time:
             raise ValueError("image must be newer than previous source frame")
         if rgb.shape != (480, 640, 3) or rgb.dtype != np.uint8:
             raise ValueError("RGB must be uint8 [480, 640, 3]")
-        self._image = observed_at, rgb.copy()
+        self._image = lower, upper, rgb.copy()
         self._last_image_time = observed_at
         return self._pair()
 
@@ -118,20 +121,21 @@ class SonicObservationPairer:
     def _pair(self) -> SonicObservation | None:
         if self._image is None:
             return None
-        stamp, rgb = self._image
+        lower, upper, rgb = self._image
+        stamp = (lower + upper) / 2
         candidates = [
             entry
             for entry in self._states
             if entry[0] > self._used_state_sequence
-            and max(stamp, *entry[1]) - min(stamp, *entry[1]) <= self._max_skew
-            and min(stamp, *entry[1]) > self._last_observed_at
+            and max(upper, *entry[1]) - min(lower, *entry[1]) <= self._max_skew
+            and min(lower, *entry[1]) > self._last_observed_at
         ]
         if not candidates:
             return None
         index, times, values = min(
             candidates, key=lambda item: max(abs(stamp - t) for t in item[1])
         )
-        obs = SonicObservation(self._sequence, min(stamp, *times), values, rgb)
+        obs = SonicObservation(self._sequence, min(lower, *times), values, rgb)
         self._sequence += 1
         self._used_state_sequence, self._last_observed_at = index, obs.observed_at
         self._image = None

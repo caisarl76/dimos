@@ -42,6 +42,7 @@ class SonicObservationConfig(ModuleConfig):
     camera_frame_id: str = Field(min_length=1)
     # Explicit commissioning budget; this does not assert hardware synchronization.
     max_skew_seconds: float = Field(gt=0, le=0.2, allow_inf_nan=False)
+    camera_timestamp_error_seconds: float = Field(ge=0, le=0.1, allow_inf_nan=False)
     left_hand_slot_names: tuple[str, ...]
     right_hand_slot_names: tuple[str, ...]
     max_age_seconds: float = Field(default=0.2, gt=0, le=0.2, allow_inf_nan=False)
@@ -77,6 +78,7 @@ class SonicObservationModule(Module):
 
     def __init__(self, **kwargs: Any) -> None:
         self._lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         super().__init__(**kwargs)
         self._running = False
         self._reset()
@@ -109,10 +111,11 @@ class SonicObservationModule(Module):
             or uncertainty > self.config.clock_change_limit_seconds / 2
             or (
                 self._clock_offset is not None
-                and abs(offset - self._clock_offset) > self.config.clock_change_limit_seconds
+                and abs(offset - self._clock_offset) + uncertainty
+                > self.config.clock_change_limit_seconds
             )
         ):
-            self._fault = "local camera clock mapping changed or is uncertain; restart required"
+            self._fault = "local camera clock mapping changed or is uncertain; replace module/session required"
             self._pairer = SonicObservationPairer(
                 max_skew=self.config.max_skew_seconds, max_age=self.config.max_age_seconds
             )
@@ -121,6 +124,24 @@ class SonicObservationModule(Module):
             self._clock_offset = offset
             self._clock_uncertainty = uncertainty
         return after
+
+    @rpc
+    def start(self) -> None:
+        with self._lifecycle_lock:
+            if not self._running:
+                super().start()
+
+    @rpc
+    def stop(self) -> None:
+        with self._lifecycle_lock:
+            super().stop()
+
+    def _camera_uncertainty(self) -> float:
+        return (
+            self._clock_uncertainty
+            + self.config.clock_change_limit_seconds
+            + self.config.camera_timestamp_error_seconds
+        )
 
     async def main(self) -> AsyncIterator[None]:
         with self._lock:
@@ -154,7 +175,9 @@ class SonicObservationModule(Module):
                     raise ValueError("camera frame ID or RGB format mismatch")
                 assert self._clock_offset is not None
                 stamp = image.ts - self._clock_offset
-                obs = self._pairer.push_image(image.data, observed_at=stamp, now=now)
+                obs = self._pairer.push_image(
+                    image.data, observed_at=stamp, now=now, uncertainty=self._camera_uncertainty()
+                )
                 self._camera_at = stamp
                 self._images += 1
                 self._publish_observation(obs)
@@ -252,6 +275,7 @@ class SonicObservationModule(Module):
                 "diagnostic_time_basis": "camera source versus telemetry receipt; acquisition alignment unverified",
                 "clock_mapping": "same-host UNIX to monotonic; fixed offset",
                 "clock_mapping_uncertainty_s": self._clock_uncertainty,
+                "camera_time_uncertainty_s": self._camera_uncertainty(),
                 "clock_offset_s": self._clock_offset,
                 "max_skew_s": self.config.max_skew_seconds,
                 "accepted_images": self._images,
