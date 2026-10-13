@@ -73,7 +73,7 @@ Stage A has no dependency on the off-board protocol or robot networking. Its rea
 
 ### Task 3: Private native planner guard and telemetry
 
-**Files:** Create `scripts/prepare_g1_sonic_navigation_runtime.py` and `docs/artifacts/g1_navigation_sonic_20261013/native-navigation.patch`. Patch only the private copy at `build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/`: create `include/input_interface/planner_lease.hpp` and `unit_tests/test_planner_lease.cpp`; modify `include/input_interface/zmq_manager.hpp`, `include/output_interface/output_interface.hpp`, `src/g1_deploy_onnx_ref.cpp` and that directory's `CMakeLists.txt` only if needed for test wiring.
+**Files:** Create `scripts/prepare_g1_sonic_navigation_runtime.py` and `docs/artifacts/g1_navigation_sonic_20261013/native-navigation.patch`. Patch only the private copy at `build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/`: create `include/input_interface/planner_lease.hpp`, `planner_packet.hpp` and planner lease/parser/receiver/shared-oracle unit tests; modify `include/input_interface/zmq_manager.hpp`, `zmq_packed_message_subscriber.hpp`, `include/output_interface/zmq_output_handler.hpp`, `src/g1_deploy_onnx_ref.cpp` and that directory's `CMakeLists.txt` only if needed for test wiring.
 
 **Interfaces:**
 - Consumes Task 2's exact planner/control field names, dtypes and feedback MessagePack object. Adds an opt-in `--guarded-planner` flag; existing stationary-pilot defaults still discard planner motion.
@@ -85,6 +85,8 @@ Stage A has no dependency on the off-board protocol or robot networking. Its rea
 - [ ] Configure/build privately: `cmake -S build/sonic-navigation-runtime/source/gear_sonic_deploy -B build/sonic-navigation-runtime/cmake -DBUILD_ROS2=OFF -DBUILD_DEPLOY_TESTS=ON`; then `cmake --build build/sonic-navigation-runtime/cmake --target run_tests --parallel 2`. Use the existing approved native build environment/dependencies; if unavailable, report the concrete missing capability before provisioning anything.
 - [ ] Run `build/sonic-navigation-runtime/source/gear_sonic_deploy/target/release/run_tests --gtest_filter=PlannerLease.*`, demonstrate failure, then implement the opt-in parser/admission/install checks and coherent guard/frame telemetry. Add a private trace at the native motion-state-change replan branch so Task 5 can count those events separately from scheduled inference; validate feedback packet bounds before publication. Watchdog is based on accepted receipt, independent of capped motion deadline `min(deadline, now+0.250)`; duplicates/invalid packets do not refresh it.
 - [ ] Rerun new tests and the existing `run_tests` suite; require PASS. Export the exact private diff to `native-navigation.patch`, record updated source hashes and selectively commit the preparer, patch and evidence manifest. Shared baseline hashes must still match.
+
+**Task 3 regression gate (2026-10-13):** private controller builds; all 32 planner/pose/safety tests pass. Full suite has one unchanged legacy FK failure because its exact `reference/bones_072925_test` fixture is unavailable. The local official example is not equivalent and fails in both baseline/private binaries (396 assertions each). Keep this gate open; continue host-only Task 4 work and disclose it at Stage A review. Do not substitute generated data or weaken FK assertions.
 
 ### Task 4: Navigation admission in the existing execution owner
 
