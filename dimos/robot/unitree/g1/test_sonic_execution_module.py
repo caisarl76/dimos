@@ -467,13 +467,13 @@ def test_atomic_navigation_requires_begin_and_shutdown_sends_end(execution_confi
         )
 
     try:
+        started = time.monotonic()
         module.start()
+        assert not module._navigation.publisher_ready(now=started + 0.249)
         peer.reference_endpoint = module.get_status()["reference_endpoint"]
         peer.connected.set()
         wait_until(
-            lambda: (
-                module.get_status()["subscriptions_ready"] and module.get_status()["feedback_fresh"]
-            ),
+            lambda: module.get_status()["ready"],
             timeout=3,
         )
         source(1, 0.2)

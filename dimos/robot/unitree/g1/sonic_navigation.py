@@ -35,6 +35,10 @@ HEADER_SIZE = 1280
 Vector = tuple[float, float, float]
 
 
+class NavigationVelocityError(ValueError):
+    """A finite source velocity outside the admitted navigation envelope."""
+
+
 @dataclass(frozen=True, init=False)
 class NavigationInput:
     """Atomic input with an owned velocity snapshot and execution-host deadlines.
@@ -205,6 +209,7 @@ class NavigationLimits:
     min_walk_speed: float = 0.10
     max_walk_speed: float = 0.20
     max_yaw_rate: float = 0.20
+    turn_deadband: float = 0.01
     facing_lookahead: float = 0.50
     max_facing_offset: float = 0.10
     angular_threshold: float = 0.02
@@ -218,6 +223,8 @@ class NavigationLimits:
             raise ValueError("walking limits must be inside the commissioned envelope")
         if self.max_yaw_rate > 0.2 or self.max_facing_offset > 0.1:
             raise ValueError("turning limits exceed the commissioned envelope")
+        if self.turn_deadband >= self.max_yaw_rate:
+            raise ValueError("turn deadband must leave an admitted turning range")
 
 
 def _yaw(quaternion: tuple[float, ...] | None) -> float:
@@ -297,15 +304,20 @@ class PlannerIntentTracker:
         )
         vx, vy, vz, wx, wy, wz = components
         if vy != 0 or vz != 0 or wx != 0 or wy != 0:
-            raise ValueError("navigation supports only forward/backward and yaw")
+            raise NavigationVelocityError("navigation supports only forward/backward and yaw")
         if abs(vx) > self.limits.max_walk_speed or abs(wz) > self.limits.max_yaw_rate:
-            raise ValueError("navigation velocity exceeds commissioned limits")
+            raise NavigationVelocityError("navigation velocity exceeds commissioned limits")
         if stopping:
             return self.stop(feedback)
         if feedback.planner_reference_active is not True:
             raise ValueError("active planner reference frame required")
         measured = _yaw(feedback.base_quat_measured)
         reference = _yaw(feedback.reference_heading_quat)
+        # Small follower corrections must hold facing even when measured yaw
+        # drifts after a turn. Thresholding the resulting vector alone would
+        # eventually chase that drift and trigger a new native replan.
+        if abs(wz) <= self.limits.turn_deadband:
+            wz = 0.0
         if abs(vx) < self.limits.min_walk_speed and wz == 0:
             return self.stop(feedback)
         if self._facing_world is None:

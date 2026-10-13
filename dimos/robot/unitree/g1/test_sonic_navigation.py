@@ -171,6 +171,26 @@ def test_small_sign_changing_yaw_does_not_chatter():
         assert value.movement == held.movement
 
 
+@pytest.mark.parametrize("vx", [0.0, 0.2])
+def test_tiny_turn_intent_does_not_chase_measured_heading_drift(vx):
+    tracker = PlannerIntentTracker(NavigationLimits())
+    held = tracker.update(twist(vx, 0.005), feedback())
+    for index in range(50):
+        # Model the measured post-turn drift from the native noisy-trace run,
+        # plus +/-0.005 rad sensor noise, while the follower crosses zero.
+        measured = 0.001 * index + (0.005 if index % 2 else -0.005)
+        command = twist(vx, -0.005 if index % 2 else 0.005)
+        assert tracker.update(command, feedback(measured)).facing == held.facing
+
+
+def test_commissioned_turn_rate_still_advances_facing_with_measured_turn():
+    tracker = PlannerIntentTracker(NavigationLimits())
+    first = tracker.update(twist(0, 0.1), feedback())
+    assert math.atan2(first.facing[1], first.facing[0]) == pytest.approx(0.05)
+    second = tracker.update(twist(0, 0.1), feedback(0.025))
+    assert math.atan2(second.facing[1], second.facing[0]) == pytest.approx(0.075)
+
+
 def test_reference_reset_reanchors_held_heading():
     tracker = PlannerIntentTracker(NavigationLimits())
     tracker.update(twist(0.2), feedback())

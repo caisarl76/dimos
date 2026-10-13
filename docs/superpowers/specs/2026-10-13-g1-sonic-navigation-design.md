@@ -178,6 +178,15 @@ the configured ceiling. Native MuJoCo selection is separate from the follower's
 `GlobalConfig.simulation`; keep the latter disabled (`""` in this HEAD) in this composition, avoiding
 its 0.8 rad/s minimum turn override.
 
+The native simulation exposed an additional drift path: tiny nonzero turn
+commands can repeatedly re-anchor facing to measured yaw after a real turn,
+even with the angular floor disabled. Apply a 0.01 rad/s turn deadband in the
+intent tracker before converting facing. Commands inside that band act as
+zero yaw rate, holding world facing during translation and frozen stop facing
+in IDLE. This is below the commissioned 0.1–0.2 rad/s turn inputs and corresponds
+to a 0.02 rad yaw error at the follower's gain, below its 0.35 rad orientation
+tolerance. Test measured heading drift as well as alternating sensor noise.
+
 Initial conversion parameters, all explicit configuration values:
 
 | Parameter | Initial value | Effect |
@@ -185,12 +194,13 @@ Initial conversion parameters, all explicit configuration values:
 | `min_walk_speed` | 0.10 m/s | `abs(vx) < threshold` becomes IDLE with zero movement; no upward speed rounding |
 | `max_walk_speed` | 0.20 m/s | Admission/native cap; lower supported speeds need measured validation |
 | `max_yaw_rate` | 0.20 rad/s | Matches the configured current follower envelope |
+| `turn_deadband` | 0.01 rad/s | Treat `abs(wz) <= deadband` as zero before facing conversion |
 | `facing_lookahead` T | 0.50 s | Converts requested turn rate to a finite facing target |
 | `max_facing_offset` theta_max | 0.10 rad | Bounds each target relative to measured yaw |
 | direction/facing update threshold | 0.02 rad | Wrapped angular difference from last emitted target |
 | speed update threshold | 0.01 m/s | Difference from last emitted target; mode/zero transitions bypass it |
 
-For a fresh command with `wz != 0`, compute
+For a fresh command with `abs(wz) > turn_deadband`, compute
 `target_yaw = measured_yaw + clamp(wz * T, -theta_max, +theta_max)`.
 This also applies during translation. There is no accumulated turn integrator.
 For `abs(vx) < min_walk_speed` and nonzero wz, send **IDLE**, zero movement and

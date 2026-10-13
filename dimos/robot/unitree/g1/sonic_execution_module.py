@@ -189,6 +189,7 @@ class SonicExecutionModule(Module):
                     not self.config.navigation_enabled
                     or (
                         result["navigation"]["pose_ready"]
+                        and self._navigation.publisher_ready(now=time.monotonic())
                         and state.planner_guard is not None
                         and state.planner_guard.mode == 0
                         and not state.planner_guard.lease_armed
@@ -262,6 +263,9 @@ class SonicExecutionModule(Module):
             pub.setsockopt(zmq.XPUB_NODROP, 1)
             pub.setsockopt(zmq.SNDHWM, 16)
             pub.bind(self.config.reference_bind)
+            if self.config.navigation_enabled:
+                self._navigation_input = self._pending_navigation = None
+                self._navigation.publisher_started(now=time.monotonic())
             sub.setsockopt(zmq.RCVHWM, 128)
             sub.setsockopt(zmq.MAXMSGSIZE, MAX_PACKET_BYTES)
             sub.setsockopt(zmq.SUBSCRIBE, TOPIC)

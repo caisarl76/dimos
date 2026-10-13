@@ -108,17 +108,34 @@ Stage A has no dependency on the off-board protocol or robot networking. Its rea
 
 ### Task 5: On-host MuJoCo proof
 
-**Files:** Create `docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_sim.py` and `demo_analyze_navigation.py`; add `on-host-sim/manifest.json`, `on-host-sim/results.json` and per-run telemetry after execution. Read existing simulation assets/probes without changing them.
+**Files:** Create `docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_sim.py`, `demo_navigation_sim_worker.py` and `demo_analyze_navigation.py`; add `on-host-sim/manifest.json`, `on-host-sim/results.json` and per-run telemetry after execution. Add optional timestamped diagnostic sidecars in the private native `src/g1_deploy_onnx_ref.cpp`, exported as `native-navigation-diagnostics.patch` with hash provenance. Read existing simulation assets/probes without changing them. Fix the observed tiny-turn drift in `sonic_navigation.py` with regressions in `test_sonic_navigation.py`; keep the native control/admission rules unchanged.
 
 **Interfaces:**
 - Consumes Tasks 1–4 and the existing seeded sonic78 task session.
-- Produces `demo_navigation_sim.py --stage on-host --output PATH` and `demo_analyze_navigation.py PATH`; analysis exits zero only when all declared checks pass. Bind explicitly configured loopback endpoints and a unique private simulator DDS domain/interface; no robot NIC in this stage.
+- Produces `demo_navigation_sim.py --stage on-host --output PATH` and `demo_analyze_navigation.py PATH`; analysis exits zero only when all declared checks pass. Bind explicitly configured loopback endpoints and DDS domain 0 isolated inside a fresh loopback-only network namespace (native SDK fixes domain 0); no robot NIC in this stage.
 
 - [ ] Add harness assertions before control changes: one native controller/publisher, stable initial IDLE, native guard enabled, required feedback/subscriptions ready, simulation fixture explicitly selected. Snapshot baseline source/asset/environment hashes and reuse the existing local simulator configuration.
 - [ ] Run a 5 s IDLE baseline, 2 s +0.2 forward, 2 s -0.2 backward and 2 s pure turns each direction, separated by stopped IDLE. Record simulator ground-truth planar speed/yaw/displacement, measured joints/IMU and reference fields separately. Assert intended displacement/yaw signs and final planar speed <0.03 m/s/yaw rate <0.03 rad/s held for 0.5 s within a 3 s settling timeout; failure blocks progression rather than adjusting pass criteria after the run.
 - [ ] Inject 250 ms source pauses (no cancellation), a >2 s source outage, lost feedback/subscriptions and a stopped publisher. Check Task 4's statuses and Task 3's native behavior, including a motion expiry between healthy heartbeats.
 - [ ] Replay the zero-crossing follower trace plus ±0.005 rad IMU noise for 5 s; count **native motion-state-triggered replans**, excluding scheduled replans. Require no heartbeat-induced replans and at most one threshold-induced state change for the fixed-target noisy trace. Verify real turns still change facing when accumulated measured motion crosses 0.02 rad.
 - [ ] Run planner → seeded pose for at least 1 s → confirmed planner IDLE; cancel pose and expire its source separately. Check unchanged 200 ms pose lease, suspended planner watchdog and no old motion after handback. Analyze results with `demo_analyze_navigation.py`; all assertions must pass before Stage B. Selectively commit harness and compact evidence, preserving failures as evidence.
+
+Observed during execution: run02's unchanged two-second forward check failed
+at -0.03797 m. Runs03–04 demonstrate forward motion with the same assets, but
+do not explain or erase that failure. Run05 passed all four movement signs and
+stops, then exposed a separate noisy-facing drift bug. The approved facing
+threshold alone was insufficient when tiny nonzero turn requests followed
+measured post-turn drift. The revised spec adds a 0.01 rad/s turn deadband;
+regressions cover both translation and IDLE. Preserve all failures and keep
+commissioning blocked until the transition discrepancy is resolved.
+
+Run08 also failed the unchanged three-second measured-settling gate. Run09
+translated with active admission, held facing and literal heartbeats, but
+recorded 19 native replans as actual body yaw changed the converted movement
+direction. Task 5 remains open. A proposed separation of deterministic
+constant-heading noise proof from live body-yaw attribution is awaiting user
+review in `docs/artifacts/g1_navigation_sonic_20261013/stage-a-test-amendment.md`;
+it has not changed the approved acceptance criteria or authorized Stage B.
 
 ### Stage A review gate
 
@@ -147,7 +164,7 @@ Stage A has no dependency on the off-board protocol or robot networking. Its rea
 - Consumes Task 6's ReadinessSnapshot, Task 4's NavigationInput/ControlSpec and existing `ReplanningAStarPlannerSpec` (`set_goal`, `cancel_goal`, `get_state`). The peer injects that existing Spec locally; no private MovementManager method calls.
 - Define frozen `NavigationPollReply(correlation_id: str, request_id: str | None, source_sequence: int, twist: Twist | None, source_age: float, readiness: ReadinessSnapshot)` and `bound_navigation_input(reply: NavigationPollReply, *, t0: float, t1: float) -> NavigationInput`; reject RTT >0.100 or negative/nonfinite ages. Set velocity deadline `t0+0.350-source_age`; readiness deadline is the minimum `t0+budget-input.age` across inputs. Expired/missing readiness is never marked ready.
 - Version 1 private link uses bounded JSON over ZeroMQ ROUTER/DEALER, explicit endpoint config, 64 KiB maximum frame, one part, at most one pending poll and one independent control request. Strict schema includes version, operation, correlation/local request ID and finite six-component Twist; no pickle on the network. Do not embed remote absolute monotonic deadlines.
-- Peer input `cmd_vel: In[Twist]` is the only off-board consumer; increment original source sequence once per actual MovementManager emission. Serve age at reply time, not at caching time. Raw/map inputs feed Task 6's monitor. Relay outputs only atomic `navigation_input: Out[NavigationInput]`, with the Twist and bounded deadlines; it publishes only fresh source sequences. There is no pc2 cmd_vel publisher/consumer.
+- Peer input `cmd_vel: In[Twist]` is the only off-board consumer; increment original source sequence once per actual MovementManager emission. Serve age at reply time, not at caching time. Raw/map inputs feed Task 6's monitor. Relay outputs only atomic `navigation_input: Out[NavigationInput]`, with the Twist and bounded deadlines. It may repeat the held source sequence, velocity and original velocity deadline while advancing independently validated sensor readiness; a repeated sequence never refreshes motion. There is no pc2 cmd_vel publisher/consumer.
 - Relay implements Task 4's SonicNavigationControlSpec. Close local admission before remote cancel; poll/cancel use separate bounded request slots. Reply to cancel only after public `cancel_goal()` succeeds and a fresh `get_state()==NavigationState.IDLE` is obtained, preserving request correlation. Missing reply is unresolved, never success.
 
 - [ ] Write `test_unsynchronized_clock_deadline`: peer clock can be 10,000 while pc2 t0=10.0/t1=10.08, reported source age 0.12; assert local velocity deadline 10.23 and motion heartbeat never exceeds it. Cached sequence, stale correlation, age NaN/-1, RTT 0.101, excess packet size and invalid version cannot refresh a target.

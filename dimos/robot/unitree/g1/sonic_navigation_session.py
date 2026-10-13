@@ -31,6 +31,7 @@ from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_navigation import (
     NavigationInput,
     NavigationLimits,
+    NavigationVelocityError,
     PlannerIntentTracker,
     encode_navigation_control,
     encode_planner,
@@ -55,6 +56,7 @@ class NavigationStatus:
     cancellation_pending: bool = False
     fault: str | None = None
     pose_ready: bool = True
+    rejected_input: str | None = None
 
 
 class SonicNavigationSession:
@@ -84,6 +86,20 @@ class SonicNavigationSession:
         self._idle_since: float | None = None
         self._peer_settled_until = -math.inf
         self._outage_since: float | None = None
+        self._publisher_ready_at = math.inf
+
+    def publisher_started(self, *, now: float) -> None:
+        """Record a fresh socket binding; drain receipts before a new handshake."""
+        if self.status.phase != NavigationPhase.DISARMED or self.status.request_id is not None:
+            raise RuntimeError("publisher startup requires a fresh navigation owner")
+        if not math.isfinite(now):
+            raise ValueError("finite publisher start time required")
+        self._input = None
+        self._readiness_deadline = -math.inf
+        self._publisher_ready_at = now + 0.250
+
+    def publisher_ready(self, *, now: float) -> bool:
+        return now >= self._publisher_ready_at
 
     @property
     def status(self) -> NavigationStatus:
@@ -115,6 +131,8 @@ class SonicNavigationSession:
     def begin(
         self, feedback: SonicFeedback, readiness: NavigationInput, *, now: float
     ) -> NavigationStatus:
+        if not self.publisher_ready(now=now):
+            raise RuntimeError("publisher startup quiet interval unresolved")
         if self._status.phase not in (NavigationPhase.DISARMED, NavigationPhase.FAULT) or (
             self._status.request_id is not None and not self._status.pose_ready
         ):
@@ -225,7 +243,11 @@ class SonicNavigationSession:
             if self._last_feedback is None or self._last_feedback.planner_guard is None
             else self._last_feedback.planner_guard.high_water
         )
-        self._tracker.stop(self._last_feedback)
+        try:
+            self._tracker.stop(self._last_feedback)
+        except ValueError:
+            # Malformed frame feedback must not prevent the native End command.
+            self._tracker.stop(None)
         self._end_sequence = self._next(now, hwm)
         self._control_deadline = now + 0.25
         self._control = encode_navigation_control(
@@ -257,14 +279,15 @@ class SonicNavigationSession:
         return True
 
     def confirm_peer_status(self, reply: dict[str, Any], *, now: float) -> bool:
-        if (
-            not self._cancel_confirmed
-            or reply.get("request_id") != self.status.request_id
-            or (
-                reply.get("cancelled") is not True
-                or reply.get("state") != "idle"
-                or reply.get("ready") is not True
-            )
+        if reply.get("request_id") != self.status.request_id:
+            return False
+        # Current, correlated negative evidence supersedes an earlier proof.
+        # The execution owner rejects expired RPC replies before calling here.
+        self._peer_settled_until = -math.inf
+        if not self._cancel_confirmed or (
+            reply.get("cancelled") is not True
+            or reply.get("state") != "idle"
+            or reply.get("ready") is not True
         ):
             return False
         numbers: list[float] = []
@@ -347,10 +370,15 @@ class SonicNavigationSession:
                         if value.source_sequence != self._applied_source_sequence:
                             intent = self._tracker.update(value.twist, feedback)
                             self._applied_source_sequence = value.source_sequence
+                            self._set(rejected_input=None)
                         else:
                             intent = self._tracker.heartbeat()
+                    except NavigationVelocityError as exc:
+                        intent = self._tracker.stop(feedback)
+                        self._applied_source_sequence = value.source_sequence
+                        self._set(rejected_input=str(exc))
                     except ValueError:
-                        self.fail("invalid_navigation_velocity", now=now)
+                        self.fail("invalid_navigation_feedback", now=now)
                         return
                     deadline = min(value.velocity_deadline, self._readiness_deadline, now + 0.25)
                 packet = encode_planner(
