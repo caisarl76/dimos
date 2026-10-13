@@ -1,40 +1,49 @@
 # Stage A review and current gates
 
-Independent read-only review: `/root/stage_a_review`, gpt-6-astra, high reasoning.
-The reviewer inspected the implementation and raw evidence; it changed no files
-and launched no controller.
+Independent read-only reviewer: `/root/stage_a_review`, gpt-6-astra, high
+reasoning. The reviewer changed no files and launched no controller.
 
-Four blocking code/provenance findings are resolved and independently checked:
+The five original findings are resolved: correlated negative settling evidence
+revokes pose permission; finite unsupported/over-limit velocity becomes recoverable
+IDLE; publisher startup enforces the 250 ms quiet interval; upstream observation
+changes have their own baseline import; and the user-approved separate fixed-heading
+and live-heading proofs now cover translation, not just IDLE.
 
-- A newer correlated negative settling result revokes prior pose permission.
-- Finite unsupported/over-limit velocity commands emit IDLE with rejected-input
-  status; newer valid source commands recover without ending the request.
-- Publisher binding begins a fail-closed 250 ms quiet interval before rearm.
-- The other session's observation changes are imported unchanged in their own
-  labelled baseline commit `9fa98b269`, with updated source hashes and tests.
+The amendment review found two additional analyzer gaps: duplicate state-triggered
+replans could match unchanged intent, and a packet sent after inference began could
+explain a replan. Both regressions failed before the fixes. Eight artifact tests
+now pass; the analyzer compares successive native states including periodic rows
+and requires a pre-start send plus a real applied acknowledgment and valid deadline.
 
-Verification: 399 SONIC tests and four shared Python/native lease-oracle tests
-pass. Mypy passes for four production integration files; Ruff passes changed
-Python files. All 20 original SONIC baseline and 51 original native source hashes
-match their recorded snapshots. No package installation or original workspace
-source/model changes were performed.
+Reanalysis passes the saved evidence without another controller launch:
 
-The fifth finding remains open: the translating noise proof cannot meet the
-approved total native-replan limit. Run06 recorded 26 successful checks, but its
-noise trace exercised IDLE and does not satisfy this finding. Run07 lost readiness
-when the first PController.advance lazily imported SciPy; initialization is now
-done before live leases. Run08 failed the unchanged forward stopping gate. Run09
-stayed active and translated, with held facing and literal heartbeats, but
-recorded 19 native state replans. Raw review attributes the 18 subsequent updates
-to movement changes exceeding 0.02 rad during actual body-yaw variation.
+- Run10: constant-heading fixture, one state replan plus five periodic replans,
+  identical admitted motion, 48 advancing source sequences, measured stop in 2.27 s.
+- Run11: production live body-heading conversion, 19 attributed state replans plus
+  five periodic replans, 0.814 m forward displacement, held facing/literal heartbeats,
+  measured stop in 2.55 s.
+- Run12: full 26-case matrix passes, including four movement signs/stops, source
+  expiry/outage, feedback/subscription/publisher loss, pose lease suspension,
+  pose expiry and handback. All 16 live-noise state replans are attributed; there
+  are no unexplained conversions or heartbeat-only state replans.
 
-Reviewer recommendation: keep the body-frame semantic, retain the ≤1 bound for a
-deterministic constant-heading fixture, and separately attribute every live
-direction/native-replan change. This alters the approved test interpretation;
-the proposal is recorded in [stage-a-test-amendment.md](stage-a-test-amendment.md)
-for user review. Run09 remains failed. This review does not authorize Stage B or
-waive missing proof.
+The diagnostic runs remain incomplete full matrices. The default analyzer rejects
+those; `--proof-only` explicitly validates the labelled noise proof. Run09 retains
+its failed verdict under the previous aggregate criterion. All earlier raw
+failures remain recorded and hashed.
 
-Task 5 and Stage A simulation verdict: **OPEN**. Stage B: **not started**.
-Real robot commissioning: **blocked**, also by run02's unexplained reverse
-displacement, run08's stopping failure and the missing exact FK fixture.
+The tested production baseline has 399 SONIC and four shared lease-oracle tests
+passing. Production control semantics and its tested source bytes are unchanged.
+The original native source still matches all 51 hashes. The task-boundary audit
+found four newer upstream Python files (observation, session, service and service
+tests); their separate import and compatibility tests must finish before Stage B.
+
+Host-only Stage A proof: **PASS after the reviewed analyzer fixes**. Host-only
+Stage B: **awaiting upstream compatibility update**. Real robot commissioning:
+**blocked** by run02's unexplained reverse displacement, run08's stopping failure
+and the missing exact FK fixture. No original workspace, environment or model was
+modified and no real robot controller was launched.
+
+See [task5-amendment-evidence.json](task5-amendment-evidence.json) for source, test
+and per-run hashes; [stage-a-test-amendment.md](stage-a-test-amendment.md) records
+the user's approved change in test interpretation.

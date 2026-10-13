@@ -222,6 +222,16 @@ valid reference frame on a reported heading reset/reinitialization; never reuse
 old frame-dependent values after a transition. This prevents exact-float-change
 replanning on every planner tick while still following actual steering changes.
 
+Approved test clarification (2026-10-13): keep the ≤1 native motion-state-replan
+bound, including walking entry, for a labelled constant-heading noise fixture.
+The separate live translating proof retains measured-yaw body-frame conversion
+and reports all direction replans due to real body-heading changes. Each emitted
+change must have an admitted fresh source threshold crossing or mode/sign/frame
+transition; each native state replan must match an applied acknowledged changed
+intent. Heartbeats cannot cause state replans. Measure five seconds from applied
+walking while counting from its request, preserving the initial transition.
+This clarification does not relax measured stopping or commissioning gates.
+
 Missing, invalid or inactive reference telemetry blocks walking and requests
 IDLE. Direct map-frame inputs are excluded from initial admission. Navigation
 commissioning requires the accurate sensor-to-base extrinsic and base-frame

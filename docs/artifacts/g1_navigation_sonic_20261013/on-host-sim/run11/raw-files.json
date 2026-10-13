@@ -1,0 +1,90 @@
+{
+  "inputs.jsonl": {
+    "sha256": "bb62a2dd58c65cff37b66c605e96f3c457b240030f4417277469cb8a2e683698",
+    "bytes": 121611
+  },
+  "noise-helper.py": {
+    "sha256": "2779c8125f86d4b43f015e3625cd6c4df1bd2443ea56768886809d9e0566588f",
+    "bytes": 7925
+  },
+  "sim-ready": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "analysis.json": {
+    "sha256": "5b19d139afa3e3b1449806d4444262cc653987b07b9e0463ccba708c4f38e9ef",
+    "bytes": 6931
+  },
+  "target-motion.csv.frames.csv": {
+    "sha256": "98fd0df77a68893bceb0fb9271bbee21abe7e8d97dbcb3084a9caa606f8332a6",
+    "bytes": 1794829
+  },
+  "planner-motion.csv.replans.csv": {
+    "sha256": "9d0ab6f084096f3cd154b90bedb68c43383c551880f7b30159b52318807d9ab0",
+    "bytes": 100161
+  },
+  "results.json": {
+    "sha256": "f712aa1b917ec12e696cd33afad5231b1cbe6cc040a5b86d1dc1252d817323f0",
+    "bytes": 1106
+  },
+  "planner-motion.csv": {
+    "sha256": "3bd940ae1e9f693c67dc87e8ad72d7673d33efcddae8693f1a889231a865ec41",
+    "bytes": 628396
+  },
+  "references.jsonl": {
+    "sha256": "4326299888c85806ab6adbcc7f7b778ab4c897d77f087e05560ed6b459d9c34c",
+    "bytes": 1901818
+  },
+  "manifest.json": {
+    "sha256": "bc64da5e28f47dd0c4b12b551f95800dae8bd555f1148f8f03703f771492cdf3",
+    "bytes": 3564
+  },
+  "conversions.jsonl": {
+    "sha256": "0cb22a3af1f9f0e17405a107cd53cb1a4197c21abac3d834abe9de16215b45be",
+    "bytes": 42459
+  },
+  "target-motion.csv": {
+    "sha256": "b8f38144a5cc5c45c52e163dba008b036ffffa575f15deac9d80da1201646386",
+    "bytes": 466355
+  },
+  "telemetry.jsonl": {
+    "sha256": "e74a6c6f96871c08d514b052f751777a7d4f6c503011778a0d6d80b545022754",
+    "bytes": 13353994
+  },
+  "sim-config.json": {
+    "sha256": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+    "bytes": 10216
+  },
+  "physics-latest.json": {
+    "sha256": "00b0baa62a2e7d853f8679ff8544ddf6724106d5a91b4ca0a0ffde0b9cde2b94",
+    "bytes": 3791
+  },
+  "sent.jsonl": {
+    "sha256": "4dcc352a180943faa888deb5c8f77b9e4b69a696edbf88cc2c5212f6af39c94e",
+    "bytes": 1916342
+  },
+  "deploy.log": {
+    "sha256": "90c28d69ede5e2bb5ef810b95b0d7cd82489572df77da7672f5ffc2aeb885017",
+    "bytes": 32406
+  },
+  "physics.jsonl": {
+    "sha256": "55c56999425c50b0b914d8d1eb7d11448b1e6caf3f54b5c006643234277d8dbe",
+    "bytes": 9008220
+  },
+  "sim.log": {
+    "sha256": "05c13e4ab9f8857e4bf10451a02fd46433c049e55eaded04de62402653d70415",
+    "bytes": 130
+  },
+  "sim-stop": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "harness.py": {
+    "sha256": "78990e9ad843fcc7b3afdc7495b908d89b9bcfb10bd917d3ec70d414b523fafb",
+    "bytes": 38938
+  },
+  "release": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

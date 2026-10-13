@@ -1,0 +1,82 @@
+{
+  "passed": false,
+  "completed": [
+    "before_noisy_trace_settled",
+    "initial_idle_settled",
+    "noisy_trace_replan_limit",
+    "noisy_trace_settled"
+  ],
+  "missing": [
+    "backward",
+    "backward_settled",
+    "feedback_loss_200ms",
+    "forward",
+    "forward_settled",
+    "left_turn",
+    "left_turn_settled",
+    "native_watchdog_250ms",
+    "pose_source_expiry_200ms",
+    "right_turn",
+    "right_turn_settled",
+    "seeded_pose_suspends_planner_watchdog",
+    "source_expiry_idle_without_latch",
+    "source_outage_ends",
+    "source_pause_250ms",
+    "stopped_publisher_watchdog",
+    "subscriptions_loss"
+  ],
+  "failed": [],
+  "run_status": "diagnostic_only",
+  "run_error": null,
+  "wire_samples": {
+    "moving": 239,
+    "idle": 399,
+    "pose": 0
+  },
+  "translating_noise": {
+    "passed": true,
+    "checks": {
+      "five_second_trace": true,
+      "advancing_physics": true,
+      "both_sensor_noise_signs": true,
+      "moving_wire": true,
+      "advancing_source": true,
+      "literal_heartbeats": true,
+      "active_throughout": true,
+      "native_replans": true,
+      "conversion_provenance": true,
+      "held_facing": true,
+      "fixed_movement": true,
+      "bounded_applied_latency": true,
+      "forward_physics": true,
+      "standing_envelope": true
+    },
+    "forward_displacement_m": 0.11030674458448296,
+    "native_state_replans": 1,
+    "planner_packets": 238,
+    "source_sequences": 48,
+    "attribution": {
+      "passed": true,
+      "errors": [],
+      "native_state_replans": 1,
+      "attributed": [
+        {
+          "monotonic": 1069744.969525194,
+          "acknowledged_sequences": [
+            1069744921452535,
+            1069744942552449,
+            1069744963525657
+          ],
+          "reasons": [
+            "mode_changed",
+            "facing_changed",
+            "speed_changed",
+            "direction_changed"
+          ]
+        }
+      ]
+    },
+    "conversion_errors": []
+  },
+  "noise_proof_only_passed": true
+}

@@ -1,6 +1,6 @@
-# Proposed Stage A noise-test amendment
+# Approved Stage A noise-test amendment
 
-Status: awaiting user review. No control-semantic change is implemented or
+Status: approved by the user's "confirmed. proceed" on 2026-10-13. No control-semantic change is implemented or
 proposed. Task 5 and the Stage A simulation gate remain open; Stage B has not
 started. The approved native execution method and sole motor owner are retained.
 
@@ -44,7 +44,7 @@ acknowledgment separately. Start the five-second measurement at applied walking,
 but count replans from the preceding request so entry is included. Verify bounded
 admission latency and permit only the corresponding initial IDLE prefix.
 
-Implementation after approval: add these two labelled harness paths and their raw
+Implementation: add these two labelled harness paths and their raw
 analyzer checks, rerun the constant-heading/native and live proofs, then request
 the pending Stage A evidence review. Do not replace or relabel run09's failure.
 

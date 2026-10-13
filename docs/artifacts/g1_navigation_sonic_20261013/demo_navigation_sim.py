@@ -18,10 +18,15 @@ import os
 from pathlib import Path
 import signal
 import socket
+import struct
 import subprocess
 import time
 from typing import Any
 
+from demo_navigation_noise import (
+    ConversionTrace,
+    FixedHeadingFixture,
+)
 import numpy as np
 import zmq
 
@@ -60,20 +65,50 @@ class SimulationExecution(SonicExecutionModule):
 
     drop_planner: bool = False
     drop_pose: bool = False
+    fixed_fixture: FixedHeadingFixture | None = None
+    noise_timing: dict[str, Any] | None = None
 
     def _send(self, packet: bytes) -> None:
+        fixture_record = None
+        if (
+            self.fixed_fixture is not None
+            and packet.startswith(b"planner")
+            and (
+                struct.unpack("<i", packet[1287:1291])[0] == 1
+                or self.fixed_fixture.source_sequence >= 0
+            )
+        ):
+            value, state = self._navigation._input, self.get_feedback()
+            if value is not None and state is not None:
+                packet, fixture_record = self.fixed_fixture.convert(
+                    packet,
+                    value.twist,
+                    state,
+                    source_sequence=self._navigation.status.source_sequence,
+                )
         if not (
             (self.drop_planner and packet.startswith(b"planner"))
             or (self.drop_pose and packet.startswith(b"pose"))
         ):
             super()._send(packet)
+            sent_at = time.monotonic()
+            if (
+                self.noise_timing is not None
+                and packet.startswith(b"planner")
+                and struct.unpack("<i", packet[1287:1291])[0] == 1
+                and "first_moving" not in self.noise_timing
+            ):
+                self.noise_timing.update(
+                    first_moving=sent_at, first_sequence=struct.unpack("<q", packet[1323:1331])[0]
+                )
             if getattr(self, "sent_trace", None) is not None:
                 self.sent_trace.write(
                     json.dumps(
                         {
-                            "monotonic": time.monotonic(),
+                            "monotonic": sent_at,
                             "source_sequence": self._navigation.status.source_sequence,
                             "packet_hex": packet.hex(),
+                            "fixture": fixture_record,
                         }
                     )
                     + "\n"
@@ -184,6 +219,11 @@ def main() -> None:
         action="store_true",
         help="Isolate the translating trace; never report the full commissioning matrix passed",
     )
+    parser.add_argument(
+        "--noise-proof",
+        choices=["fixed", "live"],
+        help="Run only the labelled constant-heading fixture or live-heading attribution proof",
+    )
     args = parser.parse_args()
     isolated(args.host_netns)
     root = Path(__file__).resolve().parents[3]
@@ -247,6 +287,9 @@ def main() -> None:
         "worker_sha256": hashlib.sha256(
             Path(__file__).with_name("demo_navigation_sim_worker.py").read_bytes()
         ).hexdigest(),
+        "noise_helper_sha256": hashlib.sha256(
+            Path(__file__).with_name("demo_navigation_noise.py").read_bytes()
+        ).hexdigest(),
         "production_source_sha256": {
             name: hashlib.sha256((root / name).read_bytes()).hexdigest()
             for name in (
@@ -260,6 +303,7 @@ def main() -> None:
         "diagnose_forward": args.diagnose_forward,
         "diagnose_transitions": args.diagnose_transitions,
         "diagnose_noisy_follower": args.diagnose_noisy_follower,
+        "noise_proof": args.noise_proof,
         "scope": "One native controller, one production execution publisher, headless physics; on-host input/control fixture",
         "thresholds": {
             "linear_speed_mps": 0.03,
@@ -269,6 +313,10 @@ def main() -> None:
         },
     }
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (args.output / "harness.py").write_bytes(Path(__file__).read_bytes())
+    (args.output / "noise-helper.py").write_bytes(
+        Path(__file__).with_name("demo_navigation_noise.py").read_bytes()
+    )
     results: dict[str, Any] = {"status": "incomplete", "cases": [], "error": None}
     processes: list[subprocess.Popen[Any]] = []
     owner: SimulationExecution | None = None
@@ -292,6 +340,13 @@ def main() -> None:
     telemetry = (args.output / "telemetry.jsonl").open("w")
     refs = (args.output / "references.jsonl").open("w")
     sent = (args.output / "sent.jsonl").open("w")
+    inputs = (args.output / "inputs.jsonl").open("w")
+    conversions = (args.output / "conversions.jsonl").open("w")
+
+    def record_conversion(record: dict[str, Any]) -> None:
+        conversions.write(json.dumps(record) + "\n")
+        conversions.flush()
+
     context = zmq.Context()
     observer = context.socket(zmq.SUB)
     observer.setsockopt(zmq.LINGER, 0)
@@ -311,9 +366,13 @@ def main() -> None:
                     next_source = now + 0.1
                     if noisy_follower is not None:
                         noisy_tick += 1
-                        measured_yaw = yaw(row["qpos"][3:7])
+                        measured_yaw = 0.0 if args.noise_proof == "fixed" else yaw(row["qpos"][3:7])
                         error = 0.01 if noisy_tick % 2 else -0.01
-                        w, x, y, z = row["qpos"][3:7]
+                        w, x, y, z = (
+                            (1.0, 0.0, 0.0, 0.0)
+                            if args.noise_proof == "fixed"
+                            else row["qpos"][3:7]
+                        )
                         pose = PoseStamped(
                             position=Vector3(*row["pelvis"]),
                             orientation=Quaternion(x=x, y=y, z=z, w=w),
@@ -332,6 +391,23 @@ def main() -> None:
                         held_input = NavigationInput(
                             velocity, sequence, now + 0.35, row["monotonic"] + 0.2, ready, None
                         )
+                        inputs.write(
+                            json.dumps(
+                                {
+                                    "monotonic": now,
+                                    "source_sequence": sequence,
+                                    "velocity": list(held_input._velocity),
+                                    "velocity_deadline": held_input.velocity_deadline,
+                                    "readiness_deadline": held_input.readiness_deadline,
+                                    "physics_stamp": row["monotonic"],
+                                    "kind": "fixed_heading_fixture"
+                                    if args.noise_proof == "fixed"
+                                    else "live",
+                                }
+                            )
+                            + "\n"
+                        )
+                        inputs.flush()
                     source.publish(
                         NavigationInput(
                             held_input.twist,
@@ -498,7 +574,7 @@ def main() -> None:
                 ("left_turn", 0.0, 0.2),
                 ("right_turn", 0.0, -0.2),
             ]
-            if args.diagnose_noisy_follower:
+            if args.diagnose_noisy_follower or args.noise_proof:
                 motions = []
             if args.diagnose_transitions:
                 motions = [
@@ -561,9 +637,28 @@ def main() -> None:
                 return
             scenario = "noisy_follower"
             settle("before_noisy_trace")
+            owner._navigation._tracker = ConversionTrace(
+                owner._navigation._tracker,
+                lambda: owner._navigation.status.source_sequence,
+                record_conversion,
+            )
+            if args.noise_proof == "fixed":
+                owner.fixed_fixture = FixedHeadingFixture()
             noisy_follower = follower
-            noise_started = time.monotonic()
+            request_time = time.monotonic()
+            owner.noise_timing = {"request": request_time}
             (args.output / "imu-noise").touch()
+            wait(
+                lambda: (
+                    "first_sequence" in owner.noise_timing
+                    and owner.get_feedback().planner_guard.mode == 1
+                    and owner.get_feedback().planner_guard.applied_sequence
+                    >= owner.noise_timing["first_sequence"]
+                ),
+                0.2,
+                "first moving native acknowledgment",
+            )
+            noise_started = owner.get_feedback().received_monotonic
             pump(5.0)
             noise_ended = time.monotonic()
             noisy_follower = None
@@ -578,7 +673,7 @@ def main() -> None:
                 changes = [
                     row
                     for row in csv.DictReader(stream)
-                    if noise_started <= float(row["started_monotonic"]) < noise_ended
+                    if request_time <= float(row["started_monotonic"]) < noise_ended
                     and any(
                         row[key] == "1"
                         for key in (
@@ -593,19 +688,25 @@ def main() -> None:
             results["cases"].append(
                 {
                     "name": "noisy_trace_replan_limit",
-                    "passed": len(changes) <= 1 and navigation_active,
+                    "passed": navigation_active
+                    and (args.noise_proof != "fixed" or len(changes) <= 1),
                     "start": noise_started,
                     "end": noise_ended,
+                    "request": request_time,
+                    "first_moving": owner.noise_timing["first_moving"],
+                    "first_applied": noise_started,
+                    "proof": "fixed" if args.noise_proof == "fixed" else "live",
                     "native_state_replans": len(changes),
                     "navigation_active": navigation_active,
                     "yaw_noise_rad": 0.005,
                     "source": "PController.advance, 0.2 m/s, alternating +/-0.01 rad lookahead error",
                 }
             )
-            assert len(changes) <= 1, "fixed-target noisy trace triggered excess native replans"
+            if args.noise_proof == "fixed":
+                assert len(changes) <= 1, "fixed-heading fixture triggered excess native replans"
             assert navigation_active, "noisy trace lost navigation admission"
             settle("noisy_trace")
-            if args.diagnose_noisy_follower:
+            if args.diagnose_noisy_follower or args.noise_proof:
                 owner.end_navigation()
                 wait(lambda: owner.get_navigation_status()["pose_ready"], 3.0, "diagnostic stop")
                 results["status"] = "diagnostic_only"
@@ -815,6 +916,8 @@ def main() -> None:
         telemetry.close()
         refs.close()
         sent.close()
+        inputs.close()
+        conversions.close()
         (args.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
 
 

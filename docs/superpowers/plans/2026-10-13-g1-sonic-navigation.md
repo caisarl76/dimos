@@ -114,11 +114,11 @@ Stage A has no dependency on the off-board protocol or robot networking. Its rea
 - Consumes Tasks 1–4 and the existing seeded sonic78 task session.
 - Produces `demo_navigation_sim.py --stage on-host --output PATH` and `demo_analyze_navigation.py PATH`; analysis exits zero only when all declared checks pass. Bind explicitly configured loopback endpoints and DDS domain 0 isolated inside a fresh loopback-only network namespace (native SDK fixes domain 0); no robot NIC in this stage.
 
-- [ ] Add harness assertions before control changes: one native controller/publisher, stable initial IDLE, native guard enabled, required feedback/subscriptions ready, simulation fixture explicitly selected. Snapshot baseline source/asset/environment hashes and reuse the existing local simulator configuration.
-- [ ] Run a 5 s IDLE baseline, 2 s +0.2 forward, 2 s -0.2 backward and 2 s pure turns each direction, separated by stopped IDLE. Record simulator ground-truth planar speed/yaw/displacement, measured joints/IMU and reference fields separately. Assert intended displacement/yaw signs and final planar speed <0.03 m/s/yaw rate <0.03 rad/s held for 0.5 s within a 3 s settling timeout; failure blocks progression rather than adjusting pass criteria after the run.
-- [ ] Inject 250 ms source pauses (no cancellation), a >2 s source outage, lost feedback/subscriptions and a stopped publisher. Check Task 4's statuses and Task 3's native behavior, including a motion expiry between healthy heartbeats.
-- [ ] Replay the zero-crossing follower trace plus ±0.005 rad IMU noise for 5 s; count **native motion-state-triggered replans**, excluding scheduled replans. Require no heartbeat-induced replans and at most one threshold-induced state change for the fixed-target noisy trace. Verify real turns still change facing when accumulated measured motion crosses 0.02 rad.
-- [ ] Run planner → seeded pose for at least 1 s → confirmed planner IDLE; cancel pose and expire its source separately. Check unchanged 200 ms pose lease, suspended planner watchdog and no old motion after handback. Analyze results with `demo_analyze_navigation.py`; all assertions must pass before Stage B. Selectively commit harness and compact evidence, preserving failures as evidence.
+- [x] Add harness assertions before control changes: one native controller/publisher, stable initial IDLE, native guard enabled, required feedback/subscriptions ready, simulation fixture explicitly selected. Snapshot baseline source/asset/environment hashes and reuse the existing local simulator configuration.
+- [x] Run a 5 s IDLE baseline, 2 s +0.2 forward, 2 s -0.2 backward and 2 s pure turns each direction, separated by stopped IDLE. Record simulator ground-truth planar speed/yaw/displacement, measured joints/IMU and reference fields separately. Assert intended displacement/yaw signs and final planar speed <0.03 m/s/yaw rate <0.03 rad/s held for 0.5 s within a 3 s settling timeout; failure blocks progression rather than adjusting pass criteria after the run.
+- [x] Inject 250 ms source pauses (no cancellation), a >2 s source outage, lost feedback/subscriptions and a stopped publisher. Check Task 4's statuses and Task 3's native behavior, including a motion expiry between healthy heartbeats.
+- [x] Run the approved separate `--noise-proof fixed` and `--noise-proof live` paths. Keep the ≤1 native motion-state-replan bound, including walking entry, for a deterministic constant-heading zero-crossing follower/±0.005 rad noise fixture. In live translation retain production measured-yaw conversion; log exact source inputs, conversion operands, wire packets and native applied acknowledgments, and attribute every native state replan to an admitted changed state and every emitted direction change to a fresh threshold crossing or mode/sign/reference transition. No heartbeat-only or unexplained replans. Measure five seconds from applied walking, count replans from the preceding request, and bound initial admission latency. Record all genuine body-yaw changes separately from sensor noise. Verify real turns still change facing when accumulated measured motion crosses 0.02 rad.
+- [x] Run planner → seeded pose for at least 1 s → confirmed planner IDLE; cancel pose and expire its source separately. Check unchanged 200 ms pose lease, suspended planner watchdog and no old motion after handback. Analyze results with `demo_analyze_navigation.py`; all assertions must pass before Stage B. Selectively commit harness and compact evidence, preserving failures as evidence.
 
 Observed during execution: run02's unchanged two-second forward check failed
 at -0.03797 m. Runs03–04 demonstrate forward motion with the same assets, but
@@ -132,14 +132,15 @@ commissioning blocked until the transition discrepancy is resolved.
 Run08 also failed the unchanged three-second measured-settling gate. Run09
 translated with active admission, held facing and literal heartbeats, but
 recorded 19 native replans as actual body yaw changed the converted movement
-direction. Task 5 remains open. A proposed separation of deterministic
-constant-heading noise proof from live body-yaw attribution is awaiting user
-review in `docs/artifacts/g1_navigation_sonic_20261013/stage-a-test-amendment.md`;
-it has not changed the approved acceptance criteria or authorized Stage B.
+direction. Task 5 remains open. The user approved separating deterministic
+constant-heading noise proof from live body-yaw attribution in
+`docs/artifacts/g1_navigation_sonic_20261013/stage-a-test-amendment.md`.
+Run09's recorded failure remains unchanged; stopping and commissioning gates
+are retained. Stage B still depends on the completed Stage A checks/review.
 
 ### Stage A review gate
 
-- [ ] After Task 5, obtain a fresh read-only architecture/code review of Tasks 1–5, including the imported baseline boundary, atomic input wiring, shared lease fixtures and MuJoCo evidence. The reviewer uses Astra/high and a limited context; it performs no implementation. Fix blocking findings with regression tests before starting Stage B. No additional user permission check is required for this already approved gate.
+- [x] After Task 5, obtain a fresh read-only architecture/code review of Tasks 1–5, including the imported baseline boundary, atomic input wiring, shared lease fixtures and MuJoCo evidence. The reviewer uses Astra/high and a limited context; it performs no implementation. Fix blocking findings with regression tests before starting Stage B. No additional user permission check is required for this already approved gate.
 
 ## Stage B — New two-host transport and navigation graphs
 
