@@ -430,3 +430,82 @@ def test_guard_confirmation_is_unavailable_when_receiver_ends(
     assert module.get_status()["state"] == ending
     assert module.get_status()["reference_guard"] is None
     assert module.get_feedback() is None
+
+
+def test_navigation_fields_are_optional_and_packet_coherent(payload):
+    legacy = decode(payload)
+    assert legacy.base_quat_measured is None
+    assert legacy.reference_heading_quat is None
+    assert legacy.planner_reference_active is None
+    payload.update(
+        base_quat_measured=[2, 0, 0, 0],
+        reference_heading_quat=[1, 0, 0, 0],
+        planner_reference_active=[1],
+    )
+    state = decode(payload)
+    assert state.base_quat_measured == (1, 0, 0, 0)
+    assert state.reference_heading_quat == (1, 0, 0, 0)
+    assert state.planner_reference_active is True
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("base_quat_measured", [0, 0, 0, 0]),
+        ("base_quat_measured", [1, 0, 0]),
+        ("base_quat_measured", [float("nan"), 0, 0, 0]),
+        ("reference_heading_quat", [True, 0, 0, 0]),
+        ("planner_reference_active", [2]),
+        ("planner_reference_active", [True]),
+        ("planner_reference_active", [0, 1]),
+        ("planner_reference_active", None),
+    ],
+)
+def test_malformed_navigation_field_cannot_refresh_feedback(payload, field, value):
+    buffer = FeedbackBuffer(stale_after=0.2)
+    buffer.accept(decode(payload))
+    payload[field] = value
+    with pytest.raises(ValueError):
+        buffer.accept(decode(payload))
+    assert buffer.latest(now=100.2) is None
+
+
+@pytest.fixture
+def planner_guard_payload():
+    return {
+        "mode": 0,
+        "high_water": 12,
+        "applied_sequence": 12,
+        "rearm_barrier": 10,
+        "lease_armed": True,
+        "latched": False,
+        "idle_ack_sequence": 11,
+        "fault": None,
+    }
+
+
+def test_planner_guard_is_typed_and_distinct_from_pose(payload, planner_guard_payload):
+    payload["planner_guard"] = planner_guard_payload
+    state = decode(payload)
+    assert state.reference_guard is None
+    assert state.planner_guard.high_water == 12
+    assert state.planner_guard.idle_ack_sequence == 11
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("high_water", -1),
+        ("applied_sequence", 13),
+        ("idle_ack_sequence", 13),
+        ("rearm_barrier", 13),
+        ("mode", 2),
+        ("latched", 1),
+        ("fault", 3),
+    ],
+)
+def test_invalid_planner_guard_rejected(payload, planner_guard_payload, field, value):
+    planner_guard_payload[field] = value
+    payload["planner_guard"] = planner_guard_payload
+    with pytest.raises(ValueError):
+        decode(payload)
