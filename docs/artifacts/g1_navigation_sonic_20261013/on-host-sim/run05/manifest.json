@@ -1,0 +1,55 @@
+{
+  "stage": "on-host",
+  "command": [
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref",
+    "lo",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/model_decoder.onnx",
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/reference/example",
+    "--obs-config",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/observation_config.yaml",
+    "--encoder-file",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/model_encoder.onnx",
+    "--planner-file",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/planner/target_vel/V2/planner_sonic.onnx",
+    "--input-type",
+    "zmq_manager",
+    "--output-type",
+    "zmq",
+    "--zmq-host",
+    "127.0.0.1",
+    "--zmq-port",
+    "18556",
+    "--zmq-out-port",
+    "18557",
+    "--disable-crc-check",
+    "--reference-timeout-ms",
+    "200",
+    "--guarded-planner",
+    "--planner-motion-logfile",
+    "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/run05/planner-motion.csv",
+    "--target-motion-logfile",
+    "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/run05/target-motion.csv"
+  ],
+  "netns": "net:[4026532899]",
+  "host_netns": "net:[4026531840]",
+  "interfaces": [
+    [
+      1,
+      "lo"
+    ]
+  ],
+  "gpu": "1",
+  "dds": "domain 0 isolated in this namespace",
+  "binary_sha256": "ce396b2b005264a1dc13f282bc032d0baf56be14d0a3456c815d42611802648b",
+  "harness_sha256": "10ad9a6ac8f6aec8cdd073a138b0cd29c890bd92634cbad9087d8446ec75218a",
+  "worker_sha256": "9fbc8d1caa472c8fdecaebcae5aa7cb118079a8bf7286a7923b4d66963b692be",
+  "diagnose_forward": false,
+  "diagnose_transitions": null,
+  "scope": "One native controller, one production execution publisher, headless physics; on-host input/control fixture",
+  "thresholds": {
+    "linear_speed_mps": 0.03,
+    "yaw_rate_radps": 0.03,
+    "settle_seconds": 0.5,
+    "settle_timeout": 3.0
+  }
+}

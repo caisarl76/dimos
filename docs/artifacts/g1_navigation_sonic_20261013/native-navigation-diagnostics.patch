@@ -1,0 +1,83 @@
+--- a/src/g1_deploy_onnx_ref.cpp
++++ b/src/g1_deploy_onnx_ref.cpp
+@@ -312,6 +312,10 @@
+     // =========================================================================
+     std::unique_ptr<std::ofstream> target_motion_file_;
+     std::unique_ptr<std::ofstream> planner_motion_file_;
++    // Private diagnostics only: enabled by guarded planner plus existing log flags.
++    // Separate streams are owned by the control and planner threads respectively.
++    std::unique_ptr<std::ofstream> navigation_frames_file_;
++    std::unique_ptr<std::ofstream> navigation_replans_file_;
+     std::unique_ptr<std::ofstream> policy_input_file_;
+     // Temporary simulation diagnostic, enabled with the existing input-log flag.
+     std::unique_ptr<std::ofstream> encoder_parity_file_;
+@@ -2244,6 +2248,15 @@
+ 
+         // open file in append mode:
+         target_motion_file_ = std::make_unique<std::ofstream>(target_motion_file_path, std::ios::app);
++        if (guarded_planner) {
++          navigation_frames_file_ = std::make_unique<std::ofstream>(target_motion_file_path + ".frames.csv");
++          *navigation_frames_file_ << std::setprecision(17);
++          *navigation_frames_file_ << "monotonic,frame,reference_x,reference_y,reference_z";
++          for (int i = 0; i < 4; ++i) *navigation_frames_file_ << ",reference_quat_" << i;
++          for (int i = 0; i < 29; ++i) *navigation_frames_file_ << ",reference_motor_q_" << i;
++          for (int i = 0; i < 29; ++i) *navigation_frames_file_ << ",measured_motor_q_" << i;
++          *navigation_frames_file_ << '\n';
++        }
+       }
+ 
+       if(!planner_motion_file_path.empty())
+@@ -2254,6 +2267,14 @@
+ 
+         // open file in append mode:
+         planner_motion_file_ = std::make_unique<std::ofstream>(planner_motion_file_path, std::ios::app);
++        if (guarded_planner) {
++          navigation_replans_file_ = std::make_unique<std::ofstream>(planner_motion_file_path + ".replans.csv");
++          *navigation_replans_file_ << std::setprecision(17);
++          *navigation_replans_file_ << "started_monotonic,finished_monotonic,mode,periodic,mode_changed,facing_changed,height_changed,speed_changed,direction_changed,counter,generated_frame,speed,movement_x,movement_y,facing_x,facing_y";
++          for (int i = 0; i < 144; ++i) *navigation_replans_file_ << ",context_" << i;
++          for (int i = 0; i < 29; ++i) *navigation_replans_file_ << ",measured_motor_q_" << i;
++          *navigation_replans_file_ << '\n';
++        }
+       }
+ 
+       if(!policy_input_file_path.empty())
+@@ -3858,6 +3879,20 @@
+               )) {
+                 throw std::runtime_error("Error when updating planner");
+               }
++              if (navigation_replans_file_) {
++                auto& log = *navigation_replans_file_;
++                log << std::chrono::duration<double>(gather_input_start_time.time_since_epoch()).count()
++                    << ',' << std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count()
++                    << ',' << current_mode << ',' << time_to_replan << ',' << movement_mode_changed
++                    << ',' << facing_direction_changed << ',' << height_changed << ',' << movement_speed_changed
++                    << ',' << movement_direction_changed << ',' << replan_interval_counter_ << ',' << planner_->gen_frame_
++                    << ',' << movement_speed << ',' << movement_direction[0] << ',' << movement_direction[1]
++                    << ',' << facing_direction[0] << ',' << facing_direction[1];
++                const auto context = planner_->GetContextBuffer();
++                for (int i = 0; i < 144; ++i) log << ',' << context[i];
++                for (int i = 0; i < 29; ++i) log << ',' << ls->motor_state()[i].q();
++                log << std::endl;
++              }
+               
+             } catch (const std::exception& e) {
+               std::cout << "✗ Error during planning update: " << e.what() << std::endl;
+@@ -4048,6 +4083,17 @@
+               std::cout << "Stopping control system." << std::endl;
+               operator_state.stop = true;
+               return;
++            }
++            if (navigation_frames_file_) {
++              auto& log = *navigation_frames_file_;
++              log << std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count()
++                  << ',' << current_frame_copy;
++              for (auto value : current_motion_copy->BodyPositions(current_frame_copy)[0]) log << ',' << value;
++              for (auto value : current_motion_copy->BodyQuaternions(current_frame_copy)[0]) log << ',' << value;
++              for (int i = 0; i < 29; ++i) log << ',' << current_motion_copy->JointPositions(current_frame_copy)[isaaclab_to_mujoco[i]];
++              auto measured = low_state_buffer_.GetDataWithTime().data;
++              for (int i = 0; i < 29; ++i) log << ',' << measured->motor_state()[i].q();
++              log << std::endl;
+             }
+             // GatherObservations can select a fallback encoder mode.
+             current_encoder_mode_copy = current_motion_copy->GetEncodeMode();

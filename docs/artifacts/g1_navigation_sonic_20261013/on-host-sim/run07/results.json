@@ -1,0 +1,96 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5072223239112645,
+      "speed": 0.002129150776365787,
+      "yaw_rate": -0.009339512522211279
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "start": 1063552.327297284,
+      "end": 1063554.328916088,
+      "forward_displacement_m": 0.01988998185126658,
+      "yaw_change_rad": 0.008170456231102657
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.5085330239962786,
+      "speed": 0.001793267105309394,
+      "yaw_rate": -0.00584873667347084
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "start": 1063556.850166288,
+      "end": 1063558.840595221,
+      "forward_displacement_m": -0.28066950856238443,
+      "yaw_change_rad": -0.0031159580871253662
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.005557688884437,
+      "speed": 0.006708700288134185,
+      "yaw_rate": 0.0013782943556350758
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "start": 1063560.847494953,
+      "end": 1063562.843772552,
+      "forward_displacement_m": -0.0018347453851289602,
+      "yaw_change_rad": 0.05707291777495056
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 1.959197429008782,
+      "speed": 0.008557747085854875,
+      "yaw_rate": 0.007685337988892554
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "start": 1063564.813323687,
+      "end": 1063566.821385745,
+      "forward_displacement_m": 0.011047748815317077,
+      "yaw_change_rad": -0.22604190651836664
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 1.987678897101432,
+      "speed": 0.0029138856738684595,
+      "yaw_rate": -0.007738175346343342
+    },
+    {
+      "name": "before_noisy_trace_settled",
+      "passed": true,
+      "elapsed": 0.5285400548018515,
+      "speed": 0.003907605691465987,
+      "yaw_rate": -0.011443314354971978
+    },
+    {
+      "name": "noisy_trace_replan_limit",
+      "passed": true,
+      "start": 1063569.355192315,
+      "end": 1063574.3559086,
+      "native_state_replans": 1,
+      "yaw_noise_rad": 0.005,
+      "source": "PController.advance, 0.2 m/s, alternating +/-0.01 rad lookahead error"
+    },
+    {
+      "name": "noisy_trace_settled",
+      "passed": true,
+      "elapsed": 0.5065954150632024,
+      "speed": 0.00033610932433739555,
+      "yaw_rate": 0.0023940527609665994
+    }
+  ],
+  "error": "AssertionError: "
+}

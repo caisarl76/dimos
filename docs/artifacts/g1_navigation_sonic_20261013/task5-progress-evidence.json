@@ -1,0 +1,150 @@
+{
+  "recorded_at": "2026-10-13T09:08:45.004614+00:00",
+  "scope": "Host-only native simulation and Stage A review fixes; no real robot control; Task5 and commissioning gates remain OPEN",
+  "tests": {
+    "sonic": {
+      "tests": 399,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_sha256": "9393e92ec649b33d8f16b6e90151941f49a9226c4c840c735a17da9979a63492"
+    },
+    "shared_lease": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_sha256": "2f04c3b866cf146590cbe4741e3d961fe6395427ecfbc2f62826890c101283a5"
+    }
+  },
+  "checks": [
+    "mypy4productionPASS",
+    "RuffchangedPythonPASS",
+    "20originalSONICbaselinehashesmatch",
+    "51originalnativehashesmatch"
+  ],
+  "source_sha256": {
+    "dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1",
+    "dimos/robot/unitree/g1/test_sonic_navigation.py": "8fe6fa36ddc6b55df6c9fce2aebddc0488aa991dd154e09385f8d713c3baa1e1",
+    "dimos/robot/unitree/g1/test_sonic_observation_module.py": "4dbdf8d35f7b1f2c10619ad6499d6cdb86e34a077ea5daf3f8a29bb90473a814",
+    "dimos/robot/unitree/g1/sonic_observation_module.py": "d0336492a2dd21a62a0733f34c12112e5e8255c91ff7eb3edab214d3cdd64e2e",
+    "dimos/robot/unitree/g1/sonic_feedback_module.py": "e723a74e38c7f0ed4e3e7a81b39bce11f5cd8ec021ef9ed9e544371b60534bdb",
+    "dimos/robot/unitree/g1/sonic_feedback.py": "9496e254e7f22e6848d7899bc290b638cb11b07e74646c269812cfa9d03f79c8",
+    "dimos/robot/unitree/g1/sonic_policy_client.py": "57b624ae6094cc44c668331b6a68972de5f52565d91655053231d90a0e470221",
+    "dimos/robot/unitree/g1/test_sonic_navigation_session.py": "9028391bc2a37fbd5c40a618c3a6e23e016cf9c1e7b1974ad5db7e1750ed92e8",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "884873648c2d48b15fc6cad965cca1e21517a35921f5d03fc7532bc2e8058062",
+    "dimos/robot/unitree/g1/sonic_observation_pairing.py": "cf43819e38072eb026ce6f4d997a792e70f179a1428a17214dd35748e14dc589",
+    "dimos/robot/unitree/g1/test_sonic_feedback.py": "e9d8e5d00ffa065ddae57366a6a3f5bac4c337456a71e9a75db25e28944279b7",
+    "dimos/robot/unitree/g1/sonic_observation.py": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+    "dimos/robot/unitree/g1/sonic_navigation_session.py": "539decddaea5d82136a25157645b1d5e5fb72e173368dba156fdd9538a5e68e7",
+    "dimos/robot/unitree/g1/sonic_session.py": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+    "dimos/robot/unitree/g1/sonic_navigation.py": "48411fc888ef2545f805d4014f4ea6a11c1bc439a465531487155dba864ac5da",
+    "dimos/robot/unitree/g1/test_sonic_session.py": "c416685dbe41c58ac0caabbe56a0363ef4a6b84b72511f78c2552906679307b3",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "14ff7f88fc79828c6db10901ad7c4ea95272720cb77fae6e5233985616028f98",
+    "dimos/robot/unitree/g1/test_sonic_observation_pairing.py": "66c8d2400485291c79d9f5cecde40b63badf3329dfe1aff1d52d9bd5ddaecbad",
+    "dimos/robot/unitree/g1/test_sonic_observation.py": "3b758e3c0daa850d9d34ee1ecefcdc7490c024ecd25bffff650378ec28cf2516",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "7306f7f3e26db0a0ab485337d574c80ee4763a72cff212d924d5e9e2149a18ca",
+    "dimos/robot/unitree/g1/test_sonic_reference.py": "41bc177786ec074aaa2c005a427262e78331156f43cb0280a31dde5eeee0677a",
+    "dimos/robot/unitree/g1/test_sonic_policy_client.py": "9461272e11166dccb33a722be7e0013c5264fe98b8b8efbe8c5c9d2afdb68322",
+    "dimos/robot/unitree/g1/test_sonic_execution_module.py": "1db806b4b187b63cfb864e2245181ddceec4e7ac55cece316b9899ee3feed9bf"
+  },
+  "runs": {
+    "run01": {
+      "status": "motion_phase_passed_remaining_fault_and_pose_checks",
+      "error": null,
+      "cases": 9,
+      "failed_cases": [],
+      "manifest_sha256": "511b21c811272c45d2b72fb44d29c1d5fb7e4aef0628b35ae80d8d8dddf0b0c1",
+      "results_sha256": "cd208e6e10b219d7ad032ff3c65ed753ceb75cbe540e376ae9b9b887d0d0ba1e",
+      "raw_manifest_sha256": "4a3264331010bcbca5b923e12f4a08e535b360a0c5bb00cdcc28c5cb0a786906"
+    },
+    "run02": {
+      "status": "failed",
+      "error": "AssertionError: forward direction mismatch",
+      "cases": 2,
+      "failed_cases": [
+        "forward"
+      ],
+      "manifest_sha256": "511b21c811272c45d2b72fb44d29c1d5fb7e4aef0628b35ae80d8d8dddf0b0c1",
+      "results_sha256": "98c9e554c4971d145db04c3738272f4f11a0c0237a05fe6bcd265ec3a41e19a0",
+      "raw_manifest_sha256": "259963999e319f2d45199865029a94c2d1b5103aca0e10ffa0a3c0b00ac1cd60"
+    },
+    "run03": {
+      "status": "diagnostic_only",
+      "error": null,
+      "cases": 3,
+      "failed_cases": [],
+      "manifest_sha256": "12625e631ad67802f0df8f6c6d441ed7d80d7c844ea7834ea6c8c4d48a91361d",
+      "results_sha256": "69fac4066db931dcb82803b60676c6a7b94077496bc175a0edc76ff937e529e1",
+      "raw_manifest_sha256": "f684fda404f56a689dff3e6858c1f6a8e7dc55d189b67aa71d2136846fc5d4b5"
+    },
+    "run04": {
+      "status": "diagnostic_only",
+      "error": null,
+      "cases": 7,
+      "failed_cases": [],
+      "manifest_sha256": "5a66009a0e76260cb72c5096ef08d9251d33d6025b90eeff17320b97934a0411",
+      "results_sha256": "ac55b4b4be650fa271011032c37d5a526a185954701a687834e056621ff7272e",
+      "raw_manifest_sha256": "b1fd488dd6b6151a2ef82e8258729a09d6684eae628cbef4c0eee859682f962a"
+    },
+    "run05": {
+      "status": "failed",
+      "error": "AssertionError: fixed-target noisy trace triggered excess native replans",
+      "cases": 10,
+      "failed_cases": [],
+      "manifest_sha256": "afefa02f339f2015c57a04d962eb9500401cc1458d334179d072a9bb72566f0d",
+      "results_sha256": "1bd6d849a53753e352c88ff151b2492d1e01f6d14cc66deb43e35e328deba899",
+      "raw_manifest_sha256": "2848f4d5aaa5e9581dc94f4a354f5f78418105540fbb7d77066247b78a785d08"
+    },
+    "run06": {
+      "status": "passed",
+      "error": null,
+      "cases": 26,
+      "failed_cases": [],
+      "manifest_sha256": "a17191c9c8289715970c2c0d1e958c9c5c2df0dcacd7cddb19b2d0d7a93c12ce",
+      "results_sha256": "839bd3aadc518675e2d560a6302d0d740a23ecee432d87e0d4a329f2abb4aa9b",
+      "raw_manifest_sha256": "66e3b699ec1976eb720312207af583c3989710790ca27f61d57f0652158f8135"
+    },
+    "run07": {
+      "status": "failed",
+      "error": "AssertionError: ",
+      "cases": 12,
+      "failed_cases": [],
+      "manifest_sha256": "3df86d1a1eded3ff922c0bb3ec2c896e9302de40c02bcac27376abbcf60965bf",
+      "results_sha256": "afec799639b13394c5b5250fde45d073fef9aaa7947c295f69dd72df11dcc259",
+      "raw_manifest_sha256": "670b52f382579480c130d2ee046441c75f1b34dbda74f8e4b1bb606ad824ba9e"
+    },
+    "run08": {
+      "status": "failed",
+      "error": "TimeoutError: forward measured settling",
+      "cases": 2,
+      "failed_cases": [],
+      "manifest_sha256": "0edce27ffb0854df3624197b10006da76048c5560fb59f019e6bb0d7366f1c2c",
+      "results_sha256": "e31e9a2fc3b5416ea4d8e0afe484ede09885439b0cda8e8c7f518f4cb60116e9",
+      "raw_manifest_sha256": "dd096ca4be99a111b0a2cb3f9afe0e031e2df4e617ed95ad6026871b37f12350"
+    },
+    "run09": {
+      "status": "failed",
+      "error": "AssertionError: fixed-target noisy trace triggered excess native replans",
+      "cases": 3,
+      "failed_cases": [
+        "noisy_trace_replan_limit"
+      ],
+      "manifest_sha256": "cb4fb7eca32e6bc9226d13dd0c8d9374d154fa7ee04acdd498cceeb18f03e1da",
+      "results_sha256": "23e3dc4378c8acf08c64544100e59c981c94cf91201cf4d0c615cf7ad6ee73b6",
+      "raw_manifest_sha256": "abfa62ab53e6b0c3b63b4b012f374f7b3a890f4e46fe879deeb45c883dd46701"
+    }
+  },
+  "gates": {
+    "task5": "OPEN",
+    "stage_a_simulation": "OPEN",
+    "stage_b": "NOT_STARTED",
+    "real_robot_commissioning": "BLOCKED"
+  },
+  "blockers": [
+    "Exact reference/bones_072925_test fixture absent; example substitute fails396FKassertions in both baseline/private",
+    "Run02 two-second forward displacement-.03797m remains unexplained",
+    "Run08 forward measured settling failed unchanged3s/.03mps/.03radps/.5scriterion",
+    "Run09 translating-noise count19 exceeds approved<=1; heldfacing/literalheartbeats verified,18above-thresholdmovementchanges track actualbodyyaw; testrefinement requiresreview"
+  ]
+}
