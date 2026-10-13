@@ -74,7 +74,7 @@ class GlobalPlanner(Resource):
     _max_path_deviation: float = 0.9
     _replanning_enabled: bool = True
 
-    def __init__(self, global_config: GlobalConfig) -> None:
+    def __init__(self, global_config: GlobalConfig, *, min_angular_velocity: float = 0.2) -> None:
         self.path = Subject()
         self.goal_reached = Subject()
 
@@ -82,7 +82,10 @@ class GlobalPlanner(Resource):
         self._navigation_map = NavigationMap(self._global_config, "voronoi")
         self._navigation_map_near = NavigationMap(self._global_config, "gradient")
         self._local_planner = LocalPlanner(
-            self._global_config, self._navigation_map, self._goal_tolerance
+            self._global_config,
+            self._navigation_map,
+            self._goal_tolerance,
+            min_angular_velocity=min_angular_velocity,
         )
 
         stuck_threshold = self._stuck_threshold

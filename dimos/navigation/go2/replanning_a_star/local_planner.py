@@ -71,7 +71,12 @@ class LocalPlanner(Resource):
     _navigation_costmap_last: float = 0.0
 
     def __init__(
-        self, global_config: GlobalConfig, navigation_map: NavigationMap, goal_tolerance: float
+        self,
+        global_config: GlobalConfig,
+        navigation_map: NavigationMap,
+        goal_tolerance: float,
+        *,
+        min_angular_velocity: float = 0.2,
     ) -> None:
         self.cmd_vel = Subject()
         self.stopped_navigating = Subject()
@@ -94,6 +99,7 @@ class LocalPlanner(Resource):
             self._global_config,
             speed,
             self._control_frequency,
+            min_angular_velocity=min_angular_velocity,
         )
 
     def start(self) -> None:

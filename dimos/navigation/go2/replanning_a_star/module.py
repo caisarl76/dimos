@@ -16,6 +16,7 @@ import os
 from typing import Any
 
 from dimos_lcm.std_msgs import Bool, String
+from pydantic import Field
 from reactivex.disposable import Disposable
 
 from dimos.core.core import rpc
@@ -35,6 +36,7 @@ logger = setup_logger()
 
 
 class ReplanningAStarPlannerConfig(ModuleConfig):
+    min_angular_velocity: float = Field(default=0.2, ge=0, allow_inf_nan=False)
     robot_width: float | None = None
     robot_rotation_diameter: float | None = None
 
@@ -71,7 +73,9 @@ class ReplanningAStarPlanner(Module, NavigationInterface):
         effective_global_config = (
             self.config.g.model_copy(update=overrides) if overrides else self.config.g
         )
-        self._planner = GlobalPlanner(effective_global_config)
+        self._planner = GlobalPlanner(
+            effective_global_config, min_angular_velocity=self.config.min_angular_velocity
+        )
 
     @rpc
     def start(self) -> None:

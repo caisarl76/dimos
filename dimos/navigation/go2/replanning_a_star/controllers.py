@@ -41,12 +41,22 @@ class PController:
     _control_frequency: float
 
     _min_linear_velocity: float = 0.2
-    _min_angular_velocity: float = 0.2
+    _min_angular_velocity: float
     _k_angular: float = 0.5
     _max_angular_accel: float = 2.0
     _rotation_threshold: float = 90 * (math.pi / 180)
 
-    def __init__(self, global_config: GlobalConfig, speed: float, control_frequency: float) -> None:
+    def __init__(
+        self,
+        global_config: GlobalConfig,
+        speed: float,
+        control_frequency: float,
+        *,
+        min_angular_velocity: float = 0.2,
+    ) -> None:
+        if not math.isfinite(min_angular_velocity) or min_angular_velocity < 0:
+            raise ValueError("min_angular_velocity must be finite and nonnegative")
+        self._min_angular_velocity = min_angular_velocity
         self._global_config = global_config
         self._speed = speed
         self._control_frequency = control_frequency
@@ -120,8 +130,17 @@ class PdController(PController):
     _prev_yaw_error: float
     _prev_angular_velocity: float
 
-    def __init__(self, global_config: GlobalConfig, speed: float, control_frequency: float) -> None:
-        super().__init__(global_config, speed, control_frequency)
+    def __init__(
+        self,
+        global_config: GlobalConfig,
+        speed: float,
+        control_frequency: float,
+        *,
+        min_angular_velocity: float = 0.2,
+    ) -> None:
+        super().__init__(
+            global_config, speed, control_frequency, min_angular_velocity=min_angular_velocity
+        )
 
         self._prev_yaw_error = 0.0
         self._prev_angular_velocity = 0.0
