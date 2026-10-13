@@ -1,0 +1,29 @@
+{
+  "label": "Unreviewed manipulation-session SONIC baseline; no navigation changes",
+  "source_workspace": "/home/jihun/work/dimos_dev",
+  "source_head": "7529659c88c76eb4800552ad1d4fa5dd584ecc80",
+  "captured_at": "2026-10-13T02:33:24.577875+00:00",
+  "update_rule": "On upstream baseline hash change: stop at task boundary, import/rebase a separately labelled baseline update, resolve navigation diffs, rerun affected tests before proceeding. Never modify original workspace.",
+  "files_sha256": {
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "485ef9072431cb15ca955d321735339586b3813d3708a6c47772309d5461d665",
+    "dimos/robot/unitree/g1/sonic_feedback.py": "9c29f93c50d20d59c4a8e9244509069ebaa84c690db7b66c5bce9d02871058be",
+    "dimos/robot/unitree/g1/sonic_feedback_module.py": "e723a74e38c7f0ed4e3e7a81b39bce11f5cd8ec021ef9ed9e544371b60534bdb",
+    "dimos/robot/unitree/g1/sonic_observation.py": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+    "dimos/robot/unitree/g1/sonic_observation_module.py": "617f6415630324d23c0e0c8db788ef6c218c767c214d6df18b2e0b1623979c12",
+    "dimos/robot/unitree/g1/sonic_observation_pairing.py": "60ebf2c50edcc83babb30055751eb65eec26435aa6c756ffb0c2521ccd7190ca",
+    "dimos/robot/unitree/g1/sonic_policy_client.py": "57b624ae6094cc44c668331b6a68972de5f52565d91655053231d90a0e470221",
+    "dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
+    "dimos/robot/unitree/g1/sonic_session.py": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+    "dimos/robot/unitree/g1/test_sonic_execution_module.py": "d238272cbb3bd5a0d57e7df43b09994d2cc18eeb145a08acaadd22ee50ccdad5",
+    "dimos/robot/unitree/g1/test_sonic_feedback.py": "f518dd972e553263ff78c94d38906526bd73c41d10171fc3185ba07b26fdd1e4",
+    "dimos/robot/unitree/g1/test_sonic_observation.py": "3b758e3c0daa850d9d34ee1ecefcdc7490c024ecd25bffff650378ec28cf2516",
+    "dimos/robot/unitree/g1/test_sonic_observation_module.py": "2743593890fd0f2187704aebdc6bfe3b01996eab43a69a16ef43b74ab7ebc205",
+    "dimos/robot/unitree/g1/test_sonic_observation_pairing.py": "140a6152a0b9900b5667a6018a8d3979b2176d347c882d5eaae2006c634cb9a9",
+    "dimos/robot/unitree/g1/test_sonic_policy_client.py": "9461272e11166dccb33a722be7e0013c5264fe98b8b8efbe8c5c9d2afdb68322",
+    "dimos/robot/unitree/g1/test_sonic_reference.py": "41bc177786ec074aaa2c005a427262e78331156f43cb0280a31dde5eeee0677a",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+    "dimos/robot/unitree/g1/test_sonic_session.py": "c416685dbe41c58ac0caabbe56a0363ef4a6b84b72511f78c2552906679307b3",
+    "dimos/robot/unitree/g1/test_data/sonic_reference_golden.json": "252e79a21ecf9a469bcf7166ca9799d1a45ec0eab48cb668e8de357a20c45f58"
+  }
+}
