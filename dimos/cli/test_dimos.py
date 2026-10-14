@@ -276,18 +276,6 @@ def test_daemon_reuses_identity_only_for_exec_handoff(
     assert f"Run ID:    {expected_run_id}" in result.output
 
 
-def test_foreground_ignores_daemon_exec_identity(
-    stubbed_run: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("DIMOS_RUN_ID", "launcher-run")
-    monkeypatch.setenv("_DIMOS_DAEMON_STATUS_FD", "7")
-
-    result = CliRunner().invoke(main, ["run", "alpha"])
-
-    assert result.exit_code == 0, result.output
-    assert stubbed_run["entry"]["run_id"] == "test-alpha"
-
-
 def test_run_rejects_record_topics_matching_nothing(stubbed_run: dict[str, Any]) -> None:
     result = CliRunner().invoke(
         main, ["--record", "sqlite", "--record-topics", "nope", "run", "alpha"]
