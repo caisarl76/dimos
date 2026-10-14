@@ -317,7 +317,7 @@ def _autodiscover(
         except Exception:
             logger.warning("Host autodiscovery round failed", exc_info=True)
             new = []
-        if new and not daemon.describe().active_run_ids:
+        if new and daemon.close_if_idle():
             logger.info("Linking to discovered Hosts", endpoints=new)
             daemon.connect += new
             relink.set()

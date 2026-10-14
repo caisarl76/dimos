@@ -209,6 +209,7 @@ class HostDaemon:
         self._epoch = uuid.uuid4().hex
         self._deployments: dict[str, _Deployment] = {}
         self._lock = threading.RLock()
+        self._closing = False
 
     @property
     def client_endpoint(self) -> str:
@@ -251,6 +252,7 @@ class HostDaemon:
             connect_timeout=0,
             adminspace=True,
         )
+        self._closing = False
         with ExitStack() as cleanup:
             cleanup.callback(pool.close_all)
             cleanup.callback(self.shutdown)
@@ -283,11 +285,20 @@ class HostDaemon:
                 listen=tuple(self.listen),
             )
 
+    def close_if_idle(self) -> bool:
+        """Refuse further starts if no run is active; True when it did."""
+        with self._lock:
+            self._refresh_locked()
+            self._closing = not self._deployments
+            return self._closing
+
     def start(self, epoch: str, fragment: HostFragment) -> DeploymentStatus:
         self._check_epoch(epoch)
         self._check_fragment(fragment)
 
         with self._lock:
+            if self._closing:
+                raise RuntimeError("Host is relinking; retry the start")
             self._refresh_locked()
             existing = self._deployments.get(fragment.run_id)
             if existing is not None:

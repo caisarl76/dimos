@@ -173,12 +173,13 @@ def with_host_config(
 
     host_env = configuration_environment(environ)
     parser = BlueprintConfigParser(blueprint)
-    host, baseline = parser.parse(environ=host_env), parser.parse(environ={})
+    host = parser.parse(environ=host_env)
+    host_fields = parser.environment_module_fields(host_env)
     modules = {}
     for atom in blueprint.active_blueprints:
         values = config.module_kwargs(atom.name)
-        host_values, base_values = host.module_kwargs(atom.name), baseline.module_kwargs(atom.name)
-        values.update({k: v for k, v in host_values.items() if base_values.get(k) != v})
+        host_values = host.module_kwargs(atom.name)
+        values.update({k: host_values[k] for k in host_fields.get(atom.name, ())})
         modules[atom.name] = values
     merged = ParsedBlueprintConfig(
         _module_config_values=snapshot_mapping(modules),

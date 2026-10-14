@@ -223,6 +223,19 @@ def test_start_reports_child_failure(host_setup: dict[str, Any]) -> None:
     host_setup["kill"].assert_called_once_with(fragment.run_id)
 
 
+def test_close_if_idle_refuses_starts_only_when_idle(host_setup: dict[str, Any]) -> None:
+    daemon = host_setup["daemon"]
+    fragment = host_setup["fragment"]
+    epoch = daemon.describe().epoch
+    daemon.start(epoch, fragment)
+    assert not daemon.close_if_idle()
+
+    idle = HostDaemon("host-1", log_root=host_setup["daemon"]._log_root)
+    assert idle.close_if_idle()
+    with pytest.raises(RuntimeError, match="relinking"):
+        idle.start(idle.describe().epoch, fragment)
+
+
 def test_stop_releases_host(host_setup: dict[str, Any]) -> None:
     daemon = host_setup["daemon"]
     fragment = host_setup["fragment"]

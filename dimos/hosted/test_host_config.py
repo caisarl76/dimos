@@ -35,3 +35,10 @@ def test_host_env_beats_controller_only_where_it_sets_something() -> None:
     assert merged.module_kwargs("mounted")["mount"] == "ATHENS"
     assert merged.module_kwargs("mounted")["iface"] == "wlan0"
     assert merged.global_config["viewer"] == "none"
+
+
+def test_host_env_equal_to_the_default_still_beats_controller() -> None:
+    blueprint = Mounted.blueprint()
+    controller = BlueprintConfigParser(blueprint).parse(environ={"MOUNTED__IFACE": "wlan0"})
+    merged = with_host_config(blueprint, controller, environ={"MOUNTED__IFACE": "eth0"})
+    assert merged.module_kwargs("mounted")["iface"] == "eth0"
