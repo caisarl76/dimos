@@ -44,7 +44,7 @@ from dimos.core.coordination.module_coordinator import (
 from dimos.core.coordination.worker_manager_python import WorkerManagerPython
 from dimos.core.core import rpc
 from dimos.core.global_config import GlobalConfig
-from dimos.core.module import Module
+from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import IO, In, Out, Stream
 from dimos.core.transport import CloudflareTransport, PubSubTransport
 from dimos.core.transport_factory import transport_topic
@@ -785,6 +785,57 @@ def test_check_requirements_failure(mocker) -> None:
 
     with pytest.raises(SystemExit):
         _check_requirements(bp)
+
+
+class _EndpointConfig(ModuleConfig):
+    endpoint: str = "tcp://127.0.0.1:1"
+
+
+class _EndpointModule(Module):
+    config: _EndpointConfig
+
+
+def _reject_graph(seen: list[Any]) -> Callable[[Blueprint, Any], None]:
+    def check(blueprint: Blueprint, module_kwargs: Any) -> None:
+        seen.append(([a.module for a in blueprint.active_blueprints], module_kwargs))
+        raise ValueError("graph rejected")
+
+    return check
+
+
+def test_validators_see_final_graph_and_resolved_kwargs_before_startup(mocker) -> None:
+    seen: list[Any] = []
+    blueprint = autoconnect(
+        _EndpointModule.blueprint(endpoint="tcp://127.0.0.1:2").validators(_reject_graph(seen)),
+        ModuleC.blueprint(),
+    )
+    parsed = BlueprintConfigParser(blueprint).parse(
+        environ={},
+        overrides={"g": {"viewer": "none"}, _EndpointModule.name: {"endpoint": "tcp://10.0.0.1:3"}},
+    )
+    configure = mocker.patch("dimos.core.coordination.module_coordinator._run_configurators")
+    materialize = mocker.patch("dimos.core.coordination.module_coordinator._materialize_transports")
+    start = mocker.patch.object(ModuleCoordinator, "start")
+
+    with pytest.raises(ValueError, match="graph rejected"):
+        ModuleCoordinator.build(blueprint, parsed)
+
+    assert seen[0][0] == [_EndpointModule, ModuleC]
+    assert seen[0][1][_EndpointModule.name]["endpoint"] == "tcp://10.0.0.1:3"
+    configure.assert_not_called()
+    materialize.assert_not_called()
+    start.assert_not_called()
+
+
+def test_load_blueprint_validators_run_before_workers(dynamic_coordinator, mocker) -> None:
+    seen: list[Any] = []
+    add_workers = mocker.spy(WorkerManagerPython, "add_workers")
+
+    with pytest.raises(ValueError, match="graph rejected"):
+        dynamic_coordinator.load_blueprint(ModuleA.blueprint().validators(_reject_graph(seen)))
+
+    assert seen[0] == ([ModuleA], {ModuleA.name: {}})
+    add_workers.assert_not_called()
 
 
 def test_restart_module_basic(dynamic_coordinator) -> None:

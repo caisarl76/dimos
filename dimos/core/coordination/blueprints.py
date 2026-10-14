@@ -196,6 +196,11 @@ class Blueprint:
 
     requirement_checks: tuple[Callable[[], str | None], ...] = field(default_factory=tuple)
     configurator_checks: "tuple[SystemConfigurator, ...]" = field(default_factory=tuple)
+    # Run on the final composed graph and resolved module kwargs before any
+    # system configuration, transport or worker startup. Raise to reject.
+    validator_checks: tuple[Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None], ...] = (
+        field(default_factory=tuple)
+    )
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
@@ -342,6 +347,11 @@ class Blueprint:
     def configurators(self, *checks: "SystemConfigurator") -> "Blueprint":
         return replace(self, configurator_checks=self.configurator_checks + tuple(checks))
 
+    def validators(
+        self, *checks: Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None]
+    ) -> "Blueprint":
+        return replace(self, validator_checks=self.validator_checks + tuple(checks))
+
     @cached_property
     def active_blueprints(self) -> tuple[BlueprintAtom, ...]:
         if not self.disabled_modules_tuple:
@@ -367,6 +377,7 @@ def autoconnect(*blueprints: Blueprint) -> Blueprint:
     )
     all_requirement_checks = tuple(check for bs in blueprints for check in bs.requirement_checks)
     all_configurator_checks = tuple(check for bs in blueprints for check in bs.configurator_checks)
+    all_validator_checks = tuple(check for bs in blueprints for check in bs.validator_checks)
 
     return Blueprint(
         blueprints=all_blueprints,
@@ -378,6 +389,7 @@ def autoconnect(*blueprints: Blueprint) -> Blueprint:
         remapping_map=MappingProxyType(all_remappings),
         requirement_checks=all_requirement_checks,
         configurator_checks=all_configurator_checks,
+        validator_checks=all_validator_checks,
     )
 
 

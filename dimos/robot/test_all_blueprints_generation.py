@@ -42,6 +42,7 @@ BLUEPRINT_METHODS = {
     "remappings",
     "requirements",
     "configurators",
+    "validators",
 }
 _EXCLUDED_MODULE_NAMES = {"Module", "ModuleBase", "StreamModule"}
 
