@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 import json
 from pathlib import Path
 import threading
@@ -31,7 +32,7 @@ from dimos.core.rpc_client import RPCClient
 from dimos.core.transport_factory import make_transport
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
-from dimos.robot.unitree.g1.sonic_observation import SonicObservation
+from dimos.robot.unitree.g1.sonic_observation import SonicDeliveryStamp, SonicObservation
 from dimos.robot.unitree.g1.sonic_policy_client import (
     SonicPolicyChunk,
     SonicPolicyClient,
@@ -69,7 +70,7 @@ def policy(mocker):
 
 
 @pytest.fixture
-def service(execution, tmp_path, policy, mocker):
+def service(execution, tmp_path, policy, mocker, request):
     module = SonicServiceModule(
         policies={"pi05": "ipc:///unused-policy"},
         execution_profile_name="scripted-peer",
@@ -78,6 +79,7 @@ def service(execution, tmp_path, policy, mocker):
         policy_timeout_seconds=0.2,
         execution_rpc_timeout_seconds=0.2,
         recovery_timeout_seconds=0.8,
+        **getattr(request, "param", {}),
     )
     mocker.patch.object(module, "_execution", execution[0], create=True)
     transport = make_transport(f"/service-test/{uuid4().hex}", SonicObservation)
@@ -99,12 +101,23 @@ def camera(service):
         sequence = 0
         try:
             while not stopped.is_set():
+                received_at = time.monotonic()
+                stamps = (
+                    tuple(
+                        SonicDeliveryStamp(group, sequence, received_at)
+                        for group in ("camera", "body", "left_hand", "right_hand")
+                    )
+                    if service.config.observation_time_basis == "delivery"
+                    else None
+                )
                 service.handle_observation(
                     SonicObservation(
                         sequence,
-                        time.monotonic(),
+                        received_at,
                         np.full(28, sequence / 1000, np.float32),
                         np.full((480, 640, 3), sequence % 255, np.uint8),
+                        time_basis=service.config.observation_time_basis,
+                        delivery_stamps=stamps,
                     )
                 )
                 sequence += 1
@@ -578,3 +591,155 @@ def test_policy_info_waits_for_navigation_settling(service, execution, camera, p
     done = terminal(service)
     assert done["outcome"] == "finished"
     assert policy[0].called and start_task.called
+
+
+@pytest.fixture
+def delivery_profile(execution_config):
+    execution_config["profile"] = replace(
+        execution_config["profile"], observation_time_basis="delivery", seed_seconds=0.3
+    )
+
+
+def test_acquisition_service_rejects_delivery_snapshot_before_inference(service, policy):
+    now = time.monotonic()
+    stamps = tuple(SonicDeliveryStamp(str(i), 1, now) for i in range(4))
+    with pytest.raises(ValueError, match="basis"):
+        service.handle_observation(
+            SonicObservation(
+                0,
+                now,
+                np.zeros(28),
+                np.zeros((480, 640, 3), np.uint8),
+                time_basis="delivery",
+                delivery_stamps=stamps,
+            )
+        )
+    assert service.get_service_status()["observation_age_s"] is None
+    policy[1].assert_not_called()
+
+
+@pytest.mark.parametrize("service", [{"observation_time_basis": "delivery"}], indirect=True)
+def test_service_rejects_execution_timing_profile_mismatch(service, camera, execution, policy):
+    request(service)
+    done = terminal(service)
+    assert done["outcome"] == "failed" and "basis" in done["reason"]
+    assert execution[0].get_status()["task"] is None
+    policy[0].assert_not_called()
+
+
+@pytest.mark.usefixtures("delivery_profile")
+@pytest.mark.parametrize("service", [{"observation_time_basis": "delivery"}], indirect=True)
+def test_delivery_basis_and_receipts_survive_service_copy_and_journal(service, camera):
+    request(service)
+    done = terminal(service)
+    status = service.get_service_status()
+    assert done["outcome"] == "finished" and done["handback_confirmed"]
+    assert status["observation_time_basis"] == "delivery"
+    assert status["acquisition_age_s"] is None and status["acquisition_skew_s"] is None
+    assert status["delivery_age_s"] >= 0
+    assert status["input_liveness_max_age_s"] == 0.2
+    assert status["prediction_max_age_s"] == 0.5
+    events = [json.loads(row) for row in Path(done["journal_path"]).read_text().splitlines()]
+    predictions = [e for e in events if e["event"] == "inference_requested"]
+    assert predictions
+    assert all(e["observation_time_basis"] == "delivery" for e in predictions)
+    assert all(len(e["delivery_stamps"]) == 4 for e in predictions)
+    assert all(
+        e["observed_at"] == min(s["received_at"] for s in e["delivery_stamps"]) for e in predictions
+    )
+
+
+@pytest.mark.usefixtures("delivery_profile")
+@pytest.mark.parametrize("service", [{"observation_time_basis": "delivery"}], indirect=True)
+def test_delivery_expiry_recovers_while_first_inference_is_still_blocked(
+    service, camera, execution, policy
+):
+    entered, release = threading.Event(), threading.Event()
+
+    def blocked(**kwargs):
+        entered.set()
+        assert release.wait(3)
+        return policy[2](**kwargs)
+
+    policy[1].side_effect = blocked
+    try:
+        request(service, 2)
+        assert entered.wait(2)
+        camera.set()
+        wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=1)
+        task = execution[0].get_status()["task"]
+        assert task["handback_confirmed"] and "delivery" in task["reason"]
+        assert not release.is_set()
+    finally:
+        release.set()
+    done = terminal(service)
+    assert done["outcome"] == "failed" and done["accepted_predictions"] == 0
+
+
+@pytest.mark.usefixtures("delivery_profile")
+@pytest.mark.parametrize("service", [{"observation_time_basis": "delivery"}], indirect=True)
+def test_delivery_expiry_during_seeding_requests_recovery(
+    service, camera, execution, policy, mocker
+):
+    original = execution[0].start_task
+
+    def freeze_after_start():
+        result = original()
+        camera.set()
+        return result
+
+    mocker.patch.object(execution[0], "start_task", side_effect=freeze_after_start)
+    request(service, 2)
+    done = terminal(service)
+    assert done["outcome"] == "failed" and done["handback_confirmed"]
+    assert "delivery" in done["reason"]
+    policy[1].assert_not_called()
+
+
+def delivery_observation(sequence, source="receiver"):
+    now = time.monotonic()
+    return SonicObservation(
+        sequence,
+        now,
+        np.zeros(28),
+        np.zeros((480, 640, 3), np.uint8),
+        time_basis="delivery",
+        delivery_stamps=tuple(SonicDeliveryStamp(f"{source}/{i}", sequence, now) for i in range(4)),
+    )
+
+
+@pytest.mark.parametrize("service", [{"observation_time_basis": "delivery"}], indirect=True)
+def test_delivery_receiver_restart_latches_fault_even_when_sequence_restarts(service):
+    service.handle_observation(delivery_observation(5))
+    with pytest.raises(ValueError, match="source changed"):
+        service.handle_observation(delivery_observation(0, "replacement"))
+    assert service.get_service_status()["state"] == "fault"
+    with pytest.raises(RuntimeError, match="fault"):
+        request(service)
+
+
+@pytest.mark.usefixtures("delivery_profile")
+@pytest.mark.parametrize("service", [{"observation_time_basis": "delivery"}], indirect=True)
+def test_delivery_source_fault_during_policy_preflight_never_starts_execution(
+    service, execution, policy
+):
+    entered, release = threading.Event(), threading.Event()
+    info = policy[0].return_value
+
+    def blocked_info():
+        entered.set()
+        assert release.wait(3)
+        return info
+
+    policy[0].side_effect = blocked_info
+    service.handle_observation(delivery_observation(0))
+    try:
+        request(service)
+        assert entered.wait(2)
+        with pytest.raises(ValueError, match="source changed"):
+            service.handle_observation(delivery_observation(1, "replacement"))
+    finally:
+        release.set()
+    done = terminal(service)
+    assert "source changed" in done["reason"]
+    assert execution[0].get_status()["task"] is None

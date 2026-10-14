@@ -8,13 +8,13 @@
     "dimos/robot/unitree/g1/sonic_execution_module.py": "485ef9072431cb15ca955d321735339586b3813d3708a6c47772309d5461d665",
     "dimos/robot/unitree/g1/sonic_feedback.py": "9c29f93c50d20d59c4a8e9244509069ebaa84c690db7b66c5bce9d02871058be",
     "dimos/robot/unitree/g1/sonic_feedback_module.py": "e723a74e38c7f0ed4e3e7a81b39bce11f5cd8ec021ef9ed9e544371b60534bdb",
-    "dimos/robot/unitree/g1/sonic_observation.py": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+    "dimos/robot/unitree/g1/sonic_observation.py": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b",
     "dimos/robot/unitree/g1/sonic_observation_module.py": "d0336492a2dd21a62a0733f34c12112e5e8255c91ff7eb3edab214d3cdd64e2e",
     "dimos/robot/unitree/g1/sonic_observation_pairing.py": "cf43819e38072eb026ce6f4d997a792e70f179a1428a17214dd35748e14dc589",
     "dimos/robot/unitree/g1/sonic_policy_client.py": "57b624ae6094cc44c668331b6a68972de5f52565d91655053231d90a0e470221",
     "dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1",
-    "dimos/robot/unitree/g1/sonic_service_module.py": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
-    "dimos/robot/unitree/g1/sonic_session.py": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "467e434341f3e8fc435e72b4da16669fac79b10bfcaf586a711e2ffeb4861861",
+    "dimos/robot/unitree/g1/sonic_session.py": "c261b496e908bcfd1a5107bc8a25a357f991155e1a1fcfbfd214709d69427553",
     "dimos/robot/unitree/g1/test_sonic_execution_module.py": "d238272cbb3bd5a0d57e7df43b09994d2cc18eeb145a08acaadd22ee50ccdad5",
     "dimos/robot/unitree/g1/test_sonic_feedback.py": "f518dd972e553263ff78c94d38906526bd73c41d10171fc3185ba07b26fdd1e4",
     "dimos/robot/unitree/g1/test_sonic_observation.py": "3b758e3c0daa850d9d34ee1ecefcdc7490c024ecd25bffff650378ec28cf2516",
@@ -22,7 +22,7 @@
     "dimos/robot/unitree/g1/test_sonic_observation_pairing.py": "66c8d2400485291c79d9f5cecde40b63badf3329dfe1aff1d52d9bd5ddaecbad",
     "dimos/robot/unitree/g1/test_sonic_policy_client.py": "9461272e11166dccb33a722be7e0013c5264fe98b8b8efbe8c5c9d2afdb68322",
     "dimos/robot/unitree/g1/test_sonic_reference.py": "41bc177786ec074aaa2c005a427262e78331156f43cb0280a31dde5eeee0677a",
-    "dimos/robot/unitree/g1/test_sonic_service_module.py": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "42cf0431adb4684173a43084565ba9646a3dd29b9ced3409ed7edb2b5008428b",
     "dimos/robot/unitree/g1/test_sonic_session.py": "c416685dbe41c58ac0caabbe56a0363ef4a6b84b72511f78c2552906679307b3",
     "dimos/robot/unitree/g1/test_data/sonic_reference_golden.json": "252e79a21ecf9a469bcf7166ca9799d1a45ec0eab48cb668e8de357a20c45f58"
   },
@@ -70,6 +70,29 @@
         }
       },
       "reason": "Separate unchanged-byte import of the manipulation session acquisition-uncertainty fixes before the Task 5 boundary; navigation code untouched"
+    },
+    {
+      "captured_at": "2026-10-13T15:08:52.332811+00:00",
+      "reason": "Unchanged upstream delivery/acquisition timing update; retain existing navigation additions through explicit3wayresolution",
+      "files": {
+        "dimos/robot/unitree/g1/sonic_observation.py": {
+          "before": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+          "after": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b"
+        },
+        "dimos/robot/unitree/g1/sonic_service_module.py": {
+          "before": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
+          "after": "467e434341f3e8fc435e72b4da16669fac79b10bfcaf586a711e2ffeb4861861"
+        },
+        "dimos/robot/unitree/g1/sonic_session.py": {
+          "before": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+          "after": "c261b496e908bcfd1a5107bc8a25a357f991155e1a1fcfbfd214709d69427553"
+        },
+        "dimos/robot/unitree/g1/test_sonic_service_module.py": {
+          "before": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+          "after": "42cf0431adb4684173a43084565ba9646a3dd29b9ced3409ed7edb2b5008428b"
+        }
+      },
+      "integration": "service imports retain PoseStamped and ObservationTimeBasis; append both independent service test groups; no behavior invented"
     }
   ]
 }

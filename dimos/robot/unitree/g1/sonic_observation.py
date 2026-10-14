@@ -12,14 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Synchronized RGB/state snapshots for the G1 WBT sonic78 policy profile."""
+"""RGB/state snapshots with explicit acquisition or delivery timing for sonic78."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 import math
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
+
+ObservationTimeBasis = Literal["acquisition", "delivery"]
+DELIVERY_COMPONENTS = ("camera", "body", "left_hand", "right_hand")
+
+
+@dataclass(frozen=True)
+class SonicDeliveryStamp:
+    """Original same-host receiver time and opaque source delivery marker.
+
+    Markers must advance within one source lifetime. DDS publication stamps
+    and camera stamps are delivery evidence, not sensor acquisition identity.
+    """
+
+    source_id: str
+    source_marker: int | float
+    received_at: float
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if not isinstance(self.source_id, str) or not 0 < len(self.source_id.strip()) <= 512:
+            raise ValueError("delivery source identity required")
+        for value in (self.source_marker, self.received_at):
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError("finite delivery marker and receipt time required")
+
 
 _ARM_NAMES = (
     "shoulder_pitch",
@@ -56,17 +84,21 @@ def policy_joint_state(positions: Mapping[str, float]) -> NDArray[np.float32]:
 
 @dataclass(frozen=True)
 class SonicObservation:
-    """One source snapshot; observed_at uses the session's local monotonic clock.
+    """One snapshot; observed_at uses the session's local monotonic clock.
 
-    The producer must capture RGB and measured state together. Arrival time or
-    render completion must never replace observed_at. Cross-host clock mapping
-    and multi-frame observation histories are outside this profile.
+    Acquisition mode preserves paired source capture time. Delivery mode
+    preserves the oldest of four original receiver times and requires its own
+    service/execution profile; sensor acquisition age and skew remain unknown.
+    Later queues or inference must never refresh either basis. Cross-host
+    monotonic clock mapping and multi-frame histories are outside this profile.
     """
 
     sequence: int
     observed_at: float
     state: NDArray[np.float32]
     rgb: NDArray[np.uint8]
+    time_basis: ObservationTimeBasis = "acquisition"
+    delivery_stamps: tuple[SonicDeliveryStamp, ...] | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -75,6 +107,20 @@ class SonicObservation:
             or not math.isfinite(self.observed_at)
         ):
             raise ValueError("invalid observation sequence or source timestamp")
+        if self.time_basis not in ("acquisition", "delivery"):
+            raise ValueError("invalid observation time basis")
+        if self.time_basis == "acquisition":
+            if self.delivery_stamps is not None:
+                raise ValueError("delivery provenance cannot be labeled acquisition")
+        else:
+            if not isinstance(self.delivery_stamps, tuple) or len(self.delivery_stamps) != 4:
+                raise ValueError("delivery observations require four component receipts")
+            for stamp in self.delivery_stamps:
+                if not isinstance(stamp, SonicDeliveryStamp):
+                    raise ValueError("invalid component receipt")
+                stamp.validate()
+            if self.observed_at != min(s.received_at for s in self.delivery_stamps):
+                raise ValueError("observed_at must preserve the oldest component receipt")
         state, rgb = np.asarray(self.state), np.asarray(self.rgb)
         if (
             state.shape != (28,)
@@ -104,5 +150,9 @@ class SonicObservation:
             raise ValueError("finite monotonic time and positive age bound required")
         if not 0 <= now - self.observed_at < max_age:
             raise ValueError("observation stale or from the future")
+        if self.delivery_stamps is not None and any(
+            not 0 <= now - stamp.received_at < max_age for stamp in self.delivery_stamps
+        ):
+            raise ValueError("component receipt stale or from the future")
         if self.sequence <= after_sequence or self.observed_at <= after_observed_at:
             raise ValueError("observation must be newer than the previous snapshot")

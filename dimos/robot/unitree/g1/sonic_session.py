@@ -36,6 +36,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
+from dimos.robot.unitree.g1.sonic_observation import ObservationTimeBasis
 from dimos.robot.unitree.g1.sonic_reference import encode_command, encode_token_reference
 
 TICK_SECONDS = 0.02
@@ -71,8 +72,11 @@ class SonicModelProfile:
     blend_seconds: float = 0.3
     token_bound: float = 1.25
     token_step_limit: float = 0.05
+    observation_time_basis: ObservationTimeBasis = "acquisition"
 
     def __post_init__(self) -> None:
+        if self.observation_time_basis not in ("acquisition", "delivery"):
+            raise ValueError("unsupported observation_time_basis")
         if not self.name or self.source_fps not in (30, 50):
             raise ValueError("name and explicit sonic78 source_fps (30 or 50) are required")
         if self.right_hand_order not in ("native", "mujoco_swap"):

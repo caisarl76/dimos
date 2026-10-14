@@ -25,6 +25,7 @@ import asyncio
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
 import copy
+from dataclasses import asdict
 from functools import partial
 import math
 from pathlib import Path
@@ -41,7 +42,7 @@ from dimos.core.module import Module, ModuleConfig
 from dimos.core.rpc_client import RPCClient
 from dimos.core.stream import In, Out
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
-from dimos.robot.unitree.g1.sonic_observation import SonicObservation
+from dimos.robot.unitree.g1.sonic_observation import ObservationTimeBasis, SonicObservation
 from dimos.robot.unitree.g1.sonic_policy_client import SonicPolicyChunk, SonicPolicyClient
 from dimos.robot.unitree.g1.sonic_session import JsonlSessionJournal
 from dimos.spec.utils import Spec
@@ -81,6 +82,7 @@ class SonicServiceConfig(ModuleConfig):
     policies: dict[str, str]
     execution_profile_name: str = Field(min_length=1)
     journal_dir: Path
+    observation_time_basis: ObservationTimeBasis = "acquisition"
     replan_interval_seconds: float = Field(default=0.35, gt=0, le=1, allow_inf_nan=False)
     observation_max_age_seconds: float = Field(default=0.2, gt=0, le=0.2, allow_inf_nan=False)
     policy_timeout_seconds: float = Field(default=2.5, gt=0, le=5, allow_inf_nan=False)
@@ -178,6 +180,12 @@ class SonicServiceModule(Module):
             and not self._busy
             and not self._error,
             "policies": sorted(self.config.policies),
+            "observation_time_basis": self.config.observation_time_basis,
+            "input_liveness_max_age_s": self.config.observation_max_age_seconds,
+            "prediction_max_age_s": None
+            if self._service is None
+            else self._service.get("prediction_max_age_seconds"),
+            "acquisition_skew_s": None,
             "observation_time": None
             if self._observation is None
             else self._observation.observed_at,
@@ -198,25 +206,54 @@ class SonicServiceModule(Module):
         snapshot["observation_age_s"] = (
             None if observed_at is None else time.monotonic() - observed_at
         )
+        delivery = snapshot["observation_time_basis"] == "delivery"
+        snapshot["delivery_age_s"] = snapshot["observation_age_s"] if delivery else None
+        snapshot["acquisition_age_s"] = None if delivery else snapshot["observation_age_s"]
         return snapshot
 
     @rpc
     async def handle_observation(self, observation: SonicObservation) -> None:
-        """Accept a paired RGB/state snapshot on this host's original source clock."""
+        """Accept the configured timing basis, preserving its original provenance."""
+        if observation.time_basis != self.config.observation_time_basis:
+            raise ValueError("observation time basis differs from service profile")
+        # Own and revalidate metadata/arrays after transport deserialization.
+        observation = SonicObservation(
+            observation.sequence,
+            observation.observed_at,
+            observation.state,
+            observation.rgb,
+            time_basis=observation.time_basis,
+            delivery_stamps=observation.delivery_stamps,
+        )
         previous = self._observation
+        now = time.monotonic()
         observation.require_fresh(
-            now=time.monotonic(),
+            now=now,
+            max_age=self.config.observation_max_age_seconds,
+        )
+        if previous is not None and previous.delivery_stamps is not None:
+            assert observation.delivery_stamps is not None
+            for old, new in zip(previous.delivery_stamps, observation.delivery_stamps, strict=True):
+                if old.source_id != new.source_id or new.source_marker < old.source_marker:
+                    self._error = (
+                        "delivery source changed; replace receiver/adapter/service session"
+                    )
+                    self._publish()
+                    raise ValueError(self._error)
+                if new.source_marker == old.source_marker or new.received_at <= old.received_at:
+                    raise ValueError("all component deliveries must advance")
+        observation.require_fresh(
+            now=now,
             after_sequence=-1 if previous is None else previous.sequence,
             after_observed_at=-math.inf if previous is None else previous.observed_at,
             max_age=self.config.observation_max_age_seconds,
         )
-        # Deserialization may restore writable arrays. Own and validate our slot.
-        self._observation = SonicObservation(
-            observation.sequence, observation.observed_at, observation.state, observation.rgb
-        )
+        self._observation = observation
         self._publish()
 
     def _fresh_observation(self, after_sequence: int = -1) -> SonicObservation:
+        if self._error:
+            raise ValueError(self._error)
         if self._observation is None:
             raise ValueError("a fresh paired observation is required")
         self._observation.require_fresh(
@@ -260,6 +297,7 @@ class SonicServiceModule(Module):
         service = {
             "service_id": service_id,
             "policy_name": policy_name,
+            "observation_time_basis": self.config.observation_time_basis,
             "instruction": instruction,
             "duration_seconds": duration_seconds,
             "phase": "preparing",
@@ -420,8 +458,20 @@ class SonicServiceModule(Module):
                     await asyncio.sleep(0.02)
                 status = await self._call(self._execution.get_status)
             profile = status["profile"]
+            if (
+                profile.get("observation_time_basis", "acquisition")
+                != self.config.observation_time_basis
+            ):
+                raise ValueError("execution and service observation time basis must match")
             if profile["name"] != self.config.execution_profile_name or not status["ready"]:
                 raise ValueError("ready execution with the configured profile required")
+            service["prediction_max_age_seconds"] = profile["max_observation_age"]
+            self._event(
+                "timing_profile",
+                observation_time_basis=self.config.observation_time_basis,
+                input_liveness_max_age_s=self.config.observation_max_age_seconds,
+                prediction_max_age_s=profile["max_observation_age"],
+            )
             startup = (
                 profile["seed_seconds"] + profile["arm_timeout"] + profile["first_chunk_timeout"]
             )
@@ -460,6 +510,17 @@ class SonicServiceModule(Module):
                 task = status["task"]
                 self._execution_status(task)
                 now = time.monotonic()
+                if (
+                    self.config.observation_time_basis == "delivery"
+                    and task["phase"] not in ("done", "handback")
+                    and not self._cancel_requested
+                ):
+                    if self._error:
+                        raise ValueError(self._error)
+                    try:
+                        self._fresh_observation()
+                    except ValueError as exc:
+                        raise ValueError(f"delivery inputs expired: {exc}") from exc
                 if task["phase"] == "done":
                     break
                 if task["phase"] == "handback":
@@ -512,6 +573,15 @@ class SonicServiceModule(Module):
                         if observation is not None:
                             last_observation = observation.sequence
                             next_inference = time.monotonic() + self.config.replan_interval_seconds
+                            self._event(
+                                "inference_requested",
+                                sequence=sequence,
+                                observed_at=observation.observed_at,
+                                observation_time_basis=observation.time_basis,
+                                delivery_stamps=None
+                                if observation.delivery_stamps is None
+                                else [asdict(s) for s in observation.delivery_stamps],
+                            )
                             self._inference = asyncio.create_task(
                                 self._offload(
                                     client.infer,

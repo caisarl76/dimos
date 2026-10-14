@@ -1,0 +1,50 @@
+{
+  "captured_at": "2026-10-14T00:35:42.889778+00:00",
+  "scope": "Separately import upstream SONIC acquisition/delivery timing changes; preserve navigation service RPC and cancellation/settling additions",
+  "baseline_update": {
+    "captured_at": "2026-10-13T15:08:52.332811+00:00",
+    "reason": "Unchanged upstream delivery/acquisition timing update; retain existing navigation additions through explicit3wayresolution",
+    "files": {
+      "dimos/robot/unitree/g1/sonic_observation.py": {
+        "before": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+        "after": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b"
+      },
+      "dimos/robot/unitree/g1/sonic_service_module.py": {
+        "before": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
+        "after": "467e434341f3e8fc435e72b4da16669fac79b10bfcaf586a711e2ffeb4861861"
+      },
+      "dimos/robot/unitree/g1/sonic_session.py": {
+        "before": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+        "after": "c261b496e908bcfd1a5107bc8a25a357f991155e1a1fcfbfd214709d69427553"
+      },
+      "dimos/robot/unitree/g1/test_sonic_service_module.py": {
+        "before": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+        "after": "42cf0431adb4684173a43084565ba9646a3dd29b9ced3409ed7edb2b5008428b"
+      }
+    },
+    "integration": "service imports retain PoseStamped and ObservationTimeBasis; append both independent service test groups; no behavior invented"
+  },
+  "upstream_files_match_manifest": 20,
+  "tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "418",
+    "time": "31.451",
+    "timestamp": "2026-10-14T00:08:53.575646+09:00",
+    "hostname": "jihun-Z590-AORUS-ELITE"
+  },
+  "junit_sha256": "f26bee18887e604aa980ef10137c0d315d4fc6693bd791fa406a26a81c895240",
+  "mypy": "6productionfilesPASS",
+  "ruff": "mergedservice/testPASS",
+  "merged_file_sha256": {
+    "dimos/robot/unitree/g1/sonic_observation.py": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "e0e14b31656c8d9efca90f60ba03ce82d3dcb68c42f78153234be10d48dcadb1",
+    "dimos/robot/unitree/g1/sonic_session.py": "c261b496e908bcfd1a5107bc8a25a357f991155e1a1fcfbfd214709d69427553",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "b349d367ecccfa379b3610884bfd09c122cce969bbe0061d1613bcb4e606d806"
+  },
+  "original_workspace_modified_by_this_session": false,
+  "environment_installs": false,
+  "gate": "UpstreamcompatibilityPASS;host-onlyStageBmayproceed;hardwarecommissioningstillblocked"
+}
