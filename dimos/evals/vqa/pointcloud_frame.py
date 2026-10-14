@@ -276,9 +276,7 @@ class PointCloudFrameLoader:
             stream = stream.filter(lambda obs: obs.data.brightness > min_brightness)
         selected_obs = cast(
             "list[Observation[Image]]",
-            list(
-                stream.transform(QualityWindow(lambda img: img.sharpness, window=quality_window))
-            ),
+            list(stream.transform(QualityWindow(lambda img: img.sharpness, window=quality_window))),
         )
         indices: list[int] = []
         for obs in selected_obs:
