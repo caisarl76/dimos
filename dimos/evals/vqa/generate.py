@@ -80,8 +80,7 @@ class GenerationRequest(BaseModel):
                 raise ValueError("image_index cannot be combined with start, stop, or stride")
             if self.quality_window is not None or self.min_brightness is not None:
                 raise ValueError(
-                    "quality_window/min_brightness require range mode (start/stop), "
-                    "not image_index"
+                    "quality_window/min_brightness require range mode (start/stop), not image_index"
                 )
             return self
         if self.start is None or self.stop is None:

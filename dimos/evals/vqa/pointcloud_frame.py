@@ -274,9 +274,7 @@ class PointCloudFrameLoader:
         stream = self._images.range_seek(start, stop)
         if min_brightness is not None:
             stream = stream.filter(lambda obs: obs.data.brightness > min_brightness)
-        selected = stream.transform(
-            QualityWindow(lambda img: img.sharpness, window=quality_window)
-        )
+        selected = stream.transform(QualityWindow(lambda img: img.sharpness, window=quality_window))
         indices: list[int] = []
         for obs in selected:
             index = ts_to_index.get(obs.ts)
@@ -287,11 +285,7 @@ class PointCloudFrameLoader:
             raise ValueError(
                 f"quality window selected no frames in [{start}, {stop}) "
                 f"(window={quality_window}s"
-                + (
-                    f", min_brightness={min_brightness}"
-                    if min_brightness is not None
-                    else ""
-                )
+                + (f", min_brightness={min_brightness}" if min_brightness is not None else "")
                 + ")"
             )
         return tuple(indices)

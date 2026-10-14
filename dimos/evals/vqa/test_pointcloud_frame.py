@@ -344,10 +344,6 @@ def test_select_quality_indices_uses_mem_quality_window() -> None:
         loader._images = store.stream("color_image").order_by("ts")
 
         assert loader.select_quality_indices(0, 5, quality_window=1.0) == (1, 4)
-        assert loader.select_quality_indices(
-            0, 5, quality_window=1.0, min_brightness=0.2
-        ) == (1, 4)
+        assert loader.select_quality_indices(0, 5, quality_window=1.0, min_brightness=0.2) == (1, 4)
         # Dark mid-frame (index 2) is dropped before the window pick.
-        assert loader.select_quality_indices(
-            0, 3, quality_window=1.0, min_brightness=0.2
-        ) == (1,)
+        assert loader.select_quality_indices(0, 3, quality_window=1.0, min_brightness=0.2) == (1,)
