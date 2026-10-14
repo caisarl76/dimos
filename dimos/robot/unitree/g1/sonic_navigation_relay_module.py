@@ -59,6 +59,10 @@ class SonicNavigationRelayModule(Module):
         self._retired_requests: set[str] = set()
         self._request_generation = 0
         self._reset_fault: str | None = None
+        # Peer instance epoch: pc2-side source sequences stay monotonic across peer
+        # restarts. A new epoch starts only without a live session or after the
+        # serving peer confirms cancellation; motion still needs an explicit begin.
+        self._sequence_offset = 0
 
     @rpc
     def start(self) -> None:
@@ -94,9 +98,25 @@ class SonicNavigationRelayModule(Module):
             fault,
         )
 
+    def _in_epoch(self, value: NavigationInput) -> NavigationInput:
+        return NavigationInput(
+            value.twist,
+            value.source_sequence + self._sequence_offset,
+            value.velocity_deadline,
+            value.readiness_deadline,
+            value.ready,
+            value.fault,
+        )
+
+    def _new_epoch(self) -> None:
+        # Keep the pc2 high-water: closed inputs still carry it, new values exceed it.
+        if self._latest is not None:
+            self._sequence_offset = self._latest.source_sequence + 1
+
     def accept_poll(self, reply: NavigationPollReply, *, t0: float, t1: float) -> NavigationInput:
-        value = bound_navigation_input(reply, t0=t0, t1=t1)
+        raw = bound_navigation_input(reply, t0=t0, t1=t1)
         with self._lock:
+            value = self._in_epoch(raw)
             if self._goal_pending:
                 # Poll/control sockets have no ordering guarantee. Until the
                 # goal acknowledgment, retain only the previous bounded proof.
@@ -108,6 +128,14 @@ class SonicNavigationRelayModule(Module):
             previous = self._latest
             if reply.request_id != self._request_id:
                 self._reset_fault = "peer_request_changed"
+            if (
+                previous is not None
+                and value.source_sequence < previous.source_sequence
+                and (self._request_id is None or self._cancel_confirmed)
+            ):
+                # A restarted peer with no live session: nothing to protect.
+                self._new_epoch()
+                value = self._in_epoch(raw)
             if previous is not None:
                 if value.source_sequence < previous.source_sequence:
                     self._reset_fault = "peer_source_rollback"
@@ -218,6 +246,11 @@ class SonicNavigationRelayModule(Module):
         )
         with self._lock:
             if confirmed and self._request_id == request_id:
+                if self._reset_fault is not None:
+                    # The serving peer confirmed IDLE through its public planner: a
+                    # fresh handshake, so its sequences may start a new epoch.
+                    self._reset_fault = None
+                    self._new_epoch()
                 self._cancel_pending = False
                 self._cancel_confirmed = True
                 self._cancel_previous_request_id = None
