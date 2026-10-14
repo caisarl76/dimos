@@ -274,9 +274,14 @@ class PointCloudFrameLoader:
         stream = self._images.range_seek(start, stop)
         if min_brightness is not None:
             stream = stream.filter(lambda obs: obs.data.brightness > min_brightness)
-        selected = stream.transform(QualityWindow(lambda img: img.sharpness, window=quality_window))
+        selected_obs = cast(
+            "list[Observation[Image]]",
+            list(
+                stream.transform(QualityWindow(lambda img: img.sharpness, window=quality_window))
+            ),
+        )
         indices: list[int] = []
-        for obs in selected:
+        for obs in selected_obs:
             index = ts_to_index.get(obs.ts)
             if index is None:
                 raise RuntimeError(f"quality window selected unknown timestamp {obs.ts}")
