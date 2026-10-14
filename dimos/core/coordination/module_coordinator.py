@@ -380,6 +380,7 @@ class ModuleCoordinator(Resource):
         global_values, module_kwargs, transport_overrides = _resolve_blueprint_config(
             blueprint, parsed_config
         )
+        _run_validators(blueprint, module_kwargs)
         global_config.update(**global_values)
         transports = _materialize_transports(blueprint, transport_overrides)
 
@@ -448,6 +449,7 @@ class ModuleCoordinator(Resource):
         global_values, module_kwargs, transport_overrides = _resolve_blueprint_config(
             blueprint, parsed_config, sparse_globals=True
         )
+        _run_validators(blueprint, module_kwargs)
         self._global_config.update(**global_values)
         transports = _materialize_transports(blueprint, transport_overrides)
 
@@ -909,6 +911,15 @@ def _run_configurators(blueprint: Blueprint) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+def _run_validators(blueprint: Blueprint, module_kwargs: Mapping[str, Mapping[str, Any]]) -> None:
+    resolved = {
+        bp.name: {**bp.kwargs, **module_kwargs.get(bp.name, {})}
+        for bp in blueprint.active_blueprints
+    }
+    for check in blueprint.validator_checks:
+        check(blueprint, resolved)
 
 
 def _check_requirements(blueprint: Blueprint) -> None:
