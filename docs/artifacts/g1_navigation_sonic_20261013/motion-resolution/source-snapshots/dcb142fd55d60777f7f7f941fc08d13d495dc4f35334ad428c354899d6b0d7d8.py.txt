@@ -1,0 +1,13 @@
+"""Absolute wall-clock pacing with an unchanged physics step."""
+
+from dataclasses import dataclass
+
+
+@dataclass
+class FixedStepSchedule:
+    scheduled_at: float
+    timestep: float
+
+    def delay_after_step(self, now: float) -> float:
+        self.scheduled_at += self.timestep
+        return max(0.0, self.scheduled_at - now)

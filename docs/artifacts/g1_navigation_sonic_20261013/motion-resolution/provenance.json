@@ -1,0 +1,48 @@
+{
+  "updated_at": "2026-10-14T04:34:53.848377+00:00",
+  "source_files": {
+    "include/localmotion_kplanner.hpp": "180ee51c915c719373c6d3b96f8493c580b10f30b37c381d09e9dea781c07a4d",
+    "src/g1_deploy_onnx_ref.cpp": "f53c46847d6b59ce774e5708b81b924df8823a4e3188daead0945ef96ae69c9f",
+    "unit_tests/test_planner_terminal_hold.cpp": "72cdd585a0daa0d31aac20042f63fe8e13a6a5beb0804a08739eecfaf6eafd17"
+  },
+  "binaries": {
+    "g1_deploy_onnx_ref": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+    "run_tests": "d0091b8629ecfe377dfa2f4a5a45f9e7b9a8cf1c38c69fbe553bc9a8ee628213"
+  },
+  "patch_sha256": "edfe5b22f23a3209b64605aa4bcb7e0f67faac083492fbe000371faa7f322c1c",
+  "commands": [
+    {
+      "command": "cmake --build build/sonic-navigation-runtime/cmake --target run_tests g1_deploy_onnx_ref -j2",
+      "exit_code": 0
+    },
+    {
+      "command": "run_tests --gtest_filter=PlannerTerminalHold.* (before correction)",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 1
+    },
+    {
+      "command": "run_tests --gtest_filter=PlannerTerminalHold.* (after correction)",
+      "exit_code": 0,
+      "passed": 3
+    },
+    {
+      "command": "run_tests (sandbox)",
+      "exit_code": 134,
+      "reason": "existing ZMQ loopback test blocked by sandbox; FK fixture also missing"
+    },
+    {
+      "command": "run_tests (outside sandbox, loopback test only networking)",
+      "exit_code": 1,
+      "reason": "see native-suite-unsandboxed.log; FK missing original fixture/XML",
+      "passed": 35,
+      "failed": 1,
+      "failed_tests": [
+        "FK.TestFKAndGlobalVelocities"
+      ]
+    }
+  ],
+  "physical_gates": "unresolved pending original-envelope A/B native trials",
+  "allowlist_deviations": [],
+  "patch_replay": "Applied to saved pre-fix sources in /tmp/nav-terminal-patch-replay; all three resulting files byte-match compiled sources."
+}

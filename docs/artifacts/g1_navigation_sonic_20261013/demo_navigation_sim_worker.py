@@ -1,3 +1,17 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Bounded headless SONIC simulation worker; requires a private loopback namespace."""
 
 import argparse
@@ -8,6 +22,7 @@ from pathlib import Path
 import socket
 import time
 
+from demo_navigation_timing import FixedStepSchedule
 from gear_sonic.utils.mujoco_sim.base_sim import BaseSimulator
 from gear_sonic.utils.mujoco_sim.configs import SimLoopConfig
 import numpy as np
@@ -17,6 +32,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--host-netns", required=True)
+    parser.add_argument("--pacing", choices=["relative", "absolute"], default="absolute")
     args = parser.parse_args()
     if [name for _, name in socket.if_nameindex()] != ["lo"]:
         raise RuntimeError("Simulation requires a network namespace with only lo")
@@ -49,6 +65,8 @@ def main() -> None:
 
     sim.unitree_bridge.PublishLowState = publish_with_yaw_noise
     start = time.monotonic()
+    schedule = FixedStepSchedule(start, config["SIMULATE_DT"])
+    missed_step_deadlines = 0
     next_record = 0.0
     released = False
     resets = 0
@@ -57,6 +75,8 @@ def main() -> None:
         with (args.output / "physics.jsonl").open("w") as log:
             while time.monotonic() - start < 240 and not (args.output / "sim-stop").exists():
                 step_started = time.monotonic()
+                lateness = max(0.0, step_started - schedule.scheduled_at)
+                missed_step_deadlines += int(lateness >= config["SIMULATE_DT"])
                 if not released and (args.output / "release").exists():
                     sim.handle_keyboard_button("9")
                     sim.handle_keyboard_button("backspace")
@@ -79,6 +99,8 @@ def main() -> None:
                     row = {
                         "monotonic": time.monotonic(),
                         "sim_time": float(env.mj_data.time),
+                        "scheduler_lateness_s": lateness,
+                        "missed_step_deadlines": missed_step_deadlines,
                         "pelvis": q[:3].tolist(),
                         "tilt_deg": tilt,
                         "band": bool(env.elastic_band.enable),
@@ -98,7 +120,10 @@ def main() -> None:
                     temp = args.output / "physics.tmp"
                     temp.write_text(text)
                     temp.replace(args.output / "physics-latest.json")
-                time.sleep(max(0, config["SIMULATE_DT"] - (time.monotonic() - step_started)))
+                delay = schedule.delay_after_step(time.monotonic())
+                if args.pacing == "relative":
+                    delay = max(0.0, config["SIMULATE_DT"] - (time.monotonic() - step_started))
+                time.sleep(delay)
     finally:
         sim.close()
 

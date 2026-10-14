@@ -1,3 +1,17 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Native navigation commissioning in a private loopback-only namespace.
 
 Uses one execution owner/publisher and only its own native/simulator children.
@@ -27,6 +41,7 @@ from demo_navigation_noise import (
     ConversionTrace,
     FixedHeadingFixture,
 )
+from demo_navigation_verdict import transition_verdict
 import numpy as np
 import zmq
 
@@ -203,6 +218,10 @@ def main() -> None:
     parser.add_argument("--gpu", required=True)
     parser.add_argument("--reference-port", type=int, required=True)
     parser.add_argument("--feedback-port", type=int, required=True)
+    parser.add_argument("--pacing", choices=["relative", "absolute"], default="absolute")
+    parser.add_argument(
+        "--binary", type=Path, help="Explicit private native binary for a matched A/B trial"
+    )
     parser.add_argument(
         "--diagnose-forward",
         action="store_true",
@@ -229,7 +248,9 @@ def main() -> None:
     root = Path(__file__).resolve().parents[3]
     args.output.mkdir(parents=True, exist_ok=False)
     runtime = root / "build/sonic-navigation-runtime"
-    binary = runtime / "source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    binary = args.binary or runtime / "source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    if not binary.resolve().is_relative_to(runtime.resolve()):
+        raise ValueError("A/B binary must belong to this private runtime")
     assets = runtime / "assets"
     expected = json.loads((Path(__file__).with_name("simulation-assets.json")).read_text())
     for name, digest in expected["sha256"].items():
@@ -287,6 +308,13 @@ def main() -> None:
         "worker_sha256": hashlib.sha256(
             Path(__file__).with_name("demo_navigation_sim_worker.py").read_bytes()
         ).hexdigest(),
+        "timing_helper_sha256": hashlib.sha256(
+            Path(__file__).with_name("demo_navigation_timing.py").read_bytes()
+        ).hexdigest(),
+        "verdict_helper_sha256": hashlib.sha256(
+            Path(__file__).with_name("demo_navigation_verdict.py").read_bytes()
+        ).hexdigest(),
+        "pacing": args.pacing,
         "noise_helper_sha256": hashlib.sha256(
             Path(__file__).with_name("demo_navigation_noise.py").read_bytes()
         ).hexdigest(),
@@ -506,6 +534,8 @@ def main() -> None:
                         str(args.output),
                         "--host-netns",
                         args.host_netns,
+                        "--pacing",
+                        args.pacing,
                     ],
                     cwd=args.groot,
                     env=env,
@@ -633,6 +663,9 @@ def main() -> None:
             if args.diagnose_transitions:
                 owner.end_navigation()
                 wait(lambda: owner.get_navigation_status()["pose_ready"], 3.0, "diagnostic stop")
+                assert transition_verdict(results["cases"], args.diagnose_transitions), (
+                    "diagnostic cases failed the original direction/settling criteria"
+                )
                 results["status"] = "diagnostic_only"
                 return
             scenario = "noisy_follower"

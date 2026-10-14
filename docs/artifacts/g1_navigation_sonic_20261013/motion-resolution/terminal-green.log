@@ -1,0 +1,33 @@
+Note: Google Test filter = PlannerTerminalHold.*
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from PlannerTerminalHold
+[ RUN      ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity (0 ms)
+[ RUN      ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions (0 ms)
+[ RUN      ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity (0 ms)
+[----------] 3 tests from PlannerTerminalHold (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 3 tests.

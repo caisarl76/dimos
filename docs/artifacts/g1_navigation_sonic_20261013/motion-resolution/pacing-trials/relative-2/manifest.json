@@ -1,0 +1,75 @@
+{
+  "stage": "on-host",
+  "command": [
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/motion-ab/corrected-g1_deploy_onnx_ref",
+    "lo",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/model_decoder.onnx",
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/reference/example",
+    "--obs-config",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/observation_config.yaml",
+    "--encoder-file",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/model_encoder.onnx",
+    "--planner-file",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/planner/target_vel/V2/planner_sonic.onnx",
+    "--input-type",
+    "zmq_manager",
+    "--output-type",
+    "zmq",
+    "--zmq-host",
+    "127.0.0.1",
+    "--zmq-port",
+    "18556",
+    "--zmq-out-port",
+    "18557",
+    "--disable-crc-check",
+    "--reference-timeout-ms",
+    "200",
+    "--guarded-planner",
+    "--planner-motion-logfile",
+    "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/pacing-trials/relative-2/planner-motion.csv",
+    "--target-motion-logfile",
+    "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/pacing-trials/relative-2/target-motion.csv"
+  ],
+  "netns": "net:[4026532899]",
+  "host_netns": "net:[4026531840]",
+  "interfaces": [
+    [
+      1,
+      "lo"
+    ]
+  ],
+  "gpu": "1",
+  "dds": "domain 0 isolated in this namespace",
+  "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+  "harness_sha256": "750a936747834c950b398030d73d31c6840a3bc4640fab7bb0575d91780c62ae",
+  "worker_sha256": "32793cce87b14555fe92136f0fe8fdefdea2979cda69959a9b626af8b818b9c1",
+  "timing_helper_sha256": "dcb142fd55d60777f7f7f941fc08d13d495dc4f35334ad428c354899d6b0d7d8",
+  "pacing": "relative",
+  "noise_helper_sha256": "b78963675465e5c873212d287e4229e388f63b041f2eb98e1f2f99d380f0c6bd",
+  "production_source_sha256": {
+    "dimos/robot/unitree/g1/sonic_navigation.py": "48411fc888ef2545f805d4014f4ea6a11c1bc439a465531487155dba864ac5da",
+    "dimos/robot/unitree/g1/sonic_navigation_session.py": "b0b609fd62265c672be34efc6eba97ac77d109cc2a73157325bca8419c6ba797",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "884873648c2d48b15fc6cad965cca1e21517a35921f5d03fc7532bc2e8058062",
+    "dimos/navigation/go2/replanning_a_star/controllers.py": "808ab7030c00d198da04f25b250a070c04461492f5a77ee783494ba2e423d9dd"
+  },
+  "asset_sha256": {
+    "policy_model_decoder.trt": "95493343b352ccac34ecf12b8c52aa079f179d247f4382424dedbb3bb8bad1f4",
+    "model_encoder.onnx": "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae",
+    "observation_config.yaml": "4a67713b310932e50aca81f19188c8d76013148e98b15c8b5bbea995f12e59f0",
+    "model_decoder.onnx": "34bae8570d4a4421a5391a5c2befd745d4a02d182ec539e5f9da44c091c67509",
+    "encoder_model_encoder.trt": "6d94a4075318a61724132431e4911ce8eadbde294b8eee89b00c58a5fa00f3b3",
+    "planner/target_vel/V2/planner_planner_sonic.trt": "761cc7bd4418142258c7a45c6c46bf7d4ae6ef9f61b883d84df229c8ad98b7b8",
+    "planner/target_vel/V2/planner_sonic.onnx": "39b553e197f62f077975ba38512bc04781a3fc37c2af7c6756e04629f760edea"
+  },
+  "diagnose_forward": false,
+  "diagnose_transitions": 3,
+  "diagnose_noisy_follower": false,
+  "noise_proof": null,
+  "scope": "One native controller, one production execution publisher, headless physics; on-host input/control fixture",
+  "thresholds": {
+    "linear_speed_mps": 0.03,
+    "yaw_rate_radps": 0.03,
+    "settle_seconds": 0.5,
+    "settle_timeout": 3.0
+  }
+}

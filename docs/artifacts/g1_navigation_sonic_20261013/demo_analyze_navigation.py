@@ -1,3 +1,17 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Reject incomplete native navigation evidence; never relax run thresholds."""
 
 from __future__ import annotations
@@ -114,12 +128,33 @@ def attribute_replans(*, sent: list[dict], acks: list[dict], native: list[dict])
             -1,
         )
         changed = any(row[key] == "1" for key in REASONS)
+        horizon = row.get("horizon_refresh", "0") == "1"
+        if horizon:
+            try:
+                # This proof is pinned to the shipped 10-frame/stride-5
+                # encoder and .1s planner period with two-frame lookahead.
+                remaining = int(row["horizon_remaining"])
+                window = int(row["horizon_window"])
+                margin = int(row["horizon_margin"])
+                valid_horizon = (
+                    mode == 1
+                    and float(row["speed"]) > 0
+                    and window == 46
+                    and margin == 8
+                    and 0 < remaining <= window + margin
+                )
+            except (KeyError, ValueError):
+                valid_horizon = False
+            if not valid_horizon:
+                errors.append(f"native {start}: invalid horizon refresh reason")
         if changed and previous_native == payload:
             errors.append(f"native {start}: state replan repeated unchanged motion")
         # Periodic inference establishes the preceding state too; skipping it
         # could let a later heartbeat-only replan masquerade as a transition.
         previous_native = payload
         if not changed:
+            if row.get("periodic") != "1" and not horizon:
+                errors.append(f"native {start}: inference has no recorded maintenance reason")
             continue
         matches = []
         for ack in acks:

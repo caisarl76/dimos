@@ -1,0 +1,7 @@
+{
+  "command": [
+    "build/sonic-navigation-runtime/source/gear_sonic_deploy/target/release/run_tests",
+    "--gtest_filter=PlannerHorizon.*:PlannerTerminalHold.*:PlannerLease.*:ReferenceLease.*:ReferenceValidation.*-PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd"
+  ],
+  "exit_code": 0
+}

@@ -1,0 +1,195 @@
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
+@@ -271,6 +271,8 @@
+     int gen_frame_;
+     bool motion_available_ = false;
+ 
++    int GetMotionLookAheadSteps() const { return config_.motion_look_ahead_steps; }
++
+ protected:
+     // Common configuration
+     PlannerConfig config_;
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
+@@ -94,6 +94,7 @@
+ 
+ // New Planner Classes
+ #include "../include/localmotion_kplanner.hpp"
++#include "../include/planner_horizon.hpp"
+ #include "../include/localmotion_kplanner_tensorrt.hpp"
+ 
+ // Utility classes
+@@ -2270,7 +2271,7 @@
+         if (guarded_planner) {
+           navigation_replans_file_ = std::make_unique<std::ofstream>(planner_motion_file_path + ".replans.csv");
+           *navigation_replans_file_ << std::setprecision(17);
+-          *navigation_replans_file_ << "started_monotonic,finished_monotonic,mode,periodic,mode_changed,facing_changed,height_changed,speed_changed,direction_changed,counter,generated_frame,speed,movement_x,movement_y,facing_x,facing_y";
++          *navigation_replans_file_ << "started_monotonic,finished_monotonic,mode,periodic,mode_changed,facing_changed,height_changed,speed_changed,direction_changed,counter,generated_frame,speed,movement_x,movement_y,facing_x,facing_y,horizon_refresh,horizon_remaining,horizon_window,horizon_margin";
+           for (int i = 0; i < 144; ++i) *navigation_replans_file_ << ",context_" << i;
+           for (int i = 0; i < 29; ++i) *navigation_replans_file_ << ",measured_motor_q_" << i;
+           *navigation_replans_file_ << '\n';
+@@ -3827,6 +3828,29 @@
+               need_replan = true;
+             }
+ 
++            PlannerHorizonSnapshot horizon;
++            int planning_frame = 0;
++            if (auto manager = dynamic_cast<ZMQManager*>(input_interface_.get());
++                manager && manager->GuardedPlannerEnabled()) {
++              horizon.guarded = true;
++              if (movement_state_data.data) {
++                horizon.mode = static_cast<LocomotionMode>(movement_state_data.data->locomotion_mode);
++                horizon.speed = movement_state_data.data->movement_speed;
++              }
++              // Observation gathering and motion advancement use this same
++              // mutex. Release it before UpdatePlanning acquires planner locks
++              // or runs inference so control can continue advancing frames.
++              std::lock_guard<std::mutex> lock(current_motion_mutex_);
++              horizon.playing = operator_state.play;
++              horizon.active_planner = current_motion_ == planner_motion_;
++              planning_frame = current_frame_;
++              horizon.remaining = planner_motion_->timesteps - planning_frame;
++              horizon.window = saved_frame_for_observation_window_;
++            }
++            const auto horizon_decision = EvaluatePlannerHorizon(
++                horizon, planner_dt_, planner_->GetMotionLookAheadSteps());
++            need_replan = need_replan || horizon_decision.refresh;
++
+             if (!need_replan) {
+               // no need to replan, return
+               return;
+@@ -3870,7 +3894,7 @@
+ 
+               // gotta make sure planner_motion actually has data...
+               if(!planner_->UpdatePlanning(
+-                current_frame_,
++                horizon_decision.refresh ? planning_frame : current_frame_,
+                 planner_motion_,
+                 current_mode,
+                 movement_speed,
+@@ -3888,7 +3912,9 @@
+                     << ',' << facing_direction_changed << ',' << height_changed << ',' << movement_speed_changed
+                     << ',' << movement_direction_changed << ',' << replan_interval_counter_ << ',' << planner_->gen_frame_
+                     << ',' << movement_speed << ',' << movement_direction[0] << ',' << movement_direction[1]
+-                    << ',' << facing_direction[0] << ',' << facing_direction[1];
++                    << ',' << facing_direction[0] << ',' << facing_direction[1]
++                    << ',' << horizon_decision.refresh << ',' << horizon.remaining
++                    << ',' << horizon.window << ',' << horizon_decision.margin;
+                 const auto context = planner_->GetContextBuffer();
+                 for (int i = 0; i < 144; ++i) log << ',' << context[i];
+                 for (int i = 0; i < 29; ++i) log << ',' << ls->motor_state()[i].q();
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/planner_horizon.hpp
+@@ -0,0 +1,33 @@
++#ifndef PLANNER_HORIZON_HPP
++#define PLANNER_HORIZON_HPP
++
++#include "localmotion_kplanner.hpp"
++
++// Snapshot under current_motion_mutex_; evaluation performs no inference.
++struct PlannerHorizonSnapshot {
++  bool guarded = false;
++  bool active_planner = false;
++  bool playing = false;
++  LocomotionMode mode = LocomotionMode::IDLE;
++  double speed = 0.0;
++  int remaining = 0;  // Includes the current frame.
++  int window = 0;     // Includes the current frame.
++};
++
++struct PlannerHorizonDecision {
++  bool refresh = false;
++  int margin = 0;
++};
++
++inline PlannerHorizonDecision EvaluatePlannerHorizon(
++    const PlannerHorizonSnapshot& state, double planner_dt, int lookahead) {
++  // Cover one planner polling period, generation lookahead, and one control
++  // tick for applying the result. This is a scheduling reserve, not a hard
++  // real-time latency guarantee.
++  const int margin = static_cast<int>(std::ceil(planner_dt * 50.0)) + lookahead + 1;
++  const bool eligible = state.guarded && state.active_planner && state.playing &&
++      state.mode == LocomotionMode::SLOW_WALK && state.speed > 0.0 && state.window > 0;
++  return {eligible && state.remaining <= state.window + margin, margin};
++}
++
++#endif  // PLANNER_HORIZON_HPP
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_horizon.cpp
+@@ -0,0 +1,76 @@
++#include <gtest/gtest.h>
++
++#include "planner_horizon.hpp"
++
++namespace {
++PlannerHorizonSnapshot WalkingSnapshot() {
++  PlannerHorizonSnapshot state;
++  state.guarded = true;
++  state.active_planner = true;
++  state.playing = true;
++  state.mode = LocomotionMode::SLOW_WALK;
++  state.speed = 0.2;
++  state.remaining = 54;
++  state.window = 46;  // Enabled encoder: 10 samples, stride 5.
++  return state;
++}
++}  // namespace
++
++TEST(PlannerHorizon, RefreshesAt54ButNot55RemainingFrames) {
++  auto state = WalkingSnapshot();
++  auto decision = EvaluatePlannerHorizon(state, 0.1, 2);
++  EXPECT_EQ(decision.margin, 8);
++  EXPECT_TRUE(decision.refresh);
++  state.remaining = 55;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++}
++
++TEST(PlannerHorizon, UsesObservationWindowPeriodAndLookahead) {
++  auto state = WalkingSnapshot();
++  state.window = 21;
++  state.remaining = 30;
++  // ceil(0.11 * 50) + 2 + one apply tick = 9.
++  auto decision = EvaluatePlannerHorizon(state, 0.11, 2);
++  EXPECT_EQ(decision.margin, 9);
++  EXPECT_TRUE(decision.refresh);
++  state.remaining = 31;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.11, 2).refresh);
++  EXPECT_TRUE(EvaluatePlannerHorizon(state, 0.11, 3).refresh);
++}
++
++TEST(PlannerHorizon, LegacyIsDisabledByDefault) {
++  PlannerHorizonSnapshot defaults;
++  EXPECT_FALSE(defaults.guarded);
++  auto state = WalkingSnapshot();
++  state.guarded = defaults.guarded;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++}
++
++TEST(PlannerHorizon, NoFutureObservationWindowNeedsNoRefresh) {
++  auto state = WalkingSnapshot();
++  state.window = 0;
++  state.remaining = 1;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++}
++
++TEST(PlannerHorizon, ExcludesTurnIdleAndOtherLocomotionModes) {
++  auto state = WalkingSnapshot();
++  state.speed = 0.0;  // In-place turning has no translating horizon.
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++  state.speed = -1.0;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++  state.speed = 0.2;
++  state.mode = LocomotionMode::IDLE;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++  state.mode = LocomotionMode::RUN;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++}
++
++TEST(PlannerHorizon, RequiresActivePlayingPlannerMotion) {
++  auto state = WalkingSnapshot();
++  state.active_planner = false;  // Includes pose/streamed/current motion mismatch.
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++  state.active_planner = true;
++  state.playing = false;
++  EXPECT_FALSE(EvaluatePlannerHorizon(state, 0.1, 2).refresh);
++}

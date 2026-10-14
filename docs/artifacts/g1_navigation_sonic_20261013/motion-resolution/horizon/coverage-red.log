@@ -1,0 +1,32 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______ test_buffer_replay_reports_padding_even_when_physical_case_passed _______
+
+trace = PosixPath('/tmp/pytest-of-jihun/pytest-476/test_buffer_replay_reports_pad0')
+
+    def test_buffer_replay_reports_padding_even_when_physical_case_passed(trace):
+        result = proof.analyze_run(trace)
+        case = result["cases"][0]
+>       assert case["max_terminal_slots"] == 4
+E       assert 0 == 4
+
+docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py:51: AssertionError
+___ test_contradictory_last_joint_cannot_be_matched_using_root_or_timestamps ___
+
+trace = PosixPath('/tmp/pytest-of-jihun/pytest-476/test_contradictory_last_joint_0')
+
+    def test_contradictory_last_joint_cannot_be_matched_using_root_or_timestamps(trace):
+        path = trace / "target-motion.csv.frames.csv"
+        rows = list(csv.reader(path.open()))
+        rows[-1][-1] = str(float(rows[-1][-1]) + 0.1)
+        with path.open("w") as stream:
+            csv.writer(stream).writerows(rows)
+        case = proof.analyze_run(trace)["cases"][0]
+>       assert case["unmatched_samples"] == 1
+E       assert 0 == 1
+
+docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py:66: AssertionError
+=========================== short test summary info ============================
+FAILED docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py::test_buffer_replay_reports_padding_even_when_physical_case_passed
+FAILED docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py::test_contradictory_last_joint_cannot_be_matched_using_root_or_timestamps
+2 failed in 0.09s

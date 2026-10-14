@@ -1,0 +1,36 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5038418238982558,
+      "speed": 0.0005376205246906578,
+      "yaw_rate": -0.011529031003223758
+    },
+    {
+      "name": "forward_transition_0",
+      "passed": true,
+      "start": 1138852.210585871,
+      "end": 1138854.222692275,
+      "forward_displacement_m": 0.06067955700101015,
+      "yaw_change_rad": -0.044214269711004825
+    },
+    {
+      "name": "forward_transition_0_settled",
+      "passed": true,
+      "elapsed": 2.9957867849152535,
+      "speed": 0.0022035475429216344,
+      "yaw_rate": -0.01057697307221934
+    },
+    {
+      "name": "forward_transition_1",
+      "passed": true,
+      "start": 1138862.220535325,
+      "end": 1138864.248652283,
+      "forward_displacement_m": 0.009655243615777305,
+      "yaw_change_rad": -0.010692787306957878
+    }
+  ],
+  "error": "TimeoutError: forward_transition_1 measured settling"
+}

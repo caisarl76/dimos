@@ -1,0 +1,57 @@
+{
+  "recorded_at": "2026-10-14T06:11:07.183339+00:00",
+  "source_root": "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref",
+  "before_source_files": {
+    "include/localmotion_kplanner.hpp": "180ee51c915c719373c6d3b96f8493c580b10f30b37c381d09e9dea781c07a4d",
+    "src/g1_deploy_onnx_ref.cpp": "f53c46847d6b59ce774e5708b81b924df8823a4e3188daead0945ef96ae69c9f"
+  },
+  "after_source_files": {
+    "include/localmotion_kplanner.hpp": "e5618c9403ba1c1f1a96783f9d360dbf980c77b64b986cd92690105ae35c3403",
+    "src/g1_deploy_onnx_ref.cpp": "bee3076fbbe747158830355b2fc0003111acbedde177c8c6fa40ccf2ae2a4e44",
+    "include/planner_horizon.hpp": "1ca73bc6823ac211321900f097709f257f32b576048c478585dbe01aee234c9d",
+    "unit_tests/test_planner_horizon.cpp": "fbdd5eb2dea3187a21ad2c119b779a6e49d036b0ea91c3e2b55d5dad771f2e72"
+  },
+  "binaries": {
+    "g1_deploy_onnx_ref": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+    "run_tests": "f2e2822025c338dad51e4c8d1504edd12766038a06eac6de6e5e81630f9782fb"
+  },
+  "preserved_terminal_only_binary": {
+    "path": "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/motion-ab/corrected-g1_deploy_onnx_ref",
+    "sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76"
+  },
+  "original_native_source": {
+    "root": "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref",
+    "baseline_manifest": "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/baseline-native-source.json",
+    "unchanged_files": 51,
+    "all_match": true
+  },
+  "patch_sha256": "ccef6ac1e8697399a0db5de6999c6a202417fdaef3c73a9cd8c7c6909b2ff8f3",
+  "patch_replay": {
+    "exit_code": 0,
+    "all_four_files_byte_match": true,
+    "directory": "/tmp/nav-horizon-patch-replay"
+  },
+  "verification": {
+    "red": {
+      "passed": 4,
+      "failed": 2,
+      "exit_code": 1
+    },
+    "focused_cpu": {
+      "passed": 32,
+      "exit_code": 0
+    },
+    "full_suite": {
+      "passed": 41,
+      "failed": 1,
+      "exit_code": 1,
+      "failure": "FK.TestFKAndGlobalVelocities: missing unchanged reference/bones_072925_test/ and g1/g1_29dof.xml"
+    },
+    "build": {
+      "exit_code": 0,
+      "command": "cmake --build build/sonic-navigation-runtime/cmake --target run_tests g1_deploy_onnx_ref -j2"
+    }
+  },
+  "allowlist_deviations": [],
+  "physical_gates": "Unresolved; main owns unchanged-envelope A/B simulation and measured coverage validation."
+}

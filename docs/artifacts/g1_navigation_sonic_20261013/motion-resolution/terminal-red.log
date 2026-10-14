@@ -1,0 +1,324 @@
+Note: Google Test filter = PlannerTerminalHold.*
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from PlannerTerminalHold
+[ RUN      ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.09999999776482589
+  0.0
+    Which is: 0
+0
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.70000000298023335
+  0.0
+    Which is: 0
+1
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.2999999523162844
+  0.0
+    Which is: 0
+2
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.19999999552965178
+  0.0
+    Which is: 0
+3
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.79999998211860712
+  0.0
+    Which is: 0
+4
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.4000000059604667
+  0.0
+    Which is: 0
+5
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.29999999329447768
+  0.0
+    Which is: 0
+6
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.8999999612569809
+  0.0
+    Which is: 0
+7
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.4999999105930333
+  0.0
+    Which is: 0
+8
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.39999999105930356
+  0.0
+    Which is: 0
+9
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.99999994039535611
+  0.0
+    Which is: 0
+10
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.5999999642372142
+  0.0
+    Which is: 0
+11
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.2999998927116434
+  0.0
+    Which is: 0
+12
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.49999997019767806
+  0.0
+    Which is: 0
+13
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.0999999940395355
+  0.0
+    Which is: 0
+14
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.7000000178813952
+  0.0
+    Which is: 0
+15
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.3999999463558215
+  0.0
+    Which is: 0
+16
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.59999998658895537
+  0.0
+    Which is: 0
+17
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.1999999731779107
+  0.0
+    Which is: 0
+18
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.7999999225139618
+  0.0
+    Which is: 0
+19
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.5000000000000022
+  0.0
+    Which is: 0
+20
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.8999999761581454
+  0.0
+    Which is: 0
+21
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.5999999046325688
+  0.0
+    Which is: 0
+22
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.9999998807907122
+  0.0
+    Which is: 0
+23
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.6999998092651412
+  0.0
+    Which is: 0
+24
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.099999934434893
+  0.0
+    Which is: 0
+25
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.8000000119209334
+  0.0
+    Which is: 0
+26
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.199999988079071
+  0.0
+    Which is: 0
+27
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:50: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 2.8999999165535026
+  0.0
+    Which is: 0
+28
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.09999999776482589
+  0.0
+    Which is: 0
+0
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.19999999552965178
+  0.0
+    Which is: 0
+3
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.29999999329447768
+  0.0
+    Which is: 0
+6
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.39999999105930356
+  0.0
+    Which is: 0
+9
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.49999997019767806
+  0.0
+    Which is: 0
+13
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.59999998658895537
+  0.0
+    Which is: 0
+17
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.70000000298023335
+  0.0
+    Which is: 0
+1
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.79999998211860712
+  0.0
+    Which is: 0
+4
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.8999999612569809
+  0.0
+    Which is: 0
+7
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 0.99999994039535611
+  0.0
+    Which is: 0
+10
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.0999999940395355
+  0.0
+    Which is: 0
+14
+/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp:53: Failure
+Expected equality of these values:
+  motion.JointVelocities(4)[joint]
+    Which is: 1.1999999731779107
+  0.0
+    Which is: 0
+18
+[  FAILED  ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity (0 ms)
+[ RUN      ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions (0 ms)
+[ RUN      ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity (0 ms)
+[----------] 3 tests from PlannerTerminalHold (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 2 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity
+
+ 1 FAILED TEST

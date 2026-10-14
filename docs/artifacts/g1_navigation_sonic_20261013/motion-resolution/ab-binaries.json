@@ -1,0 +1,10 @@
+{
+  "corrected_binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+  "baseline_source_sha256": {
+    "include/localmotion_kplanner.hpp": "d1e8bf164a42bf6e88e5f706c2694134693b9052b24b83b9fa1e47ef0550c4cd",
+    "src/g1_deploy_onnx_ref.cpp": "79685037fcfaaefb3d891a5a6110b0823263e66839874bf2556207a50f5473d3"
+  },
+  "build_exit_code": 0,
+  "baseline_binary_sha256": "ce396b2b005264a1dc13f282bc032d0baf56be14d0a3456c815d42611802648b",
+  "corrected_sources_and_binary_restored": true
+}

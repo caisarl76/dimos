@@ -1,0 +1,535 @@
+{
+  "captured_at": "2026-10-14T06:27:37.386593+00:00",
+  "trials": [
+    {
+      "group": "ab-trials",
+      "name": "baseline-1",
+      "accepted": false,
+      "status": "failed",
+      "case_count": 4,
+      "failed_cases": [],
+      "error": "TimeoutError: forward_transition_1 measured settling",
+      "binary_sha256": "ce396b2b005264a1dc13f282bc032d0baf56be14d0a3456c815d42611802648b",
+      "pacing": "relative",
+      "raw_hashes_sha256": "8eab95887ebbeea34ded88e4e0b0064e0a243b6fb936bca386b5f03082df45c2",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.06067955700101015,
+        "forward_transition_1": 0.009655243615777305
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5038418238982558,
+        "forward_transition_0_settled": 2.9957867849152535
+      }
+    },
+    {
+      "group": "ab-trials",
+      "name": "baseline-2",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "ce396b2b005264a1dc13f282bc032d0baf56be14d0a3456c815d42611802648b",
+      "pacing": "relative",
+      "raw_hashes_sha256": "2fe0852804d70fe87c4283ff569e183b74a7a3d0df53818822f45a2a5ec72134",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.040209885157732765,
+        "forward_transition_1": 0.038952921977291215,
+        "forward_transition_2": 0.2623625278525302
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5033180539030582,
+        "forward_transition_0_settled": 2.134217059938237,
+        "forward_transition_1_settled": 2.4986345539800823,
+        "forward_transition_2_settled": 2.0743199379649013
+      }
+    },
+    {
+      "group": "ab-trials",
+      "name": "baseline-3",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "ce396b2b005264a1dc13f282bc032d0baf56be14d0a3456c815d42611802648b",
+      "pacing": "relative",
+      "raw_hashes_sha256": "cf3425f953b676e2b6c402cbe352ae9f9fdfd4736e8913b9f07e6e07cd9fab81",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.19984905782810874,
+        "forward_transition_1": 0.10391450113681973,
+        "forward_transition_2": 0.03544463059772109
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5096071569714695,
+        "forward_transition_0_settled": 2.5285123488865793,
+        "forward_transition_1_settled": 1.3411590829491615,
+        "forward_transition_2_settled": 2.1629138209391385
+      }
+    },
+    {
+      "group": "ab-trials",
+      "name": "corrected-1",
+      "accepted": false,
+      "status": "failed",
+      "case_count": 2,
+      "failed_cases": [],
+      "error": "TimeoutError: forward_transition_0 measured settling",
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "relative",
+      "raw_hashes_sha256": "fea78cf60d6f036cabe7a5024eeee0ffbb4672f0f86f2b159b80ca256a56a801",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.12002545118270964
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5081879661884159
+      }
+    },
+    {
+      "group": "ab-trials",
+      "name": "corrected-2",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "relative",
+      "raw_hashes_sha256": "8ad7ca91811eed48bb8fdf2f6e820847860cd20643d69070f3f75dfe88eb1f81",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.017894190637058525,
+        "forward_transition_1": 0.03647725520061817,
+        "forward_transition_2": 0.16287098687999985
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5276937370654196,
+        "forward_transition_0_settled": 2.108514596009627,
+        "forward_transition_1_settled": 2.53998148906976,
+        "forward_transition_2_settled": 2.5368019309826195
+      }
+    },
+    {
+      "group": "ab-trials",
+      "name": "corrected-3",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "relative",
+      "raw_hashes_sha256": "2360fd7d631f72492479610193233aafe482c5b0d1bc1283940669ad89c00b07",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.17676013685577704,
+        "forward_transition_1": 0.23928406992447698,
+        "forward_transition_2": 0.2381557797386193
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5128893330693245,
+        "forward_transition_0_settled": 1.8576725479215384,
+        "forward_transition_1_settled": 2.5168258999474347,
+        "forward_transition_2_settled": 2.360924347070977
+      }
+    },
+    {
+      "group": "pacing-trials",
+      "name": "absolute-1",
+      "accepted": false,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [
+        "forward_transition_0"
+      ],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "7419d5a3acd824251d00b27fc2078b1f99c323700632050d9133b911308ab90b",
+      "movement_displacements_m": {
+        "forward_transition_0": -0.013892227517600879,
+        "forward_transition_1": 0.005502325304037145,
+        "forward_transition_2": 0.040696704360501386
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5274543210398406,
+        "forward_transition_0_settled": 2.1055584819987416,
+        "forward_transition_1_settled": 2.6915551810525358,
+        "forward_transition_2_settled": 2.5048959751147777
+      }
+    },
+    {
+      "group": "pacing-trials",
+      "name": "absolute-2",
+      "accepted": false,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [
+        "forward_transition_0"
+      ],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "577e26f0f299e40db5432d2942a798d088907d707d362041526033dedc08ba6a",
+      "movement_displacements_m": {
+        "forward_transition_0": -0.020891059614174163,
+        "forward_transition_1": 0.05985451674540485,
+        "forward_transition_2": 0.25866236815803645
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5261267079040408,
+        "forward_transition_0_settled": 2.144468566868454,
+        "forward_transition_1_settled": 2.165755045134574,
+        "forward_transition_2_settled": 2.1740160710178316
+      }
+    },
+    {
+      "group": "pacing-trials",
+      "name": "absolute-3",
+      "accepted": false,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [
+        "forward_transition_0"
+      ],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "5fbaa8e0249f73f120b14cc906a4475fad2143187e2b10233abde33bbddd1c28",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.0006720793491511245,
+        "forward_transition_1": 0.08598879107380066,
+        "forward_transition_2": 0.25950083581283256
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.503404047107324,
+        "forward_transition_0_settled": 2.725882668979466,
+        "forward_transition_1_settled": 2.7625401499681175,
+        "forward_transition_2_settled": 2.1539005099330097
+      }
+    },
+    {
+      "group": "pacing-trials",
+      "name": "relative-1",
+      "accepted": false,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [
+        "forward_transition_2"
+      ],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "relative",
+      "raw_hashes_sha256": "f65ae20432a4b72de7881f4034ca9168fb9c79e640ca122ee3fcd74e7713f440",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.0924418144175006,
+        "forward_transition_1": 0.014270074708277274,
+        "forward_transition_2": -0.016711939486579747
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5024939321447164,
+        "forward_transition_0_settled": 2.6554996769409627,
+        "forward_transition_1_settled": 2.0849657831713557,
+        "forward_transition_2_settled": 2.2406897319015115
+      }
+    },
+    {
+      "group": "pacing-trials",
+      "name": "relative-2",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "relative",
+      "raw_hashes_sha256": "a467b395ef0cdd7c6dc9b0e16afa021deeaa312dd6ce4edec2ff17fe41772361",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.1698783828444814,
+        "forward_transition_1": 0.21960855162616796,
+        "forward_transition_2": 0.23870285060273333
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5058474470861256,
+        "forward_transition_0_settled": 2.242871438153088,
+        "forward_transition_1_settled": 2.102757847169414,
+        "forward_transition_2_settled": 1.7294293609447777
+      }
+    },
+    {
+      "group": "pacing-trials",
+      "name": "relative-3",
+      "accepted": false,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [
+        "forward_transition_0"
+      ],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "relative",
+      "raw_hashes_sha256": "9ad168b1f75da170d5f781577891a0007c2cb7bac43bdf4bd41ab6b4aec05ed9",
+      "movement_displacements_m": {
+        "forward_transition_0": -0.008959065193681334,
+        "forward_transition_1": 0.06721637989242409,
+        "forward_transition_2": 0.28716953144224444
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5057245958596468,
+        "forward_transition_0_settled": 2.502105511026457,
+        "forward_transition_1_settled": 1.8709249298553914,
+        "forward_transition_2_settled": 2.1729950411245227
+      }
+    },
+    {
+      "group": "fullmatrix-trials",
+      "name": "fullmatrix-1",
+      "accepted": false,
+      "status": "failed",
+      "case_count": 2,
+      "failed_cases": [
+        "forward"
+      ],
+      "error": "AssertionError: forward direction mismatch",
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "4254761a00ecbcc59769ea7a003ce7ec7cd961637d40b8b880e8c679f1395c2e",
+      "movement_displacements_m": {
+        "forward": -0.003492048176332597
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5051452820189297
+      }
+    },
+    {
+      "group": "fullmatrix-trials",
+      "name": "fullmatrix-2",
+      "accepted": true,
+      "status": "passed",
+      "case_count": 26,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "b8fc2af04cdd72eac85f60016801d1f8f27937d1ac200b1985c0bed72fb7d34c",
+      "movement_displacements_m": {
+        "forward": 0.10183226414028673,
+        "backward": -0.1258730116025366,
+        "left_turn": -0.0007867223167583553,
+        "right_turn": -0.0007459554403455948
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5239279340021312,
+        "forward_settled": 2.916054735193029,
+        "backward_settled": 2.298265374964103,
+        "left_turn_settled": 2.2935013610403985,
+        "right_turn_settled": 2.218381257960573,
+        "before_noisy_trace_settled": 0.5304382110480219,
+        "noisy_trace_settled": 2.0307069378905,
+        "source_expiry_settled": 1.4977916509378701,
+        "watchdog_settled": 2.303107896121219,
+        "pose_handback_settled": 2.0956961889751256,
+        "pose_expiry_settled": 2.054603890981525,
+        "publisher_disconnect_settled": 2.43946187896654
+      }
+    },
+    {
+      "group": "fullmatrix-trials",
+      "name": "fullmatrix-3",
+      "accepted": false,
+      "status": "passed",
+      "case_count": 26,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "3325d6dcfb3f77a6f2fd45c2840826b7a53ee09018b42e1aba152ce7d03d2a76",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "4a19653133ff392c22c94009d28e9cae0c29fd2efacff5c8c6f1d1cc17d21652",
+      "movement_displacements_m": {
+        "forward": 0.08255984799133784,
+        "backward": -0.2200189504792379,
+        "left_turn": 0.001816006204107423,
+        "right_turn": -0.004899288750074415
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.4872631619218737,
+        "forward_settled": 2.5428001841064543,
+        "backward_settled": 2.1022574701346457,
+        "left_turn_settled": 1.1932939258404076,
+        "right_turn_settled": 2.185719624860212,
+        "before_noisy_trace_settled": 0.4902354651130736,
+        "noisy_trace_settled": 2.3268602429889143,
+        "source_expiry_settled": 1.6158622379880399,
+        "watchdog_settled": 2.0830195830203593,
+        "pose_handback_settled": 2.0906719667837024,
+        "pose_expiry_settled": 1.154784229816869,
+        "publisher_disconnect_settled": 2.033185083884746
+      }
+    },
+    {
+      "group": "horizon-trials",
+      "name": "fullmatrix-1",
+      "accepted": true,
+      "status": "passed",
+      "case_count": 26,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "7546e270fff175a6cc81357df176458fa38840757e25d7ee746b2900938f882a",
+      "movement_displacements_m": {
+        "forward": 0.08794190035666392,
+        "backward": -0.2308091731365938,
+        "left_turn": -0.0044961804985577504,
+        "right_turn": 0.0042085355728687405
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5244604921899736,
+        "forward_settled": 2.6682249819859862,
+        "backward_settled": 2.2249173279851675,
+        "left_turn_settled": 1.0532641960307956,
+        "right_turn_settled": 1.7806920630391687,
+        "before_noisy_trace_settled": 0.5214237261097878,
+        "noisy_trace_settled": 2.4531024349853396,
+        "source_expiry_settled": 1.239997864002362,
+        "watchdog_settled": 2.014131181873381,
+        "pose_handback_settled": 2.0939670379739255,
+        "pose_expiry_settled": 2.0005537860561162,
+        "publisher_disconnect_settled": 1.9987667149398476
+      }
+    },
+    {
+      "group": "horizon-trials",
+      "name": "fullmatrix-2",
+      "accepted": true,
+      "status": "passed",
+      "case_count": 26,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "4c3e34f0a04f11a2253861164aa9704fb03b8e2d1e4abc5ef7278fd6270c3ad4",
+      "movement_displacements_m": {
+        "forward": 0.08907219846217732,
+        "backward": -0.31190361677911993,
+        "left_turn": -0.003624649199955682,
+        "right_turn": -0.001210186670237842
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5048080799169838,
+        "forward_settled": 2.1110319630242884,
+        "backward_settled": 2.0743471120949835,
+        "left_turn_settled": 2.157870094059035,
+        "right_turn_settled": 1.8202306609600782,
+        "before_noisy_trace_settled": 0.5257134349085391,
+        "noisy_trace_settled": 1.648996268864721,
+        "source_expiry_settled": 1.773218034999445,
+        "watchdog_settled": 1.2319883299060166,
+        "pose_handback_settled": 2.163740044925362,
+        "pose_expiry_settled": 1.1706859648693353,
+        "publisher_disconnect_settled": 2.348408922087401
+      }
+    },
+    {
+      "group": "horizon-trials",
+      "name": "fullmatrix-3",
+      "accepted": true,
+      "status": "passed",
+      "case_count": 26,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "4ef0e9c0796d46a157bd44a06bb3230b5889fd7e53d5c0db5b7c660c77b0d183",
+      "movement_displacements_m": {
+        "forward": 0.2733080031444913,
+        "backward": -0.28636709617822986,
+        "left_turn": -0.006630616100209525,
+        "right_turn": 0.0021533056794293226
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.4999389690347016,
+        "forward_settled": 2.1795634320005774,
+        "backward_settled": 2.1178499590605497,
+        "left_turn_settled": 0.9193659350275993,
+        "right_turn_settled": 2.133723813807592,
+        "before_noisy_trace_settled": 0.5206124228425324,
+        "noisy_trace_settled": 2.1189035379793495,
+        "source_expiry_settled": 1.4646558680105954,
+        "watchdog_settled": 2.0064378490205854,
+        "pose_handback_settled": 1.0227618350181729,
+        "pose_expiry_settled": 1.7364777738694102,
+        "publisher_disconnect_settled": 2.311319801956415
+      }
+    },
+    {
+      "group": "horizon-trials",
+      "name": "transitions-1",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "e211f9dd9cdebfa5c2648f69b612b0343f84fd489297070e3a05de6683388d04",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.2035408879743462,
+        "forward_transition_1": 0.23451911277807105,
+        "forward_transition_2": 0.25840733756485096
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5229197379667312,
+        "forward_transition_0_settled": 2.189900113036856,
+        "forward_transition_1_settled": 2.259019237011671,
+        "forward_transition_2_settled": 2.1600024371873587
+      }
+    },
+    {
+      "group": "horizon-trials",
+      "name": "transitions-2",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "fb0481f06ab467bbc5d2f39c2ed6d27bc5901dbcc26aaeb9d00efd573b766ce9",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.18375637637058095,
+        "forward_transition_1": 0.22022263166880351,
+        "forward_transition_2": 0.26790647260138284
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.5074853608384728,
+        "forward_transition_0_settled": 2.249640171183273,
+        "forward_transition_1_settled": 2.2269259840250015,
+        "forward_transition_2_settled": 2.10080987890251
+      }
+    },
+    {
+      "group": "horizon-trials",
+      "name": "transitions-3",
+      "accepted": true,
+      "status": "diagnostic_only",
+      "case_count": 7,
+      "failed_cases": [],
+      "error": null,
+      "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+      "pacing": "absolute",
+      "raw_hashes_sha256": "afec94cbd80cbac470ec48b34e6fbb7d5e575b687efd8df776275bf52adc529d",
+      "movement_displacements_m": {
+        "forward_transition_0": 0.21649852576530168,
+        "forward_transition_1": 0.3011687689326742,
+        "forward_transition_2": 0.2811899550748021
+      },
+      "settling_times_s": {
+        "initial_idle_settled": 0.52821064600721,
+        "forward_transition_0_settled": 2.321631853003055,
+        "forward_transition_1_settled": 2.1685145699884742,
+        "forward_transition_2_settled": 1.9983045880217105
+      }
+    }
+  ],
+  "headless_original_envelope": "PASS: 9 forward/stop cycles and 3 full 26-case matrices; independent horizon coverage proof remains separately required",
+  "fk_gate": "BLOCKED: exact original recording and matching XML staging required",
+  "hardware_commissioning": "NOT AUTHORIZED/NOT RUN; pending calibration and later plan tasks"
+}

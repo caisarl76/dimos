@@ -1,0 +1,278 @@
+{
+  "source_sha256": {
+    "demo_navigation_horizon_proof.py": "9174c36b1ac40fc57d39d9b53f5164c6147289391f2fecfd9d8c2db8481eb2b8",
+    "test_navigation_horizon_proof.py": "0952d8353406bae2ee1dbc358212fc67bedfd2b32b4601cc12a221e3f906e2e2"
+  },
+  "runs": [
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/fullmatrix-trials/fullmatrix-1",
+      "coverage_passed": false,
+      "windows": 1,
+      "eligible_samples": 90,
+      "terminal_windows": 32,
+      "terminal_windows_ge3": 12,
+      "max_terminal_slots": 4,
+      "max_clamped_slots": 4,
+      "initial_exclusion_seconds": {
+        "forward": 0.19939747406169772
+      },
+      "max_inference_seconds": 0.004872487857937813,
+      "max_first_observed_merge_latency_seconds": 0.020276262890547514,
+      "horizon_refresh_rows": 0,
+      "temporal_coverage": {
+        "forward": {
+          "target_start_gap_s": 0.019445844925940037,
+          "target_end_gap_s": 0.016032757004722953,
+          "target_max_gap_s": 0.024732428835704923,
+          "proof_failure_reasons": [
+            "terminal_windows"
+          ]
+        }
+      }
+    },
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-1",
+      "coverage_passed": true,
+      "windows": 3,
+      "eligible_samples": 279,
+      "terminal_windows": 0,
+      "terminal_windows_ge3": 0,
+      "max_terminal_slots": 0,
+      "max_clamped_slots": 0,
+      "initial_exclusion_seconds": {
+        "forward_transition_0": 0.18629950797185302,
+        "forward_transition_1": 0.16640073410235345,
+        "forward_transition_2": 0.11130428197793663
+      },
+      "max_inference_seconds": 0.005152542144060135,
+      "max_first_observed_merge_latency_seconds": 0.04002568288706243,
+      "horizon_refresh_rows": 17,
+      "temporal_coverage": {
+        "forward_transition_0": {
+          "target_start_gap_s": 0.0063048109877854586,
+          "target_end_gap_s": 0.013971026055514812,
+          "target_max_gap_s": 0.02006023400463164,
+          "proof_failure_reasons": []
+        },
+        "forward_transition_1": {
+          "target_start_gap_s": 0.006364925066009164,
+          "target_end_gap_s": 0.013561441097408533,
+          "target_max_gap_s": 0.020080539165064692,
+          "proof_failure_reasons": []
+        },
+        "forward_transition_2": {
+          "target_start_gap_s": 0.011273174080997705,
+          "target_end_gap_s": 0.008739958051592112,
+          "target_max_gap_s": 0.020061327144503593,
+          "proof_failure_reasons": []
+        }
+      }
+    },
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-2",
+      "coverage_passed": true,
+      "windows": 3,
+      "eligible_samples": 273,
+      "terminal_windows": 0,
+      "terminal_windows_ge3": 0,
+      "max_terminal_slots": 0,
+      "max_clamped_slots": 0,
+      "initial_exclusion_seconds": {
+        "forward_transition_0": 0.20117915305308998,
+        "forward_transition_1": 0.15589921409264207,
+        "forward_transition_2": 0.21108119003474712
+      },
+      "max_inference_seconds": 0.005158410174772143,
+      "max_first_observed_merge_latency_seconds": 0.039993345038965344,
+      "horizon_refresh_rows": 14,
+      "temporal_coverage": {
+        "forward_transition_0": {
+          "target_start_gap_s": 0.0012306112330406904,
+          "target_end_gap_s": 0.018160560866817832,
+          "target_max_gap_s": 0.020091310841962695,
+          "proof_failure_reasons": []
+        },
+        "forward_transition_1": {
+          "target_start_gap_s": 0.015913026873022318,
+          "target_end_gap_s": 0.013563825050368905,
+          "target_max_gap_s": 0.020068651996552944,
+          "proof_failure_reasons": []
+        },
+        "forward_transition_2": {
+          "target_start_gap_s": 0.011048312997445464,
+          "target_end_gap_s": 0.013387646060436964,
+          "target_max_gap_s": 0.02007272094488144,
+          "proof_failure_reasons": []
+        }
+      }
+    },
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-3",
+      "coverage_passed": true,
+      "windows": 3,
+      "eligible_samples": 276,
+      "terminal_windows": 0,
+      "terminal_windows_ge3": 0,
+      "max_terminal_slots": 0,
+      "max_clamped_slots": 0,
+      "initial_exclusion_seconds": {
+        "forward_transition_0": 0.19922400824725628,
+        "forward_transition_1": 0.15444303397089243,
+        "forward_transition_2": 0.18456216901540756
+      },
+      "max_inference_seconds": 0.00515514612197876,
+      "max_first_observed_merge_latency_seconds": 0.039983819937333465,
+      "horizon_refresh_rows": 17,
+      "temporal_coverage": {
+        "forward_transition_0": {
+          "target_start_gap_s": 0.01919175824150443,
+          "target_end_gap_s": 0.016033182153478265,
+          "target_max_gap_s": 0.020087630953639746,
+          "proof_failure_reasons": []
+        },
+        "forward_transition_1": {
+          "target_start_gap_s": 0.014430827926844358,
+          "target_end_gap_s": 0.0007459688931703568,
+          "target_max_gap_s": 0.02007535705342889,
+          "proof_failure_reasons": []
+        },
+        "forward_transition_2": {
+          "target_start_gap_s": 0.004571199184283614,
+          "target_end_gap_s": 0.015436546877026558,
+          "target_max_gap_s": 0.02005585003644228,
+          "proof_failure_reasons": []
+        }
+      }
+    },
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/fullmatrix-1",
+      "coverage_passed": true,
+      "windows": 3,
+      "eligible_samples": 431,
+      "terminal_windows": 0,
+      "terminal_windows_ge3": 0,
+      "max_terminal_slots": 0,
+      "max_clamped_slots": 0,
+      "initial_exclusion_seconds": {
+        "forward": 0.1187271389644593,
+        "backward": 0.2391788351815194,
+        "noisy_trace_replan_limit": 0.07925714901648462
+      },
+      "max_inference_seconds": 0.005154784070327878,
+      "max_first_observed_merge_latency_seconds": 0.04001885512843728,
+      "horizon_refresh_rows": 25,
+      "temporal_coverage": {
+        "forward": {
+          "target_start_gap_s": 0.01872870698571205,
+          "target_end_gap_s": 0.005950916092842817,
+          "target_max_gap_s": 0.020090527134016156,
+          "proof_failure_reasons": []
+        },
+        "backward": {
+          "target_start_gap_s": 0.019173978129401803,
+          "target_end_gap_s": 0.0008778320625424385,
+          "target_max_gap_s": 0.020073596155270934,
+          "proof_failure_reasons": []
+        },
+        "noisy_trace_replan_limit": {
+          "target_start_gap_s": 0.019266337854787707,
+          "target_end_gap_s": 0.009072348941117525,
+          "target_max_gap_s": 0.020072040846571326,
+          "proof_failure_reasons": []
+        }
+      }
+    },
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/fullmatrix-2",
+      "coverage_passed": true,
+      "windows": 3,
+      "eligible_samples": 437,
+      "terminal_windows": 0,
+      "terminal_windows_ge3": 0,
+      "max_terminal_slots": 0,
+      "max_clamped_slots": 0,
+      "initial_exclusion_seconds": {
+        "forward": 0.10600978205911815,
+        "backward": 0.17631618096493185,
+        "noisy_trace_replan_limit": 0.05491441814228892
+      },
+      "max_inference_seconds": 0.0051454531494528055,
+      "max_first_observed_merge_latency_seconds": 0.04006911884061992,
+      "horizon_refresh_rows": 22,
+      "temporal_coverage": {
+        "forward": {
+          "target_start_gap_s": 0.005995421204715967,
+          "target_end_gap_s": 0.003638718742877245,
+          "target_max_gap_s": 0.02007897198200226,
+          "proof_failure_reasons": []
+        },
+        "backward": {
+          "target_start_gap_s": 0.016322075156494975,
+          "target_end_gap_s": 0.003607136895880103,
+          "target_max_gap_s": 0.020084124989807606,
+          "proof_failure_reasons": []
+        },
+        "noisy_trace_replan_limit": {
+          "target_start_gap_s": 0.014862219104543328,
+          "target_end_gap_s": 0.0066816548351198435,
+          "target_max_gap_s": 0.020099769113585353,
+          "proof_failure_reasons": []
+        }
+      }
+    },
+    {
+      "run": "docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/fullmatrix-3",
+      "coverage_passed": true,
+      "windows": 3,
+      "eligible_samples": 436,
+      "terminal_windows": 0,
+      "terminal_windows_ge3": 0,
+      "max_terminal_slots": 0,
+      "max_clamped_slots": 0,
+      "initial_exclusion_seconds": {
+        "forward": 0.1260351489763707,
+        "backward": 0.14627828286029398,
+        "noisy_trace_replan_limit": 0.05774573911912739
+      },
+      "max_inference_seconds": 0.0051594830583781,
+      "max_first_observed_merge_latency_seconds": 0.03999287891201675,
+      "horizon_refresh_rows": 25,
+      "temporal_coverage": {
+        "forward": {
+          "target_start_gap_s": 0.006013160105794668,
+          "target_end_gap_s": 0.018726227805018425,
+          "target_max_gap_s": 0.02004752610810101,
+          "proof_failure_reasons": []
+        },
+        "backward": {
+          "target_start_gap_s": 0.00629729893989861,
+          "target_end_gap_s": 0.008640820859000087,
+          "target_max_gap_s": 0.020069419872015715,
+          "proof_failure_reasons": []
+        },
+        "noisy_trace_replan_limit": {
+          "target_start_gap_s": 0.01773679000325501,
+          "target_end_gap_s": 0.008282111724838614,
+          "target_max_gap_s": 0.02008342300541699,
+          "proof_failure_reasons": []
+        }
+      }
+    }
+  ],
+  "regressions": {
+    "red_exit_code": 1,
+    "red_failed": 2,
+    "green_exit_code": 0,
+    "green_passed": 7,
+    "lint_exit_code": 0,
+    "gap_red_exit_code": 1,
+    "gap_red_failed": 4,
+    "gap_red_passed": 3
+  },
+  "scope": "Recorded native target frames cover the original result windows with start/end/internal gaps <=0.12 s; initial IDLE-to-SLOW_WALK exclusion <=0.350 s. These are evidence bounds, not physical envelope changes.",
+  "proof_bounds": {
+    "target_start_end_internal_gap_s": 0.12,
+    "initial_transition_exclusion_s": 0.35,
+    "feedback_age_s": "0 <= age < 0.2"
+  }
+}

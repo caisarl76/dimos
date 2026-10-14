@@ -1,3 +1,17 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Noise proof must reject unaccounted motion changes, even with healthy leases."""
 
 from dataclasses import replace
@@ -126,6 +140,58 @@ def test_unchanged_state_cannot_explain_a_second_native_replan(evidence):
 def test_native_replan_cannot_be_explained_by_a_later_send(evidence):
     evidence["sent"][0]["monotonic"] = 10.043
     evidence["acks"][0]["monotonic"] = 10.044
+    assert not attribute_replans(**evidence)["passed"]
+
+
+def horizon_row(evidence):
+    return {
+        **evidence["native"][0],
+        "started_monotonic": "10.05",
+        "finished_monotonic": "10.055",
+        "mode_changed": "0",
+        "speed_changed": "0",
+        "direction_changed": "0",
+        "periodic": "0",
+        "horizon_refresh": "1",
+        "horizon_remaining": "54",
+        "horizon_window": "46",
+        "horizon_margin": "8",
+    }
+
+
+def test_horizon_only_refresh_has_its_own_validated_reason(evidence):
+    evidence["native"].append(horizon_row(evidence))
+    assert attribute_replans(**evidence)["passed"]
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("horizon_remaining", "55"),
+        ("horizon_window", "0"),
+        ("horizon_margin", "1000"),
+        ("mode", "0"),
+        ("speed", "0"),
+    ],
+)
+def test_invalid_horizon_claim_cannot_explain_extra_inference(evidence, field, value):
+    row = horizon_row(evidence)
+    row[field] = value
+    evidence["native"].append(row)
+    assert not attribute_replans(**evidence)["passed"]
+
+
+def test_horizon_reason_cannot_hide_an_unchanged_state_replan(evidence):
+    row = horizon_row(evidence)
+    row["direction_changed"] = "1"
+    evidence["native"].append(row)
+    assert not attribute_replans(**evidence)["passed"]
+
+
+def test_native_inference_without_any_recorded_reason_is_rejected(evidence):
+    row = horizon_row(evidence)
+    row["horizon_refresh"] = "0"
+    evidence["native"].append(row)
     assert not attribute_replans(**evidence)["passed"]
 
 

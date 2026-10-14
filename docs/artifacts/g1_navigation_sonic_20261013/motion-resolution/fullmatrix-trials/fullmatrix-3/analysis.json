@@ -1,0 +1,292 @@
+{
+  "passed": false,
+  "completed": [
+    "backward",
+    "backward_settled",
+    "before_noisy_trace_settled",
+    "feedback_loss_200ms",
+    "forward",
+    "forward_settled",
+    "initial_idle_settled",
+    "left_turn",
+    "left_turn_settled",
+    "native_watchdog_250ms",
+    "noisy_trace_replan_limit",
+    "noisy_trace_settled",
+    "pose_expiry_settled",
+    "pose_handback_settled",
+    "pose_source_expiry_200ms",
+    "publisher_disconnect_settled",
+    "right_turn",
+    "right_turn_settled",
+    "seeded_pose_suspends_planner_watchdog",
+    "source_expiry_idle_without_latch",
+    "source_expiry_settled",
+    "source_outage_ends",
+    "source_pause_250ms",
+    "stopped_publisher_watchdog",
+    "subscriptions_loss",
+    "watchdog_settled"
+  ],
+  "missing": [],
+  "failed": [],
+  "run_status": "passed",
+  "run_error": null,
+  "wire_samples": {
+    "moving": 500,
+    "idle": 1210,
+    "pose": 164
+  },
+  "translating_noise": {
+    "passed": false,
+    "checks": {
+      "five_second_trace": true,
+      "advancing_physics": true,
+      "both_sensor_noise_signs": true,
+      "moving_wire": true,
+      "advancing_source": true,
+      "literal_heartbeats": true,
+      "active_throughout": true,
+      "native_replans": false,
+      "conversion_provenance": true,
+      "held_facing": true,
+      "fixed_movement": true,
+      "bounded_applied_latency": true,
+      "forward_physics": true,
+      "standing_envelope": true
+    },
+    "forward_displacement_m": 0.8000196120159752,
+    "native_state_replans": 20,
+    "planner_packets": 238,
+    "source_sequences": 48,
+    "attribution": {
+      "passed": false,
+      "errors": [
+        "native 1142342.8553898272: no acknowledged matching intent"
+      ],
+      "native_state_replans": 20,
+      "attributed": [
+        {
+          "monotonic": 1142340.255394804,
+          "acknowledged_sequences": [
+            1142340219022778,
+            1142340240281865
+          ],
+          "reasons": [
+            "mode_changed",
+            "speed_changed",
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142340.955398469,
+          "acknowledged_sequences": [
+            1142340855849746,
+            1142340877182117,
+            1142340898305085,
+            1142340919460819,
+            1142340940538784
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142341.155400885,
+          "acknowledged_sequences": [
+            1142341066181829,
+            1142341087391124,
+            1142341108352622,
+            1142341129257480,
+            1142341150584871
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142341.2553909172,
+          "acknowledged_sequences": [
+            1142341172184341,
+            1142341193162977,
+            1142341214053616,
+            1142341234939468
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142341.3553876001,
+          "acknowledged_sequences": [
+            1142341256086066,
+            1142341277502594,
+            1142341298393990,
+            1142341319317788,
+            1142341340299406
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142341.455388786,
+          "acknowledged_sequences": [
+            1142341382484626,
+            1142341403543372,
+            1142341424403066,
+            1142341445263855
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142341.855407545,
+          "acknowledged_sequences": [
+            1142341782720693,
+            1142341804022672,
+            1142341825009345,
+            1142341845871147
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142342.055403155,
+          "acknowledged_sequences": [
+            1142342016774606
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142342.255391166,
+          "acknowledged_sequences": [
+            1142342227206853,
+            1142342248351042
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142342.6553914482,
+          "acknowledged_sequences": [
+            1142342628994502,
+            1142342650012865
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142342.8553898272,
+          "acknowledged_sequences": [],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142342.955394899,
+          "acknowledged_sequences": [
+            1142342945557443
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142343.155395146,
+          "acknowledged_sequences": [
+            1142343072289467,
+            1142343093348212,
+            1142343114227861,
+            1142343135272417
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142343.25538812,
+          "acknowledged_sequences": [
+            1142343178110128,
+            1142343199226965,
+            1142343220508707
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142343.7553865472,
+          "acknowledged_sequences": [
+            1142343706132102,
+            1142343727186693,
+            1142343748004598
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142343.8553873522,
+          "acknowledged_sequences": [
+            1142343811466631,
+            1142343832574847,
+            1142343853545107
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142344.055391364,
+          "acknowledged_sequences": [
+            1142344023197194,
+            1142344044441905
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142344.155390904,
+          "acknowledged_sequences": [
+            1142344129247143,
+            1142344150221408
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142344.95539833,
+          "acknowledged_sequences": [
+            1142344950240884
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1142345.155395297,
+          "acknowledged_sequences": [
+            1142345077135245,
+            1142345098265004,
+            1142345119143522,
+            1142345140231738
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        }
+      ]
+    },
+    "conversion_errors": []
+  },
+  "noise_proof_only_passed": false
+}

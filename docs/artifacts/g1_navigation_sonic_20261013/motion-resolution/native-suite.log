@@ -1,0 +1,40 @@
+[==========] Running 36 tests from 6 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from FK
+[ RUN      ] FK.TestFKAndGlobalVelocities
+Reading motion data from CSV files in: reference/bones_072925_test/
+Error reading directory: filesystem error: directory iterator cannot open directory: No such file or directory [reference/bones_072925_test/]
+unknown file: Failure
+C++ exception with description "Couldn't parse xml file g1/g1_29dof.xml" thrown in the test body.
+[  FAILED  ] FK.TestFKAndGlobalVelocities (0 ms)
+[----------] 1 test from FK (0 ms total)
+
+[----------] 14 tests from PlannerLease
+[ RUN      ] PlannerLease.ExpiredPending
+[       OK ] PlannerLease.ExpiredPending (0 ms)
+[ RUN      ] PlannerLease.HealthyHeartbeatMotionExpiry
+[       OK ] PlannerLease.HealthyHeartbeatMotionExpiry (0 ms)
+[ RUN      ] PlannerLease.DuplicateDoesNotRenew
+[       OK ] PlannerLease.DuplicateDoesNotRenew (0 ms)
+[ RUN      ] PlannerLease.RearmBarrier
+[       OK ] PlannerLease.RearmBarrier (0 ms)
+[ RUN      ] PlannerLease.EndCannotClearLatch
+[       OK ] PlannerLease.EndCannotClearLatch (0 ms)
+[ RUN      ] PlannerLease.PoseSuspendsPlannerLease
+[       OK ] PlannerLease.PoseSuspendsPlannerLease (0 ms)
+[ RUN      ] PlannerLease.HandbackNeedsNewBegin
+[       OK ] PlannerLease.HandbackNeedsNewBegin (0 ms)
+[ RUN      ] PlannerLease.LegacyPlannerRejected
+[       OK ] PlannerLease.LegacyPlannerRejected (0 ms)
+[ RUN      ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath
+[       OK ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath (0 ms)
+[ RUN      ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow
+[       OK ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow (0 ms)
+[ RUN      ] PlannerLease.SharedDeadlineSequenceOracle
+[       OK ] PlannerLease.SharedDeadlineSequenceOracle (0 ms)
+[ RUN      ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload
+[       OK ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload (0 ms)
+[ RUN      ] PlannerLease.ControlParserCannotStartOrStopMotors
+[       OK ] PlannerLease.ControlParserCannotStartOrStopMotors (0 ms)
+[ RUN      ] PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd
+Operation not permitted (src/ip_resolver.cpp:542)
