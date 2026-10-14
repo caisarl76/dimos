@@ -175,7 +175,7 @@ class SonicNavigationSession:
         if self._status.phase not in (NavigationPhase.REARMING, NavigationPhase.ACTIVE):
             return False
         if (
-            value.source_sequence <= self._source_barrier
+            value.source_sequence < self._source_barrier
             or value.source_sequence < self.status.source_sequence
         ):
             return False
