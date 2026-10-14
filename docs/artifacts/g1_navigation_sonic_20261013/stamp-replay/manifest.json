@@ -1,0 +1,41 @@
+{
+  "captured_at": "2026-10-14T02:11:45.287945+00:00",
+  "session_recovered_from": "01a11f87-0f25-7182-a8a2-b9f2fd212d59",
+  "image_id": "sha256:01980cefa285106c334c71d9dafb8db6b8ff24ded4d6539f6d91baaab56178b0",
+  "pointlio_core_revision": "3c1dcf8b9dfe6402aaf141e116f4caef6c5c8088",
+  "pointlio_core_source_tar_sha256": "db81ac5b549108d2bc6e82698ab656a5f6c4726c2fe09b69104ab185d0a1e7d4",
+  "native_binary_sha256": {
+    "pointlio_native": "78d4f0b19561ccc0324dde8abe6bde2c597244f11c0137c51fcc89a43d827821",
+    "voxel_ray_tracing": "f6663b3c86a29bb0963815ac45ec83b66d5de9d650475edf321ba6d996b2803c"
+  },
+  "image_wrapper_sha256": {
+    "pointlio_module": "0d808607cde8edb730222720574a9211b3c671cf67ab91a6ecda2ddac82c87e9",
+    "raymap_module": "efc97e45cb1a873b3d74f1bde4811e25f50131347a55f85e0dde94a706123e35"
+  },
+  "source_sha256": {
+    "dimos/hardware/sensors/lidar/pointlio/rust/src/module.rs": "0d808607cde8edb730222720574a9211b3c671cf67ab91a6ecda2ddac82c87e9",
+    "dimos/mapping/ray_tracing/rust/src/module.rs": "efc97e45cb1a873b3d74f1bde4811e25f50131347a55f85e0dde94a706123e35",
+    "dimos/robot/unitree/g1/sonic_navigation_readiness.py": "e0979f84b2098e39adcfcdc597357caf0fb6bd676445df3b608a7fba89fc2b42",
+    "dimos/robot/unitree/g1/test_sonic_navigation_readiness.py": "4036ed4d5fe1200cd481eac8dbc48a6a617ffa42cb48c439a6876c25f79887d3",
+    "dimos/mapping/test_costmapper_stamps.py": "1fd6f1108f6f3e732adfaa22d38c2ccc523d43874eeb85211ec4cab82f21df6a",
+    "docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_stamp_replay.py": "ba17d933cc07050efe9d9bf94747028539feb88d46ebb16a3f7d6af1f6377963",
+    "docs/artifacts/g1_navigation_sonic_20261013/demo_dds_lio_adapter.py": "98fd9af0f537586badf937ed79c17756bcdf9769d608b76b2efe1cdc91af9828"
+  },
+  "executed_script_sha256": "69f0cfca72787f72085c062700e3ecccefbeb574fe9fb61232face533f8467c4",
+  "post_run_script_change": "Apache license header only; runtime statements unchanged",
+  "replay_sha256": {
+    "stamp-replay/dds-inputs.npz": "7f20818a9d0453049bf7fad7512ce15b8d51182ccdaff37ce92fc20b1d51b46b",
+    "stamp-replay/runtime.log": "41fb73afd30b37060eee631a24c9d5600d96b29a6e6520fa7f4bb77ce659bfd7",
+    "stamp-replay/results/results.json": "d368546a7a621c61facabd544cb9643bc766ccd6f9ba27fe6ebfca325b28c696",
+    "stamp-replay/results/output-stamps.npz": "ddf0f797cee5da09b1413f4cfa22c969027ab7de3cc8d95911395a83653a50f1"
+  },
+  "environment_fingerprints_checked": 1232,
+  "environment_integrity_exit_code": 0,
+  "original_workspace_modified_by_this_session": false,
+  "no_robot_control_started": true,
+  "limitations": [
+    "One saved cloud reused at recorded cloud stamps; recorded IMU values/timestamps replayed. Final IMU timestamps extended to drain the last scan.",
+    "TF is odom to sensor, not calibrated base odometry; readiness stays closed without commissioned sensor-to-base extrinsics.",
+    "Hardware commissioning remains blocked by missing exact FK fixture and the preserved run02/run08 failures."
+  ]
+}
