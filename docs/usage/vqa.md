@@ -19,7 +19,8 @@ dimos evals vqa generate /path/to/calibrated-recording.db --start 0 --stop 100 -
 ```
 
 Optionally refine each uniform anchor to the sharpest nearby frame
-(`k = min(k_max, max(0, stride // 2 - 1))`, default `k_max=5`):
+(`k = min(k_max, max(0, stride // 2 - 1))`, default `k_max=5`).
+Neighborhoods stay inside the requested `[start, stop)` range:
 
 ```bash skip
 dimos evals vqa generate /path/to/calibrated-recording.db \

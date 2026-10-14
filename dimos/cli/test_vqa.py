@@ -50,9 +50,11 @@ def test_vqa_generate_cli_declares_single_image_input() -> None:
     assert "--start" in output
     assert "--stop" in output
     assert "--stride" in output
+    assert "--sharp-stride" in output
+    assert "--sharpness-k-max" in output
     assert "--sync-tolerance" not in output
     assert "--output" in output
-    assert "absent or empty" in output
+    assert "absent or" in output and "empty" in output
 
 
 def test_vqa_run_cli_declares_standalone_dataset_input() -> None:
@@ -151,6 +153,54 @@ def test_vqa_generate_cli_accepts_frame_range(
                 output=tmp_path,
             ),
             None,
+        )
+    ]
+
+
+def test_vqa_generate_cli_accepts_sharp_stride_options(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[GenerationRequest] = []
+
+    def fake_generate(
+        request: GenerationRequest, config: VqaGenerationConfig | None = None
+    ) -> GenerationResult:
+        seen.append(request)
+        return GenerationResult(output=request.output_directory(), cases=())
+
+    monkeypatch.setattr(generate_module, "generate_dataset", fake_generate)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evals",
+            "vqa",
+            "generate",
+            "recording.db",
+            "--start",
+            "0",
+            "--stop",
+            "100",
+            "--stride",
+            "10",
+            "--sharp-stride",
+            "--sharpness-k-max",
+            "8",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen == [
+        GenerationRequest(
+            dataset="recording.db",
+            start=0,
+            stop=100,
+            stride=10,
+            sharp_stride=True,
+            sharpness_k_max=8,
+            output=tmp_path,
         )
     ]
 

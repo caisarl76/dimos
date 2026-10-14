@@ -37,7 +37,8 @@ def generate(
         "--sharp-stride/--no-sharp-stride",
         help=(
             "In range mode, keep uniform anchors but pick the sharpest color_image "
-            "in each neighborhood of half-width min(k_max, stride//2 - 1)"
+            "in each neighborhood of half-width min(k_max, stride//2 - 1), "
+            "clipped to [start, stop)"
         ),
     ),
     sharpness_k_max: int = typer.Option(

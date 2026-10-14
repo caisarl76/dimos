@@ -121,12 +121,22 @@ def select_sharp_stride_indices(
     image_count: int,
     half_width: int,
     score_at: Callable[[int], float],
+    *,
+    range_start: int | None = None,
+    range_stop: int | None = None,
 ) -> tuple[int, ...]:
-    """Pick the sharpest frame in each anchor neighborhood; dedupe preserving order."""
+    """Pick the sharpest frame in each anchor neighborhood; dedupe preserving order.
+
+    Neighborhoods are clipped to the recording and, when provided, to
+    ``[range_start, range_stop)`` so sharp-stride cannot escape the requested
+    generation range.
+    """
     if image_count < 1:
         raise ValueError("image_count must be >= 1")
     if half_width < 0:
         raise ValueError("half_width must be >= 0")
+    if range_start is not None and range_stop is not None and range_stop <= range_start:
+        raise ValueError("range_stop must be greater than range_start")
     selected: list[int] = []
     seen: set[int] = set()
     for anchor in anchors:
@@ -134,12 +144,48 @@ def select_sharp_stride_indices(
             raise IndexError(f"anchor index {anchor} is out of range for {image_count} images")
         lo = max(0, anchor - half_width)
         hi = min(image_count - 1, anchor + half_width)
+        if range_start is not None:
+            lo = max(lo, range_start)
+        if range_stop is not None:
+            hi = min(hi, range_stop - 1)
+        if lo > hi:
+            raise ValueError(
+                f"sharp-stride neighborhood for anchor {anchor} is empty after range clipping"
+            )
         best_index = max(range(lo, hi + 1), key=score_at)
         if best_index in seen:
             continue
         seen.add(best_index)
         selected.append(best_index)
     return tuple(selected)
+
+
+def resolve_generation_frame_indices(
+    request: GenerationRequest,
+    image_count: int,
+    *,
+    score_at: Callable[[int], float] | None = None,
+) -> tuple[int, ...]:
+    """Resolve the color_image indices that generation will consume."""
+    anchors = tuple(request.frame_indices())
+    if not anchors:
+        raise ValueError("generation selected no frames")
+    if anchors[-1] >= image_count:
+        raise IndexError(
+            f"color_image index {anchors[-1]} is out of range for {image_count} images"
+        )
+    if not request.sharp_stride:
+        return anchors
+    if score_at is None:
+        raise ValueError("sharp_stride requires a sharpness score function")
+    return select_sharp_stride_indices(
+        anchors,
+        image_count,
+        request.sharp_stride_half_width(),
+        score_at,
+        range_start=request.start,
+        range_stop=request.stop,
+    )
 
 
 class VqaGenerationConfig(BaseModel):
@@ -215,35 +261,25 @@ def generate_dataset(
     from dimos.models.vl.openai import OpenAIVlModel
 
     config = config or VqaGenerationConfig()
-    anchors = tuple(request.frame_indices())
     with PointCloudFrameLoader(
         request.dataset,
         tolerance_s=config.synchronization_tolerance_s,
     ) as loader:
-        image_count = loader.image_count
-        if not anchors:
-            raise ValueError("generation selected no frames")
-        if anchors[-1] >= image_count:
-            raise IndexError(
-                f"color_image index {anchors[-1]} is out of range for {image_count} images"
-            )
-        if request.sharp_stride:
-            half_width = request.sharp_stride_half_width()
-            sharpness_cache: dict[int, float] = {}
+        sharpness_cache: dict[int, float] = {}
 
-            def score_at(index: int) -> float:
-                cached = sharpness_cache.get(index)
-                if cached is not None:
-                    return cached
-                score = loader.load_image(index).sharpness
-                sharpness_cache[index] = score
-                return score
+        def score_at(index: int) -> float:
+            cached = sharpness_cache.get(index)
+            if cached is not None:
+                return cached
+            score = loader.load_image(index).sharpness
+            sharpness_cache[index] = score
+            return score
 
-            indices: Sequence[int] = select_sharp_stride_indices(
-                anchors, image_count, half_width, score_at
-            )
-        else:
-            indices = anchors
+        indices = resolve_generation_frame_indices(
+            request,
+            loader.image_count,
+            score_at=score_at if request.sharp_stride else None,
+        )
 
         author_model = OpenAIVlModel()
         detector_model = MoondreamVlModel()
