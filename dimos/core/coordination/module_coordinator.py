@@ -688,7 +688,6 @@ class ModuleCoordinator(Resource):
             if consumer == name
         ]
 
-        # The module list goes out once the module is back, not while it is gone.
         self._unload_module(name)
 
         if reload_source:
