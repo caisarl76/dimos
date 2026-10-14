@@ -629,3 +629,30 @@ def test_restarted_peer_without_live_session_starts_new_epoch(relays, peer, mock
     restarted = relay.accept_poll(replace(reply, source_sequence=1), t0=10.01, t1=10.02)
     assert restarted.ready and restarted.fault is None
     assert restarted.source_sequence > old.source_sequence
+
+
+def test_pending_goal_refreshes_readiness_but_holds_motion(relays, peer, mocker):
+    relay = relays()
+    published = mocker.patch.object(relay, "_publish_input")
+    reply = replace(restarted_peer_replies(peer), request_id="request-1")
+    accept_goal(relay, mocker)
+    walking = replace(reply, source_sequence=5, twist=Twist(linear=Vector3(0.2, 0, 0)))
+    held = relay.accept_poll(walking, t0=10, t1=10.01)
+    during: list = []
+
+    def goal_in_flight(*args, **kwargs):
+        newer = replace(reply, source_sequence=7, twist=Twist(linear=Vector3(0.1, 0, 0)))
+        during.append(relay.accept_poll(newer, t0=10.15, t1=10.16))
+        during.append(relay.accept_poll(replace(reply, source_sequence=1), t0=10.17, t1=10.18))
+        return {"request_id": "request-1", "accepted": True, "fault": None}, 10.2, 10.21
+
+    mocker.patch.object(relay._link, "control", side_effect=goal_in_flight)
+    assert relay.set_navigation_goal("request-1", PoseStamped(frame_id="odom"))
+    refreshed, rollback = during
+    # Readiness keeps flowing while the goal is pending; motion stays the held proof.
+    assert refreshed.ready and refreshed.readiness_deadline > held.readiness_deadline
+    assert refreshed.source_sequence == held.source_sequence
+    assert refreshed._velocity == held._velocity
+    assert refreshed.velocity_deadline == held.velocity_deadline
+    assert published.call_args_list[-1].args[0] is refreshed
+    assert not rollback.ready
