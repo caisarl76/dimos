@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -70,12 +70,16 @@ class GenerationRequest(BaseModel):
     start: int | None = Field(default=None, ge=0)
     stop: int | None = Field(default=None, gt=0)
     stride: int | None = Field(default=None, ge=1)
+    sharp_stride: bool = False
+    sharpness_k_max: int = Field(default=5, ge=0)
 
     @model_validator(mode="after")
     def valid_selection(self) -> GenerationRequest:
         if self.image_index is not None:
             if self.start is not None or self.stop is not None or self.stride is not None:
                 raise ValueError("image_index cannot be combined with start, stop, or stride")
+            if self.sharp_stride:
+                raise ValueError("sharp_stride requires range mode (start/stop), not image_index")
             return self
         if self.start is None or self.stop is None:
             raise ValueError("provide image_index or both start and stop")
@@ -89,10 +93,53 @@ class GenerationRequest(BaseModel):
         assert self.start is not None and self.stop is not None
         return range(self.start, self.stop, self.stride or 1)
 
+    def sharp_stride_half_width(self) -> int:
+        """Neighborhood half-width around each uniform anchor for sharp-stride."""
+        return sharp_stride_half_width(self.stride or 1, self.sharpness_k_max)
+
     def output_directory(self) -> Path:
         if self.output is not None:
             return self.output.expanduser()
         return STATE_DIR / "datasets" / "vqa" / f"{Path(self.dataset).stem}-frames"
+
+
+def sharp_stride_half_width(stride: int, k_max: int) -> int:
+    """Return k = min(k_max, max(0, stride // 2 - 1)).
+
+    Tight strides collapse to k=0 (baseline anchors only). Wide strides expand
+    up to k_max so adjacent anchors do not share midpoints.
+    """
+    if stride < 1:
+        raise ValueError("stride must be >= 1")
+    if k_max < 0:
+        raise ValueError("k_max must be >= 0")
+    return min(k_max, max(0, stride // 2 - 1))
+
+
+def select_sharp_stride_indices(
+    anchors: Sequence[int],
+    image_count: int,
+    half_width: int,
+    score_at: Callable[[int], float],
+) -> tuple[int, ...]:
+    """Pick the sharpest frame in each anchor neighborhood; dedupe preserving order."""
+    if image_count < 1:
+        raise ValueError("image_count must be >= 1")
+    if half_width < 0:
+        raise ValueError("half_width must be >= 0")
+    selected: list[int] = []
+    seen: set[int] = set()
+    for anchor in anchors:
+        if anchor < 0 or anchor >= image_count:
+            raise IndexError(f"anchor index {anchor} is out of range for {image_count} images")
+        lo = max(0, anchor - half_width)
+        hi = min(image_count - 1, anchor + half_width)
+        best_index = max(range(lo, hi + 1), key=score_at)
+        if best_index in seen:
+            continue
+        seen.add(best_index)
+        selected.append(best_index)
+    return tuple(selected)
 
 
 class VqaGenerationConfig(BaseModel):
@@ -168,16 +215,35 @@ def generate_dataset(
     from dimos.models.vl.openai import OpenAIVlModel
 
     config = config or VqaGenerationConfig()
-    indices = request.frame_indices()
+    anchors = tuple(request.frame_indices())
     with PointCloudFrameLoader(
         request.dataset,
         tolerance_s=config.synchronization_tolerance_s,
     ) as loader:
         image_count = loader.image_count
-        if indices[-1] >= image_count:
+        if not anchors:
+            raise ValueError("generation selected no frames")
+        if anchors[-1] >= image_count:
             raise IndexError(
-                f"color_image index {indices[-1]} is out of range for {image_count} images"
+                f"color_image index {anchors[-1]} is out of range for {image_count} images"
             )
+        if request.sharp_stride:
+            half_width = request.sharp_stride_half_width()
+            sharpness_cache: dict[int, float] = {}
+
+            def score_at(index: int) -> float:
+                cached = sharpness_cache.get(index)
+                if cached is not None:
+                    return cached
+                score = loader.load_image(index).sharpness
+                sharpness_cache[index] = score
+                return score
+
+            indices: Sequence[int] = select_sharp_stride_indices(
+                anchors, image_count, half_width, score_at
+            )
+        else:
+            indices = anchors
 
         author_model = OpenAIVlModel()
         detector_model = MoondreamVlModel()

@@ -18,6 +18,14 @@ Generate from a range. `stop` is exclusive:
 dimos evals vqa generate /path/to/calibrated-recording.db --start 0 --stop 100 --stride 10
 ```
 
+Optionally refine each uniform anchor to the sharpest nearby frame
+(`k = min(k_max, max(0, stride // 2 - 1))`, default `k_max=5`):
+
+```bash skip
+dimos evals vqa generate /path/to/calibrated-recording.db \
+  --start 0 --stop 100 --stride 10 --sharp-stride
+```
+
 Generated datasets default to:
 
 ```text

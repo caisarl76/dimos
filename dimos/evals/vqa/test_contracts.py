@@ -47,6 +47,8 @@ from dimos.evals.vqa.generate import (
     PublicCase,
     VqaGenerationConfig,
     generate_frames_dataset,
+    select_sharp_stride_indices,
+    sharp_stride_half_width,
 )
 from dimos.evals.vqa.primitives.edge_tam import ObjectMaskEvidence
 from dimos.evals.vqa.primitives.range import ObjectRangeEvidence
@@ -815,6 +817,46 @@ def test_generation_request_selects_frame_range() -> None:
     )
 
     assert request.frame_indices() == range(2, 10, 3)
+
+
+@pytest.mark.parametrize(
+    ("stride", "k_max", "expected"),
+    (
+        (1, 5, 0),
+        (2, 5, 0),
+        (10, 5, 4),
+        (20, 5, 5),
+        (20, 0, 0),
+    ),
+)
+def test_sharp_stride_half_width(stride: int, k_max: int, expected: int) -> None:
+    assert sharp_stride_half_width(stride, k_max) == expected
+
+
+def test_select_sharp_stride_indices_picks_neighborhood_max_and_dedupes() -> None:
+    scores = {i: float(i) for i in range(30)}
+    scores[12] = 100.0
+    scores[22] = 100.0
+    selected = select_sharp_stride_indices(
+        anchors=(10, 20),
+        image_count=30,
+        half_width=4,
+        score_at=scores.__getitem__,
+    )
+    assert selected == (12, 22)
+
+    both_prefer_12 = select_sharp_stride_indices(
+        anchors=(10, 11),
+        image_count=30,
+        half_width=4,
+        score_at=lambda index: 100.0 if index == 12 else float(index),
+    )
+    assert both_prefer_12 == (12,)
+
+
+def test_generation_request_rejects_sharp_stride_with_image_index() -> None:
+    with pytest.raises(ValidationError, match="sharp_stride"):
+        GenerationRequest(dataset="go2_short", image_index=4, sharp_stride=True)
 
 
 @pytest.mark.parametrize(

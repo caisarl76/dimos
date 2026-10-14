@@ -32,6 +32,19 @@ def generate(
     start: int | None = typer.Option(None, min=0, help="First color_image index in range mode"),
     stop: int | None = typer.Option(None, min=1, help="Exclusive color_image stop index"),
     stride: int | None = typer.Option(None, min=1, help="Frame stride in range mode"),
+    sharp_stride: bool = typer.Option(
+        False,
+        "--sharp-stride/--no-sharp-stride",
+        help=(
+            "In range mode, keep uniform anchors but pick the sharpest color_image "
+            "in each neighborhood of half-width min(k_max, stride//2 - 1)"
+        ),
+    ),
+    sharpness_k_max: int = typer.Option(
+        5,
+        min=0,
+        help="Maximum neighborhood half-width (in frames) when --sharp-stride is set",
+    ),
     output: Path | None = typer.Option(
         None,
         help="Destination directory; must be absent or empty",
@@ -52,6 +65,8 @@ def generate(
             start=start,
             stop=stop,
             stride=stride,
+            sharp_stride=sharp_stride,
+            sharpness_k_max=sharpness_k_max,
         )
         result = generate_dataset(request)
     except (ValueError, IndexError, OSError) as exc:
