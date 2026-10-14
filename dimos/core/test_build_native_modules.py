@@ -27,7 +27,6 @@ import ast
 import importlib
 from importlib.machinery import SourceFileLoader
 from importlib.util import module_from_spec, spec_from_loader
-import inspect
 import json
 import os
 from pathlib import Path
@@ -70,6 +69,7 @@ class _ClassDef(NamedTuple):
     bases: tuple[str, ...]
     command: str | None  # build_command literal defined in this class body
     command_kind: str  # "absent" | "literal" | "opaque"
+    owns_source_dir: bool = False
 
 
 def _base_names(node: ast.ClassDef) -> tuple[str, ...]:
@@ -83,7 +83,7 @@ def _base_names(node: ast.ClassDef) -> tuple[str, ...]:
     return tuple(names)
 
 
-def _own_build_command(node: ast.ClassDef) -> tuple[str, str | None]:
+def _own_default(node: ast.ClassDef, field: str) -> tuple[str, str | None]:
     for stmt in node.body:
         if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
             target, value = stmt.target.id, stmt.value
@@ -95,7 +95,7 @@ def _own_build_command(node: ast.ClassDef) -> tuple[str, str | None]:
             target, value = stmt.targets[0].id, stmt.value
         else:
             continue
-        if target != "build_command" or value is None:
+        if target != field or value is None:
             continue
         if isinstance(value, ast.Constant) and (
             value.value is None or isinstance(value.value, str)
@@ -117,15 +117,26 @@ def _scan_all_config_classes() -> list[_ClassDef]:
             rel = path.relative_to(DIMOS_PROJECT_ROOT).as_posix()
             for node in ast.walk(ast.parse(path.read_text(), filename=rel)):
                 if isinstance(node, ast.ClassDef):
-                    kind, command = _own_build_command(node)
-                    classes.append(_ClassDef(rel, node.name, _base_names(node), command, kind))
+                    kind, command = _own_default(node, "build_command")
+                    source_kind, _ = _own_default(node, "source_dir")
+                    classes.append(
+                        _ClassDef(
+                            rel,
+                            node.name,
+                            _base_names(node),
+                            command,
+                            kind,
+                            source_kind != "absent",
+                        )
+                    )
     return classes
 
 
 def _closure_nix_configs(classes: list[_ClassDef]) -> set[tuple[str, str]]:
-    """(file, class) for every transitive NativeModuleConfig subclass whose
-    effective build_command default (own, or inherited from another config in
-    the closure) mentions nix."""
+    """Build owners, including indirect configs that change a command or directory.
+
+    Unmodified inherited builds are covered by their defining ancestor.
+    """
     by_name: dict[str, list[_ClassDef]] = {}
     for cls in classes:
         by_name.setdefault(cls.name, []).append(cls)
@@ -140,16 +151,18 @@ def _closure_nix_configs(classes: list[_ClassDef]) -> set[tuple[str, str]]:
             break
         closure |= added
 
-    def effective_command(cls: _ClassDef, seen: frozenset[str]) -> tuple[str, str | None]:
+    def effective_command(
+        cls: _ClassDef, seen: frozenset[str]
+    ) -> tuple[str, str | None, _ClassDef]:
         if cls.command_kind != "absent":
-            return cls.command_kind, cls.command
+            return cls.command_kind, cls.command, cls
         for base in cls.bases:
             if base in closure and base != "NativeModuleConfig" and base not in seen:
                 for parent in by_name.get(base, []):
-                    kind, command = effective_command(parent, seen | {cls.name})
+                    kind, command, owner = effective_command(parent, seen | {cls.name})
                     if kind != "absent":
-                        return kind, command
-        return "absent", None
+                        return kind, command, cls if cls.owns_source_dir else owner
+        return "absent", None, cls
 
     nix_configs = set()
     for cls in classes:
@@ -164,21 +177,21 @@ def _closure_nix_configs(classes: list[_ClassDef]) -> set[tuple[str, str]]:
                 " from EXTERNALLY_PROVISIONED in bin/build-native-modules"
             )
             continue
-        kind, command = effective_command(cls, frozenset())
+        kind, command, owner = effective_command(cls, frozenset())
         assert kind != "opaque", (
             f"{cls.file}: {cls.name}.build_command must default to a plain string literal "
             "so bin/build-native-modules can read it without importing dimos"
         )
-        if _SCRIPT.is_nix_build(command):
-            nix_configs.add((cls.file, cls.name))
+        # Deliberately independent of the production command parser: options
+        # before `build` must not silently remove a config from both scans.
+        tokens = command.split() if command else []
+        if "nix" in tokens and "build" in tokens and "develop" not in tokens:
+            nix_configs.add((owner.file, owner.name))
     return nix_configs
 
 
-def test_discovery_is_complete_and_flat() -> None:
-    """The script's direct-base discovery must find every config the transitive
-    closure finds. A mismatch means a module (e.g. a depth-2 subclass) would
-    silently escape the publish gate: flatten the hierarchy, or extend the
-    script's discovery to match."""
+def test_discovery_covers_every_build() -> None:
+    """Every distinct native build must participate in the publish gate."""
     expected = _closure_nix_configs(_scan_all_config_classes())
     discovered = {
         (module.source, module.qualname.rsplit(".", 1)[-1]) for module in _SCRIPT.discover()
@@ -187,11 +200,40 @@ def test_discovery_is_complete_and_flat() -> None:
     assert discovered, "expected at least one nix-built native module"
 
 
+def test_recorder_is_in_the_publish_manifest() -> None:
+    recorder = next(
+        module
+        for module in _SCRIPT.discover()
+        if module.qualname == "dimos.experimental.memory.rust_recorder.RustRecorderConfig"
+    )
+    assert recorder.build_dir == "dimos/experimental/memory/rust"
+    assert _SCRIPT._flake_ref_of(recorder) == ".#dimos-memory-recorder"
+
+
+@pytest.mark.parametrize("override", [None, "build_command", "source_dir"])
+def test_inherited_build_coverage_tracks_overrides(override: str | None) -> None:
+    owner = _ClassDef(
+        "owner.py", "Owner", ("NativeModuleConfig",), "nix build .#owner", "literal", True
+    )
+    child = _ClassDef(
+        "child.py",
+        "Child",
+        ("Owner",),
+        "nix build .#child" if override == "build_command" else None,
+        "literal" if override == "build_command" else "absent",
+        override == "source_dir",
+    )
+    grandchild = _ClassDef("grandchild.py", "Grandchild", ("Child",), None, "absent")
+    expected = {("owner.py", "Owner")}
+    if override is not None:
+        expected.add(("child.py", "Child"))
+    assert _closure_nix_configs([owner, child, grandchild]) == expected
+
+
 def test_ast_extraction_matches_runtime() -> None:
     """The AST-read defaults must equal what pydantic resolves at runtime —
     this equivalence is what lets CI discover modules without installing dimos.
-    The build dir mirrors NativeModule's cwd resolution, which anchors on the
-    defining file: config classes must live beside their module class."""
+    Build directories are relative to the shared project root."""
     modules = _SCRIPT.discover()
     assert modules
     for module in modules:
@@ -199,10 +241,42 @@ def test_ast_extraction_matches_runtime() -> None:
         config_class = getattr(importlib.import_module(dotted), class_name)
         fields = config_class.model_fields
         assert fields["build_command"].default == module.build_command
-        cwd = fields["cwd"].default
-        base_dir = Path(inspect.getfile(config_class)).resolve().parent
-        runtime_dir = Path(os.path.normpath(base_dir if cwd is None else base_dir / cwd))
+        source_dir = fields["source_dir"].default
+        assert source_dir is not None
+        runtime_dir = DIMOS_PROJECT_ROOT / source_dir
         assert runtime_dir == (DIMOS_PROJECT_ROOT / module.build_dir).resolve()
+
+
+def test_no_module_hashes_the_repo_root() -> None:
+    """A collected input of "." puts the whole-repo tree SHA in the marker key,
+    so it changes on every commit and the marker never matches. A
+    fileset.toSource `root` anchor (usually the repo root) must be skipped, not
+    hashed — regression guard for the rust_recorder fileset flake."""
+    for module in _SCRIPT.discover():
+        assert "." not in _SCRIPT._collect_input_paths(module), (
+            f"{module.qualname}: input set includes the repo root — a fileset root anchor "
+            "is being hashed, which busts the publish marker on every commit"
+        )
+
+
+def test_recorder_fileset_covers_every_workspace_member() -> None:
+    """Cargo resolves the workspace from the root manifest, so the recorder's
+    fileset src must carry every [workspace] member — as static path literals,
+    because the publish gate can only hash literals. Deriving the list from
+    Cargo.toml at eval time (fromTOML) is invisible to the flake parser, which
+    then hashes the fileset root instead: the repo-root tree SHA busts the
+    publish marker on every commit."""
+    flake = DIMOS_PROJECT_ROOT / "dimos" / "experimental" / "memory" / "rust" / "flake.nix"
+    block = re.search(r"members\s*=\s*\[([^]]*)\]", (DIMOS_PROJECT_ROOT / "Cargo.toml").read_text())
+    assert block is not None, "no [workspace] members array in Cargo.toml"
+    members = re.findall(r'"([^"]+)"', block.group(1))
+    assert members, "no [workspace] members parsed from Cargo.toml"
+    literals, _path_inputs = _SCRIPT._flake_refs(flake)
+    for member in members:
+        assert any(member == lit or member.startswith(lit + "/") for lit in literals), (
+            f"workspace member {member!r} has no covering path literal in {flake} — "
+            "list it in the fileset.unions so the publish gate hashes it"
+        )
 
 
 @pytest.mark.skipif(not _IN_GIT_CHECKOUT, reason="needs git HEAD for object hashes")
@@ -270,7 +344,8 @@ def test_flake_refs_resolve_and_are_covered() -> None:
             flake = DIMOS_PROJECT_ROOT / rel / "flake.nix"
             if not flake.is_file():
                 continue  # plain source tree (e.g. native/cpp), nothing to sweep
-            for match in _RAW_REF.finditer(flake.read_text()):
+            raw = flake.read_text()
+            for match in _RAW_REF.finditer(raw):
                 if match.group("scheme") == "git+file:":
                     url = match.group("path").split("?", 1)[0]
                     lock = json.loads((flake.parent / "flake.lock").read_text())
@@ -286,6 +361,8 @@ def test_flake_refs_resolve_and_are_covered() -> None:
                         " derivation on every commit behind the publish gate's back"
                     )
                     continue
+                if "fileset.toSource" in raw and re.search(r"\broot\s*=\s*$", raw[: match.start()]):
+                    continue  # fileset anchor, deliberately not an input (see _flake_refs)
                 token = match.group("path").split("?", 1)[0]
                 target = os.path.relpath(os.path.normpath(flake.parent / token), DIMOS_PROJECT_ROOT)
                 if not (DIMOS_PROJECT_ROOT / target).exists():

@@ -24,7 +24,6 @@ from dimos.core.coordination.module_coordinator import ModuleCoordinator
 from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import Out
-from dimos.core.transport import LCMTransport
 from dimos.core.transport_factory import make_transport
 from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.sensor_msgs.Image import Image
@@ -141,7 +140,7 @@ async def test_spatial_memory_module_with_replay(dimos, tmp_path):
     # Deploy modules
     # Video replay module
     video_module = dimos.deploy(VideoReplayModule, video_path=video_path)
-    video_module.video_out.transport = LCMTransport("/test_video", Image)
+    video_module.video_out.transport = make_transport("/test_video", Image)
 
     # Odometry replay module (publishes to tf system directly)
     odom_module = dimos.deploy(OdometryReplayModule, odom_path=odom_path)
@@ -150,8 +149,6 @@ async def test_spatial_memory_module_with_replay(dimos, tmp_path):
     spatial_memory = dimos.deploy(
         SpatialMemory,
         collection_name="test_spatial_memory",
-        embedding_model="clip",
-        embedding_dimensions=512,
         min_distance_threshold=0.5,  # 0.5m for test
         min_time_threshold=1.0,  # 1 second
         db_path=str(tmp_path / "chroma_db"),
