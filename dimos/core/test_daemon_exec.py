@@ -26,10 +26,6 @@ import pytest
 from dimos.core.daemon import fork_daemon, write_daemon_status
 
 
-class ExecBoundaryError(Exception):
-    """Stand in for an exec call, which must not return to the forked image."""
-
-
 def test_reexecuted_daemon_consumes_status_pipe_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -85,8 +81,8 @@ def test_macos_grandchild_reexec_preserves_interpreter_and_arguments(
             mock.patch("os.pipe", return_value=(read_fd, write_fd)),
             mock.patch("os.fork", side_effect=[0, 0]) as fork,
             mock.patch("os.setsid") as setsid,
-            mock.patch("os.execve", side_effect=ExecBoundaryError) as execve,
-            pytest.raises(ExecBoundaryError),
+            mock.patch("os.execve", side_effect=OSError("exec unavailable")) as execve,
+            pytest.raises(OSError, match="exec unavailable"),
         ):
             fork_daemon(tmp_path)
         assert fork.call_count == 2
@@ -120,27 +116,6 @@ def test_linux_grandchild_retains_fork_without_exec(
             assert fork_daemon(tmp_path) == (0, write_fd)
         execve.assert_not_called()
         assert not os.get_inheritable(write_fd)
-    finally:
-        with suppress(OSError):
-            os.close(read_fd)
-        os.close(write_fd)
-
-
-def test_macos_exec_failure_does_not_continue_building(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(sys, "platform", "darwin")
-    monkeypatch.delenv("_DIMOS_DAEMON_STATUS_FD", raising=False)
-    read_fd, write_fd = os.pipe()
-    try:
-        with (
-            mock.patch("os.pipe", return_value=(read_fd, write_fd)),
-            mock.patch("os.fork", side_effect=[0, 0]),
-            mock.patch("os.setsid"),
-            mock.patch("os.execve", side_effect=OSError("exec unavailable")),
-            pytest.raises(OSError, match="exec unavailable"),
-        ):
-            fork_daemon(tmp_path)
     finally:
         with suppress(OSError):
             os.close(read_fd)
