@@ -1,0 +1,54 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1164196.841972228,
+      "pc2_monotonic": 1154196.842050678
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.3386781958397478,
+      "peer_status": {
+        "request_id": null,
+        "cancelled": false,
+        "state": "idle",
+        "ready": true,
+        "readiness_deadline": 1154197.3426384598,
+        "linear_speed_mps": 0.0016231068045342212,
+        "yaw_rate_radps": 0.00025141386097804605,
+        "settled_for_s": 0.04194456501863897,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.4918854518327862
+    },
+    {
+      "name": "forward",
+      "passed": false,
+      "forward_displacement_m": -0.0011994167535318116,
+      "yaw_change_rad": 0.006160769659339868,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.01227717287838459,
+        "p95_s": 0.010271673544775695
+      }
+    }
+  ],
+  "error": "AssertionError: forward: {'forward_displacement_m': -0.0011994167535318116, 'yaw_change_rad': 0.006160769659339868, 'command_age': {'samples': 20, 'max_s': 0.01227717287838459, 'p95_s': 0.010271673544775695}}",
+  "load": {}
+}

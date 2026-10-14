@@ -1,0 +1,136 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1164529.430141422,
+      "pc2_monotonic": 1154529.430440833
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.2045974568463862,
+      "peer_status": {
+        "request_id": null,
+        "cancelled": false,
+        "state": "idle",
+        "ready": true,
+        "readiness_deadline": 1154529.833484662,
+        "linear_speed_mps": 0.0012763171559093689,
+        "yaw_rate_radps": -0.00041742895997933877,
+        "settled_for_s": 0.14679625001735985,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5096026828978211
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.2202412943983129,
+      "yaw_change_rad": -0.03602266553432583,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.07815429591573775,
+        "p95_s": 0.07792846868978813
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.04435400897637
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.25072833637808845,
+      "yaw_change_rad": -0.07769681075559226,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.07707137195393443,
+        "p95_s": 0.07556788785150274
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.2704885751008987
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": -0.005156848801747902,
+      "yaw_change_rad": 0.07375521147513896,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.07830354711040854,
+        "p95_s": 0.07776195694459602
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 0.941004398977384
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": 0.0013277129368009055,
+      "yaw_change_rad": -0.12097158174062406,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.07358109392225742,
+        "p95_s": 0.07357109728036448
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 1.9044327500741929
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.31614216207526624
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 2.0272759799845517
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true,
+      "phase": "stopping"
+    },
+    {
+      "name": "source_outage_settled",
+      "passed": true,
+      "elapsed": 1.07283428683877
+    },
+    {
+      "name": "link_delay_60ms_moving",
+      "passed": false
+    }
+  ],
+  "error": "AssertionError: link_delay_60ms_moving: {}",
+  "load": {}
+}

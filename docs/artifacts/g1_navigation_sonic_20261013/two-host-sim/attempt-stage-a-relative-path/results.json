@@ -1,0 +1,5 @@
+{
+  "status": "failed",
+  "cases": [],
+  "error": "RuntimeError: owned simulator/controller exited; inspect logs"
+}

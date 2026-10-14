@@ -1,0 +1,21 @@
+{
+  "deploy.log": "1e33fd75b61e483bbd98d5137026ca072defd3a509e752dbba0958c6daf7a36a",
+  "inputs.jsonl": "938ba7a1c1b52865e54e14ceea729e615a3337974a3b825a58e71641a6ff2e5c",
+  "peer-pids.json": "1c544a2d84408438a83dc9d48f387d6258fd32eff12dea5093bfd0efce8f4420",
+  "peer-telemetry.jsonl": "30e5a446df967176298bce604d53be1855b2fe42486dc0471ddc67ab4442376b",
+  "peer.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "physics-latest.json": "b37f8eaeebaec06a29b132835a95ae3d45276e3c537126b2c13a8848cd1edd37",
+  "physics.jsonl": "6d3e646e0e098b1ebdb9db1a0d2a5241ccfe2947729432f8fec790023e99fcc4",
+  "planner-motion.csv": "b2dfa9e52e27b2f58957467bb01e4c2b90af8a2a4fab27bf0eaa49fd9b7fc92a",
+  "planner-motion.csv.replans.csv": "9dac445fbdd77f0a14a0ccd7eaf3088232c75063365c739bb348ad16367e4fe1",
+  "references.jsonl": "7f3f3f73f1b2dc60bc195d9c1b65183f106cba45cbdb75b7781dcc4ad0eda3d4",
+  "release": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sim-config.json": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+  "sim-ready": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sim-stop": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sim.log": "1222eea5851c14d05dddd047fef004f293af58e26c3e7d6d28029b1e687b8f62",
+  "target-motion.csv": "06de3f18bdbaea0d208a317e4b99f07fb3a774bba9250ab0529d50082b7ae6e3",
+  "target-motion.csv.frames.csv": "8728840348a07bbee08800965d70ff90dd6ff6c23311a785a4622b39d728783b",
+  "telemetry.jsonl": "c334f693b94f4641766cf07b652a1bcf07b9f44be8c4cdc1f397bf903f785a68",
+  "../attempt04-readiness-margin.runner.log": "0e7cb7e2d57bf005a622b2b846f21b72076a0d940da284759e3571f783bf8bc3"
+}

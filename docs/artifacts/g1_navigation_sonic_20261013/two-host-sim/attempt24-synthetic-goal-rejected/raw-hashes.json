@@ -1,0 +1,23 @@
+{
+  "costmap-before.json": "9d8b90869264a566645cac93714bf8e4dc5e02b0a0d6cd1dba164a9adc097ef6",
+  "deploy.log": "4c053c729cd096ada747de4ae16d72b249047421bcf5727d50f395438423dce6",
+  "inputs.jsonl": "7419431dc5507b5898c5c9626dc07f82c1bf3a8d1c076ff1f48b4e2ddbb759f5",
+  "peer-pids.json": "3f995dd5e672e52398c83c28fe60600cbffcb90129335874c50f7405499bd3b5",
+  "peer-readiness.jsonl": "fd218feb9707b235f55aabc42a923c585d481c542ca06a241ed62158c123760b",
+  "peer-telemetry.jsonl": "dbfde341685ce7ad7b197485f7b01c028c522afb30d7425503207629ba433645",
+  "peer.log": "d0bd8a11db1aaa565098472fb519c2713e2ecdb222fb57664ac1ef79f96c143f",
+  "physics-latest.json": "2ed37bf93eaa990fd7f1b41eefb3a0bc6afc7865839897b74c7e6d38d6fabd68",
+  "physics.jsonl": "418c4e5f729df69e0b324c7519f92517ee8fdc90d5afb1ca78f73beac9ceb285",
+  "planner-motion.csv": "3a61306234cf9218cf90e4a694ad1fc153f52919e9703b7a58eeab2a82558a02",
+  "planner-motion.csv.replans.csv": "928f85a968b4d26d9bea719711a06d0d8752afd974c00e311b066fa105edeeae",
+  "references.jsonl": "1c9ddd6156d3130c1b66895018be25adeb9e71fcafc03682d991b084ec14a5ed",
+  "release": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sim-config.json": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+  "sim-ready": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sim-stop": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sim.log": "4a9bf2e82b303738c84da083be1e86cf3391df702bdbc1f622b98f2e4c2a5a2b",
+  "target-motion.csv": "450757b78598e098259e5f082439d748ad83298927ed785fd889009258c9d72e",
+  "target-motion.csv.frames.csv": "7dc9a45657523271de85215b305ab69d12a566828f9ed4e99553ee1585dfe3f8",
+  "telemetry.jsonl": "9edecfd0e84564bfc9e06133d2de83a2566135ad059e79087877ec576be15f04",
+  "../attempt24-synthetic-goal-rejected.runner.log": "194a64bb87cb360f86766df1960fb39d1ce6e1f8f7c35eb51633fbd7f6677ff8"
+}

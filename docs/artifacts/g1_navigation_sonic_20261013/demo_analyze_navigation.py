@@ -46,6 +46,41 @@ REQUIRED = {
 }
 
 
+# Stage B: the same controller cases through the real link, plus link/graph faults.
+# The translating-noise proof stays a Stage A (on-host) requirement.
+FREEZES = ("lidar_raw", "imu_raw", "waist_tf", "lio", "map", "costmap_worker")
+TWO_HOST_REQUIRED = (
+    REQUIRED - {"noisy_trace_replan_limit", "subscriptions_loss", "stopped_publisher_watchdog"}
+) | {
+    "pc2_graph_validated_before_startup",
+    "peer_graph_validated_in_separate_clock",
+    "relayed_chain_ready",
+    "link_delay_20ms_rtt_moving",
+    "link_delay_150ms_rtt_stops_motion",
+    "link_hold_300ms_idle_without_latch",
+    "link_hold_2500ms_ends",
+    *(f"freeze_{stage}_closes_admission" for stage in FREEZES),
+    *(f"freeze_{stage}_stays_closed_while_teleop_fresh" for stage in FREEZES),
+    "unknown_goal_rejected_retains_cells",
+    "occupied_goal_rejected_retains_cells",
+    "clear_goal_on_recorded_map_rejected_from_unknown_start",
+    "synthetic_clear_goal_followed_through_link",
+    "goal_cancel_reaches_public_planner",
+    "stamp_rollback_latches_peer_until_fresh_instance",
+    "fresh_peer_instance_recovers_readiness",
+    "no_startup_disk_clearing",
+    "cancel_stall_blocks_pose",
+    "cancel_resolves_after_stall",
+    "no_old_target_after_handback",
+    "peer_loss_ends_navigation",
+    "restarted_peer_requires_explicit_begin",
+    "forward_after_peer_restart",
+    "restarted_publisher_starts_disarmed",
+    "restarted_relay_refuses_unknown_peer_request",
+    "no_old_target_after_publisher_restart",
+}
+
+
 REASONS = ("mode_changed", "facing_changed", "height_changed", "speed_changed", "direction_changed")
 
 
@@ -328,7 +363,8 @@ def analyze(folder: Path) -> dict:
     result = json.loads((folder / "results.json").read_text())
     cases = {case["name"]: case for case in result["cases"]}
     failed = [name for name, case in cases.items() if case["passed"] is not True]
-    missing = sorted(REQUIRED - cases.keys())
+    two_host = manifest["stage"] == "two-host"
+    missing = sorted((TWO_HOST_REQUIRED if two_host else REQUIRED) - cases.keys())
     assert manifest["interfaces"] == [[1, "lo"]]
     assert manifest["netns"] != manifest["host_netns"]
     assert manifest["thresholds"] == {
@@ -356,7 +392,9 @@ def analyze(folder: Path) -> dict:
         elif packet.startswith(b"pose"):
             pose += 1
     noise = (
-        translating_noise_checks(folder, cases["noisy_trace_replan_limit"])
+        {"passed": True, "reason": "Stage A proof; not repeated through the link"}
+        if two_host
+        else translating_noise_checks(folder, cases["noisy_trace_replan_limit"])
         if "noisy_trace_replan_limit" in cases
         else {"passed": False, "reason": "missing trace"}
     )

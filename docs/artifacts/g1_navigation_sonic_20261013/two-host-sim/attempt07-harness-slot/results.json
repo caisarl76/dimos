@@ -1,0 +1,132 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1164671.506056913,
+      "pc2_monotonic": 1154671.506385088
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.22756485198624432,
+      "peer_status": {
+        "request_id": null,
+        "cancelled": false,
+        "state": "idle",
+        "ready": true,
+        "readiness_deadline": 1154671.9319827298,
+        "linear_speed_mps": 0.0046149126560903345,
+        "yaw_rate_radps": -0.0013534565600999335,
+        "settled_for_s": 0.16696997778490186,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.4912717929109931
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.2564910058454109,
+      "yaw_change_rad": -0.04248806182926074,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.020429530180990696,
+        "p95_s": 0.015615203627385202
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.125330040929839
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.15838504506077627,
+      "yaw_change_rad": -0.04823129544980122,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.10308631998486817,
+        "p95_s": 0.10205427702749148
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.379354114178568
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": 0.0014207538764516485,
+      "yaw_change_rad": 0.07094691074623286,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.09615892195142806,
+        "p95_s": 0.09588271138491108
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 0.8543684107717127
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": -0.0015411698200886517,
+      "yaw_change_rad": -0.15859044149213633,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.09059752500616014,
+        "p95_s": 0.09049978153780103
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 1.9481329929549247
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.25034623709507287
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 2.214543243870139
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true,
+      "phase": "stopping"
+    },
+    {
+      "name": "source_outage_settled",
+      "passed": true,
+      "elapsed": 1.3627943699248135
+    }
+  ],
+  "error": "RuntimeError: navigation request slot is busy",
+  "load": {}
+}

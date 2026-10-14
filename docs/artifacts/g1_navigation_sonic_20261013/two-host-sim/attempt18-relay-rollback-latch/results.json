@@ -1,0 +1,417 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1166255.090829118,
+      "pc2_monotonic": 1156255.091029261
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.41407174291089177,
+      "peer_status": {
+        "monotonic": 1156261.389009366,
+        "ready": true,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.509833144955337
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.2477436823439689,
+      "yaw_change_rad": -0.0542884105483522,
+      "command_age": {
+        "samples": 21,
+        "max_s": 0.06059031095355749,
+        "p95_s": 0.060552723007276654
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.0756203411147
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.24880824964761805,
+      "yaw_change_rad": -0.031873497988213984,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.05360357905738056,
+        "p95_s": 0.05341961430385709
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.376286854967475
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": -0.005966919731864164,
+      "yaw_change_rad": 0.06812256321506643,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.04388866596855223,
+        "p95_s": 0.04376657776301727
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 0.8931051129475236
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": 0.003722041899692663,
+      "yaw_change_rad": -0.12758700161084266,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.0382395307533443,
+        "p95_s": 0.0374177422025241
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 2.145661202026531
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.3380171360913664
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 2.0657504620030522
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true,
+      "phase": "stopping"
+    },
+    {
+      "name": "source_outage_settled",
+      "passed": true,
+      "elapsed": 0.972846255870536
+    },
+    {
+      "name": "link_delay_20ms_rtt_moving",
+      "passed": true,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.12716826680116355,
+        "p95_s": 0.12691253724042326
+      }
+    },
+    {
+      "name": "link_delay_150ms_rtt_stops_motion",
+      "passed": true,
+      "elapsed": 0.15236001694574952,
+      "phase": "fault",
+      "fault": "readiness_expired"
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 2.1420989569742233
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 0.508532629115507
+    },
+    {
+      "name": "link_hold_300ms_idle_without_latch",
+      "passed": true,
+      "elapsed": 0.13199555617757142
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 1.1653642400633544
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 0.5067484020255506
+    },
+    {
+      "name": "link_hold_2500ms_ends",
+      "passed": true,
+      "phase": "fault"
+    },
+    {
+      "name": "link_hold_2500ms_settled",
+      "passed": true,
+      "elapsed": 0.4877930369693786
+    },
+    {
+      "name": "freeze_lidar_raw_closes_admission",
+      "passed": true,
+      "elapsed": 0.2833691139239818,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lidar_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 0.28403409011662006
+    },
+    {
+      "name": "freeze_lidar_raw_settled",
+      "passed": true,
+      "elapsed": 1.047413155902177
+    },
+    {
+      "name": "freeze_imu_raw_closes_admission",
+      "passed": true,
+      "elapsed": 0.21790179098024964,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_imu_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 0.2197261080145836
+    },
+    {
+      "name": "freeze_imu_raw_settled",
+      "passed": true,
+      "elapsed": 0.8469744950998574
+    },
+    {
+      "name": "freeze_waist_tf_closes_admission",
+      "passed": true,
+      "elapsed": 0.4845915900077671,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_waist_tf_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 0.48539259284734726
+    },
+    {
+      "name": "freeze_waist_tf_settled",
+      "passed": true,
+      "elapsed": 1.0816502480302006
+    },
+    {
+      "name": "freeze_lio_closes_admission",
+      "passed": true,
+      "elapsed": 0.37485702498815954,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lio_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 0.37574467598460615
+    },
+    {
+      "name": "freeze_lio_settled",
+      "passed": true,
+      "elapsed": 1.1431109479162842
+    },
+    {
+      "name": "freeze_map_closes_admission",
+      "passed": true,
+      "elapsed": 0.9864858582150191,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_map_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 0.9882303210906684
+    },
+    {
+      "name": "freeze_map_settled",
+      "passed": true,
+      "elapsed": 0.5287430640310049
+    },
+    {
+      "name": "freeze_costmap_worker_closes_admission",
+      "passed": true,
+      "elapsed": 1.0039933021180332,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": [
+        [
+          "CostMapper"
+        ]
+      ]
+    },
+    {
+      "name": "freeze_costmap_worker_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 1.0048326489049941
+    },
+    {
+      "name": "freeze_costmap_worker_settled",
+      "passed": true,
+      "elapsed": 0.5078112538903952
+    },
+    {
+      "name": "unknown_goal_rejected_retains_cells",
+      "passed": true,
+      "goal": [
+        -0.6000000927597284,
+        -0.8000000733882189
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 0,
+        "plan": 0
+      },
+      "goal_cell_after": -1,
+      "startup_disk_before": {
+        "radius_m": 1.2,
+        "cells": 1807,
+        "unknown": 1375,
+        "free": 370,
+        "occupied": 59
+      },
+      "startup_disk_after": {
+        "radius_m": 1.2,
+        "cells": 1807,
+        "unknown": 1375,
+        "free": 370,
+        "occupied": 59
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "unknown_goal_settled",
+      "passed": true,
+      "elapsed": 0.93019366892986
+    },
+    {
+      "name": "occupied_goal_rejected_retains_cells",
+      "passed": true,
+      "goal": [
+        -0.7000000942498446,
+        0.749999949708581
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 0,
+        "plan": 0
+      },
+      "goal_cell_after": 100,
+      "startup_disk_before": {
+        "radius_m": 1.2,
+        "cells": 1807,
+        "unknown": 1375,
+        "free": 370,
+        "occupied": 59
+      },
+      "startup_disk_after": {
+        "radius_m": 1.2,
+        "cells": 1807,
+        "unknown": 1375,
+        "free": 370,
+        "occupied": 59
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "occupied_goal_settled",
+      "passed": true,
+      "elapsed": 0.8297359650023282
+    },
+    {
+      "name": "clear_goal_on_recorded_map_rejected_from_unknown_start",
+      "passed": true,
+      "goal": [
+        1.2999999355524778,
+        -0.5000000689178705
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 0,
+        "plan": 0
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "clear_goal_settled",
+      "passed": true,
+      "elapsed": 0.8267709179781377
+    },
+    {
+      "name": "synthetic_clear_goal_followed_through_link",
+      "passed": true,
+      "elapsed_to_motion": 0.10951331886462867,
+      "gained": {
+        "cmd_vel": 19,
+        "plan": 1
+      },
+      "forward_displacement_m": 0.21283915627957492,
+      "command_age": {
+        "samples": 17,
+        "max_s": 0.13419438106939197,
+        "p95_s": 0.09052642909809944
+      },
+      "note": "sim-only synthetic all-free costmap replaces frozen CostMapper output"
+    },
+    {
+      "name": "goal_cancel_reaches_public_planner",
+      "passed": true,
+      "elapsed": 1.373267891118303,
+      "since_request": 1.374171158997342
+    },
+    {
+      "name": "synthetic_clear_goal_settled",
+      "passed": true,
+      "elapsed": 0.571128420997411
+    },
+    {
+      "name": "stamp_rollback_latches_peer_until_fresh_instance",
+      "passed": true,
+      "fault": "source_stamp_rollback:global_costmap",
+      "latched_after_s": 1.3969838619232178e-06,
+      "begin_refused": "ValueError: fresh navigation readiness required"
+    }
+  ],
+  "error": "TimeoutError: fresh peer commissioning",
+  "load": {
+    "physics_after_release": {
+      "max_scheduler_lateness_s": 0.10094138002023101,
+      "p99_scheduler_lateness_s": 0.00020774527220055296,
+      "missed_step_deadlines": 104,
+      "automatic_resets": 0
+    }
+  }
+}

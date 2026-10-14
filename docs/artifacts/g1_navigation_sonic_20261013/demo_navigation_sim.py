@@ -59,6 +59,14 @@ from dimos.robot.unitree.g1.sonic_navigation import NavigationInput
 from dimos.robot.unitree.g1.sonic_reference import encode_command
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 
+if os.environ.get("SONIC_TWO_HOST_OUTPUT"):
+    # Two-host workers re-import this entry module; serve the replay shim to the sender only.
+    import demo_navigation_audit
+    import demo_navigation_dds_finder
+
+    demo_navigation_dds_finder.install()
+    demo_navigation_audit.install()
+
 
 def isolated(host_netns: str) -> None:
     if [name for _, name in socket.if_nameindex()] != ["lo"] or os.readlink(
@@ -209,9 +217,56 @@ class PhysicsProof:
         raise RuntimeError("no off-board goal planner in Stage A")
 
 
+def native_command(args: Any, binary: Path, assets: Path, feedback_port: int) -> list[str]:
+    return [
+        str(binary),
+        "lo",
+        str(assets / "model_decoder.onnx"),
+        str(args.groot / "gear_sonic_deploy/reference/example"),
+        "--obs-config",
+        str(assets / "observation_config.yaml"),
+        "--encoder-file",
+        str(assets / "model_encoder.onnx"),
+        "--planner-file",
+        str(assets / "planner/target_vel/V2/planner_sonic.onnx"),
+        "--input-type",
+        "zmq_manager",
+        "--output-type",
+        "zmq",
+        "--zmq-host",
+        "127.0.0.1",
+        "--zmq-port",
+        str(args.reference_port),
+        "--zmq-out-port",
+        str(feedback_port),
+        "--disable-crc-check",
+        "--reference-timeout-ms",
+        "200",
+        "--guarded-planner",
+        "--planner-motion-logfile",
+        str(args.output / "planner-motion.csv"),
+        "--target-motion-logfile",
+        str(args.output / "target-motion.csv"),
+    ]
+
+
+def native_env(args: Any) -> dict[str, str]:
+    env = {
+        **os.environ,
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "CUDA_VISIBLE_DEVICES": args.gpu,
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "MUJOCO_GL": "egl",
+    }
+    sdk = args.groot / "gear_sonic_deploy/thirdparty/unitree_sdk2/thirdparty/lib/x86_64"
+    env["LD_LIBRARY_PATH"] = str(sdk) + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+    return env
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stage", choices=["on-host"], required=True)
+    parser.add_argument("--stage", choices=["on-host", "two-host"], required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--groot", type=Path, required=True)
     parser.add_argument("--host-netns", required=True)
@@ -245,6 +300,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     isolated(args.host_netns)
+    if args.stage == "two-host":
+        from demo_navigation_two_host import run_two_host
+
+        run_two_host(args)
+        return
     root = Path(__file__).resolve().parents[3]
     args.output.mkdir(parents=True, exist_ok=False)
     runtime = root / "build/sonic-navigation-runtime"
@@ -255,46 +315,8 @@ def main() -> None:
     expected = json.loads((Path(__file__).with_name("simulation-assets.json")).read_text())
     for name, digest in expected["sha256"].items():
         assert hashlib.sha256((assets / name).read_bytes()).hexdigest() == digest, name
-    command = [
-        str(binary),
-        "lo",
-        str(assets / "model_decoder.onnx"),
-        str(args.groot / "gear_sonic_deploy/reference/example"),
-        "--obs-config",
-        str(assets / "observation_config.yaml"),
-        "--encoder-file",
-        str(assets / "model_encoder.onnx"),
-        "--planner-file",
-        str(assets / "planner/target_vel/V2/planner_sonic.onnx"),
-        "--input-type",
-        "zmq_manager",
-        "--output-type",
-        "zmq",
-        "--zmq-host",
-        "127.0.0.1",
-        "--zmq-port",
-        str(args.reference_port),
-        "--zmq-out-port",
-        str(args.feedback_port),
-        "--disable-crc-check",
-        "--reference-timeout-ms",
-        "200",
-        "--guarded-planner",
-        "--planner-motion-logfile",
-        str(args.output / "planner-motion.csv"),
-        "--target-motion-logfile",
-        str(args.output / "target-motion.csv"),
-    ]
-    env = {
-        **os.environ,
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "CUDA_VISIBLE_DEVICES": args.gpu,
-        "HF_HUB_OFFLINE": "1",
-        "TRANSFORMERS_OFFLINE": "1",
-        "MUJOCO_GL": "egl",
-    }
-    sdk = args.groot / "gear_sonic_deploy/thirdparty/unitree_sdk2/thirdparty/lib/x86_64"
-    env["LD_LIBRARY_PATH"] = str(sdk) + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+    command = native_command(args, binary, assets, args.feedback_port)
+    env = native_env(args)
     manifest = {
         "stage": args.stage,
         "command": command,
