@@ -33,6 +33,7 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--host-netns", required=True)
     parser.add_argument("--pacing", choices=["relative", "absolute"], default="absolute")
+    parser.add_argument("--max-seconds", type=float, default=240.0)
     args = parser.parse_args()
     if [name for _, name in socket.if_nameindex()] != ["lo"]:
         raise RuntimeError("Simulation requires a network namespace with only lo")
@@ -73,7 +74,10 @@ def main() -> None:
     (args.output / "sim-ready").touch()
     try:
         with (args.output / "physics.jsonl").open("w") as log:
-            while time.monotonic() - start < 240 and not (args.output / "sim-stop").exists():
+            while (
+                time.monotonic() - start < args.max_seconds
+                and not (args.output / "sim-stop").exists()
+            ):
                 step_started = time.monotonic()
                 lateness = max(0.0, step_started - schedule.scheduled_at)
                 missed_step_deadlines += int(lateness >= config["SIMULATE_DT"])

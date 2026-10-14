@@ -1,0 +1,71 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1165979.953615106,
+      "pc2_monotonic": 1155979.953858832
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.4267167099751532,
+      "peer_status": {
+        "monotonic": 1155986.256666334,
+        "ready": true,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5086598161142319
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.22301621940696667,
+      "yaw_change_rad": -0.033731776750822146,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.055143418023362756,
+        "p95_s": 0.054455771821085366
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.143859826028347
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.13561601029068707,
+      "yaw_change_rad": -0.10571073240019743,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.0514843980781734,
+        "p95_s": 0.051297795865684746
+      }
+    }
+  ],
+  "error": "TimeoutError: backward measured physics settling",
+  "load": {
+    "physics_after_release": {
+      "max_scheduler_lateness_s": 0.0014958211686462164,
+      "p99_scheduler_lateness_s": 0.00048254106426611545,
+      "missed_step_deadlines": 0,
+      "automatic_resets": 0
+    }
+  }
+}

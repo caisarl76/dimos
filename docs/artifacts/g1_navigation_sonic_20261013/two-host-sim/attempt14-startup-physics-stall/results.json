@@ -1,0 +1,32 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1165756.218216293,
+      "pc2_monotonic": 1155756.218489413
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.4106410031672567,
+      "peer_status": {
+        "monotonic": 1155756.630229718,
+        "ready": true,
+        "fault": null
+      }
+    }
+  ],
+  "error": "AssertionError: unsupported/no resets required",
+  "load": {}
+}

@@ -1,0 +1,29 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1165885.899893971,
+      "pc2_monotonic": 1155885.900138056
+    }
+  ],
+  "error": "TimeoutError: readiness after release",
+  "load": {
+    "physics_after_release": {
+      "max_scheduler_lateness_s": 0.008802515920251608,
+      "p99_scheduler_lateness_s": 0.0015591382235288509,
+      "missed_step_deadlines": 6,
+      "automatic_resets": 0
+    }
+  }
+}

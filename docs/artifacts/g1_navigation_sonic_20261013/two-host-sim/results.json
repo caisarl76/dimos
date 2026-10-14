@@ -1,0 +1,478 @@
+{
+  "trials": {
+    "trial1": {
+      "status": "passed",
+      "error": null,
+      "cases": 79,
+      "failed_cases": [],
+      "analyzer_passed": true,
+      "raw_files": 27,
+      "load": {
+        "vla_phase": {
+          "cpu_percent": {
+            "sim": 60.8,
+            "native": 14.3,
+            "peer_host": 179.9,
+            "pc2_host": 29.7
+          },
+          "native_loop": {
+            "lowstate_ms": {
+              "samples": 3,
+              "max": 1.553,
+              "p95": 1.5446,
+              "over_50ms": 0
+            },
+            "imu_ms": {
+              "samples": 3,
+              "max": 1.533,
+              "p95": 1.5256999999999998,
+              "over_50ms": 0
+            }
+          },
+          "sensor_relay_active": true
+        },
+        "physics_after_release": {
+          "max_scheduler_lateness_s": 0.09889047546312213,
+          "p99_scheduler_lateness_s": 0.014639921123161845,
+          "missed_step_deadlines": 633,
+          "automatic_resets": 0
+        }
+      }
+    },
+    "trial2": {
+      "status": "failed",
+      "error": null,
+      "cases": 79,
+      "failed_cases": [
+        "left_turn_settled"
+      ],
+      "analyzer_passed": false,
+      "raw_files": 27,
+      "load": {
+        "vla_phase": {
+          "cpu_percent": {
+            "sim": 61.7,
+            "native": 14.7,
+            "peer_host": 181.4,
+            "pc2_host": 29.3
+          },
+          "native_loop": {
+            "lowstate_ms": {
+              "samples": 3,
+              "max": 2.631,
+              "p95": 2.6119,
+              "over_50ms": 0
+            },
+            "imu_ms": {
+              "samples": 3,
+              "max": 2.622,
+              "p95": 2.6025,
+              "over_50ms": 0
+            }
+          },
+          "sensor_relay_active": true
+        },
+        "physics_after_release": {
+          "max_scheduler_lateness_s": 0.09141819807700813,
+          "p99_scheduler_lateness_s": 0.013597005172632631,
+          "missed_step_deadlines": 576,
+          "automatic_resets": 0
+        }
+      }
+    },
+    "trial3": {
+      "status": "passed",
+      "error": null,
+      "cases": 79,
+      "failed_cases": [],
+      "analyzer_passed": true,
+      "raw_files": 27,
+      "load": {
+        "vla_phase": {
+          "cpu_percent": {
+            "sim": 57.8,
+            "native": 14.3,
+            "peer_host": 177.7,
+            "pc2_host": 29.9
+          },
+          "native_loop": {
+            "lowstate_ms": {
+              "samples": 3,
+              "max": 5.9,
+              "p95": 5.8864,
+              "over_50ms": 0
+            },
+            "imu_ms": {
+              "samples": 3,
+              "max": 5.894,
+              "p95": 5.8801,
+              "over_50ms": 0
+            }
+          },
+          "sensor_relay_active": true
+        },
+        "physics_after_release": {
+          "max_scheduler_lateness_s": 0.0852722697891295,
+          "p99_scheduler_lateness_s": 0.012042880326043778,
+          "missed_step_deadlines": 629,
+          "automatic_resets": 0
+        }
+      }
+    }
+  },
+  "attempts": {
+    "attempt-stage-a-relative-path": {
+      "status": "failed",
+      "error": "RuntimeError: owned simulator/controller exited; inspect logs",
+      "cases": 0,
+      "failed_cases": [],
+      "analyzer_passed": false,
+      "raw_files": 11,
+      "cause": "Operator error: relative output path for the Stage A regression run"
+    },
+    "attempt01-peer-config": {
+      "status": "failed",
+      "error": "RuntimeError: peer host exited",
+      "cases": 1,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 17,
+      "cause": "Upstream CostMapper config could not pass BlueprintConfigParser (fixed 618628118)"
+    },
+    "attempt02-readiness-gate": {
+      "status": "failed",
+      "error": "ValueError: fresh navigation readiness required",
+      "cases": 3,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 19,
+      "cause": "Harness began before relayed sensor/map readiness"
+    },
+    "attempt03-proxy-timeout": {
+      "status": "failed",
+      "error": "AssertionError: forward: {'forward_displacement_m': 0.0007587130266250544, 'yaw_change_rad': -0.006726475809567513, 'command_age': {'samples': 21, 'max_s': 0.09047422115691006, 'p95_s': 0.0856408157851547}}",
+      "cases": 5,
+      "failed_cases": [
+        "forward"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 19,
+      "cause": "Harness TCP fault proxy socket timeout dropped native subscriptions"
+    },
+    "attempt04-readiness-margin": {
+      "status": "failed",
+      "error": "AssertionError: forward: {'forward_displacement_m': -0.0011994167535318116, 'yaw_change_rad': 0.006160769659339868, 'command_age': {'samples': 20, 'max_s': 0.01227717287838459, 'p95_s': 0.010271673544775695}}",
+      "cases": 5,
+      "failed_cases": [
+        "forward"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 19,
+      "cause": "base_tf 200 ms budget expired between 10 Hz polls (budget amended db61fb371)"
+    },
+    "attempt05-base-tf-budget": {
+      "status": "failed",
+      "error": "AssertionError: forward: {'forward_displacement_m': -0.0033642010437504705, 'yaw_change_rad': -0.021630343672778288, 'command_age': {'samples': 20, 'max_s': 0.08541953680105507, 'p95_s': 0.08197051928145811}}",
+      "cases": 5,
+      "failed_cases": [
+        "forward"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Same, with per-input readiness observer"
+    },
+    "attempt06-link-delay-60ms": {
+      "status": "failed",
+      "error": "AssertionError: link_delay_60ms_moving: {}",
+      "cases": 18,
+      "failed_cases": [
+        "link_delay_60ms_moving"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Per-request link connections: 60 ms network RTT exceeds 100 ms poll bound (finding; cases reworked)"
+    },
+    "attempt07-harness-slot": {
+      "status": "failed",
+      "error": "RuntimeError: navigation request slot is busy",
+      "cases": 17,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Harness used the relay control slot (now an independent observer)"
+    },
+    "attempt08-recover-phase": {
+      "status": "failed",
+      "error": "TimeoutError: link_delay handback",
+      "cases": 20,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Harness recovery wrongly required phase disarmed"
+    },
+    "attempt09-empty-path": {
+      "status": "failed",
+      "error": "AssertionError: unknown_goal_rejected_retains_cells: {'goal': [-0.6000000927597284, -0.7999996934086084], 'accepted': True, 'gained': {'cmd_vel': 0, 'path': 2}, 'startup_disk': {'radius_m': 1.2, 'cells': 1807, 'unknown': 1385, 'free': 358, 'occupied': 57}, 'robot_cell': -1}",
+      "cases": 45,
+      "failed_cases": [
+        "unknown_goal_rejected_retains_cells"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Harness counted planner clearing paths as plans"
+    },
+    "attempt10-grid-hash": {
+      "status": "failed",
+      "error": "AssertionError: unknown_goal_rejected_retains_cells: {'goal': [-0.6000000927597284, -0.8000000733882189], 'accepted': True, 'gained': {'cmd_vel': 0, 'plan': 0}, 'startup_disk': {'radius_m': 1.2, 'cells': 1807, 'unknown': 1375, 'free': 372, 'occupied': 59}, 'robot_cell': -1}",
+      "cases": 45,
+      "failed_cases": [
+        "unknown_goal_rejected_retains_cells"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Harness compared whole-grid hashes instead of goal cells"
+    },
+    "attempt11-recorded-clear-goal": {
+      "status": "failed",
+      "error": "AssertionError: clear_goal_followed_through_link: {'goal': [1.2999999355524778, -0.4999998789280653], 'accepted': True, 'gained': {'cmd_vel': 0, 'plan': 0}, 'peer_moving_commands': False}",
+      "cases": 49,
+      "failed_cases": [
+        "clear_goal_followed_through_link"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Recorded near-field unknown start: A* finds no path (conservative; synthetic goal added)"
+    },
+    "attempt12-rollback-latch": {
+      "status": "failed",
+      "error": "TimeoutError: ready after synthetic goal",
+      "cases": 53,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Synthetic costmap stand-in triggered peer stamp-rollback latch (now an explicit case)"
+    },
+    "attempt13-replay-wrap-gap": {
+      "status": "failed",
+      "error": "TimeoutError: source_expiry measured physics settling",
+      "cases": 14,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Replay shim loop gap caused periodic readiness expiry"
+    },
+    "attempt14-startup-physics-stall": {
+      "status": "failed",
+      "error": "AssertionError: unsupported/no resets required",
+      "cases": 3,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Host startup stalled physics; robot fell before graphs released (startup reordered)"
+    },
+    "attempt15-sim-time-tick": {
+      "status": "failed",
+      "error": "TimeoutError: readiness after release",
+      "cases": 2,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 19,
+      "cause": "Replay shim lowstate tick rolled back on physics release"
+    },
+    "attempt16-backward-settle": {
+      "status": "failed",
+      "error": "TimeoutError: backward measured physics settling",
+      "cases": 7,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 20,
+      "cause": "Physics settle gate missed after backward (recorded; harness now continues)"
+    },
+    "attempt17-proxy-fd-leak": {
+      "status": "failed",
+      "error": "ValueError: filedescriptor out of range in select()",
+      "cases": 54,
+      "failed_cases": [
+        "link_delay_settled"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Harness fault proxy leaked descriptors"
+    },
+    "attempt18-relay-rollback-latch": {
+      "status": "failed",
+      "error": "TimeoutError: fresh peer commissioning",
+      "cases": 54,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Relay could never recover from a restarted peer (epoch fix c5b3d1406)"
+    },
+    "attempt19-latched-ready-gate": {
+      "status": "failed",
+      "error": "TimeoutError: native_watchdog ready",
+      "cases": 61,
+      "failed_cases": [
+        "backward_settled"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 22,
+      "cause": "Harness waited for execution ready while native guard latched"
+    },
+    "attempt20-pose-ready-lease": {
+      "status": "failed",
+      "error": "RuntimeError: fresh guarded planner, cancellation/settling and command/planner/pose subscriptions required",
+      "cases": 64,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 22,
+      "cause": "Harness started pose without re-checking readiness"
+    },
+    "attempt21-goal-pending-race": {
+      "status": "failed",
+      "error": "TimeoutError: A* motion through the link",
+      "cases": 50,
+      "failed_cases": [
+        "backward_settled"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Relay withheld readiness during a slow goal (fix 64f849408)"
+    },
+    "attempt22-chunk-gap": {
+      "status": "failed",
+      "error": "ValueError: session is not accepting chunks",
+      "cases": 64,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 23,
+      "cause": "Harness paused chunk submission to sample CPU"
+    },
+    "attempt23-frozen-owner-rpc": {
+      "status": "failed",
+      "error": "TimeoutError: RPC call to 'SonicExecutionModule/get_feedback' timed out after 120.0 seconds",
+      "cases": 74,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 24,
+      "cause": "Harness called RPCs into the frozen execution worker"
+    },
+    "attempt24-synthetic-goal-rejected": {
+      "status": "failed",
+      "error": "RuntimeError: navigation goal rejected or admission closed",
+      "cases": 50,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 21,
+      "cause": "Synthetic goal rejected (see attempt28/attempt30)"
+    },
+    "attempt25-sim-lifetime": {
+      "status": "failed",
+      "error": "RuntimeError: owned simulator/controller exited; inspect logs",
+      "cases": 76,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 24,
+      "cause": "Simulator worker 240 s lifetime (now configurable)"
+    },
+    "attempt26-latched-restart-gate": {
+      "status": "failed",
+      "error": "TimeoutError: restarted publisher readiness",
+      "cases": 76,
+      "failed_cases": [
+        "forward_settled"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 24,
+      "cause": "Harness waited for execution ready after publisher restart"
+    },
+    "attempt27-pc2-restart-replay": {
+      "status": "failed",
+      "error": "TimeoutError: restarted publisher link readiness",
+      "cases": 76,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 24,
+      "cause": "Replay restarted with pc2 sender; relay never paired with a fresh peer"
+    },
+    "attempt28-goal-outage-race": {
+      "status": "failed",
+      "error": "RuntimeError: navigation goal rejected or admission closed",
+      "cases": 50,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 22,
+      "cause": "Harness goal timing crossed the 2 s source-outage bound"
+    },
+    "attempt29-relay-foreign-latch": {
+      "status": "failed",
+      "error": "TimeoutError: restarted publisher link readiness",
+      "cases": 77,
+      "failed_cases": [
+        "backward_settled"
+      ],
+      "analyzer_passed": null,
+      "raw_files": 25,
+      "cause": "Relay foreign-request latch never cleared for a fresh peer (fix 30b2bc65f)"
+    },
+    "attempt30-old-goal-redelivery": {
+      "status": "failed",
+      "error": "RuntimeError: navigation goal rejected or admission closed",
+      "cases": 50,
+      "failed_cases": [],
+      "analyzer_passed": null,
+      "raw_files": 22,
+      "cause": "Peer still reported the previous request uncancelled at a new goal; planner received no duplicate goal; not reproduced in 3 audited trials (unexplained)"
+    },
+    "prefix-trial1-proxy-overlap-leak": {
+      "status": "passed",
+      "error": null,
+      "cases": 79,
+      "failed_cases": [],
+      "analyzer_passed": true,
+      "raw_files": 27,
+      "cause": "Complete 79-case trial (superseded): harness proxy leaked sockets of overlapping connections; functional results stand, re-run after the fix"
+    },
+    "prefix-trial2-proxy-overlap-leak": {
+      "status": "failed",
+      "error": null,
+      "cases": 79,
+      "failed_cases": [
+        "forward_settled"
+      ],
+      "analyzer_passed": false,
+      "raw_files": 27,
+      "cause": "Complete 79-case trial (superseded): harness proxy leaked sockets of overlapping connections; functional results stand, re-run after the fix"
+    },
+    "prefix-trial3-proxy-overlap-leak": {
+      "status": "passed",
+      "error": null,
+      "cases": 79,
+      "failed_cases": [],
+      "analyzer_passed": true,
+      "raw_files": 27,
+      "cause": "Complete 79-case trial (superseded): harness proxy leaked sockets of overlapping connections; functional results stand, re-run after the fix"
+    }
+  },
+  "stage_a_regression": {
+    "status": "passed",
+    "error": null,
+    "cases": 26,
+    "failed_cases": [],
+    "analyzer_passed": true,
+    "raw_files": 22
+  },
+  "verdict": {
+    "trials_run": 3,
+    "trials_all_cases_passed": [
+      "trial1",
+      "trial3"
+    ],
+    "trial_failures": {
+      "trial2": [
+        "left_turn_settled"
+      ]
+    },
+    "scope": "Headless two-host simulation in one loopback namespace; recorded sensors do not follow the robot; not hardware commissioning"
+  }
+}

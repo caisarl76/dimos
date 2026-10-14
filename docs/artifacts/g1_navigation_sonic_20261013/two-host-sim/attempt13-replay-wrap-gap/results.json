@@ -1,0 +1,111 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1165577.45579346,
+      "pc2_monotonic": 1155577.456058634
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.4459473548922688,
+      "peer_status": {
+        "monotonic": 1155577.891485286,
+        "ready": true,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.489120006095618
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.1441649171230941,
+      "yaw_change_rad": -0.027757587695976152,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.08272890979424119,
+        "p95_s": 0.07847394064301626
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.2043064010795206
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.17151738757101503,
+      "yaw_change_rad": -0.016427524432445606,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.1110279280692339,
+        "p95_s": 0.09217618381371723
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.1687782648950815
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": -0.003547917309490908,
+      "yaw_change_rad": 0.09544728131508541,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.07880474114790559,
+        "p95_s": 0.07561639654450118
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 2.420253393938765
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": -0.00043107100253784655,
+      "yaw_change_rad": -0.11377946939640513,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.06197530822828412,
+        "p95_s": 0.06180864201160148
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 2.0994672200176865
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.2760535709094256
+    }
+  ],
+  "error": "TimeoutError: source_expiry measured physics settling",
+  "load": {}
+}

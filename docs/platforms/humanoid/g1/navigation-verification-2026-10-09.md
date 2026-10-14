@@ -62,7 +62,7 @@ step-climbing capability.
 
 ## Fresh evidence
 
-Evidence is under [g1_navigation_20261009](/docs/artifacts/g1_navigation_20261009/).
+Evidence is under `docs/artifacts/g1_navigation_20261009/` in the original workspace (not imported into this branch).
 
 - Local navigation suite: **30 passed**, including movement-manager override,
   A* and goal validation, stubbed agent tool routing, and navigation/G1 TF checks.
@@ -298,7 +298,7 @@ source was changed during this resumption.
 
 New scripts and evidence are under
 `docs/artifacts/g1_navigation_20261012/`. The archive retains the successful
-capture and earlier diagnostic failures. See [sensor-mapping.png](/docs/artifacts/g1_navigation_20261012/sensor-mapping.png)
+capture and earlier diagnostic failures. See `docs/artifacts/g1_navigation_20261012/sensor-mapping.png` (original workspace, not imported)
 for the saved map, costmap, and reported sensor position.
 
 ## MID360S compatibility and fixes
@@ -485,17 +485,17 @@ and zero-stick payloads passed. Its source hash
 matches pc2's task image. This checks serialization only, not the live G1
 bridge, joystick arbitration, or stopping behavior. Evidence:
 `webrtc-joystick-payload-check.json` and `demo_webrtc_joystick_payload.py`.
-## SONIC planner follow-up — 2026-10-13
+## SONIC planner follow-up, 2026-10-13
 
 The user selected native SONIC planner mode for direction, speed and independent
 facing, with a later pose-mode handoff to VLA manipulation. Read the existing
 `/home/jihun/work/GR00T-WholeBodyControl` checkout at
 `7c6d710b783a984ede504d24a65bc70e486b3b1d`, preserving its local changes.
-The [integration design](../../../superpowers/specs/2026-10-13-g1-sonic-navigation-design.md)
+The [integration design](/docs/superpowers/specs/2026-10-13-g1-sonic-navigation-design.md)
 records the packet contract, frame conversion, sole-publisher ownership,
 guarded handoff and software/simulation/hardware acceptance sequence.
 
-The offline [protocol check](../../../artifacts/g1_navigation_sonic_20261013/protocol-check.json)
+The offline [protocol check](/docs/artifacts/g1_navigation_sonic_20261013/protocol-check.json)
 passed 11 checks for planner layout, mode-only command parity, existing DimOS
 sonic78 pose encoding and reference-frame conversion. This is serialization/math
 evidence only; no SONIC motion or mode command was sent to pc2.
@@ -539,8 +539,73 @@ own validated blueprint, joined by the new SonicNavigationLink transport.
 Existing advancing sensor/LIO/map/costmap stamps are reused for readiness, and
 native planner packets retain sequence/deadline without a request-ID field.
 Body-frame commands require accurate sensor-to-base extrinsics rather than a
-map-to-IMU heading alignment. The [staged implementation plan](../../../superpowers/plans/2026-10-13-g1-sonic-navigation.md)
+map-to-IMU heading alignment. The [staged implementation plan](/docs/superpowers/plans/2026-10-13-g1-sonic-navigation.md)
 proves the controller path with local Twist/MuJoCo before the off-board link,
 then proceeds to isolated pc2 commissioning. This is prepared work awaiting
 plan review; no proposed production changes or robot motion occurred in this
 design/plan revision.
+
+## Two-host link simulation, 2026-10-14
+
+Software and simulation evidence only. No pc2 process, no robot motion and no
+external network traffic. All runs happened inside a private loopback-only
+network namespace on the workstation. The setup:
+
+- **The two "hosts"**: both validated blueprints, each with its own zenoh router.
+  - The pc2 graph has the read-only sensor sender, the relay and the one execution owner.
+  - The peer graph has PointLio, ray map, CostMapper, A*, MovementManager and the peer, and runs in its own process with its monotonic clock offset by 10,000–40,000 s.
+- **Controller and physics**: the private native SONIC controller and headless MuJoCo physics.
+- **What crosses between hosts**: only the private link, the sensor relay and the native endpoints. The link and both native endpoints run through byte-level delay/hold proxies.
+- **Sensor input**: recorded MID360S cloud/IMU payloads reach the production sender through a simulation-only DDS reader stand-in, scoped to that one module. The waist lowstate comes from physics.
+
+The x86 `pointlio_native` and `voxel_ray_tracing` were built from the locked
+sources at pinned PointLio core `3c1dcf8b`.
+Harness, evidence and per-run hashes are in
+[two-host-sim/results.json](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/results.json).
+
+**Result.** Three full trials of 79 cases each with the final harness, all analyzed with the Task 5 analyzer:
+
+- Trials 1 and 3 passed every case.
+- Trial 2 failed one case, `left_turn_settled`, with the physics settling gate unchanged.
+  - After the turn the robot was physically still within about 2 s: speed stayed below 0.013 m/s.
+  - The gate's 20 ms yaw-rate estimate kept jittering at about ±0.033 rad/s, just above its 0.03 limit, so the 0.5 s dwell kept restarting; settling took 6.76 s against the 3 s limit.
+  - An earlier, now superseded set of three trials, made before a harness proxy leak was fixed, showed the same 2-of-3 pattern (one `forward_settled` miss at 3.15 s).
+- The wire checks found valid planner sequences and 0.10–0.20 m/s moving packets (about 900 moving, 1,700–1,900 IDLE and 190 pose packets per trial).
+- The Stage A on-host matrix still passes 26/26 after the harness refactor.
+
+| Case group | Measured across the three final trials |
+| --- | --- |
+| Teleop through the link (MovementManager → peer → link → relay → execution) | forward 0.073–0.180 m, backward −0.133 to −0.260 m, turns +0.073–0.108 / −0.097 to −0.164 rad over 2 s; command source age at pc2 receipt p95 7–52 ms |
+| Source pause / outage | IDLE without latch 0.29 s after the last emission; session ended at the 2 s outage |
+| Link delay | 20 ms network RTT keeps moving; 150 ms RTT stops motion in 0.13–0.15 s |
+| Link hold | IDLE without latch in 0.14–0.20 s; a 2.5 s hold ends the session |
+| Frozen stage, while teleop keeps sending fresh Twist | admission closed after raw LiDAR 0.31–0.33 s, IMU 0.22–0.24 s, waist edge 0.49–0.57 s, PointLio 0.31–0.36 s, ray map 0.94–1.03 s, CostMapper worker 0.93–0.98 s; stays closed until an explicit begin |
+| Goals on the recorded map | unknown and occupied goals rejected with the goal cell unchanged; the free goal is also rejected because the robot's start cell is unknown. The 1.2 m disk stays 76% unknown (no startup clearing) |
+| Goal through the full chain (sim-only synthetic free costmap replacing a frozen CostMapper) | A* plan → 0.2 m/s commands → 0.18–0.21 m of physical walking; cancel reached the public planner RPC and was confirmed IDLE |
+| Cancel stall (A* worker stopped) | admission closed at once; pose activation refused while the cancel was unresolved; resolved 0.84–1.79 s after resume |
+| Native watchdog / feedback loss / pose expiry | latched in 0.26–0.27 s; `feedback_lost` at 0.35 s; pose expired in 0.20–0.24 s without a planner latch |
+| VLA pose phase with the sensor relay active | CPU: physics 58–62%, native 14–15%, peer host 178–181%, pc2 host 29–30%; native LowState/IMU age ≤ 5.9 ms, none over 50 ms. Physics steps: p99 lateness 12–15 ms, max 85–99 ms, no resets |
+| Restarts | peer loss: IDLE in 0.09–0.15 s, then the session ends; peer stamp rollback latches until a fresh peer (ready again in 0.64–0.72 s); a restarted peer or publisher never resumes the old session; recovery needs a fresh peer plus an explicit begin |
+
+**Defects found and fixed during Task 9**, each committed separately with its own regression test:
+
+1. CostMapper's base-typed occupancy config made any blueprint pinning `HeightCostConfig` unparseable by `dimos run`. This was a pre-existing upstream bug.
+2. The composed `odom→base_link` edge refreshes only at the LIO scan rate, so its 200 ms budget expired between 10 Hz polls. With your approval it now uses the 350 ms LIO budget; the 200 ms waist edge is still enforced before composition.
+3. The relay could never recover from a restarted peer. With your approval it now uses per-peer-instance sequence epochs, started after a confirmed cancel or when no session is live.
+4. A goal round trip longer than the ~195 ms readiness margin ended the session. With your approval, the relay now refreshes readiness while holding the motion proof during a pending goal.
+5. After a pc2 restart, the relay's foreign-request latch never cleared, even for a fresh peer. It now clears only when neither side owns a request.
+
+**Findings, not fixed:**
+
+- The link opens a new connection for every request. Its application round trip is therefore several network RTTs, and network RTT above roughly 30 ms stops motion safely.
+- For an occupied goal, A* substituted a "safe goal" 2.3 m from the requested point. No path existed in these runs, but this relocation needs review before physical goals.
+- The physics settling gate missed once in each set of three trials. The cause is 20 ms yaw-rate jitter (about ±0.033 rad/s) against its 0.03 limit, not actual motion; any change to how the gate is measured needs approval.
+- One earlier attempt (attempt 30) saw the peer still reporting the previous request at a new goal. Its planner received no duplicate goal, and six audited trials did not reproduce it, so it remains unexplained.
+- On this shared workstation, host-process startup stalled physics steps; the harness now starts both hosts while the robot is still supported.
+
+**Limits of this evidence:**
+
+- The recorded sensors do not move with the simulated robot, so the peer's odometry, settling and map are static. Physics settling is measured separately.
+- No goal was reached on the real recorded map, because the near-field unknowns remain.
+- The torso→MID360 mount is the nominal URDF value, not a commissioned extrinsic.
+- None of this is pc2 load or hardware evidence. The exact FK fixture and the commissioning gates remain open.

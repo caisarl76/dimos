@@ -1,0 +1,111 @@
+{
+  "stage": "two-host",
+  "command": [
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref",
+    "lo",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/model_decoder.onnx",
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/reference/example",
+    "--obs-config",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/observation_config.yaml",
+    "--encoder-file",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/model_encoder.onnx",
+    "--planner-file",
+    "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets/planner/target_vel/V2/planner_sonic.onnx",
+    "--input-type",
+    "zmq_manager",
+    "--output-type",
+    "zmq",
+    "--zmq-host",
+    "127.0.0.1",
+    "--zmq-port",
+    "18559",
+    "--zmq-out-port",
+    "18557",
+    "--disable-crc-check",
+    "--reference-timeout-ms",
+    "200",
+    "--guarded-planner",
+    "--planner-motion-logfile",
+    "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/attempt08/planner-motion.csv",
+    "--target-motion-logfile",
+    "/tmp/dimos-g1-sonic-navigation-20261013/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/attempt08/target-motion.csv"
+  ],
+  "netns": "net:[4026532905]",
+  "host_netns": "net:[4026531840]",
+  "interfaces": [
+    [
+      1,
+      "lo"
+    ]
+  ],
+  "gpu": "1",
+  "ports": {
+    "reference": 18556,
+    "reference_proxy": 18559,
+    "feedback": 18557,
+    "feedback_proxy": 18558,
+    "cloud": 18601,
+    "state": 18602,
+    "link": 18603,
+    "link_proxy": 18604,
+    "router_pc2": 18611,
+    "router_peer": 18612
+  },
+  "peer_clock_offsets_s": [
+    10000,
+    20000
+  ],
+  "binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
+  "peer_native_sha256": {
+    "pointlio_native": "f11b34804175672f130ee4feaac782e81791315f971381c93296f38fba480c35",
+    "voxel_ray_tracing": "b7e6ddede709dd947988cb61871c0d736bb74b819b1d93ee81690bc6cde9821c"
+  },
+  "replay_sha256": "7f20818a9d0453049bf7fad7512ce15b8d51182ccdaff37ce92fc20b1d51b46b",
+  "harness_sha256": {
+    "demo_navigation_sim.py": "5d9ae6cba7f1564f9f3323278769e7588da85757ddb3dfdeff37dcee9386fb8f",
+    "demo_navigation_two_host.py": "5ccffc40d62684a4503d26e5c3935a8d26f3375e57a2ab3e0fb4c46210b82207",
+    "demo_navigation_two_host_peer.py": "6b912899809d5f794733d3fdaa4b685f909f98367cad6a2efc3701e860f01a45",
+    "demo_navigation_dds_finder.py": "7830e39be2d81432f19d027de70df895316bccc25432801fa39f02d0829b3715",
+    "demo_navigation_sim_worker.py": "21c27bb1bac2ccafd7147cda271a2f4db7f55bab5254ff8176e221e6c3362385",
+    "demo_navigation_timing.py": "c02bf094e8c8be26ffce7aa7bde04bcdf598a894bdefcaefc1d78658cce343b0"
+  },
+  "dds_shim_sha256": {
+    "two-host-dds-shim/cyclonedds/__init__.py": "7e220ee38fc9ad193eef7c6a121d7674ee4f903e960e53519134d7bb2f18ec06",
+    "two-host-dds-shim/unitree_sdk2py/__init__.py": "5f8683e151607a064b80eb1d0b6d3de6b48150b4176b8c5fa10c2257ceba7489"
+  },
+  "production_source_sha256": {
+    "dimos/robot/unitree/g1/sonic_navigation.py": "48411fc888ef2545f805d4014f4ea6a11c1bc439a465531487155dba864ac5da",
+    "dimos/robot/unitree/g1/sonic_navigation_session.py": "b0b609fd62265c672be34efc6eba97ac77d109cc2a73157325bca8419c6ba797",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "884873648c2d48b15fc6cad965cca1e21517a35921f5d03fc7532bc2e8058062",
+    "dimos/robot/unitree/g1/sonic_navigation_link.py": "2a34f89545de65d088ec88e359dea61a9d94c2a79bc0ac24e31e06987f29c83a",
+    "dimos/robot/unitree/g1/sonic_navigation_peer_module.py": "95c01d352ce076091555bd58ddd3f98d20168dede57164f4164a94bdba9e5395",
+    "dimos/robot/unitree/g1/sonic_navigation_relay_module.py": "c10f8e2818c6cb91f4c0e84be56d7be2565a5fecd2a582578417af00f751e764",
+    "dimos/robot/unitree/g1/sonic_navigation_readiness.py": "62ddae1207e42a1a0a2051c4b4a1076c69af700b38b50bd851e93d7ddff256e1",
+    "dimos/robot/unitree/g1/sonic_navigation_sensor_module.py": "b42159f4a8287689e3c3eb6c185e29765b7a3effb72d912cfe7b0bc7a991dad3",
+    "dimos/robot/unitree/g1/sonic_navigation_graph.py": "b204a9ea363fce065c1aacdf14954e9e94bafeec23bfb90e3b5df698292bf662",
+    "dimos/robot/unitree/g1/blueprints/navigation/unitree_g1_sonic_navigation_peer.py": "0daaaa937328b5afef9ff6e15c931e4210ab296e975fd99d351275996ee6e45f",
+    "dimos/robot/unitree/g1/blueprints/navigation/unitree_g1_sonic_navigation_pc2.py": "328c59c85b0baefcd82dc635e5ec6beb8a1fd003303228f1d4924e99ee0c5d27",
+    "dimos/navigation/go2/replanning_a_star/controllers.py": "808ab7030c00d198da04f25b250a070c04461492f5a77ee783494ba2e423d9dd"
+  },
+  "asset_sha256": {
+    "policy_model_decoder.trt": "95493343b352ccac34ecf12b8c52aa079f179d247f4382424dedbb3bb8bad1f4",
+    "model_encoder.onnx": "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae",
+    "observation_config.yaml": "4a67713b310932e50aca81f19188c8d76013148e98b15c8b5bbea995f12e59f0",
+    "model_decoder.onnx": "34bae8570d4a4421a5391a5c2befd745d4a02d182ec539e5f9da44c091c67509",
+    "encoder_model_encoder.trt": "6d94a4075318a61724132431e4911ce8eadbde294b8eee89b00c58a5fa00f3b3",
+    "planner/target_vel/V2/planner_planner_sonic.trt": "761cc7bd4418142258c7a45c6c46bf7d4ae6ef9f61b883d84df229c8ad98b7b8",
+    "planner/target_vel/V2/planner_sonic.onnx": "39b553e197f62f077975ba38512bc04781a3fc37c2af7c6756e04629f760edea"
+  },
+  "scope": "Both validated blueprints, the real link and sensor relay, one native controller and headless physics in one loopback namespace; recorded sensors do not follow the robot",
+  "simulation_only": [
+    "DDS reader stand-in replays recorded MID360S payloads; lowstate from physics",
+    "nominal URDF torso->MID360 mount stands in for the commissioned extrinsic",
+    "operator start command sent by a short-lived harness publisher before pc2 binds"
+  ],
+  "thresholds": {
+    "linear_speed_mps": 0.03,
+    "yaw_rate_radps": 0.03,
+    "settle_seconds": 0.5,
+    "settle_timeout": 3.0
+  }
+}
