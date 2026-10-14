@@ -1,0 +1,14 @@
+[
+  {
+    "association": "COLLABORATOR",
+    "author": "ZhengyiLuo",
+    "body": "Please refer to `gear_sonic/data_process/convert_soma_csv_to_motion_lib.py` for converting raw motion file to pkl. ",
+    "html_url": "https://github.com/NVlabs/GR00T-WholeBodyControl/issues/117#issuecomment-4316694406"
+  },
+  {
+    "association": "NONE",
+    "author": "zhuan1202",
+    "html_url": "https://github.com/NVlabs/GR00T-WholeBodyControl/issues/117#issuecomment-4727697369",
+    "summary": "User reports KeyError: joint_pos when sending the training-format output to convert_motions.py."
+  }
+]

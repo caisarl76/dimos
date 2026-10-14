@@ -1,0 +1,8 @@
+[
+  {
+    "association": "COLLABORATOR",
+    "author": "KevinMi2023p",
+    "body": "I believe these might be what you're looking for\n`gear_sonic/data_process/export_motion_to_deploy.py /path/to/motion.pkl --output-dir gear_sonic_deploy/reference/my_motion --target-fps 50`\n\n`./deploy.sh --cp /absolute/path/exported/model_step_XXXXXX --obs-config policy/release/observation_config_sonic_release.yaml --motion-data reference/my_motion sim`",
+    "html_url": "https://github.com/NVlabs/GR00T-WholeBodyControl/issues/241#issuecomment-5957798919"
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "source_url": "https://huggingface.co/api/datasets/bones-studio/seed/tree/2f59b2077b9da34dd4e43618e705c7cb962c9a66",
+  "archive": [
+    {
+      "type": "file",
+      "oid": "1af40344d78baf58baee9a02e1693d09c60d35eb",
+      "size": 23499973647,
+      "lfs": {
+        "oid": "****************************************************************",
+        "size": 23499973647,
+        "pointerSize": 136
+      },
+      "xetHash": "****************************************************************",
+      "path": "g1.tar.gz"
+    }
+  ],
+  "archive_downloaded": false
+}

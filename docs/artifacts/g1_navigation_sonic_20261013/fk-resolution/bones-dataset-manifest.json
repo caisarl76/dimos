@@ -1,0 +1,12 @@
+{
+  "source_url": "https://huggingface.co/api/datasets/bones-studio/seed",
+  "sha": "2f59b2077b9da34dd4e43618e705c7cb962c9a66",
+  "file_count": 541,
+  "exact_name_matches": [],
+  "motion_or_archive_paths": [
+    "g1.tar.gz",
+    "soma_proportional.tar.gz",
+    "soma_uniform.tar.gz"
+  ],
+  "raw_response_sha256": "1742c3228f601a00683c269c900dbbf0096f2985f05d6ed5b35d908c7ad33037"
+}

@@ -1,0 +1,79 @@
+{
+  "checked_at": "2026-10-14T04:55:48.027135+00:00",
+  "official_github_revision": "45c03facbf848e0c743091b7d9c17952096ff908",
+  "sources": [
+    {
+      "id": "legacy_test",
+      "url": "https://github.com/NVlabs/GR00T-WholeBodyControl/blob/45c03facbf848e0c743091b7d9c17952096ff908/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_fk.cpp",
+      "finding": "Loads reference/bones_072925_test without naming the intended clip."
+    },
+    {
+      "id": "converter",
+      "url": "https://github.com/NVlabs/GR00T-WholeBodyControl/blob/45c03facbf848e0c743091b7d9c17952096ff908/gear_sonic_deploy/reference/convert_motions.py",
+      "finding": "Usage examples name bones_072925_test.pkl, but provide no URL or input checksum."
+    },
+    {
+      "id": "motion_format",
+      "url": "https://nvlabs.github.io/GR00T-WholeBodyControl/references/motion_reference.html",
+      "finding": "Documents deploy dictionary and CSV schema, not the original fixture source."
+    },
+    {
+      "id": "downloads",
+      "url": "https://nvlabs.github.io/GR00T-WholeBodyControl/getting_started/download_models.html",
+      "finding": "Walking sample plus 30 GB SMPL training archives; no identified legacy fixture."
+    },
+    {
+      "id": "training",
+      "url": "https://nvlabs.github.io/GR00T-WholeBodyControl/user_guide/training.html",
+      "finding": "Converts Bones-SEED CSV into training motion_lib PKL at 30 fps from 120 fps source."
+    },
+    {
+      "id": "training_data",
+      "url": "https://nvlabs.github.io/GR00T-WholeBodyControl/user_guide/training_data.html",
+      "finding": "Links bones-studio/seed as official motion data source."
+    },
+    {
+      "id": "bones_card",
+      "url": "https://huggingface.co/datasets/bones-studio/seed/blob/2f59b2077b9da34dd4e43618e705c7cb962c9a66/README.md",
+      "finding": "Documents general G1 CSV trajectory archive, no identified legacy fixture."
+    },
+    {
+      "id": "release_manifest",
+      "url": "https://huggingface.co/nvidia/GEAR-SONIC/blob/6733128a3d8a523b1418b06bca3cdf61c8b0987f/config.json",
+      "finding": "Canonical manifest lists sample_data prefix and SMPL archive parts, no legacy FK asset."
+    },
+    {
+      "id": "maintainer_training_conversion",
+      "url": "https://github.com/NVlabs/GR00T-WholeBodyControl/issues/117#issuecomment-4316694406",
+      "finding": "Collaborator ZhengyiLuo recommends convert_soma_csv_to_motion_lib.py for raw motion conversion."
+    },
+    {
+      "id": "maintainer_deploy_export",
+      "url": "https://github.com/NVlabs/GR00T-WholeBodyControl/issues/241#issuecomment-5957798919",
+      "finding": "Collaborator KevinMi2023p recommends export_motion_to_deploy.py --target-fps 50."
+    },
+    {
+      "id": "official_exporter",
+      "url": "https://github.com/NVlabs/GR00T-WholeBodyControl/blob/45c03facbf848e0c743091b7d9c17952096ff908/gear_sonic/data_process/export_motion_to_deploy.py",
+      "finding": "Official main contains CPU-capable exporter from MotionLibRobot data to deploy CSVs and optional intermediate pickle; not present in installed checkout."
+    },
+    {
+      "id": "support",
+      "url": "https://nvlabs.github.io/GR00T-WholeBodyControl/resources/support.html",
+      "finding": "GEAR WBC team contact is gear-wbc@nvidia.com."
+    }
+  ],
+  "downloaded_metadata_only": {
+    "path": "nvidia-release-config.json",
+    "sha256": "326dcc509ad93509cf262871256a74f508f43a8430f61ec6abe8034e985ce948"
+  },
+  "downloaded_source_to_scratch": {
+    "convert_motions_sha256": "0202701f9278471524ffe01cb41101054e1d96d9381f1eeb5f8cd1701525f951",
+    "export_motion_to_deploy_sha256": "807ec84dcafdf80a34d8f4cdca88842fa9db64633b0b36f4398aeff43cd05920"
+  },
+  "exact_fixture_url_found": false,
+  "source_motion_identity_found": false,
+  "full_archives_inspected": false,
+  "native_test_rerun": false,
+  "result": "Official generation pipeline identified; original legacy fixture still unidentified. Maintainer clarification required, not a confirmed private-only resource."
+}

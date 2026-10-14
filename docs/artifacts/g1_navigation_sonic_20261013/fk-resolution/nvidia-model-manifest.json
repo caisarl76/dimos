@@ -1,0 +1,22 @@
+{
+  "source_url": "https://huggingface.co/api/models/nvidia/GEAR-SONIC",
+  "sha": "6733128a3d8a523b1418b06bca3cdf61c8b0987f",
+  "file_count": 67,
+  "exact_name_matches": [],
+  "motion_or_archive_paths": [
+    "bones_seed_smpl/bones_seed_smpl.tar.part_aa",
+    "bones_seed_smpl/bones_seed_smpl.tar.part_ab",
+    "bones_seed_smpl/bones_seed_smpl.tar.part_ac",
+    "bones_seed_smpl/bones_seed_smpl.tar.part_ad",
+    "bones_seed_smpl/bones_seed_smpl.tar.part_ae",
+    "bones_seed_smpl/bones_seed_smpl.tar.part_af",
+    "bones_seed_smpl/bones_seed_smpl.tar.part_ag",
+    "sample_data/robot_filtered/210531/walk_forward_amateur_001__A001.pkl",
+    "sample_data/robot_filtered/210531/walk_forward_amateur_001__A001_M.pkl",
+    "sample_data/smpl_filtered/walk_forward_amateur_001__A001.pkl",
+    "sample_data/smpl_filtered/walk_forward_amateur_001__A001_M.pkl",
+    "sample_data/soma_filtered/210531/walk_forward_amateur_001__A001.pkl",
+    "sample_data/soma_filtered/210531/walk_forward_amateur_001__A001_M.pkl"
+  ],
+  "raw_response_sha256": "72d30b7edc7efbd9053ae4486318b9926002057d83619448953b61eac542e2da"
+}
