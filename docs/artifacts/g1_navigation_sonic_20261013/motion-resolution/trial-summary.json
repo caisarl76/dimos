@@ -529,7 +529,14 @@
       }
     }
   ],
-  "headless_original_envelope": "PASS: 9 forward/stop cycles and 3 full 26-case matrices; independent horizon coverage proof remains separately required",
+  "headless_original_envelope": "PASS: 9 forward/stop cycles and 3 full 26-case matrices; 99 checks; independent coverage PASS in all six corrected runs",
   "fk_gate": "BLOCKED: exact original recording and matching XML staging required",
-  "hardware_commissioning": "NOT AUTHORIZED/NOT RUN; pending calibration and later plan tasks"
+  "hardware_commissioning": "NOT AUTHORIZED/NOT RUN; pending calibration and later plan tasks",
+  "independent_coverage": {
+    "corrected_runs": 6,
+    "translating_windows": 18,
+    "eligible_frames": 2132,
+    "terminal_or_clamped_samples": 0,
+    "report": "horizon/coverage-summary.json"
+  }
 }

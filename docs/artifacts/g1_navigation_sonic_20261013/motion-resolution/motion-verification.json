@@ -17,9 +17,11 @@
   "native_binary_sha256": "edbb873f166009e567d4d546fee32e4a9b54bed2251abc22377038cbf01a406b",
   "coverage_all_sha256": "9e5145f4c174ab75fdda9256157d88c01f5496ef729b6f3aa6d0f469fdcc1d47",
   "coverage_summary_sha256": "8ccc46c0e69535197aa9222f72db16ccef53e71cac4a6b772ef18943373337ae",
-  "trial_summary_sha256": "81e30da9e1ded66997acaa681cad673a6ffbf1062dd347e80759ab147b7393b4",
+  "trial_summary_sha256": "28737dddd59fcb6192f0b54f19a575b14c6d675c282d5e587bbd8bf7df940872",
   "fk": "BLOCKED: exact original bones_072925_test recording remains unavailable; no substitution",
   "original_source_integrity": "20 upstream Python and 51 original native file hashes unchanged",
   "review": "Task 7 and native horizon independent reviews no remaining findings; coverage audit gap counterexamples reproduced and fixed",
-  "hardware_commissioning": "Pending exact FK fixture, calibration and later authorized hardware tasks"
+  "hardware_commissioning": "Pending exact FK fixture, calibration and later authorized hardware tasks",
+  "required_hooks": "PASS",
+  "whitespace_check": "PASS excluding archived .patch context whitespace, preserved for exact patch replay per repository hook exclusions"
 }
