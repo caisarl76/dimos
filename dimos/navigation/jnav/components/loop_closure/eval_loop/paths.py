@@ -30,14 +30,12 @@ PGO_EVAL = Path(
 
 
 def import_ivan():
-    """Ivan's go2 PGO lives on main (dimos/navigation/go2/loop_closure), not on this branch."""
+    """Ivan's go2 PGO (dimos/navigation/go2/loop_closure), merged in from main."""
     try:
         from dimos.navigation.go2.loop_closure import module, pgo, pgo_map
     except ImportError as error:
         raise SystemExit(
-            "can't import dimos.navigation.go2.loop_closure — put a dimos main checkout first on the path:\n"
-            "  git worktree add --detach ../dimos_main origin/main\n"
-            "  PYTHONPATH=../dimos_main python ...\n"
+            "can't import dimos.navigation.go2.loop_closure; is the venv for this checkout active?\n"
             f"({error})"
         ) from None
     return module, pgo, pgo_map

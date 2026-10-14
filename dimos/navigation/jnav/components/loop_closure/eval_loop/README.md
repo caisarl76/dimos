@@ -9,10 +9,8 @@ top-downs. `live_timing.py` replays a recording through Ivan's live module path 
 # 1. gsc_pgo's offline runner, built from this branch
 (cd dimos/navigation/jnav/components/loop_closure/gsc_pgo/rust && nix develop path:. --command cargo build --release --features native --bin pgo-eval)
 
-# 2. Ivan's PGO lives on main, so every python step runs with a main checkout first on the path
-git worktree add --detach ../dimos_main origin/main
-export PYTHONPATH=$PWD/../dimos_main
-source .venv/bin/activate          # needs gtsam + open3d
+# 2. python env (Ivan's PGO, dimos/navigation/go2/loop_closure, came in with the merge of main)
+uv sync && source .venv/bin/activate   # needs gtsam + open3d
 cd dimos/navigation/jnav/components/loop_closure/eval_loop
 export EVAL_LOOP_OUT=~/eval_loop_results   # prepared dbs, maps, pngs land here
 ```
