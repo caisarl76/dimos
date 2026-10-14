@@ -44,6 +44,6 @@ Stage B: **awaiting upstream compatibility update**. Real robot commissioning:
 and the missing exact FK fixture. No original workspace, environment or model was
 modified and no real robot controller was launched.
 
-See [task5-amendment-evidence.json](task5-amendment-evidence.json) for source, test
-and per-run hashes; [stage-a-test-amendment.md](stage-a-test-amendment.md) records
+See [task5-amendment-evidence.json](/docs/artifacts/g1_navigation_sonic_20261013/task5-amendment-evidence.json) for source, test
+and per-run hashes; [stage-a-test-amendment.md](/docs/artifacts/g1_navigation_sonic_20261013/stage-a-test-amendment.md) records
 the user's approved change in test interpretation.

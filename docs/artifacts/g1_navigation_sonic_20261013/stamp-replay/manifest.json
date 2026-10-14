@@ -18,11 +18,12 @@
     "dimos/robot/unitree/g1/sonic_navigation_readiness.py": "e0979f84b2098e39adcfcdc597357caf0fb6bd676445df3b608a7fba89fc2b42",
     "dimos/robot/unitree/g1/test_sonic_navigation_readiness.py": "4036ed4d5fe1200cd481eac8dbc48a6a617ffa42cb48c439a6876c25f79887d3",
     "dimos/mapping/test_costmapper_stamps.py": "1fd6f1108f6f3e732adfaa22d38c2ccc523d43874eeb85211ec4cab82f21df6a",
-    "docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_stamp_replay.py": "ba17d933cc07050efe9d9bf94747028539feb88d46ebb16a3f7d6af1f6377963",
-    "docs/artifacts/g1_navigation_sonic_20261013/demo_dds_lio_adapter.py": "98fd9af0f537586badf937ed79c17756bcdf9769d608b76b2efe1cdc91af9828"
+    "docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_stamp_replay.py": "8e6fc7f5d710d9aabf6147f2f5983ed6e6d41c9efd577f7fc7b2cc75a5c2d35b",
+    "docs/artifacts/g1_navigation_sonic_20261013/demo_dds_lio_adapter.py": "98fd9af0f537586badf937ed79c17756bcdf9769d608b76b2efe1cdc91af9828",
+    "docs/artifacts/g1_navigation_sonic_20261013/test_navigation_stamp_replay.py": "b8e123b8eb005d0fd0dc563f12668fb295c4b12fe300aff7de0ff9011d544647"
   },
   "executed_script_sha256": "69f0cfca72787f72085c062700e3ecccefbeb574fe9fb61232face533f8467c4",
-  "post_run_script_change": "Apache license header only; runtime statements unchanged",
+  "post_run_script_change": "License header, standalone/package adapter imports, and reviewed raw-scan-end assertions. Native trace reanalyzed without controller rerun; see source-stamp-reanalysis.json.",
   "replay_sha256": {
     "stamp-replay/dds-inputs.npz": "7f20818a9d0453049bf7fad7512ce15b8d51182ccdaff37ce92fc20b1d51b46b",
     "stamp-replay/runtime.log": "41fb73afd30b37060eee631a24c9d5600d96b29a6e6520fa7f4bb77ce659bfd7",
@@ -37,5 +38,14 @@
     "One saved cloud reused at recorded cloud stamps; recorded IMU values/timestamps replayed. Final IMU timestamps extended to drain the last scan.",
     "TF is odom to sensor, not calibrated base odometry; readiness stays closed without commissioned sensor-to-base extrinsics.",
     "Hardware commissioning remains blocked by missing exact FK fixture and the preserved run02/run08 failures."
-  ]
+  ],
+  "review_regression_tests": {
+    "passed": 3,
+    "failure_caught": "unrelated shared output clock and incoherent LIO/odometry stamps",
+    "junit_sha256": "4e913364a58eebf396f34d86472f508b0e69a4c4fdb198054c1c5aa4b30c5fdd"
+  },
+  "inherited_reference_import_sha256": {
+    "docs/artifacts/g1_navigation_sonic_20261013/protocol-check.json": "5ae8f792ef9c9c6c5593ce072b23222b20033a0c778989210320edd1e6327adf",
+    "docs/artifacts/g1_navigation_sonic_20261013/native-source-provenance.json": "04bbd4c9627980dc45a27c51ac89f7a75849c865d29cd9fd2a84e7ff8aa64b52"
+  }
 }

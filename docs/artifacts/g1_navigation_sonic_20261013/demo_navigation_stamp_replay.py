@@ -31,7 +31,6 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
-from demo_dds_lio_adapter import encode_cloud, encode_imu
 from dimos_lcm.sensor_msgs import Imu as LCMImu, PointCloud2 as LCMPointCloud2
 import numpy as np
 import zenoh
@@ -43,6 +42,11 @@ from dimos.mapping.costmapper import CostMapper
 from dimos.mapping.ray_tracing.module import RayTracingVoxelMap
 from dimos.msgs.sensor_msgs.Imu import Imu
 from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
+
+if __package__:
+    from .demo_dds_lio_adapter import encode_cloud, encode_imu
+else:
+    from demo_dds_lio_adapter import encode_cloud, encode_imu
 
 
 def header(stamp: float) -> SimpleNamespace:
@@ -114,6 +118,29 @@ def check_fixture(fixture: Path) -> dict[str, Any]:
             "saved_cloud_points": len(points),
             "adapter_checks_passed": True,
         }
+
+
+def validate_stamp_chain(
+    rows: dict[str, list[float]], *, scan_stamps: list[float], scan_duration: float
+) -> None:
+    expected_ends = [stamp + scan_duration for stamp in scan_stamps]
+    for name in ("lidar", "odometry", "tf", "global_map", "global_costmap"):
+        assert rows.get(name), f"missing {name} output"
+        assert np.isfinite(rows[name]).all(), name
+        assert np.all(np.diff(rows[name]) > 0), f"nonadvancing {name}"
+    for name in ("lidar", "odometry"):
+        assert all(any(abs(stamp - end) < 5e-7 for end in expected_ends) for stamp in rows[name]), (
+            f"{name} stamp does not match an original raw scan end"
+        )
+    for name, parent in [
+        ("lidar", "odometry"),
+        ("tf", "odometry"),
+        ("global_map", "lidar"),
+        ("global_costmap", "global_map"),
+    ]:
+        assert all(any(abs(stamp - s) < 5e-7 for s in rows[parent]) for stamp in rows[name]), (
+            f"{name} stamp does not match consumed {parent}"
+        )
 
 
 def run(fixture: Path, output: Path) -> None:
@@ -216,16 +243,10 @@ def run(fixture: Path, output: Path) -> None:
         assert required <= rows.keys(), f"missing streams: {required - rows.keys()}"
         for name in required:
             assert len(rows[name]) >= 5, f"insufficient {name} outputs"
-            assert np.isfinite(rows[name]).all(), name
-            assert np.all(np.diff(rows[name]) > 0), f"nonadvancing {name}"
-        for name, parent in [
-            ("tf", "odometry"),
-            ("global_map", "lidar"),
-            ("global_costmap", "global_map"),
-        ]:
-            assert all(any(abs(stamp - s) < 5e-7 for s in rows[parent]) for stamp in rows[name]), (
-                name
-            )
+        # Pinned preprocessing skips point 0 and retains every third valid point.
+        # In this recorded cloud, its last retained offset is 100.310 ms.
+        assert points["time"][-3] == 100_310_000
+        validate_stamp_chain(rows, scan_stamps=clouds[:, 1].tolist(), scan_duration=0.10031)
         # Idle, exact duplicate inputs and fresh IMUs without a LiDAR scan cannot
         # publish progressing localization/map stamps.
         assert quiet() == counts, "idle pipeline manufactured output"

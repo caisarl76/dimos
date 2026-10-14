@@ -1,0 +1,40 @@
+{
+  "checked_at": "2026-10-13T01:24:29.572569+00:00",
+  "passed": true,
+  "checks": [
+    "planner_layout_forward",
+    "planner_layout_strafe_left_facing_forward",
+    "planner_layout_idle",
+    "mode_only_command_planner_True",
+    "mode_only_command_planner_False",
+    "v4_sonic78_matches_existing_dimos_encoder",
+    "reference_frame_roundtrip_0.0",
+    "reference_frame_roundtrip_1.5707963267948966",
+    "reference_frame_roundtrip_-1.2",
+    "initializing_reference_forces_idle",
+    "missing_reference_frame_rejected"
+  ],
+  "packets": [
+    {
+      "case": "forward",
+      "bytes": 1323,
+      "sha256": "0f7520d35a7565b5bd40ac3ad46c5f79eeb5766c429446837976de46d7180ca6"
+    },
+    {
+      "case": "strafe_left_facing_forward",
+      "bytes": 1323,
+      "sha256": "0f97ccdb0da8008a011bb9f68ed6a8bffbc5ec80fcc60ba2cbe1bbb89e0d7b10"
+    },
+    {
+      "case": "idle",
+      "bytes": 1323,
+      "sha256": "2f15423a9ce186c46035f69c242f9fbdfb5dab1a4b3b0c3456ba9f9ff58086c3"
+    }
+  ],
+  "source_sha256": {
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic/utils/teleop/zmq/zmq_planner_sender.py": "f33d7715d36cda8ae64b7ce48d4f5a4c74d73fb1eb9a6c17fe85b3456b023f63",
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic/utils/inference/planner_heading_frame.py": "7f10364e85c899b3f2f0dc63748cd757f728b193c4f6ff1ad67ffe433373d70e",
+    "/home/jihun/work/dimos_dev/dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1"
+  },
+  "scope": "Offline extracted functions only; no transport, native inference, or robot motion."
+}

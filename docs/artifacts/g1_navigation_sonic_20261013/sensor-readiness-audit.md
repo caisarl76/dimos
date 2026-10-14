@@ -40,18 +40,23 @@ recorded timestamps and extends the final IMU times to drain scans. This checks
 timestamp propagation and idle behavior; it does not reproduce the original
 sequence of spatial scans or commission the sensor-to-base extrinsic.
 
-All recorded assertions passed: 96 advancing cloud, odometry, TF and global-map
+The recorded checks passed: 96 advancing cloud, odometry, TF and global-map
 outputs, and 83 costmaps. TF stamps match odometry; map stamps match consumed
-LIO clouds; costmap stamps match consumed maps. Idle time, exact duplicate raw
-inputs and fresh IMU-only input produced no additional output. Adapter checks
+LIO clouds; costmap stamps match consumed maps. A review regression now also
+ties each LIO/odometry stamp to the recorded scan start plus its retained
+100.310 ms endpoint, and checks LIO/odometry coherence. Reanalysis of the saved
+trace passes; an unrelated shared output clock is rejected. Idle time, exact duplicate raw
+inputs and fresh IMU-only input produced no additional output within each
+one-second quiet observation window. That window does not positively acknowledge
+input consumption or exclude longer processing delays. Adapter checks
 preserved header stamps, XYZ, Livox offsets and acceleration conversion.
 
 The container exited successfully and removed itself. All 1,232 stored pc2
 environment fingerprints matched afterward. The original manipulation workspace
 and its 20 imported source hashes were unchanged. Results, raw output stamps,
 image/native/source hashes and replay limits are in
-[the replay manifest](stamp-replay/manifest.json) and
-[the measured results](stamp-replay/results/results.json).
+[the replay manifest](/docs/artifacts/g1_navigation_sonic_20261013/stamp-replay/manifest.json) and
+[the measured results](/docs/artifacts/g1_navigation_sonic_20261013/stamp-replay/results/results.json).
 
 Host preparation can proceed to the two-host link after the readiness task's
 tests and selective commit. Hardware commissioning remains blocked by the

@@ -8,7 +8,7 @@
 
 **Tech Stack:** DimOS typed streams/RPC Specs, Python/pytest, ZeroMQ, private C++ SONIC receiver, CMake/GTest, MuJoCo, existing isolated Docker runtime, ARM64 TensorRT.
 
-**Spec:** [G1 navigation through SONIC planner mode](../specs/2026-10-13-g1-sonic-navigation-design.md). Read it with this plan; its admission and handoff rules are normative.
+**Spec:** [G1 navigation through SONIC planner mode](/docs/superpowers/specs/2026-10-13-g1-sonic-navigation-design.md). Read it with this plan; its admission and handoff rules are normative.
 
 ## Global Constraints
 

@@ -3,6 +3,12 @@
 * text=auto eol=lf
 # Ensure Python files always use LF for line endings.
 *.py text eol=lf
+# Navigation replay and native diagnostic archives exceed the 75 KB source limit.
+docs/artifacts/g1_navigation_sonic_20261013/stamp-replay/dds-inputs.npz filter=lfs diff=lfs merge=lfs -text
+docs/artifacts/g1_navigation_sonic_20261013/native-fk-private-example-attempt.log filter=lfs diff=lfs merge=lfs -text
+docs/artifacts/g1_navigation_sonic_20261013/native-fk-baseline-example-attempt.log filter=lfs diff=lfs merge=lfs -text
+docs/artifacts/g1_navigation_sonic_20261013/native-patch-replay.json filter=lfs diff=lfs merge=lfs -text
+docs/artifacts/g1_navigation_sonic_20261013/native-baseline-snapshot.json filter=lfs diff=lfs merge=lfs -text
 # Keep dependency lockfiles tracked without including their generated contents in diffs.
 Cargo.lock -diff linguist-generated
 uv.lock -diff linguist-generated

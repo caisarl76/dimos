@@ -38,7 +38,7 @@ Official references: [repository](https://github.com/NVlabs/GR00T-WholeBodyContr
 [manager workflow](https://nvlabs.github.io/GR00T-WholeBodyControl/tutorials/vr_wholebody_teleop.html),
 [token streaming](https://nvlabs.github.io/GR00T-WholeBodyControl/tutorials/zmq.html).
 
-The offline [protocol check](../../artifacts/g1_navigation_sonic_20261013/protocol-check.json)
+The offline [protocol check](/docs/artifacts/g1_navigation_sonic_20261013/protocol-check.json)
 passed 11 cases using AST-extracted existing functions, without imports that
 start controllers, sockets, robot commands or native inference. It checked the
 packet layout, forward/strafe/IDLE examples, mode-only command parity, sonic78
@@ -537,7 +537,7 @@ model hashes before commissioning. `build/sonic-grasp-runtime/source` is not an
 independent git checkout: record a SHA256 manifest for the native source files,
 plus the controller binary, build configuration and model assets. A parent
 repository commit cannot identify this private runtime's source changes.
-A read-only [native-source baseline](../../artifacts/g1_navigation_sonic_20261013/native-source-provenance.json)
+A read-only [native-source baseline](/docs/artifacts/g1_navigation_sonic_20261013/native-source-provenance.json)
 now records 51 C++/CMake files. It identifies the inspected baseline, not a new
 build or an attestation of the installed binary's compiled source.
 
@@ -596,7 +596,8 @@ build or an attestation of the installed binary's compiled source.
    path appear traversable. Expand only from measured results.
 
 The earlier DDS mapping and four failed stock-SDK motion pulses remain documented
-in [navigation verification](../../platforms/humanoid/g1/navigation-verification-2026-10-09.md).
+in `docs/platforms/humanoid/g1/navigation-verification-2026-10-09.md`
+in the original workspace; Task 9 imports and updates that report here.
 SONIC resolves the selected locomotion interface; it does not itself resolve
 LiDAR extrinsics, near-field coverage or autonomous clearance.
 
@@ -628,6 +629,6 @@ implementation work. This amendment does not claim a new independent review.
 This document specifies the user-selected shared-controller architecture and its
 concrete missing interfaces. No production files belonging to the other session
 have been edited. The conditional design approval permits preparation of the
-[staged implementation plan](../plans/2026-10-13-g1-sonic-navigation.md); review
+[staged implementation plan](/docs/superpowers/plans/2026-10-13-g1-sonic-navigation.md); review
 that concrete plan before implementation. Hardware launch remains a separate commissioning step
 after software and simulation evidence.

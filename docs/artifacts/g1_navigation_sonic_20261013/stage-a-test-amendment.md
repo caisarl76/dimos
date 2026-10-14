@@ -55,7 +55,7 @@ The earlier run02 reverse displacement and absent exact
 Hardware verification requires resolving those gates and fresh operator/sole
 motion-control readiness. No real robot controller was launched in this stage.
 
-Evidence: [run09 results](on-host-sim/run09/results.json),
-[raw analysis](on-host-sim/run09/analysis.json),
-[run08 stopping failure](on-host-sim/run08/results.json),
-[source/test verification](task5-progress-evidence.json).
+Evidence: [run09 results](/docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/run09/results.json),
+[raw analysis](/docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/run09/analysis.json),
+[run08 stopping failure](/docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/run08/results.json),
+[source/test verification](/docs/artifacts/g1_navigation_sonic_20261013/task5-progress-evidence.json).

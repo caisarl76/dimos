@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "raw_to_lio_and_odometry_scan_end": true,
+  "lio_odometry_coherence": true,
+  "output_stamps_sha256": "ddf0f797cee5da09b1413f4cfa22c969027ab7de3cc8d95911395a83653a50f1",
+  "assertion_script_sha256": "8e6fc7f5d710d9aabf6147f2f5983ed6e6d41c9efd577f7fc7b2cc75a5c2d35b",
+  "native_rerun": false
+}
