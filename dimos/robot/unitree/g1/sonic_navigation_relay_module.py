@@ -118,9 +118,28 @@ class SonicNavigationRelayModule(Module):
         with self._lock:
             value = self._in_epoch(raw)
             if self._goal_pending:
-                # Poll/control sockets have no ordering guarantee. Until the
-                # goal acknowledgment, retain only the previous bounded proof.
-                return self._closed_input("goal_pending")
+                # Poll/control sockets have no ordering guarantee. Until the goal
+                # acknowledgment, keep the previous motion proof (sequence, velocity,
+                # velocity deadline) and refresh only sensor readiness, so a slow
+                # goal round trip cannot expire readiness and end the session.
+                previous = self._latest
+                if (
+                    previous is None
+                    or self._reset_fault is not None
+                    or self._cancel_pending
+                    or value.source_sequence < previous.source_sequence
+                ):
+                    return self._closed_input("goal_pending")
+                held = NavigationInput(
+                    previous.twist,
+                    previous.source_sequence,
+                    previous.velocity_deadline,
+                    value.readiness_deadline,
+                    value.ready,
+                    value.fault,
+                )
+                self._publish_input(held)
+                return held
             if self._cancel_pending:
                 value = self._closed_input(self._reset_fault or "cancellation_pending")
                 self._publish_input(value)
