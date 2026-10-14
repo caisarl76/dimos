@@ -1,0 +1,28 @@
+{
+  "binary": "x86 build of the pc2-port source, sha256 f7d003584d1191221b2e75848d0d33ecc6ab8705cb436b2b974d06597e8992e3",
+  "runs": {
+    "stage-a": {
+      "status": "passed",
+      "cases": 26,
+      "failed_cases": [],
+      "analyzer_passed": false,
+      "noise_attribution_errors": [
+        "native 1206256.869367839: no acknowledged matching intent"
+      ]
+    },
+    "stage-a-2": {
+      "status": "passed",
+      "cases": 26,
+      "failed_cases": [],
+      "analyzer_passed": true,
+      "noise_attribution_errors": []
+    },
+    "stage-a-3": {
+      "status": "passed",
+      "cases": 26,
+      "failed_cases": [],
+      "analyzer_passed": true,
+      "noise_attribution_errors": []
+    }
+  }
+}

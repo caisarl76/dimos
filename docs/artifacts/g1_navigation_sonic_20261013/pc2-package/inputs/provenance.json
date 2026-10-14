@@ -1,0 +1,29 @@
+{
+  "imported_from": "manipulation session pc2-223 sync evidence (2026-10-14), unchanged bytes",
+  "files": {
+    "pc2-native-source.tar.gz": {
+      "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pc2_223_sync_20261014/pc2-native-source.tar.gz",
+      "sha256": "5216f0bf6f698eefd8bb359648262e8155b7e771d17a6c48cccab262c927fe34"
+    },
+    "pc2-223-native.patch": {
+      "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pc2_223_sync_20261014/pc2-223-native.patch",
+      "sha256": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9"
+    },
+    "native-baseline.json": {
+      "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pc2_223_sync_20261014/native-baseline.json",
+      "sha256": "ed97104a4c15490869c064b668b010e9245571a7c57e39e1b9cfa2deef6786da"
+    },
+    "native-source-final.json": {
+      "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pc2_223_sync_20261014/native-source-final.json",
+      "sha256": "b24c1a8fa07ac3fee86b668155f99c7460cbf65db12ad4a5f25a10fe39f099cb"
+    },
+    "launch-guarded.sh": {
+      "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pc2_223_sync_20261014/launch-guarded.sh",
+      "sha256": "456bb1fd5b840310ea7b1a95a6a9b6247a07dca15a3be57ebb72395226c259b8"
+    },
+    "assets-manifest.json": {
+      "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pc2_223_sync_20261014/native-validation/assets-manifest.json",
+      "sha256": "3790a5f53d70a1743295b1ae7f875f59363ad0469b64f610616499afe621d505"
+    }
+  }
+}
