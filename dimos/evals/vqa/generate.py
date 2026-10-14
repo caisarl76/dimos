@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -70,21 +70,28 @@ class GenerationRequest(BaseModel):
     start: int | None = Field(default=None, ge=0)
     stop: int | None = Field(default=None, gt=0)
     stride: int | None = Field(default=None, ge=1)
-    sharp_stride: bool = False
-    sharpness_k_max: int = Field(default=5, ge=0)
+    quality_window: float | None = Field(default=None, gt=0)
+    min_brightness: float | None = Field(default=None, ge=0, le=1)
 
     @model_validator(mode="after")
     def valid_selection(self) -> GenerationRequest:
         if self.image_index is not None:
             if self.start is not None or self.stop is not None or self.stride is not None:
                 raise ValueError("image_index cannot be combined with start, stop, or stride")
-            if self.sharp_stride:
-                raise ValueError("sharp_stride requires range mode (start/stop), not image_index")
+            if self.quality_window is not None or self.min_brightness is not None:
+                raise ValueError(
+                    "quality_window/min_brightness require range mode (start/stop), "
+                    "not image_index"
+                )
             return self
         if self.start is None or self.stop is None:
             raise ValueError("provide image_index or both start and stop")
         if self.stop <= self.start:
             raise ValueError("stop must be greater than start")
+        if self.quality_window is not None and self.stride is not None:
+            raise ValueError("quality_window cannot be combined with stride")
+        if self.min_brightness is not None and self.quality_window is None:
+            raise ValueError("min_brightness requires quality_window")
         return self
 
     def frame_indices(self) -> range:
@@ -93,80 +100,19 @@ class GenerationRequest(BaseModel):
         assert self.start is not None and self.stop is not None
         return range(self.start, self.stop, self.stride or 1)
 
-    def sharp_stride_half_width(self) -> int:
-        """Neighborhood half-width around each uniform anchor for sharp-stride."""
-        return sharp_stride_half_width(self.stride or 1, self.sharpness_k_max)
-
     def output_directory(self) -> Path:
         if self.output is not None:
             return self.output.expanduser()
         return STATE_DIR / "datasets" / "vqa" / f"{Path(self.dataset).stem}-frames"
 
 
-def sharp_stride_half_width(stride: int, k_max: int) -> int:
-    """Return k = min(k_max, max(0, stride // 2 - 1)).
-
-    Tight strides collapse to k=0 (baseline anchors only). Wide strides expand
-    up to k_max so adjacent anchors do not share midpoints.
-    """
-    if stride < 1:
-        raise ValueError("stride must be >= 1")
-    if k_max < 0:
-        raise ValueError("k_max must be >= 0")
-    return min(k_max, max(0, stride // 2 - 1))
-
-
-def select_sharp_stride_indices(
-    anchors: Sequence[int],
-    image_count: int,
-    half_width: int,
-    score_at: Callable[[int], float],
-    *,
-    range_start: int | None = None,
-    range_stop: int | None = None,
-) -> tuple[int, ...]:
-    """Pick the sharpest frame in each anchor neighborhood; dedupe preserving order.
-
-    Neighborhoods are clipped to the recording and, when provided, to
-    ``[range_start, range_stop)`` so sharp-stride cannot escape the requested
-    generation range.
-    """
-    if image_count < 1:
-        raise ValueError("image_count must be >= 1")
-    if half_width < 0:
-        raise ValueError("half_width must be >= 0")
-    if range_start is not None and range_stop is not None and range_stop <= range_start:
-        raise ValueError("range_stop must be greater than range_start")
-    selected: list[int] = []
-    seen: set[int] = set()
-    for anchor in anchors:
-        if anchor < 0 or anchor >= image_count:
-            raise IndexError(f"anchor index {anchor} is out of range for {image_count} images")
-        lo = max(0, anchor - half_width)
-        hi = min(image_count - 1, anchor + half_width)
-        if range_start is not None:
-            lo = max(lo, range_start)
-        if range_stop is not None:
-            hi = min(hi, range_stop - 1)
-        if lo > hi:
-            raise ValueError(
-                f"sharp-stride neighborhood for anchor {anchor} is empty after range clipping"
-            )
-        best_index = max(range(lo, hi + 1), key=score_at)
-        if best_index in seen:
-            continue
-        seen.add(best_index)
-        selected.append(best_index)
-    return tuple(selected)
-
-
 def resolve_generation_frame_indices(
     request: GenerationRequest,
     image_count: int,
-    *,
-    score_at: Callable[[int], float] | None = None,
 ) -> tuple[int, ...]:
-    """Resolve the color_image indices that generation will consume."""
+    """Resolve uniform color_image indices (no quality window)."""
+    if request.quality_window is not None:
+        raise ValueError("quality_window selection requires PointCloudFrameLoader")
     anchors = tuple(request.frame_indices())
     if not anchors:
         raise ValueError("generation selected no frames")
@@ -174,18 +120,7 @@ def resolve_generation_frame_indices(
         raise IndexError(
             f"color_image index {anchors[-1]} is out of range for {image_count} images"
         )
-    if not request.sharp_stride:
-        return anchors
-    if score_at is None:
-        raise ValueError("sharp_stride requires a sharpness score function")
-    return select_sharp_stride_indices(
-        anchors,
-        image_count,
-        request.sharp_stride_half_width(),
-        score_at,
-        range_start=request.start,
-        range_stop=request.stop,
-    )
+    return anchors
 
 
 class VqaGenerationConfig(BaseModel):
@@ -265,21 +200,16 @@ def generate_dataset(
         request.dataset,
         tolerance_s=config.synchronization_tolerance_s,
     ) as loader:
-        sharpness_cache: dict[int, float] = {}
-
-        def score_at(index: int) -> float:
-            cached = sharpness_cache.get(index)
-            if cached is not None:
-                return cached
-            score = loader.load_image(index).sharpness
-            sharpness_cache[index] = score
-            return score
-
-        indices = resolve_generation_frame_indices(
-            request,
-            loader.image_count,
-            score_at=score_at if request.sharp_stride else None,
-        )
+        if request.quality_window is not None:
+            assert request.start is not None and request.stop is not None
+            indices = loader.select_quality_indices(
+                request.start,
+                request.stop,
+                quality_window=request.quality_window,
+                min_brightness=request.min_brightness,
+            )
+        else:
+            indices = resolve_generation_frame_indices(request, loader.image_count)
 
         author_model = OpenAIVlModel()
         detector_model = MoondreamVlModel()

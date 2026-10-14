@@ -320,3 +320,34 @@ def test_load_selects_camera_info_for_each_image_timestamp(
     assert calibrations == list(camera_infos)
     assert early.camera_info.frame_id == "camera_early"
     assert late.camera_info.frame_id == "camera_late"
+
+
+def test_select_quality_indices_uses_mem_quality_window() -> None:
+    from types import SimpleNamespace
+
+    with MemoryStore() as store:
+        images = store.stream("color_image")
+        # Two 1s windows: sharpest at index 1 then index 4.
+        for ts, sharpness, brightness in (
+            (0.0, 0.3, 0.5),
+            (0.4, 0.9, 0.5),
+            (0.8, 0.1, 0.5),
+            (1.0, 0.5, 0.5),
+            (1.4, 0.8, 0.5),
+        ):
+            images.append(
+                SimpleNamespace(sharpness=sharpness, brightness=brightness),
+                ts=ts,
+            )
+
+        loader = PointCloudFrameLoader.__new__(PointCloudFrameLoader)
+        loader._images = store.stream("color_image").order_by("ts")
+
+        assert loader.select_quality_indices(0, 5, quality_window=1.0) == (1, 4)
+        assert loader.select_quality_indices(
+            0, 5, quality_window=1.0, min_brightness=0.2
+        ) == (1, 4)
+        # Dark mid-frame (index 2) is dropped before the window pick.
+        assert loader.select_quality_indices(
+            0, 3, quality_window=1.0, min_brightness=0.2
+        ) == (1,)

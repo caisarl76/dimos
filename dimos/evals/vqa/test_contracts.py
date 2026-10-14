@@ -50,8 +50,6 @@ from dimos.evals.vqa.generate import (
     generate_dataset,
     generate_frames_dataset,
     resolve_generation_frame_indices,
-    select_sharp_stride_indices,
-    sharp_stride_half_width,
 )
 from dimos.evals.vqa.pointcloud_frame import PointCloudFrameUnavailableError
 from dimos.evals.vqa.primitives.edge_tam import ObjectMaskEvidence
@@ -823,93 +821,25 @@ def test_generation_request_selects_frame_range() -> None:
     assert request.frame_indices() == range(2, 10, 3)
 
 
-@pytest.mark.parametrize(
-    ("stride", "k_max", "expected"),
-    (
-        (1, 5, 0),
-        (2, 5, 0),
-        (10, 5, 4),
-        (20, 5, 5),
-        (20, 0, 0),
-    ),
-)
-def test_sharp_stride_half_width(stride: int, k_max: int, expected: int) -> None:
-    assert sharp_stride_half_width(stride, k_max) == expected
-
-
-def test_select_sharp_stride_indices_picks_neighborhood_max_and_dedupes() -> None:
-    scores = {i: float(i) for i in range(30)}
-    scores[12] = 100.0
-    scores[22] = 100.0
-    selected = select_sharp_stride_indices(
-        anchors=(10, 20),
-        image_count=30,
-        half_width=4,
-        score_at=scores.__getitem__,
-    )
-    assert selected == (12, 22)
-
-    both_prefer_12 = select_sharp_stride_indices(
-        anchors=(10, 11),
-        image_count=30,
-        half_width=4,
-        score_at=lambda index: 100.0 if index == 12 else float(index),
-    )
-    assert both_prefer_12 == (12,)
-
-
-def test_select_sharp_stride_indices_clips_to_requested_range() -> None:
-    scores = {i: 0.1 for i in range(200)}
-    scores[96] = 0.9
-    scores[104] = 1.0
-    scores[100] = 0.5
-    clipped = select_sharp_stride_indices(
-        anchors=(100,),
-        image_count=200,
-        half_width=4,
-        score_at=scores.__getitem__,
-        range_start=100,
-        range_stop=101,
-    )
-    assert clipped == (100,)
-
-    within = select_sharp_stride_indices(
-        anchors=(100,),
-        image_count=200,
-        half_width=4,
-        score_at=scores.__getitem__,
-        range_start=100,
-        range_stop=110,
-    )
-    assert within == (104,)
-
-
-def test_resolve_generation_frame_indices_applies_sharp_stride_within_bounds() -> None:
+def test_resolve_generation_frame_indices_rejects_quality_window() -> None:
     request = GenerationRequest(
         dataset="recording.db",
-        start=100,
-        stop=101,
-        stride=10,
-        sharp_stride=True,
-        sharpness_k_max=5,
+        start=0,
+        stop=10,
+        quality_window=0.5,
     )
-    scores = {i: 0.1 for i in range(200)}
-    scores[96] = 0.9
-    scores[104] = 1.0
-    scores[100] = 0.4
-    assert resolve_generation_frame_indices(
-        request, image_count=200, score_at=scores.__getitem__
-    ) == (100,)
+    with pytest.raises(ValueError, match="quality_window"):
+        resolve_generation_frame_indices(request, image_count=10)
 
 
-def test_generate_dataset_forwards_sharp_stride_indices(
+def test_generate_dataset_forwards_quality_window_indices(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     captured: list[int] = []
+    seen_selection: list[tuple[int, int, float, float | None]] = []
 
-    class _SharpImage:
-        def __init__(self, score: float) -> None:
-            self.sharpness = score
+    class _FakeImage:
+        pass
 
     class _FakeLoader:
         def __init__(self, dataset: object, tolerance_s: float = 0.1) -> None:
@@ -921,9 +851,19 @@ def test_generate_dataset_forwards_sharp_stride_indices(
         def __exit__(self, *_args: object) -> None:
             return None
 
-        def load_image(self, index: int) -> _SharpImage:
-            scores = {96: 0.9, 100: 0.4, 104: 1.0}
-            return _SharpImage(scores.get(index, 0.1))
+        def select_quality_indices(
+            self,
+            start: int,
+            stop: int,
+            *,
+            quality_window: float,
+            min_brightness: float | None = None,
+        ) -> tuple[int, ...]:
+            seen_selection.append((start, stop, quality_window, min_brightness))
+            return (12, 22)
+
+        def load_image(self, index: int) -> _FakeImage:
+            return _FakeImage()
 
         def load(self, index: int) -> object:
             raise PointCloudFrameUnavailableError(f"no point cloud for {index}")
@@ -970,21 +910,37 @@ def test_generate_dataset_forwards_sharp_stride_indices(
     result = generate_dataset(
         GenerationRequest(
             dataset="recording.db",
-            start=100,
-            stop=101,
-            stride=10,
-            sharp_stride=True,
-            sharpness_k_max=5,
+            start=0,
+            stop=100,
+            quality_window=0.5,
+            min_brightness=0.1,
             output=tmp_path / "out",
         )
     )
-    assert captured == [100]
+    assert seen_selection == [(0, 100, 0.5, 0.1)]
+    assert captured == [12, 22]
     assert result.output == tmp_path / "out"
 
 
-def test_generation_request_rejects_sharp_stride_with_image_index() -> None:
-    with pytest.raises(ValidationError, match="sharp_stride"):
-        GenerationRequest(dataset="go2_short", image_index=4, sharp_stride=True)
+def test_generation_request_rejects_quality_window_with_image_index() -> None:
+    with pytest.raises(ValidationError, match="quality_window"):
+        GenerationRequest(dataset="go2_short", image_index=4, quality_window=0.5)
+
+
+def test_generation_request_rejects_quality_window_with_stride() -> None:
+    with pytest.raises(ValidationError, match="quality_window"):
+        GenerationRequest(
+            dataset="go2_short",
+            start=0,
+            stop=100,
+            stride=10,
+            quality_window=0.5,
+        )
+
+
+def test_generation_request_rejects_min_brightness_without_quality_window() -> None:
+    with pytest.raises(ValidationError, match="min_brightness"):
+        GenerationRequest(dataset="go2_short", start=0, stop=100, min_brightness=0.1)
 
 
 @pytest.mark.parametrize(

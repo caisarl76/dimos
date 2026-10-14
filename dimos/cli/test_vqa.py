@@ -50,8 +50,9 @@ def test_vqa_generate_cli_declares_single_image_input() -> None:
     assert "--start" in output
     assert "--stop" in output
     assert "--stride" in output
-    assert "--sharp-stride" in output
-    assert "--sharpness-k-max" in output
+    assert "--quality-window" in output
+    assert "--min-brightness" in output
+    assert "--sharp-stride" not in output
     assert "--sync-tolerance" not in output
     assert "--output" in output
     assert "absent or" in output and "empty" in output
@@ -157,7 +158,7 @@ def test_vqa_generate_cli_accepts_frame_range(
     ]
 
 
-def test_vqa_generate_cli_accepts_sharp_stride_options(
+def test_vqa_generate_cli_accepts_quality_window_options(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     seen: list[GenerationRequest] = []
@@ -181,11 +182,10 @@ def test_vqa_generate_cli_accepts_sharp_stride_options(
             "0",
             "--stop",
             "100",
-            "--stride",
-            "10",
-            "--sharp-stride",
-            "--sharpness-k-max",
-            "8",
+            "--quality-window",
+            "0.5",
+            "--min-brightness",
+            "0.1",
             "--output",
             str(tmp_path),
         ],
@@ -197,9 +197,8 @@ def test_vqa_generate_cli_accepts_sharp_stride_options(
             dataset="recording.db",
             start=0,
             stop=100,
-            stride=10,
-            sharp_stride=True,
-            sharpness_k_max=8,
+            quality_window=0.5,
+            min_brightness=0.1,
             output=tmp_path,
         )
     ]

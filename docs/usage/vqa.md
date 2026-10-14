@@ -18,13 +18,13 @@ Generate from a range. `stop` is exclusive:
 dimos evals vqa generate /path/to/calibrated-recording.db --start 0 --stop 100 --stride 10
 ```
 
-Optionally refine each uniform anchor to the sharpest nearby frame
-(`k = min(k_max, max(0, stride // 2 - 1))`, default `k_max=5`).
-Neighborhoods stay inside the requested `[start, stop)` range:
+Or keep update frequency with mem `QualityWindow` on `Image.sharpness`
+(same path as loop-closure / semantic-peak picking). Optional
+`--min-brightness` drops dark frames first. Do not combine with `--stride`:
 
 ```bash skip
 dimos evals vqa generate /path/to/calibrated-recording.db \
-  --start 0 --stop 100 --stride 10 --sharp-stride
+  --start 0 --stop 100 --quality-window 0.5 --min-brightness 0.1
 ```
 
 Generated datasets default to:

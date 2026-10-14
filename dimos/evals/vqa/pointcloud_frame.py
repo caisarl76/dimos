@@ -239,6 +239,63 @@ class PointCloudFrameLoader:
         camera_info = _camera_info_at(recorded_camera_info, observation.ts)
         return self._rectifier.rectify(image, camera_info)[0]
 
+    def select_quality_indices(
+        self,
+        start: int,
+        stop: int,
+        *,
+        quality_window: float,
+        min_brightness: float | None = None,
+    ) -> tuple[int, ...]:
+        """Pick color_image indices via mem ``QualityWindow`` on sharpness.
+
+        Takes ``[start, stop)``, optionally drops dark frames, then keeps the
+        sharpest observation in each ``quality_window`` seconds — same path as
+        loop-closure / semantic-peak image picking.
+        """
+        from dimos.memory.transform import QualityWindow
+
+        if start < 0:
+            raise ValueError("start must be non-negative")
+        if stop <= start:
+            raise ValueError("stop must be greater than start")
+        if quality_window <= 0:
+            raise ValueError("quality_window must be positive")
+        if min_brightness is not None and not 0.0 <= min_brightness <= 1.0:
+            raise ValueError("min_brightness must be in [0, 1]")
+        if self._images is None:
+            raise RuntimeError("point-cloud frame loader must be started before selecting frames")
+
+        ranged = self._images.range_seek(start, stop)
+        ts_to_index = {obs.ts: start + offset for offset, obs in enumerate(ranged)}
+        if not ts_to_index:
+            raise ValueError(f"color_image range [{start}, {stop}) is empty")
+
+        stream = self._images.range_seek(start, stop)
+        if min_brightness is not None:
+            stream = stream.filter(lambda obs: obs.data.brightness > min_brightness)
+        selected = stream.transform(
+            QualityWindow(lambda img: img.sharpness, window=quality_window)
+        )
+        indices: list[int] = []
+        for obs in selected:
+            index = ts_to_index.get(obs.ts)
+            if index is None:
+                raise RuntimeError(f"quality window selected unknown timestamp {obs.ts}")
+            indices.append(index)
+        if not indices:
+            raise ValueError(
+                f"quality window selected no frames in [{start}, {stop}) "
+                f"(window={quality_window}s"
+                + (
+                    f", min_brightness={min_brightness}"
+                    if min_brightness is not None
+                    else ""
+                )
+                + ")"
+            )
+        return tuple(indices)
+
 
 class _ImageRectifier:
     """Rectify images while caching maps for static camera calibration."""
