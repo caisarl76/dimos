@@ -1,0 +1,53 @@
+{
+  "target": "pc2 unitree@192.168.0.223, /home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013",
+  "dimos_source_commit": "577a8ec392f94d85d2628b5169770b165378f3c4",
+  "native": {
+    "baseline": "pc2 /home/unitree/GR00T-WholeBodyControl a9d20b2 + local changes (71 files)",
+    "manipulation_port_patch_sha256": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9",
+    "navigation_port_patch_sha256": "a1caf3b33920610e82b48e6dfff03dd09f857c57e0e44c40c5ce3ddcdf66a44e",
+    "source_files": 87,
+    "build": "host JetPack 6.2.1 toolchain, Release, -j2 nice 19, thirdparty -> original SDK",
+    "expected_tests": "all pass except FK.TestFKAndGlobalVelocities (fixture absent)"
+  },
+  "models": {
+    "files": 111,
+    "source": "pc2's own original install, hash-verified"
+  },
+  "shared_controllers_unchanged": {
+    "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/target/release/g1_deploy_onnx_ref": "bc0b17c45d06e458b847c217ec62c9e1bbb8d7db66f6688750beceb5c773a3b5",
+    "/home/unitree/dimos-sonic-guard-pc2-223-20261014/gear_sonic_deploy/target/release/g1_deploy_onnx_ref": "9c6ee5fbde7fc62121a35d62450919dc87125e727ec243afd179415d4b73cdfa"
+  },
+  "base_image": {
+    "tag": "dimos-g1-navigation-verify:20261012-pointlio",
+    "id": "sha256:01980cefa285106c334c71d9dafb8db6b8ff24ded4d6539f6d91baaab56178b0"
+  },
+  "image": "dimos-g1-sonic-navigation:20261013",
+  "payload_sha256": {
+    "Dockerfile": "8284e45bd3dc8b19c0085ec1aa44f382167caa65b97a13b74b0ef4e57f60f2f0",
+    "dimos-source.tar": "29806f723185d0b71bd7eaa7d0d3bf9107a9642e01542b18356ffe77c00948fd",
+    "launch.sh": "2f119f94cb2728c4102525b5c04fdcaccd963a7d553fdb43fe6c5281b52b50ed",
+    "models.sha256": "fff9d3b9f24627655c2ae99f6702f63f46112377173ab616c6f537316b07aed3",
+    "native-baseline.sha256": "3a02f3567aea1ca80ba3b9ed8b2006d96bb5195cd02104c13900cbcd264b204d",
+    "native-source.sha256": "481891dbec8a92f6c936a7198c9360bb7be1fb390734008edd06af4afb5203a3",
+    "native-source.tar": "418719181a03545e5a564db8e8c5ebcb71f192b115a34ba47849c9a6d1bf440a",
+    "package/config/pc2-graph.json": "8b49d63f2e16d36b4b2ba50e8220831218016d98032f28b6859b177e71fde09b",
+    "package/config/probe.json": "18b851e5e9085d3def03d8043af01ceb9958a1c2a97e5c227bc67cfef24bc897",
+    "package/demo_pc2_navigation_readiness.py": "ffd9dd7f534e42ebeaaa1de3088fc2efc2c4d3e8565415cbec12b06217e367da",
+    "package/run-pc2-graph.sh": "8e4c2d37532581b39bd1a3ddf5f4d3087a918385200d59d11350c56c4db1534f",
+    "package/smoke.py": "f140e6cfcf976c104f2fe792ea7bfac3ea015ce4580ee52e4e8b0eec0a3f722d",
+    "package/zenoh_router.py": "725703921003bf0d16fe53c857dc39d7f3d74f245c287cc8136f82bfb9f0b621",
+    "provision.sh": "6ff443f57cdf00faa066ea05b25380ea73b8da14200a8e83e747a79af5dcd815",
+    "shared-controllers.sha256": "86732ccd08728f33c44994dae86ef3109cd98cd59816d142c76e1e1a78eff86d",
+    "sonic_planner_lease_cases.json": "20d51657029c743e68b7cb9ef3f16f860898eb4ba89a41c300ee0ee8f5a6ce66",
+    "stop.sh": "8318992f43c071ea5b6c452e4a71ba93a6a0bb1ca2dbeaa38c55fedd7473220e"
+  },
+  "inputs_sha256": {
+    "assets-manifest.json": "3790a5f53d70a1743295b1ae7f875f59363ad0469b64f610616499afe621d505",
+    "launch-guarded.sh": "456bb1fd5b840310ea7b1a95a6a9b6247a07dca15a3be57ebb72395226c259b8",
+    "native-baseline.json": "ed97104a4c15490869c064b668b010e9245571a7c57e39e1b9cfa2deef6786da",
+    "native-source-final.json": "b24c1a8fa07ac3fee86b668155f99c7460cbf65db12ad4a5f25a10fe39f099cb",
+    "pc2-223-native.patch": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9",
+    "pc2-native-source.tar.gz": "5216f0bf6f698eefd8bb359648262e8155b7e771d17a6c48cccab262c927fe34",
+    "provenance.json": "9b59edcd9f24094b964d5fde9d835f26dd8b2f9c55714f9648feae002895128b"
+  }
+}
