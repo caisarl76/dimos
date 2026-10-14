@@ -147,6 +147,12 @@ class SonicNavigationRelayModule(Module):
             previous = self._latest
             if reply.request_id != self._request_id:
                 self._reset_fault = "peer_request_changed"
+            elif self._reset_fault is not None and reply.request_id is None:
+                # Neither side owns a session (e.g. a fresh peer after a pc2 restart):
+                # nothing earlier can be adopted, so the latch gives way to a new epoch.
+                self._reset_fault = None
+                self._new_epoch()
+                value = self._in_epoch(raw)
             if (
                 previous is not None
                 and value.source_sequence < previous.source_sequence

@@ -656,3 +656,22 @@ def test_pending_goal_refreshes_readiness_but_holds_motion(relays, peer, mocker)
     assert refreshed.velocity_deadline == held.velocity_deadline
     assert published.call_args_list[-1].args[0] is refreshed
     assert not rollback.ready
+
+
+def test_new_relay_clears_foreign_request_latch_only_for_a_peer_without_one(relays, peer, mocker):
+    # A restarted pc2 relay owns no session; the peer may still hold an earlier one.
+    relay = relays()
+    mocker.patch.object(relay, "_publish_input")
+    reply = restarted_peer_replies(peer)
+    foreign = relay.accept_poll(
+        replace(reply, request_id="old", source_sequence=9), t0=10, t1=10.01
+    )
+    assert not foreign.ready and foreign.fault == "peer_request_changed"
+    still = relay.accept_poll(
+        replace(reply, request_id="old", source_sequence=10), t0=10.01, t1=10.02
+    )
+    assert not still.ready  # the earlier session's commands can never be adopted
+    fresh = relay.accept_poll(
+        replace(reply, request_id=None, source_sequence=1), t0=10.02, t1=10.03
+    )
+    assert fresh.ready and fresh.fault is None
