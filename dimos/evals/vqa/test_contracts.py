@@ -964,12 +964,8 @@ def test_generate_dataset_forwards_sharp_stride_indices(
     monkeypatch.setattr(
         "dimos.evals.vqa.generate.EdgeTAMObjectMaskPipeline", lambda detector: object()
     )
-    monkeypatch.setattr(
-        "dimos.evals.vqa.generate.LidarRangeEstimator", lambda masks: object()
-    )
-    monkeypatch.setattr(
-        "dimos.evals.vqa.generate.OpenAIQuestionAuthor", lambda model: object()
-    )
+    monkeypatch.setattr("dimos.evals.vqa.generate.LidarRangeEstimator", lambda masks: object())
+    monkeypatch.setattr("dimos.evals.vqa.generate.OpenAIQuestionAuthor", lambda model: object())
 
     result = generate_dataset(
         GenerationRequest(
