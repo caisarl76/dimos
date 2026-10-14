@@ -367,11 +367,13 @@ def test_cached_reply_keeps_native_heartbeat_within_original_source_deadline(rel
     assert session.status.fault is None
 
 
-def test_source_rollback_is_delivered_as_unready_at_existing_sequence(relays, peer):
+def test_source_rollback_is_delivered_as_unready_at_existing_sequence(relays, peer, mocker):
+    # During a live session; without one, a restarted peer starts a new epoch instead.
     relay = relays()
     feed_inputs(peer)
     peer.observe_cmd_vel(Twist())
-    reply = peer.poll_reply("poll")
+    reply = replace(peer.poll_reply("poll"), request_id="request-1")
+    accept_goal(relay, mocker)
     relay.accept_poll(reply, t0=10, t1=10.01)
     reset = relay.accept_poll(replace(reply, source_sequence=0), t0=10.01, t1=10.02)
     assert not reset.ready and reset.source_sequence == 1
@@ -566,3 +568,64 @@ def test_settling_proof_rejects_status_round_trip_over_100ms(relays, peer, mocke
     mocker.patch.object(relay._link, "control", return_value=(result, 10, 10.15))
     with pytest.raises(ValueError, match="100 ms"):
         relay.get_navigation_peer_status()
+
+
+def accept_goal(relay, mocker, request_id="request-1"):
+    mocker.patch.object(
+        relay._link,
+        "control",
+        return_value=({"request_id": request_id, "accepted": True, "fault": None}, 10, 10.01),
+    )
+    assert relay.set_navigation_goal(request_id, PoseStamped(frame_id="odom"))
+
+
+def restarted_peer_replies(peer):
+    feed_inputs(peer)
+    peer.observe_cmd_vel(Twist())
+    return peer.poll_reply("poll")
+
+
+@pytest.mark.parametrize("confirmed", [True, False])
+def test_restarted_peer_needs_confirmed_cancel_for_a_new_epoch(relays, peer, mocker, confirmed):
+    relay = relays()
+    mocker.patch.object(relay, "_publish_input")
+    reply = restarted_peer_replies(peer)
+    accept_goal(relay, mocker)
+    old = relay.accept_poll(
+        replace(reply, request_id="request-1", source_sequence=5), t0=10, t1=10.01
+    )
+    assert old.ready and old.source_sequence == 5
+    # The restarted peer counts from 1 again: the live session latches closed.
+    restarted = relay.accept_poll(replace(reply, source_sequence=1), t0=10.01, t1=10.02)
+    assert not restarted.ready and restarted.fault == "peer_source_rollback"
+    mocker.patch.object(
+        relay._link,
+        "control",
+        return_value=(
+            {"request_id": "request-1", "cancelled": confirmed, "state": "idle", "fault": None},
+            10.02,
+            10.03,
+        ),
+    )
+    assert relay.cancel_navigation("request-1")["cancelled"] is confirmed
+    fresh = relay.accept_poll(
+        replace(reply, request_id="request-1", source_sequence=2), t0=10.03, t1=10.04
+    )
+    if not confirmed:
+        assert not fresh.ready and fresh.fault == "peer_source_rollback"
+        return
+    assert fresh.ready and fresh.source_sequence > old.source_sequence
+    repeated = relay.accept_poll(
+        replace(reply, request_id="request-1", source_sequence=2), t0=10.04, t1=10.05
+    )
+    assert repeated.source_sequence == fresh.source_sequence  # a cached emission stays cached
+
+
+def test_restarted_peer_without_live_session_starts_new_epoch(relays, peer, mocker):
+    relay = relays()
+    mocker.patch.object(relay, "_publish_input")
+    reply = restarted_peer_replies(peer)
+    old = relay.accept_poll(replace(reply, source_sequence=5), t0=10, t1=10.01)
+    restarted = relay.accept_poll(replace(reply, source_sequence=1), t0=10.01, t1=10.02)
+    assert restarted.ready and restarted.fault is None
+    assert restarted.source_sequence > old.source_sequence
