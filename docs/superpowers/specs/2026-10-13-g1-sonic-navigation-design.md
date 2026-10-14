@@ -475,6 +475,12 @@ Initial autonomous freshness budgets are 350 ms for advancing LiDAR/PointLio
 cloud and localization/odom, 200 ms for IMU and dynamic base TF, and 1 s for
 obstacle map/costmap processing. These are configuration limits to validate
 against the real processing rates; static calibrated TF edges do not expire.
+Amendment (2026-10-14, user-approved after the two-host simulation): the
+monitored `odom→base_link` edge is composed once per PointLio scan, so it uses
+the 350 ms LIO/odom budget. The 200 ms dynamic waist edge is enforced in the
+sensor receiver before composition; a stale or duplicate waist edge produces no
+base odometry. A 200 ms budget on the ~10 Hz composed edge expired between
+10 Hz relay polls.
 The peer tracks original advancing source sequence/stamp and original arrival
 time for each required input. Repeated/stale source stamps and republished cached
 outputs do not refresh that timer. Readiness requires valid finite base-frame

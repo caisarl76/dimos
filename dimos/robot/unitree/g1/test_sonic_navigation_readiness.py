@@ -127,3 +127,18 @@ def test_missing_inputs_are_finite_and_unready(monitor):
     assert all(
         math.isfinite(item.age) and math.isfinite(item.source_stamp) for item in result.inputs
     )
+
+
+def test_budgets_match_their_source_cadence():
+    # odom->base_link is composed once per LIO scan (the 200 ms live waist edge is
+    # enforced before composition), so it shares the LIO/odom budget; a 200 ms budget
+    # lapsed between 10 Hz relay polls in the two-host simulation.
+    assert dict(INPUT_BUDGETS) == {
+        "lidar_raw": 0.350,
+        "imu_raw": 0.200,
+        "lio_cloud": 0.350,
+        "odom": 0.350,
+        "base_tf": 0.350,
+        "global_map": 1.000,
+        "global_costmap": 1.000,
+    }
