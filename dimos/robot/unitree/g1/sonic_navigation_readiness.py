@@ -26,7 +26,7 @@ INPUT_BUDGETS: Mapping[str, float] = MappingProxyType(
         "imu_raw": 0.200,
         "lio_cloud": 0.350,
         "odom": 0.350,
-        "base_tf": 0.200,
+        "base_tf": 0.350,
         "global_map": 1.000,
         "global_costmap": 1.000,
     }
