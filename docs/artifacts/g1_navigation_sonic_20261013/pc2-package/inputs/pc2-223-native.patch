@@ -1,0 +1,952 @@
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/reference_lease.hpp
+@@ -0,0 +1,45 @@
++#pragma once
++#include <chrono>
++#include <cstdint>
++
++// Caller serializes access; times are receiver steady-clock times.
++class ReferenceLease {
++public:
++    using Clock = std::chrono::steady_clock;
++    explicit ReferenceLease(std::chrono::milliseconds timeout) : timeout_(timeout) {}
++    void Arm(Clock::time_point now) { armed_ = true; expired_ = false; last_ = now; }
++    void Disarm() { armed_ = false; }
++    bool Poll(Clock::time_point now) {
++        if (armed_ && now - last_ >= timeout_) {
++            armed_ = false;
++            expired_ = true;
++        }
++        return expired_;
++    }
++    bool Accept(int64_t index, Clock::time_point now) {
++        if (Poll(now) || !armed_ || index < 0 || index <= index_) return false;
++        index_ = index;
++        last_ = now;
++        return true;
++    }
++    bool Armed() const { return armed_; }
++    bool Expired() const { return expired_; }
++    int64_t Index() const { return index_; }
++    double AgeMs(Clock::time_point now) const {
++        return std::chrono::duration<double, std::milli>(now - last_).count();
++    }
++private:
++    std::chrono::milliseconds timeout_;
++    Clock::time_point last_{};
++    bool armed_ = false, expired_ = false;
++    int64_t index_ = -1;
++};
++
++// A receiver snapshot; planner_confirmed is filled by the successful policy tick.
++struct ReferenceGuardStatus {
++    bool armed = false, expired = false, planner_selected = false, planner_confirmed = false;
++    bool rearm_requires_planner = false;
++    int64_t accepted_index = -1, applied_index = -1;
++    uint64_t rejected = 0, epoch = 0;
++    double age_ms = -1;
++};
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/reference_validation.hpp
+@@ -0,0 +1,59 @@
++#pragma once
++#include "zmq_packed_message_subscriber.hpp"
++#include <optional>
++#include <set>
++
++// Deliberately narrow opt-in contract: the DimOS single-frame v4 f32 encoder.
++// Validate every field before the caller updates lease, sequence or motor data.
++inline std::optional<int64_t> ValidateGuardReference(
++    const ZMQPackedMessageSubscriber::DecodedHeader& header,
++    const std::vector<ZMQPackedMessageSubscriber::BufferView>& buffers) {
++    if (header.version != 4 || header.count != 1 || header.fields.size() != 4 ||
++        buffers.size() != 4 || (header.endian != "le" && header.endian != "be")) return {};
++    std::set<std::string> seen;
++    int64_t index = -1;
++    for (size_t i = 0; i < 4; ++i) {
++        const auto& field = header.fields[i];
++        const auto& buffer = buffers[i];
++        if (!buffer.data || !seen.insert(field.name).second) return {};
++        if (field.name == "frame_index") {
++            if (field.dtype != "i64" || field.shape != std::vector<size_t>{1} || buffer.size != 8) return {};
++            std::memcpy(&index, buffer.data, 8);
++            if (header.NeedsByteSwap()) index = byte_swap(index);
++            if (index < 0) return {};
++        } else {
++            size_t length = field.name == "token_state" ? 64 :
++                (field.name == "left_hand_joints" || field.name == "right_hand_joints" ? 7 : 0);
++            if (!length || field.dtype != "f32" || field.shape != std::vector<size_t>{1,length} ||
++                buffer.size != length * 4) return {};
++            for (size_t j = 0; j < length; ++j) {
++                // Integer IEEE-754 check remains valid under the deploy build's -ffast-math.
++                uint32_t bits;
++                std::memcpy(&bits, static_cast<const uint8_t*>(buffer.data) + j * 4, 4);
++                if (header.NeedsByteSwap()) bits = byte_swap(bits);
++                if ((bits & 0x7f800000u) == 0x7f800000u) return {};
++            }
++        }
++    }
++    if (index < 0) return {};
++    return index;
++}
++inline bool ValidateGuardCommand(
++    const ZMQPackedMessageSubscriber::DecodedHeader& header,
++    const std::vector<ZMQPackedMessageSubscriber::BufferView>& buffers) {
++    if (header.version != 1 || header.count != 1 || header.fields.size() != 3 || buffers.size() != 3) return false;
++    std::set<std::string> seen;
++    bool start = false, stop = false;
++    for (size_t i = 0; i < 3; ++i) {
++        const auto& field = header.fields[i];
++        const auto& buffer = buffers[i];
++        if ((field.name != "start" && field.name != "stop" && field.name != "planner") ||
++            !seen.insert(field.name).second || field.dtype != "u8" || field.shape != std::vector<size_t>{1} ||
++            buffer.size != 1 || !buffer.data) return false;
++        auto value = *static_cast<const uint8_t*>(buffer.data);
++        if (value > 1) return false;
++        if (field.name == "start") start = value;
++        if (field.name == "stop") stop = value;
++    }
++    return !(start && stop);
++}
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_endpoint_interface.hpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_endpoint_interface.hpp
+@@ -55,6 +55,8 @@
+ #ifndef ZMQ_ENDPOINT_INTERFACE_HPP
+ #define ZMQ_ENDPOINT_INTERFACE_HPP
+ 
++#include "reference_lease.hpp"
++#include "reference_validation.hpp"
+ #include <termios.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+@@ -129,8 +131,11 @@
+         int port = 5556,
+         const std::string& topic = "pose",
+         bool use_conflate = false,
+-        bool verbose = false
+-    ) : InputInterface(), host_(host), port_(port), topic_(topic), verbose_(verbose), is_localhost_(host == LOCALHOST) {
++        bool verbose = false,
++        int reference_timeout_ms = 0
++    ) : InputInterface(), host_(host), port_(port), topic_(topic), verbose_(verbose),
++        reference_guard_enabled_(reference_timeout_ms > 0),
++        reference_lease_(std::chrono::milliseconds(reference_timeout_ms)), is_localhost_(host == LOCALHOST) {
+         type_ = InputType::NETWORK;
+         
+         // Set terminal to non-blocking mode (same as SimpleKeyboard)
+@@ -205,7 +210,7 @@
+         // Read keyboard input (same as SimpleKeyboard, but without planner keys)
+         // Using shared buffered reading
+         char ch;
+-        while (ReadStdinChar(ch)) {
++        while (!reference_guard_enabled_ && ReadStdinChar(ch)) {
+             switch (ch) {
+                 case 'p':
+                 case 'P': motion_prev = true; break;
+@@ -326,7 +331,14 @@
+                 }
+                 // reset streaming buffers when enabling to avoid mixing with stale data
+                 ResetStreamedMotion(); // This also resets protocol version in the merger
+-                has_new_data_ = false;
++                {
++                    std::lock_guard<std::mutex> lock(data_mutex_);
++                    has_new_data_ = false;
++                    if (reference_guard_enabled_) {
++                        reference_lease_.Arm(ReferenceLease::Clock::now());
++                        ++reference_epoch_;
++                    }
++                }
+             } else {
+                 std::cout << "=====================================" << std::endl;
+                 std::cout << "ZMQ STREAMING MODE: DISABLED" << std::endl;
+@@ -383,6 +395,10 @@
+             int protocol_version_for_mode_update = -1;
+             {
+                 std::lock_guard<std::mutex> lock(data_mutex_);
++                if (reference_guard_enabled_ && reference_lease_.Poll(ReferenceLease::Clock::now())) {
++                    has_new_data_ = false;
++                    return; // Manager requests planner on its next input tick.
++                }
+                 if (has_new_data_) {
+                     has_new_data_ = false; // consumed
+                     if constexpr (DEBUG_LOGGING) {
+@@ -411,6 +427,7 @@
+                         {
+                             std::lock_guard<std::mutex> lock(current_motion_mutex);
+                             external_token_state_.SetData(result.token_data);
++                            if (reference_guard_enabled_) applied_reference_index_ = reference_lease_.Index();
+                             has_external_token_state_ = true;
+                             operator_state.play = true; // this should be redundant because the robot never read reference motion
+                         }
+@@ -575,7 +592,32 @@
+         toggle_zmq_mode = true;
+     }
+ 
++    bool ReferenceExpired() {
++        std::lock_guard<std::mutex> lock(data_mutex_);
++        return reference_guard_enabled_ && reference_lease_.Poll(ReferenceLease::Clock::now());
++    }
++
++    void EndReferenceStream() {
++        std::lock_guard<std::mutex> lock(data_mutex_);
++        reference_lease_.Disarm();
++        has_new_data_ = false;
++    }
++
++    ReferenceGuardStatus GetReferenceGuardStatus() const {
++        std::lock_guard<std::mutex> lock(data_mutex_);
++        ReferenceGuardStatus status;
++        status.armed = reference_lease_.Armed();
++        status.expired = reference_lease_.Expired();
++        status.accepted_index = reference_lease_.Index();
++        status.applied_index = applied_reference_index_;
++        status.rejected = rejected_references_;
++        status.epoch = reference_epoch_;
++        status.age_ms = reference_epoch_ ? reference_lease_.AgeMs(ReferenceLease::Clock::now()) : -1;
++        return status;
++    }
++
+     std::optional<std::chrono::steady_clock::time_point> GetLastUpdateTime() const override {
++      std::lock_guard<std::mutex> lock(data_mutex_);
+       if (is_localhost_) {
+         return data_timestamp_;
+       }
+@@ -586,6 +628,8 @@
+     /// Reset the streamed motion buffer, merger state, and protocol version.
+     /// Called on construction, when toggling ZMQ mode, and on safety reset.
+     void ResetStreamedMotion() {
++        std::lock_guard<std::mutex> lock(data_mutex_);
++        if (reference_guard_enabled_) reference_lease_.Disarm();
+         motion_merger_.Reset();
+         active_protocol_version_ = -1;  // Reset protocol version tracking
+         // Update legacy fields for backward compatibility
+@@ -1809,6 +1853,14 @@
+         
+         std::lock_guard<std::mutex> lock(data_mutex_);
+         
++        if (reference_guard_enabled_) {
++            const auto index = ValidateGuardReference(hdr, bufs);
++            if (!index || !reference_lease_.Accept(*index, ReferenceLease::Clock::now())) {
++                ++rejected_references_;
++                return;
++            }
++        }
++
+         // Print message received info
+         std::cout << "[ZMQEndpointInterface] Received ZMQ message - topic: '" << topic 
+                   << "', protocol_version: " << hdr.version 
+@@ -1837,6 +1889,10 @@
+     int port_;            ///< ZMQ server port.
+     std::string topic_;   ///< ZMQ subscription topic.
+     bool verbose_;        ///< Verbose logging flag.
++    const bool reference_guard_enabled_;
++    ReferenceLease reference_lease_;
++    int64_t applied_reference_index_ = -1;
++    uint64_t rejected_references_ = 0, reference_epoch_ = 0;
+     
+     /// Background subscriber for the pose / motion topic.
+     std::unique_ptr<ZMQPackedMessageSubscriber> subscriber_;
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_manager.hpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_manager.hpp
+@@ -87,7 +87,8 @@
+       const std::string& command_topic = "command",
+       const std::string& planner_topic = "planner",
+       bool zmq_conflate = false,
+-      bool zmq_verbose = false
++      bool zmq_verbose = false,
++      int reference_timeout_ms = 0
+     ) : InputInterface(), 
+         zmq_host_(zmq_host), 
+         zmq_port_(zmq_port), 
+@@ -95,14 +96,15 @@
+         command_topic_(command_topic),
+         planner_topic_(planner_topic),
+         zmq_conflate_(zmq_conflate), 
+-        zmq_verbose_(zmq_verbose) {
++        zmq_verbose_(zmq_verbose),
++        reference_guard_enabled_(reference_timeout_ms > 0) {
+       
+       type_ = InputType::NETWORK;
+       active_mode_ = ManagedMode::PLANNER;  // Default to planner mode
+       
+       // Create pose interface (for streamed motion mode)
+       pose_interface_ = std::make_unique<ZMQEndpointInterface>(
+-        zmq_host_, zmq_port_, pose_topic_, zmq_conflate_, zmq_verbose_
++        zmq_host_, zmq_port_, pose_topic_, zmq_conflate_, zmq_verbose_, reference_timeout_ms
+       );
+       
+       // Create command subscriber
+@@ -163,6 +165,22 @@
+       start_control_ = false;
+       stop_control_ = false;
+       
++      // Expiry is processed before commands; a command queued before expiry cannot rearm.
++      if (reference_guard_enabled_ && active_mode_ == ManagedMode::STREAMED_MOTION &&
++          pose_interface_->ReferenceExpired()) {
++        active_mode_ = ManagedMode::PLANNER;
++        rearm_requires_planner_ = true;
++        force_guard_idle_ = true;
++        pose_interface_->EndReferenceStream();
++        TriggerSafetyReset();
++        pose_interface_->TriggerSafetyReset();
++        std::lock_guard<std::mutex> lock(command_mutex_);
++        latest_command_.valid = latest_command_.valid && latest_command_.stop;
++        latest_command_.start = false;
++        latest_command_.planner = true; // Preserve a pending stop, never its old mode request.
++        std::cout << "[ReferenceGuard] EXPIRED: requesting planner IDLE" << std::endl;
++      }
++
+       // Handle stdin shortcuts
+       char ch;
+       while (ReadStdinChar(ch)) {
+@@ -220,7 +238,7 @@
+         }
+ 
+         // Pass other keys to pose interface (only in streamed motion mode)
+-        if (!is_manager_key && active_mode_ == ManagedMode::STREAMED_MOTION && pose_interface_) {
++        if (!reference_guard_enabled_ && !is_manager_key && active_mode_ == ManagedMode::STREAMED_MOTION && pose_interface_) {
+           pose_interface_->PushStdinChar(ch);
+         }
+       }
+@@ -241,6 +259,12 @@
+           // Handle mode switching
+           ManagedMode new_mode = latest_command_.planner ? ManagedMode::PLANNER : ManagedMode::STREAMED_MOTION;
+           
++          if (reference_guard_enabled_) {
++            if (latest_command_.planner && !latest_command_.stop) rearm_requires_planner_ = false;
++            if (new_mode == ManagedMode::STREAMED_MOTION && rearm_requires_planner_) {
++                new_mode = ManagedMode::PLANNER;
++            }
++          }
+           if (new_mode != active_mode_) {
+             // Trigger safety reset on mode switch
+             TriggerSafetyReset();
+@@ -249,6 +273,10 @@
+             }
+ 
+             if (new_mode == ManagedMode::PLANNER) {
++              if (reference_guard_enabled_) {
++                pose_interface_->EndReferenceStream();
++                force_guard_idle_ = true;
++              }
+               std::cout << "[ZMQManager] Switched to: PLANNER mode (safety reset)" << std::endl;
+               if (latest_planner_message_.valid) {
+                 constexpr auto PLANNER_MESSAGE_TIMEOUT = std::chrono::milliseconds(100);
+@@ -358,6 +386,21 @@
+         
+         // Clear hand joints control state
+         has_hand_joints_ = false;
++      }
++
++      if (reference_guard_enabled_ && force_guard_idle_) {
++        {
++          std::lock_guard<std::mutex> lock(planner_mutex_);
++          latest_planner_message_.valid = false;
++          latest_planner_message_.timestamp = {};
++        }
++        auto previous = movement_state_buffer.GetDataWithTime().data;
++        movement_state_buffer.SetData(MovementState(static_cast<int>(LocomotionMode::IDLE),
++            {0.0f, 0.0f, 0.0f}, previous ? previous->facing_direction : std::array<double, 3>{1.0, 0.0, 0.0}, -1.0f, -1.0f));
++        has_upper_body_control_ = false;
++        has_vr_3point_control_ = false;
++        has_hand_joints_ = false;
++        force_guard_idle_ = false;
+       }
+ 
+       // Delegate based on current mode
+@@ -378,6 +421,14 @@
+                                        current_motion_mutex, report_temperature);
+         }
+       }
++    }
++
++    bool ReferenceGuardEnabled() const { return reference_guard_enabled_; }
++    ReferenceGuardStatus GetReferenceGuardStatus() const {
++        auto status = pose_interface_->GetReferenceGuardStatus();
++        status.planner_selected = active_mode_ == ManagedMode::PLANNER;
++        status.rearm_requires_planner = rearm_requires_planner_;
++        return status;
+     }
+ 
+     // Forward getters to pose interface when in streamed motion mode
+@@ -672,6 +723,7 @@
+         const ZMQPackedMessageSubscriber::DecodedHeader& hdr,
+         const std::vector<ZMQPackedMessageSubscriber::BufferView>& bufs) {
+       
++      if (reference_guard_enabled_ && !ValidateGuardCommand(hdr, bufs)) return;
+       if (hdr.fields.empty() || bufs.empty()) return;
+       
+       int start_idx = -1, stop_idx = -1, planner_idx = -1;
+@@ -770,6 +822,8 @@
+         const std::string& topic,
+         const ZMQPackedMessageSubscriber::DecodedHeader& hdr,
+         const std::vector<ZMQPackedMessageSubscriber::BufferView>& bufs) {
++      if (reference_guard_enabled_) return; // Stationary guarded-v4 pilot only.
++
+       
+       int mode_idx = -1, movement_idx = -1, facing_idx = -1;
+       int speed_idx = -1, height_idx = -1;
+@@ -1227,7 +1281,7 @@
+     // ------------------------------------------------------------------
+     // Mode / message state
+     // ------------------------------------------------------------------
+-    ManagedMode active_mode_;           ///< Current operational mode (PLANNER or STREAMED_MOTION).
++    std::atomic<ManagedMode> active_mode_;           ///< Current operational mode (PLANNER or STREAMED_MOTION).
+     
+     std::mutex command_mutex_;          ///< Guards access to latest_command_.
+     CommandMessage latest_command_;     ///< Most recent (or accumulated) command message.
+@@ -1244,14 +1298,17 @@
+     bool stop_control_ = false;    ///< Stop request from command message.
+ 
+     /// True once the planner has been initialised and is generating motions.
+-    bool is_planner_ready_ = false;
++    std::atomic<bool> is_planner_ready_{false};
+     /// True when transitioning from streamed-motion (teleop) back to planner mode;
+     /// used to keep forwarding VR/hand data from the pose interface until planner is ready.
+-    bool switch_from_teleop_to_planner_ = false;
++    std::atomic<bool> switch_from_teleop_to_planner_{false};
+ 
+     /// Tracks the previous frame's VR-3-point state to detect enable/disable transitions
+     /// and automatically toggle encoder mode accordingly.
+     bool last_has_vr_3point_control_ = false;
++    const bool reference_guard_enabled_;
++    std::atomic<bool> rearm_requires_planner_{false};
++    bool force_guard_idle_ = false;
+ };
+ 
+ #endif // ZMQ_MANAGER_HPP
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
+@@ -27,6 +27,7 @@
+ #ifndef LOCALMOTION_KPLANNER_HPP
+ #define LOCALMOTION_KPLANNER_HPP
+ 
++#include <atomic>
+ #include <memory>
+ #include <vector>
+ #include <array>
+@@ -47,8 +48,8 @@
+ 
+ /// Planner lifecycle flags (set by input interfaces, read by planner thread).
+ struct PlannerState {
+-    bool enabled = false;       ///< True when the planner should be running.
+-    bool initialized = false;   ///< True after the first successful inference.
++    std::atomic<bool> enabled{false};       ///< True when the planner should be running.
++    std::atomic<bool> initialized{false};   ///< True after the first successful inference.
+ };
+ 
+ /**
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/output_interface/zmq_output_handler.hpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/output_interface/zmq_output_handler.hpp
+@@ -125,9 +125,12 @@
+  * @class ZMQOutputHandler
+  * @brief OutputInterface that publishes state data over a ZMQ PUB socket.
+  */
++#include "../input_interface/reference_lease.hpp"
++
+ class ZMQOutputHandler : public OutputInterface {
+ public:
+     static constexpr bool DEBUG_LOGGING = true;
++    void SetReferenceGuardStatus(ReferenceGuardStatus status) { reference_guard_status_ = status; }
+ 
+     /**
+      * @brief Construct the handler: create a ZMQ PUB socket and bind to the given port.
+@@ -236,6 +239,7 @@
+     }
+ 
+ private:
++    std::optional<ReferenceGuardStatus> reference_guard_status_;
+     zmq::context_t realtime_debug_context_;                ///< ZMQ context (1 I/O thread).
+     std::unique_ptr<zmq::socket_t> realtime_debug_socket_; ///< ZMQ PUB socket.
+ 
+@@ -285,7 +289,8 @@
+         }
+ 
+         pack_state(state_data_sbuf_, state, output_data_map_,
+-                   has_heading_state ? &heading_state : nullptr);
++                   has_heading_state ? &heading_state : nullptr, std::chrono::steady_clock::now(),
++                   reference_guard_status_ ? &*reference_guard_status_ : nullptr);
+     }
+ 
+ public:
+@@ -293,7 +298,8 @@
+     static void pack_state(msgpack::sbuffer& buffer, const StateLogger::Entry& state,
+                            const std::map<std::string, std::vector<double>>& visualization,
+                            const HeadingState* heading = nullptr,
+-                           std::chrono::steady_clock::time_point feedback_now = std::chrono::steady_clock::now()) {
++                           std::chrono::steady_clock::time_point feedback_now = std::chrono::steady_clock::now(),
++                           const ReferenceGuardStatus* guard = nullptr) {
+         buffer.clear();
+         msgpack::packer<msgpack::sbuffer> pk(&buffer);
+         const bool has_heading_state = heading != nullptr;
+@@ -302,7 +308,21 @@
+         // 아래에 필드를 넣거나 빼면 이 숫자도 같이 바꿀 것 (안 맞으면 msgpack 맵이 깨짐)
+         int num_state_fields = has_heading_state ? 27 : 25;
+         int num_viz_fields = static_cast<int>(visualization.size());
+-        pk.pack_map(num_state_fields + num_viz_fields);
++        pk.pack_map(num_state_fields + num_viz_fields + (guard ? 1 : 0));
++        if (guard) {
++            const auto& s = *guard;
++            pk.pack("reference_guard"); pk.pack_map(10);
++            pk.pack("armed"); pk.pack(s.armed);
++            pk.pack("expired"); pk.pack(s.expired);
++            pk.pack("planner_selected"); pk.pack(s.planner_selected);
++            pk.pack("planner_confirmed"); pk.pack(s.planner_confirmed);
++            pk.pack("rearm_requires_planner"); pk.pack(s.rearm_requires_planner);
++            pk.pack("accepted_index"); pk.pack(s.accepted_index);
++            pk.pack("applied_index"); pk.pack(s.applied_index);
++            pk.pack("rejected"); pk.pack(s.rejected);
++            pk.pack("epoch"); pk.pack(s.epoch);
++            pk.pack("age_ms"); pk.pack(s.age_ms);
++        }
+ 
+         // ---- State-logger fields ----
+ 
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
+@@ -280,6 +280,7 @@
+     
+     // Dex3 hands manager
+     Dex3Hands dex3_hands_;
++    const bool enable_dex3_hands_;
+ 
+     // Motor error monitor (tracks fault state transitions)
+     ErrorMonitor error_monitor_;
+@@ -2156,7 +2157,9 @@
+       std::string zmq_out_topic = "g1_debug",
+       bool enable_motion_recording = false,
+       std::array<double, 3> initial_compliance = {0.05, 0.05, 0.0},
+-      double initial_max_close_ratio = 1.0)
++      double initial_max_close_ratio = 1.0,
++      bool enable_dex3_hands = true,
++      int reference_timeout_ms = 0)
+       : time_(0.0),
+         publish_dt_(0.002),
+         control_dt_(0.02),
+@@ -2174,6 +2177,7 @@
+         enable_motion_recording_(enable_motion_recording),
+         initial_vr_3point_compliance_(initial_compliance),
+         initial_max_close_ratio_(initial_max_close_ratio),
++        enable_dex3_hands_(enable_dex3_hands),
+         //env(ORT_LOGGING_LEVEL_WARNING, "G1Deploy"),
+         model_path(model_file_path),
+         planner_path(planner_file_path) {
+@@ -2182,7 +2186,7 @@
+       ChannelFactory::Instance()->Init(0, networkInterface);
+ 
+       // Initialize Dex3 hands (ChannelFactory already initialized above)
+-      dex3_hands_.initialize("");
++      if (enable_dex3_hands_) { dex3_hands_.initialize(""); }
+ 
+       audio_thread_ = std::make_unique<AudioThread>();
+ 
+@@ -2431,6 +2435,7 @@
+       robot_config["is_using_encoder"] = is_using_encoder_;
+       robot_config["policy_fp16"] = policy_fp16;
+       robot_config["planner_fp16"] = planner_fp16;
++      robot_config["dex3_hands_enabled"] = enable_dex3_hands_;
+ 
+       // Initialize state logger with complete robot configuration
+       try {
+@@ -2485,7 +2490,8 @@
+       }
+       else if (input_type == "zmq_manager") {
+         input_interface_ = std::make_unique<ZMQManager>(
+-          zmq_host, zmq_port, zmq_topic, "command", "planner", zmq_conflate, zmq_verbose
++          zmq_host, zmq_port, zmq_topic, "command", "planner", zmq_conflate,
++          zmq_verbose, reference_timeout_ms
+         );
+         std::cout << "Initialized ZMQ manager" << std::endl;
+         std::cout << "  Host: " << zmq_host << ":" << zmq_port << std::endl;
+@@ -2515,7 +2521,7 @@
+         input_interface_->SetVR3PointCompliance(initial_vr_3point_compliance_);
+         // Set initial max close ratio for hands (keyboard-controlled: X/C keys)
+         input_interface_->SetMaxCloseRatio(initial_max_close_ratio_);
+-        dex3_hands_.SetMaxCloseRatio(initial_max_close_ratio_);
++        if (enable_dex3_hands_) { dex3_hands_.SetMaxCloseRatio(initial_max_close_ratio_); }
+         std::cout << "[INFO] Initial VR 3-point compliance: ["
+                   << initial_vr_3point_compliance_[0] << ", "
+                   << initial_vr_3point_compliance_[1] << ", "
+@@ -2676,7 +2682,7 @@
+       }
+ 
+       // Publish Dex3 hand commands at the same publish cadence
+-      dex3_hands_.writeOnce();
++      if (enable_dex3_hands_) { dex3_hands_.writeOnce(); }
+     }
+ 
+     /// Gracefully stop all threads and send a damping-only command.
+@@ -2745,12 +2751,12 @@
+           motor_command_tmp.q_target.at(i) =
+               static_cast<float>(current_pos * (1.0 - ratio) + default_angles[i] * ratio);
+         }
+-        dex3_hands_.close(true);
+-        dex3_hands_.close(false);
++        if (enable_dex3_hands_) { dex3_hands_.close(true); }
++        if (enable_dex3_hands_) { dex3_hands_.close(false); }
+       } else {
+         program_state_ = ProgramState::WAIT_FOR_CONTROL;
+-        dex3_hands_.open(true);
+-        dex3_hands_.open(false);
++        if (enable_dex3_hands_) { dex3_hands_.open(true); }
++        if (enable_dex3_hands_) { dex3_hands_.open(false); }
+         std::cout << "Init Done" << std::endl;
+       }
+       motor_command_buffer_.SetData(motor_command_tmp);
+@@ -3528,8 +3534,8 @@
+         (*record_input_file_) << operator_state.start << ",";
+         (*record_input_file_) << operator_state.stop << ",";
+ 
+-        (*record_input_file_) << planner_state.enabled << ",";
+-        (*record_input_file_) << planner_state.initialized << ",";
++        (*record_input_file_) << planner_state.enabled.load() << ",";
++        (*record_input_file_) << planner_state.initialized.load() << ",";
+         
+         (*record_input_file_) << movement_state_data.data->locomotion_mode << ",";
+         (*record_input_file_) << movement_state_data.data->movement_direction[0] << ",";
+@@ -3937,6 +3943,8 @@
+               operator_state.stop = true;
+               return;
+             }
++            // GatherObservations can select a fallback encoder mode.
++            current_encoder_mode_copy = current_motion_copy->GetEncodeMode();
+           } // Release lock after all observation-dependent operations
+ 
+           // Log post-state data (token state) to the most recent state logger entry
+@@ -3959,11 +3967,11 @@
+           auto motor_command_end_time = std::chrono::steady_clock::now();
+ 
+           // Update Dex3 hands max close ratio from keyboard-controlled value (X/C keys)
+-          dex3_hands_.SetMaxCloseRatio(input_interface_->GetMaxCloseRatio());
++          if (enable_dex3_hands_) { dex3_hands_.SetMaxCloseRatio(input_interface_->GetMaxCloseRatio()); }
+           
+           // set hand poses (use buffered data for consistency)
+-          dex3_hands_.setAllJointsCommand(true, left_hand_joint_buffer_);
+-          dex3_hands_.setAllJointsCommand(false, right_hand_joint_buffer_);
++          if (enable_dex3_hands_) { dex3_hands_.setAllJointsCommand(true, left_hand_joint_buffer_); }
++          if (enable_dex3_hands_) { dex3_hands_.setAllJointsCommand(false, right_hand_joint_buffer_); }
+           
+           // Update last hand actions for logging (use buffered data)
+           for (int i = 0; i < 7; ++i) {
+@@ -3976,6 +3984,16 @@
+           // Publish output data (state logger data, robot config, command/motion data) to all output interfaces
+           for (auto& output_interface : output_interfaces_) {
+             if (output_interface) {
++              auto* manager = dynamic_cast<ZMQManager*>(input_interface_.get());
++              auto* zmq = dynamic_cast<ZMQOutputHandler*>(output_interface.get());
++              if (manager && zmq && manager->ReferenceGuardEnabled()) {
++                auto status = manager->GetReferenceGuardStatus();
++                status.planner_confirmed = status.planner_selected && !status.armed &&
++                    is_using_encoder_ && planner_ && planner_->planner_state_.enabled &&
++                    planner_->planner_state_.initialized && current_motion_copy && current_motion_copy->name == "planner_motion" &&
++                    current_encoder_mode_copy == 0 && current_play_copy && !operator_state.stop;
++                zmq->SetReferenceGuardStatus(status);
++              }
+               output_interface->publish(
+                 vr_3point_position_buffer_, vr_3point_orientation_buffer_, vr_3point_compliance_buffer_,
+                 left_hand_joint_buffer_, right_hand_joint_buffer_, init_ref_data_root_rot_array_,
+@@ -4131,6 +4149,8 @@
+     std::cout << "  --policy-precision <16|32>: specify precision to run the policy model at (default: 32)" << std::endl;
+     std::cout << "  --zmq-host <host>: ZMQ server host (default: localhost)" << std::endl;
+     std::cout << "  --zmq-port <port>: ZMQ server port (default: 5556)" << std::endl;
++    std::cout << "  --disable-dex3-hands: skip Dex3 hand DDS publishers/subscribers" << std::endl;
++    std::cout << "  --reference-timeout-ms <50..2000>: opt-in stationary v4 guard; planner topic disabled" << std::endl;
+     std::cout << "  --zmq-topic <topic>: ZMQ topic/prefix (default: pose)" << std::endl;
+     std::cout << "  --zmq-conflate: enable ZMQ CONFLATE (default: disabled)" << std::endl;
+     std::cout << "  --zmq-verbose: enable ZMQ subscriber verbose logs" << std::endl;
+@@ -4188,6 +4208,8 @@
+   std::string zmq_out_topic = "g1_debug";
+   std::array<double, 3> initial_compliance = {0.5, 0.5, 0.0}; // initial compliance is 0.5 for both hands (keyboard controllable)
+   double initial_max_close_ratio = 1.0; // default allows full closure, use --max-close-ratio to limit
++  bool enable_dex3_hands = true;
++  int reference_timeout_ms = 0;
+   for (int i = 4; i < argc; i++) {
+     if (std::string(argv[i]) == "--disable-crc-check") {
+       disableCrcCheck = true;
+@@ -4356,6 +4378,16 @@
+       if (i + 1 < argc) { zmq_host = argv[i + 1]; i++; }
+     } else if (std::string(argv[i]) == "--zmq-port") {
+       if (i + 1 < argc) { zmq_port = std::stoi(argv[i + 1]); i++; }
++    } else if (std::string(argv[i]) == "--disable-dex3-hands") {
++      enable_dex3_hands = false;
++      std::cout << "[INFO] Dex3 hand DDS disabled" << std::endl;
++    } else if (std::string(argv[i]) == "--reference-timeout-ms") {
++      if (i + 1 >= argc) { std::cerr << "Missing reference timeout" << std::endl; return 1; }
++      try {
++        std::string value = argv[++i]; size_t consumed = 0;
++        reference_timeout_ms = std::stoi(value, &consumed);
++        if (consumed != value.size() || reference_timeout_ms < 50 || reference_timeout_ms > 2000) throw std::invalid_argument("range");
++      } catch (...) { std::cerr << "Reference timeout must be an integer 50..2000 ms" << std::endl; return 1; }
+     } else if (std::string(argv[i]) == "--zmq-topic") {
+       if (i + 1 < argc) { zmq_topic = argv[i + 1]; i++; }
+     } else if (std::string(argv[i]) == "--zmq-conflate") {
+@@ -4421,6 +4453,10 @@
+   }
+ 
+   std::cout << "[DEBUG] Creating G1Deploy object..." << std::endl;
++  if (reference_timeout_ms > 0 && (inputType != "zmq_manager" || plannerFile.empty() || encoderFile.empty())) {
++    std::cerr << "Reference guard requires zmq_manager, planner and encoder" << std::endl;
++    return 1;
++  }
+   G1Deploy custom(
+     networkInterface,
+     modelFile,
+@@ -4449,7 +4485,9 @@
+     zmq_out_topic,
+     enableMotionRecording,
+     initial_compliance,
+-    initial_max_close_ratio
++    initial_max_close_ratio,
++    enable_dex3_hands,
++    reference_timeout_ms
+   );
+   std::cout << "[DEBUG] G1Deploy object created successfully!" << std::endl;
+   
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_guard_telemetry.cpp
+@@ -0,0 +1,113 @@
++#include <gtest/gtest.h>
++#include <arpa/inet.h>
++#include <sys/socket.h>
++#include <unistd.h>
++#include <span>
++#include "../include/utils.hpp"
++#include "../include/robot_parameters.hpp"
++#include "../include/output_interface/zmq_output_handler.hpp"
++
++namespace {
++// Reserve an ephemeral test port without using SONIC's control/feedback ports.
++int FreeTestPort() {
++    const int fd = socket(AF_INET, SOCK_STREAM, 0);
++    if (fd < 0) throw std::runtime_error("test socket failed");
++    sockaddr_in address{};
++    address.sin_family = AF_INET;
++    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++    if (bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
++        close(fd);
++        throw std::runtime_error("test bind failed");
++    }
++    socklen_t size = sizeof(address);
++    const int result = getsockname(fd, reinterpret_cast<sockaddr*>(&address), &size);
++    close(fd);
++    if (result != 0) throw std::runtime_error("test getsockname failed");
++    return ntohs(address.sin_port);
++}
++
++class GuardTelemetry : public ::testing::TestWithParam<std::tuple<bool, bool, bool>> {};
++
++TEST_P(GuardTelemetry, CompleteMessagePreservesTorqueAndGuard) {
++    const auto [guarded, heading, hands_available] = GetParam();
++    StateLogger logger("", 2, 29, 29, 0.02, false, {{"test", true}});
++    std::array<double, 4> quat{1, 0, 0, 0};
++    std::array<double, 3> zero3{};
++    std::array<double, 29> body{}, torque{};
++    std::array<double, 58> temperature{};
++    std::array<double, 7> hand{}, left_tau{}, right_tau{};
++    for (size_t i = 0; i < torque.size(); ++i) torque[i] = i + 0.25;
++    for (size_t i = 0; i < hand.size(); ++i) {
++        left_tau[i] = i + 0.5;
++        right_tau[i] = -static_cast<double>(i) - 0.75;
++    }
++    const auto log_state = [&] {
++        std::array<std::chrono::steady_clock::time_point, 2> hand_times{};
++        if (hands_available) hand_times.fill(std::chrono::steady_clock::now());
++        logger.LogFullState(quat, zero3, zero3, quat, zero3, zero3,
++            body, body, body, temperature, body, torque,
++            hand, hand, hand, hand, hand, hand, 0.0, hand_times, left_tau, right_tau);
++    };
++    DataBuffer<HeadingState> headings;
++    if (heading) {
++        HeadingState state;
++        state.init_base_quat = quat;
++        state.delta_heading = 0.125;
++        headings.SetData(state);
++    }
++    const int port = FreeTestPort();
++    const std::string topic = "guard_test";
++    ZMQOutputHandler output(logger, port, topic);
++    if (guarded) output.SetReferenceGuardStatus({true, false, false, true, true, 123, 122, 7, 3, 12.5});
++    zmq::context_t context(1);
++    zmq::socket_t subscriber(context, ZMQ_SUB);
++    subscriber.set(zmq::sockopt::linger, 0);
++    subscriber.set(zmq::sockopt::subscribe, topic);
++    subscriber.set(zmq::sockopt::rcvtimeo, 100);
++    subscriber.connect("tcp://127.0.0.1:" + std::to_string(port));
++    zmq::message_t packet;
++    bool received = false;
++    for (int attempt = 0; attempt < 20 && !received; ++attempt) {
++        log_state();
++        output.publish({}, {}, {}, hand, hand, quat, headings, nullptr, 0);
++        received = subscriber.recv(packet).has_value();
++    }
++    ASSERT_TRUE(received);
++    ASSERT_GT(packet.size(), topic.size());
++    const auto* payload = static_cast<const char*>(packet.data()) + topic.size();
++    const size_t payload_size = packet.size() - topic.size();
++    size_t consumed = 0;
++    const auto decoded = msgpack::unpack(payload, payload_size, consumed);
++    ASSERT_EQ(consumed, payload_size) << "trailing fields indicate an incorrect MessagePack map count";
++    const auto fields = decoded.get().as<std::map<std::string, msgpack::object>>();
++    EXPECT_EQ(fields.at("motor_torque").as<std::vector<double>>(), (std::vector<double>(torque.begin(), torque.end())));
++    EXPECT_EQ(fields.at("left_hand_tau").as<std::vector<double>>(), (std::vector<double>(left_tau.begin(), left_tau.end())));
++    EXPECT_EQ(fields.at("right_hand_tau").as<std::vector<double>>(), (std::vector<double>(right_tau.begin(), right_tau.end())));
++    for (const auto* side : {"left", "right"}) {
++        const auto prefix = std::string(side) + "_hand_feedback_";
++        EXPECT_EQ(fields.at(prefix + "valid").as<bool>(), hands_available);
++        if (hands_available) EXPECT_GE(fields.at(prefix + "age_ns").as<int64_t>(), 0);
++        else EXPECT_EQ(fields.at(prefix + "age_ns").as<int64_t>(), -1);
++    }
++    EXPECT_EQ(fields.count("init_base_quat"), heading ? 1u : 0u);
++    EXPECT_EQ(fields.count("delta_heading"), heading ? 1u : 0u);
++    if (heading) EXPECT_DOUBLE_EQ(fields.at("delta_heading").as<double>(), 0.125);
++    EXPECT_EQ(fields.count("reference_guard"), guarded ? 1u : 0u);
++    if (guarded) {
++        const auto status = fields.at("reference_guard").as<std::map<std::string, msgpack::object>>();
++        ASSERT_EQ(status.size(), 10u);
++        EXPECT_TRUE(status.at("armed").as<bool>());
++        EXPECT_FALSE(status.at("expired").as<bool>());
++        EXPECT_FALSE(status.at("planner_selected").as<bool>());
++        EXPECT_TRUE(status.at("planner_confirmed").as<bool>());
++        EXPECT_TRUE(status.at("rearm_requires_planner").as<bool>());
++        EXPECT_EQ(status.at("accepted_index").as<int64_t>(), 123);
++        EXPECT_EQ(status.at("applied_index").as<int64_t>(), 122);
++        EXPECT_EQ(status.at("rejected").as<uint64_t>(), 7u);
++        EXPECT_EQ(status.at("epoch").as<uint64_t>(), 3u);
++        EXPECT_DOUBLE_EQ(status.at("age_ms").as<double>(), 12.5);
++    }
++}
++INSTANTIATE_TEST_SUITE_P(Pc2Wire, GuardTelemetry,
++    ::testing::Combine(::testing::Bool(), ::testing::Bool(), ::testing::Bool()));
++} // namespace
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_reference_lease.cpp
+@@ -0,0 +1,54 @@
++#include <gtest/gtest.h>
++#include "input_interface/reference_lease.hpp"
++
++using namespace std::chrono_literals;
++static const ReferenceLease::Clock::time_point origin{};
++
++TEST(ReferenceLease, RequiresArmAndNonnegativeIndex) {
++    ReferenceLease lease(200ms);
++    EXPECT_FALSE(lease.Accept(1, origin));
++    lease.Arm(origin);
++    EXPECT_FALSE(lease.Accept(-1, origin));
++    EXPECT_TRUE(lease.Accept(0, origin));
++    EXPECT_EQ(lease.Index(), 0);
++}
++TEST(ReferenceLease, ExpiresWithoutFirstFrameAtDeadline) {
++    ReferenceLease lease(200ms);
++    lease.Arm(origin);
++    EXPECT_FALSE(lease.Poll(origin + 199ms));
++    EXPECT_TRUE(lease.Poll(origin + 200ms));
++    EXPECT_FALSE(lease.Armed());
++    EXPECT_TRUE(lease.Expired());
++}
++TEST(ReferenceLease, DuplicateAndOlderFramesDoNotExtendDeadline) {
++    ReferenceLease lease(200ms);
++    lease.Arm(origin);
++    ASSERT_TRUE(lease.Accept(100, origin + 10ms));
++    EXPECT_FALSE(lease.Accept(100, origin + 100ms));
++    EXPECT_FALSE(lease.Accept(99, origin + 150ms));
++    EXPECT_EQ(lease.Index(), 100);
++    EXPECT_TRUE(lease.Poll(origin + 210ms));
++}
++TEST(ReferenceLease, NewFrameCannotReviveExpiredLeaseWithoutPolling) {
++    ReferenceLease lease(200ms);
++    lease.Arm(origin);
++    ASSERT_TRUE(lease.Accept(100, origin));
++    EXPECT_FALSE(lease.Accept(101, origin + 200ms));
++    EXPECT_FALSE(lease.Accept(102, origin + 201ms));
++    EXPECT_EQ(lease.Index(), 100);
++    EXPECT_TRUE(lease.Expired());
++}
++TEST(ReferenceLease, IncreasingFramesExtendDeadlineAndRearmPreservesHighWater) {
++    ReferenceLease lease(200ms);
++    lease.Arm(origin);
++    ASSERT_TRUE(lease.Accept(100, origin + 100ms));
++    ASSERT_TRUE(lease.Accept(101, origin + 250ms));
++    EXPECT_FALSE(lease.Poll(origin + 449ms));
++    EXPECT_TRUE(lease.Poll(origin + 450ms));
++    lease.Arm(origin + 500ms);
++    EXPECT_FALSE(lease.Accept(0, origin + 501ms));
++    EXPECT_FALSE(lease.Accept(101, origin + 502ms));
++    EXPECT_TRUE(lease.Accept(102, origin + 503ms));
++    lease.Disarm();
++    EXPECT_FALSE(lease.Accept(103, origin + 504ms));
++}
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_reference_validation.cpp
+@@ -0,0 +1,73 @@
++#include <gtest/gtest.h>
++#include "input_interface/reference_validation.hpp"
++#include <array>
++#include <limits>
++
++using Subscriber = ZMQPackedMessageSubscriber;
++struct Frame {
++    Subscriber::DecodedHeader header{4, "le", 1, {
++        {"token_state", "f32", {1,64}}, {"frame_index", "i64", {1}},
++        {"left_hand_joints", "f32", {1,7}}, {"right_hand_joints", "f32", {1,7}}}};
++    std::array<float,64> token{};
++    int64_t index = 123;
++    std::array<float,7> left{}, right{};
++    std::vector<Subscriber::BufferView> buffers{{token.data(), sizeof(token)},
++        {&index, sizeof(index)}, {left.data(), sizeof(left)}, {right.data(), sizeof(right)}};
++};
++TEST(ReferenceValidation, ValidatesWholeFrameBeforeReturningIndex) {
++    Frame f;
++    ASSERT_EQ(ValidateGuardReference(f.header, f.buffers), 123);
++    f.right[6] = std::numeric_limits<float>::infinity();
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++    f.right[6] = 0;
++    f.token[0] = std::numeric_limits<float>::quiet_NaN();
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++}
++TEST(ReferenceValidation, RejectsWrongLayoutAndTruncatedPayload) {
++    Frame f;
++    f.header.fields[0].shape = {64};
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++    f.header.fields[0].shape = {1,64};
++    f.buffers[2].size -= 1;
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++    f.buffers[2].size += 1;
++    f.header.fields[2].name = "right_hand_joints";
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++}
++TEST(ReferenceValidation, RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex) {
++    Frame f;
++    f.header.version = 3;
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++    f.header.version = 4;
++    f.header.fields[0].dtype = "f64";
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++    f.header.fields[0].dtype = "f32";
++    f.header.endian = "invalid";
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++    f.header.endian = "le";
++    f.index = -1;
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++}
++TEST(ReferenceValidation, DecodesBigEndianIndexAndFloatValidation) {
++    Frame f;
++    f.header.endian = "be";
++    f.index = byte_swap(int64_t{456});
++    ASSERT_EQ(ValidateGuardReference(f.header, f.buffers), 456);
++    uint32_t inf = byte_swap(uint32_t{0x7f800000});
++    std::memcpy(f.left.data(), &inf, 4);
++    EXPECT_FALSE(ValidateGuardReference(f.header, f.buffers));
++}
++TEST(ReferenceValidation, CommandRequiresThreeBooleanScalars) {
++    Subscriber::DecodedHeader h{1,"le",1,{{"start","u8",{1}},
++        {"stop","u8",{1}}, {"planner","u8",{1}}}};
++    std::array<uint8_t,3> v{0,0,1};
++    std::vector<Subscriber::BufferView> b{{&v[0],1},{&v[1],1},{&v[2],1}};
++    EXPECT_TRUE(ValidateGuardCommand(h,b));
++    v[2] = 2;
++    EXPECT_FALSE(ValidateGuardCommand(h,b));
++    v = {1,1,1};
++    EXPECT_FALSE(ValidateGuardCommand(h,b));
++    v = {0,0,1};
++    b[2].size = 0;
++    EXPECT_FALSE(ValidateGuardCommand(h,b));
++}

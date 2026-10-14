@@ -1,0 +1,36 @@
+{
+  "g": {
+    "robot_model": "unitree_g1",
+    "viewer": "none",
+    "transport": "zenoh",
+    "zenoh_mode": "client",
+    "zenoh_connect": "tcp/127.0.0.1:17111",
+    "zenoh_multicast": false,
+    "zenoh_scouting": false,
+    "zenoh_gossip": true,
+    "serve_coordinator_rpc": false,
+    "robot_ip": null,
+    "robot_ips": null
+  },
+  "sonicnavigationsensorsender": {
+    "cloud_bind": "tcp://192.168.0.223:17101",
+    "state_bind": "tcp://192.168.0.223:17102",
+    "network_interface": "enP8p1s0",
+    "dds_domain": 0
+  },
+  "sonicnavigationrelaymodule": {
+    "peer_endpoint": "tcp://192.168.0.62:17103"
+  },
+  "sonicexecutionmodule": {
+    "reference_bind": "tcp://127.0.0.1:5556",
+    "feedback_endpoint": "tcp://127.0.0.1:5557",
+    "profile": {
+      "name": "pc2-223-native-navigation",
+      "source_fps": 50,
+      "right_hand_order": "native",
+      "handback_policy": "native_planner"
+    },
+    "journal_dir": "/verification/journal",
+    "navigation_enabled": true
+  }
+}
