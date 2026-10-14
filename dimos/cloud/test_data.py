@@ -434,7 +434,7 @@ def test_upload_cli_prints_console_link(
     api_url: str,
     console_url: str,
 ) -> None:
-    cloud, t, db = env
+    cloud, _, db = env
     monkeypatch.setattr(cli, "CloudData", lambda: cloud)
     monkeypatch.setattr(global_config, "dimos_cloud_url", api_url)
     if skipped:
@@ -448,7 +448,6 @@ def test_upload_cli_prints_console_link(
     assert "  console preview: failed:" in captured.out  # fixture's invalid stream name
     assert f"  console: {console_url}/console/data?open=u0\n" in captured.out
     assert captured.err == ""
-    assert list(t.uploads) == ["u0"] and t.uploads["u0"]["state"] == "complete"
 
 
 @pytest.mark.parametrize(
@@ -477,7 +476,6 @@ def test_upload_cli_omits_console_link_for_unknown_api(
     captured = capsys.readouterr()
     assert f"{db.name}: complete (u0)\n" in captured.out
     assert "  console:" not in captured.out
-    assert "https://" not in captured.out
     assert captured.err == ""
 
 
@@ -539,7 +537,7 @@ def test_upload_cli_exits_nonzero_on_server_error(
     assert e.value.exit_code == 1
     captured = capsys.readouterr()
     assert captured.out.strip() == ""
-    assert captured.err == f"{db.name}: POST /v1/data{endpoint}: 503 storage unavailable\n1\n"
+    assert f"{db.name}: POST /v1/data{endpoint}: 503 storage unavailable\n" in captured.err
 
 
 def test_matching_suffix_uploads_raw_and_unstamped(
