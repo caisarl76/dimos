@@ -101,6 +101,17 @@ def blocked(name: str, results: list[dict[str, Any]]) -> str | None:
     return f"requires {', '.join(missing)}" if missing else None
 
 
+def prior_passed(sessions: list[Path], token: str) -> list[dict[str, Any]]:
+    """Passed cases of earlier sessions under the same operator token (same day)."""
+    cases = []
+    for session in sessions:
+        result = json.loads((session / "results.json").read_text())
+        if result["operator_ready"] != token:
+            raise SystemExit(f"{session} was run under {result['operator_ready']}, not {token}")
+        cases += [{**c, "session": session.name} for c in result["cases"] if c["passed"]]
+    return cases
+
+
 def motion(rows: list[dict[str, Any]], t0: float, t1: float) -> dict[str, float] | None:
     """LIO base displacement over (t0, t1], expressed in the starting heading frame."""
     odom = [r for r in rows if "odom" in r]
@@ -236,12 +247,14 @@ def run_session(args: Any) -> None:
     acceptance = json.loads(args.extrinsic_acceptance.read_text())
     if acceptance.get("accepted") is not True or acceptance.get("mount") != MOUNT:
         raise SystemExit(f"the operator has not accepted the mount the peer uses ({MOUNT})")
+    prior = prior_passed(args.prior_session, args.operator_ready)
     out = args.output
     out.mkdir(parents=True, exist_ok=False)
     root = HERE.parents[2]
     results: dict[str, Any] = {
         "operator_ready": args.operator_ready,
         "extrinsic_acceptance": acceptance,
+        "prior_passed": [{"session": c["session"], "name": c["name"]} for c in prior],
         "endpoints": ENDPOINTS,
         "cases_offered": {name: asdict(case) for name, case in CASES.items()},
         "harness_sha256": {
@@ -418,12 +431,12 @@ def run_session(args: Any) -> None:
                 f"phase={state.get('navigation', {}).get('phase')}"
             )
             for name in CASES:
-                reason = blocked(name, results["cases"])
+                reason = blocked(name, prior + results["cases"])
                 print(f"  {name:15s} {'available' if reason is None else reason}")
             name = input("case (or quit)> ").strip()
             if name == "quit":
                 break
-            reason = blocked(name, results["cases"])
+            reason = blocked(name, prior + results["cases"])
             if reason is not None:
                 print(f"{name}: {reason}")
                 continue
@@ -459,6 +472,13 @@ def main() -> None:
         "--extrinsic-acceptance", type=Path, default=HERE / "extrinsic-acceptance.json"
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--prior-session",
+        type=Path,
+        action="append",
+        default=[],
+        help="earlier session today whose passed cases count as prerequisites",
+    )
     run_session(parser.parse_args())
 
 
