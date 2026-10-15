@@ -59,6 +59,19 @@ from dimos.robot.unitree.g1.sonic_navigation import NavigationInput
 from dimos.robot.unitree.g1.sonic_reference import encode_command
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 
+if os.environ.get("SONIC_STUDY_FACING_CAP"):
+    # Simulation study only: override the commissioned 0.1 rad facing-lead cap in this
+    # process. Production NavigationLimits still rejects any cap above 0.1 rad.
+    from dimos.robot.unitree.g1 import sonic_navigation_session
+    from dimos.robot.unitree.g1.sonic_navigation import NavigationLimits
+
+    def _study_limits() -> NavigationLimits:
+        limits = NavigationLimits()
+        object.__setattr__(limits, "max_facing_offset", float(os.environ["SONIC_STUDY_FACING_CAP"]))
+        return limits
+
+    sonic_navigation_session.NavigationLimits = _study_limits  # type: ignore[assignment,misc]
+
 if os.environ.get("SONIC_TWO_HOST_OUTPUT"):
     # Two-host workers re-import this entry module; serve the replay shim to the sender only.
     import demo_navigation_audit
@@ -292,6 +305,11 @@ def main() -> None:
         "--diagnose-noisy-follower",
         action="store_true",
         help="Isolate the translating trace; never report the full commissioning matrix passed",
+    )
+    parser.add_argument(
+        "--study",
+        action="store_true",
+        help="Displacement/yaw versus command duration only; never a commissioning verdict",
     )
     parser.add_argument(
         "--noise-proof",
@@ -621,22 +639,33 @@ def main() -> None:
             pump(5.0)
             settle("initial_idle")
             motions = [
-                ("forward", 0.2, 0.0),
-                ("backward", -0.2, 0.0),
-                ("left_turn", 0.0, 0.2),
-                ("right_turn", 0.0, -0.2),
+                ("forward", 0.2, 0.0, 2.0),
+                ("backward", -0.2, 0.0, 2.0),
+                ("left_turn", 0.0, 0.2, 2.0),
+                ("right_turn", 0.0, -0.2, 2.0),
             ]
+            if args.study:
+                motions = [
+                    ("forward_2s", 0.2, 0.0, 2.0),
+                    ("forward_4s", 0.2, 0.0, 4.0),
+                    ("forward_6s", 0.2, 0.0, 6.0),
+                    ("left_2s", 0.0, 0.2, 2.0),
+                    ("left_4s", 0.0, 0.2, 4.0),
+                    ("right_4s", 0.0, -0.2, 4.0),
+                ]
+                results["study_facing_cap"] = os.environ.get("SONIC_STUDY_FACING_CAP", "0.1")
             if args.diagnose_noisy_follower or args.noise_proof:
                 motions = []
             if args.diagnose_transitions:
                 motions = [
-                    (f"forward_transition_{i}", 0.2, 0.0) for i in range(args.diagnose_transitions)
+                    (f"forward_transition_{i}", 0.2, 0.0, 2.0)
+                    for i in range(args.diagnose_transitions)
                 ]
-            for name, vx, wz in motions:
+            for name, vx, wz, seconds in motions:
                 before = envelope()
                 scenario = name
                 velocity = Twist(linear=Vector3(vx, 0, 0), angular=Vector3(0, 0, wz))
-                pump(2.0)
+                pump(seconds)
                 after = envelope()
                 heading = yaw(before["qpos"][3:7])
                 dx, dy = (
@@ -652,6 +681,7 @@ def main() -> None:
                         "passed": passed,
                         "start": before["monotonic"],
                         "end": after["monotonic"],
+                        "seconds": seconds,
                         "forward_displacement_m": forward,
                         "yaw_change_rad": angle,
                     }
@@ -677,11 +707,16 @@ def main() -> None:
                     )
                     results["status"] = "diagnostic_only"
                     return
-                if not args.diagnose_transitions:
+                if not (args.diagnose_transitions or args.study):
                     assert passed, name + " direction mismatch"
                 settle(name)
                 if args.diagnose_transitions:
                     pump(5.0)
+            if args.study:
+                owner.end_navigation()
+                wait(lambda: owner.get_navigation_status()["pose_ready"], 3.0, "study stop")
+                results["status"] = "study_only"
+                return
             if args.diagnose_transitions:
                 owner.end_navigation()
                 wait(lambda: owner.get_navigation_status()["pose_ready"], 3.0, "diagnostic stop")
