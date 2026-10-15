@@ -25,6 +25,7 @@ import pytest
 LAUNCH = Path(__file__).with_name("pc2-package") / "launch.sh"
 DOCKER = """#!/usr/bin/env bash
 echo "docker $*" >> "$STUB_LOG"
+[[ "$1 $2" == "container inspect" ]] && exit 1  # no task container exists
 if [[ "$*" == *demo_pc2_navigation_readiness.py* ]]; then
     out=$(printf '%s\\n' "$@" | sed -n 's/^type=bind,source=\\(.*\\),target=\\/verification$/\\1/p')
     printf '{"blocking": %s}\\n' "$STUB_BLOCKING" > "$out/readiness.json"
@@ -38,7 +39,11 @@ def host(tmp_path, monkeypatch):
     bin_dir.mkdir()
     for name, body in {
         "docker": DOCKER,
-        "pgrep": '#!/usr/bin/env bash\n[[ "${STUB_SONIC:-0}" == 1 ]]\n',
+        "pgrep": (
+            "#!/usr/bin/env bash\n"
+            'if [[ -n "${STUB_SONIC_PIDS:-}" ]]; then printf "%s\\n" $STUB_SONIC_PIDS; exit 0; fi\n'
+            '[[ "${STUB_SONIC:-0}" == 1 ]]\n'
+        ),
         "sha256sum": '#!/usr/bin/env bash\necho "sha256sum $*" >> "$STUB_LOG"\n',
     }.items():
         (bin_dir / name).write_text(body)
@@ -64,6 +69,7 @@ def host(tmp_path, monkeypatch):
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "SONIC_NAV_TASK_ROOT": str(task),
         "SONIC_SYSFS_ROOT": str(sysfs),
+        "SONIC_PROC_ROOT": str(tmp_path / "proc"),
         "STUB_LOG": str(tmp_path / "calls.log"),
         "STUB_BLOCKING": "[]",
     }
@@ -132,3 +138,28 @@ def test_native_commission_refuses_unpinned_clocks_or_a_running_controller(host)
     )
     assert run(env, "--commission", TOKEN, "native", STUB_SONIC="1").returncode == 1
     assert not (root / "native-started").exists()
+
+
+def fake_process(root: Path, pid: int, exe: Path) -> None:
+    (root / "proc" / str(pid)).mkdir(parents=True)
+    (root / "proc" / str(pid) / "exe").symlink_to(exe)
+
+
+def test_graph_refuses_while_a_foreign_sonic_controller_runs(host) -> None:
+    # The manipulation controller subscribes to 127.0.0.1:5556 by default, which the
+    # graph's execution owner binds: it must never feed a controller it does not own.
+    root, env = host
+    other = root / "other/target/release/g1_deploy_onnx_ref"
+    other.parent.mkdir(parents=True)
+    other.write_text("")
+    ours = (
+        Path(env["SONIC_NAV_TASK_ROOT"])
+        / "native/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    )
+    fake_process(root, 4242, other)
+    fake_process(root, 4343, ours)
+    refused = run(env, "--commission", TOKEN, "graph", STUB_SONIC_PIDS="4343 4242")
+    assert refused.returncode == 1 and "4242" in refused.stderr
+    assert "docker run" not in calls(root)
+    assert run(env, "--commission", TOKEN, "graph", STUB_SONIC_PIDS="4343").returncode == 0
+    assert "docker run" in calls(root)

@@ -13,10 +13,19 @@ set -euo pipefail
 verify_root=/home/unitree/dimos-navigation-verify-20261009
 task="${SONIC_NAV_TASK_ROOT:-$verify_root/sonic-navigation-20261013}"
 sysfs_root="${SONIC_SYSFS_ROOT:-/sys}"  # overrides exist only for the offline launcher test
+proc_root="${SONIC_PROC_ROOT:-/proc}"
 package="$task/package"
 source_dir="$task/native/gear_sonic_deploy"
 image=dimos-g1-sonic-navigation:20261013
 container=dimos-g1-sonic-navigation-graph-20261013
+
+foreign_controllers() {  # SONIC controllers on this host that are not this task's binary
+    local pid ours
+    ours=$(readlink -f "$source_dir/target/release/g1_deploy_onnx_ref")
+    for pid in $(pgrep -f '(^|/)g1_deploy_onnx_ref([[:space:]]|$)' || true); do
+        [[ "$(readlink -f "$proc_root/$pid/exe" 2>/dev/null)" == "$ours" ]] || echo "$pid"
+    done
+}
 
 clocks_pinned() {  # unchanged rule from the pc2-proven launcher: the `sudo jetson_clocks` state
     local ok=true cpus=0 dir min max gpu="$sysfs_root/class/devfreq/17000000.gpu"
@@ -114,6 +123,12 @@ case "$3" in
         ;;
     graph)
         verify_package
+        # Other controllers subscribe to 127.0.0.1:5556 by default, which the execution
+        # owner binds: never start the graph beside a controller this task does not own.
+        foreign=$(foreign_controllers)
+        if [[ -n "$foreign" ]]; then
+            echo "Refusing to start: SONIC controller(s) not owned by this task: $foreign" >&2; exit 1
+        fi
         if docker container inspect "$container" > /dev/null 2>&1; then
             echo "Graph container already exists: $container" >&2; exit 1
         fi
