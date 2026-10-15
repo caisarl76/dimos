@@ -1,0 +1,51 @@
+{
+  "static": true,
+  "pelvis_gyro_rms": 0.011362154047448815,
+  "gravity": {
+    "angle_deg": 1.081202206870137,
+    "roll_deg": 0.02294786494529223,
+    "pitch_deg": -1.0810385742753545,
+    "pelvis_up_torso": [
+      -0.020703702454229624,
+      0.013006766470051695,
+      0.9997010456784969
+    ],
+    "mid360_up_torso": [
+      -0.03956114667155205,
+      0.012599201066342804,
+      0.9991377161365304
+    ],
+    "samples": {
+      "mid360": 992,
+      "pelvis": 5171
+    }
+  },
+  "floor": {
+    "points": 73771,
+    "found": true,
+    "tilt_deg": 0.7247257195661998,
+    "torso_height_m": 0.8197085773607192,
+    "normal_torso": [
+      -0.03271205822149455,
+      0.016962285556160354,
+      0.9993208704493393
+    ],
+    "roll_deg": -0.22702084092721964,
+    "pitch_deg": -0.6884472297629329
+  },
+  "floor_vs_mid360_deg": 0.4654040880968809,
+  "max_tilt_deg": 1.0,
+  "passed": false,
+  "started_unix": 1792041263.7729673,
+  "observation_seconds": 5.0,
+  "mount": "g1_tf_publisher.torso_to_mid360 (URDF mount pitch + upside-down roll)",
+  "clouds": 50,
+  "cloud_points": 1002720,
+  "mid360_accel_norm_g": 1.0024290767926338,
+  "pelvis_accel_norm": 9.650740919211826,
+  "waist_mean_rad": [
+    -0.023043598995920976,
+    0.01626621604684738,
+    0.04145366319562729
+  ]
+}
