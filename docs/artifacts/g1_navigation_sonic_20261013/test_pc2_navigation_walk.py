@@ -15,6 +15,7 @@
 """Supervised walk harness decisions: case gating, measured motion and native evidence."""
 
 from datetime import date
+import json
 import math
 
 import pytest
@@ -112,3 +113,18 @@ def test_native_summary_reports_walk_then_idle_without_latch() -> None:
     assert latched["latched"] and latched["ended_idle"]
     lost = walk.native_summary([*rows, native(2.5, None)])
     assert lost["feedback_gaps"] == 1 and not lost["ended_idle"]
+
+
+def test_prior_session_counts_only_its_passed_cases_with_the_same_token(tmp_path) -> None:
+    # The native operator stop exits the controller, so later cases run in a new session.
+    token = f"operator-ready-{date.today():%Y%m%d}"
+    old = tmp_path / "s1"
+    old.mkdir()
+    cases = [*passed("idle", "operator_stop"), {"name": "forward_010", "passed": False}]
+    (old / "results.json").write_text(json.dumps({"operator_ready": token, "cases": cases}))
+    prior = walk.prior_passed([old], token)
+    assert [c["name"] for c in prior] == ["idle", "operator_stop"]
+    assert walk.blocked("forward_010", prior) is None
+    assert walk.blocked("forward_020", prior) == "requires forward_010"
+    with pytest.raises(SystemExit):
+        walk.prior_passed([old], "operator-ready-20000101")  # another day's readiness
