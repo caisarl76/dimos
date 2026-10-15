@@ -22,6 +22,7 @@ import socket
 import sys
 import threading
 import time
+import typing
 from unittest.mock import patch
 
 import numpy as np
@@ -155,3 +156,25 @@ def test_proxy_releases_overlapping_connections(proxy):
     while forwarder._sockets and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not forwarder._sockets  # each connection releases only its own sockets
+
+
+def test_sender_idl_types_resolve_like_cyclonedds(tmp_path, monkeypatch):
+    # CycloneDDS resolves IDL field annotations with get_type_hints; lazily imported
+    # names must not be left as unresolvable strings (failed on pc2 2026-10-15).
+    monkeypatch.setenv("SONIC_TWO_HOST_OUTPUT", str(tmp_path))
+    monkeypatch.setenv("SONIC_TWO_HOST_REPLAY", str(REPLAY))
+    monkeypatch.syspath_prepend(str(HERE))
+    monkeypatch.setattr(sys, "meta_path", list(sys.meta_path))
+    with patch.dict(sys.modules):
+        import demo_navigation_dds_finder
+
+        demo_navigation_dds_finder.install()
+        from dimos.robot.unitree.g1.sonic_navigation_sensor_module import (
+            SonicNavigationSensorSender,
+        )
+
+        readers = SonicNavigationSensorSender(
+            cloud_bind="tcp://127.0.0.1:*", state_bind="tcp://127.0.0.1:*"
+        )._open_readers()
+        hints = typing.get_type_hints(readers["imu_raw"].topic.kind)
+        assert set(hints) >= {"header", "angular_velocity", "linear_acceleration"}
