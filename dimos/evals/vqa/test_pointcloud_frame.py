@@ -340,7 +340,7 @@ def test_select_quality_indices_uses_mem_quality_window() -> None:
                 ts=ts,
             )
 
-        loader = PointCloudFrameLoader.__new__(PointCloudFrameLoader)
+        loader = PointCloudFrameLoader("quality-index-unit-test")
         loader._images = store.stream("color_image").order_by("ts")
 
         assert loader.select_quality_indices(0, 5, quality_window=1.0) == (1, 4)
