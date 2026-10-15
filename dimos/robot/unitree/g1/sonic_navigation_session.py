@@ -64,6 +64,10 @@ class SonicNavigationSession:
     FEEDBACK_TIMEOUT = 0.200
     SOURCE_TIMEOUT = 0.350
     OUTAGE_END = 2.0
+    # Timing lapses of the relayed readiness proof (a late relay reply, a stale peer
+    # input) stop walking at the same deadline but recover on fresh proof, like a
+    # velocity outage; integrity and configuration faults stay terminal.
+    TIMING_UNREADY = ("stale:", "upstream_lag:", "upstream_unready:", "missing:")
     SETTLE_SECONDS = 0.500
 
     def __init__(self, *, send: Callable[[bytes], None]) -> None:
@@ -171,6 +175,15 @@ class SonicNavigationSession:
         self._last_send = -math.inf
         return self.status
 
+    @classmethod
+    def _timing_lapse(cls, value: NavigationInput) -> bool:
+        fault = value.fault
+        return (
+            fault is None
+            or fault == "navigation_inputs_unready"
+            or fault.startswith(cls.TIMING_UNREADY)
+        )
+
     def receive(self, value: NavigationInput, *, now: float) -> bool:
         if self._status.phase not in (NavigationPhase.REARMING, NavigationPhase.ACTIVE):
             return False
@@ -183,6 +196,8 @@ class SonicNavigationSession:
         # change the held velocity deadline when the source sequence repeats.
         if value.ready and value.fault is None and value.readiness_deadline > now:
             self._readiness_deadline = min(value.readiness_deadline, now + self.SOURCE_TIMEOUT)
+        elif self._timing_lapse(value):
+            return False  # tick holds IDLE until fresh proof returns or the outage ends
         else:
             self.fail(value.fault or "navigation_input_unready", now=now)
             return False
@@ -322,9 +337,6 @@ class SonicNavigationSession:
         self.observe(feedback, now=now)
         phase = self.status.phase
         if phase in (NavigationPhase.REARMING, NavigationPhase.ACTIVE):
-            if self._readiness_deadline <= now:
-                self.fail("readiness_expired", now=now)
-                return
             guard = feedback.planner_guard
             if phase == NavigationPhase.ACTIVE and (
                 guard is None
@@ -351,15 +363,24 @@ class SonicNavigationSession:
                 packet = encode_planner(intent, sequence=sequence, deadline=now + 0.25)
             else:
                 value = self._input
-                expired = value is None or value.velocity_deadline <= now
+                readiness_lapsed = self._readiness_deadline <= now
+                expired = value is None or value.velocity_deadline <= now or readiness_lapsed
                 if expired:
-                    self._outage_since = (
-                        (now if value is None else value.velocity_deadline)
-                        if self._outage_since is None
-                        else self._outage_since
-                    )
+                    if self._outage_since is None:
+                        lapsed = [
+                            d
+                            for d in (
+                                now if value is None else value.velocity_deadline,
+                                self._readiness_deadline,
+                            )
+                            if d <= now
+                        ]
+                        self._outage_since = min(lapsed)
                     if now >= self._outage_since + self.OUTAGE_END:
-                        self.end(now=now)
+                        if readiness_lapsed:
+                            self.fail("readiness_expired", now=now)
+                        else:
+                            self.end(now=now)
                         return
                     intent = self._tracker.stop(feedback)
                     deadline = now + 0.25
