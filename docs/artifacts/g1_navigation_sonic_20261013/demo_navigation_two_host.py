@@ -982,9 +982,21 @@ def run_two_host(args: Any) -> None:
                 else:
                     stop_pid(target)
                 try:
+                    # A readiness lapse is a recoverable IDLE: walking stops within the
+                    # input's budget plus relay polling; admission closes after the 2 s
+                    # continuous outage (readiness_expired).
+                    stop_bound = 1.6 if stage in ("map", "costmap_worker") else 1.0
+                    halted = wait(lambda: not moving(), stop_bound, f"{stage} freeze stops motion")
+                    case(
+                        f"freeze_{stage}_stops_motion",
+                        True,
+                        elapsed=halted,
+                        bound=stop_bound,
+                        phase=nav()["phase"],
+                    )
                     elapsed = wait(
                         lambda: nav()["phase"] != "active" and idle_unlatched(),
-                        2.5,
+                        stop_bound + 2.5,
                         f"{stage} freeze closes admission",
                     )
                     case(

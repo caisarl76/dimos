@@ -1,0 +1,220 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 1243794.993331907,
+      "pc2_monotonic": 1233794.993516814
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.4281224908772856,
+      "peer_status": {
+        "monotonic": 1233801.321901652,
+        "ready": true,
+        "fault": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5151567019056529
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.1104899355771204,
+      "yaw_change_rad": -0.05865513643614297,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.05572305992245674,
+        "p95_s": 0.05567134590819478
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.327585918130353
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.13630927427736247,
+      "yaw_change_rad": -0.05191856679634442,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.05412492109462619,
+        "p95_s": 0.05405726089375094
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.605948464013636
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": -0.004715150446435768,
+      "yaw_change_rad": 0.08519599596703606,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.052037362940609455,
+        "p95_s": 0.05203126519918442
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 2.0976247070357203
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": -0.0011282126379959332,
+      "yaw_change_rad": -0.11309699676920695,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.04655782110057771,
+        "p95_s": 0.0464284471469
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 2.322433381108567
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.3178427799139172
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 2.044763901969418
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true,
+      "phase": "stopping"
+    },
+    {
+      "name": "source_outage_settled",
+      "passed": true,
+      "elapsed": 1.3832183151971549
+    },
+    {
+      "name": "link_delay_20ms_rtt_moving",
+      "passed": true,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.13431850099004805,
+        "p95_s": 0.1336289965780452
+      }
+    },
+    {
+      "name": "link_delay_150ms_rtt_stops_motion",
+      "passed": true,
+      "elapsed": 0.175780959893018,
+      "phase": "active",
+      "fault": null
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 2.3622320289723575
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 1.3174684229306877
+    },
+    {
+      "name": "link_hold_300ms_idle_without_latch",
+      "passed": true,
+      "elapsed": 0.13045994890853763
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 1.8502530890982598
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 0.9213483650237322
+    },
+    {
+      "name": "link_hold_2500ms_ends",
+      "passed": true,
+      "phase": "fault"
+    },
+    {
+      "name": "link_hold_2500ms_settled",
+      "passed": true,
+      "elapsed": 1.000555737875402
+    },
+    {
+      "name": "freeze_lidar_raw_closes_admission",
+      "passed": true,
+      "elapsed": 2.2884442198555917,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lidar_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.2896600659005344
+    },
+    {
+      "name": "freeze_lidar_raw_settled",
+      "passed": true,
+      "elapsed": 0.9375517391599715
+    },
+    {
+      "name": "freeze_imu_raw_closes_admission",
+      "passed": true,
+      "elapsed": 2.227519498905167,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_imu_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.228375521954149
+    },
+    {
+      "name": "freeze_imu_raw_settled",
+      "passed": true,
+      "elapsed": 1.1113313031382859
+    }
+  ],
+  "error": "TimeoutError: waist_tf freeze closes admission",
+  "load": {
+    "physics_after_release": {
+      "max_scheduler_lateness_s": 0.0023339916951954365,
+      "p99_scheduler_lateness_s": 0.0004586566216312346,
+      "missed_step_deadlines": 0,
+      "automatic_resets": 0
+    }
+  }
+}
