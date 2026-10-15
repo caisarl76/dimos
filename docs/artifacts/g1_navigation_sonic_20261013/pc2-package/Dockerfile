@@ -19,6 +19,7 @@ RUN mkdir source && tar -xf /tmp/dimos-source.tar -C source && rm /tmp/dimos-sou
     cd source && uv sync --frozen --no-dev --extra unitree-dds --extra sonic-feedback
 COPY --chown=nav:nav package/ /opt/sonic-navigation/package/
 ENV PATH=/opt/sonic-navigation/.venv/bin:$PATH \
-    PYTHONPATH=/opt/sonic-navigation/source:/opt/sonic-navigation/package
+    PYTHONPATH=/opt/sonic-navigation/source:/opt/sonic-navigation/package \
+    NUMBA_CACHE_DIR=/tmp/numba-cache
 WORKDIR /opt/sonic-navigation/source
 CMD ["python", "/opt/sonic-navigation/package/smoke.py"]
