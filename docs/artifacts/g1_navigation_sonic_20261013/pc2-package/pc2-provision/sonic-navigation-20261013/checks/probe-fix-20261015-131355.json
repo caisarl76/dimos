@@ -1,0 +1,84 @@
+{
+  "started_unix": 1792037636.440678,
+  "observation_seconds": 8.0,
+  "creates_writers_or_command_sockets": false,
+  "clocks": {
+    "pinned": true,
+    "checked": 9,
+    "issues": []
+  },
+  "sonic_processes": [],
+  "ports_in_use": [],
+  "streams": {
+    "lidar_raw": {
+      "samples": 80,
+      "rate_hz": 9.94066586542796,
+      "max_receipt_gap_s": 0.18315468299988424,
+      "max_source_stall_s": 0.18315468299988424,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792037639.0880146,
+      "last_source_stamp": 1792037647.0086584,
+      "budget_s": 0.35,
+      "ready": true
+    },
+    "imu_raw": {
+      "samples": 1601,
+      "rate_hz": 200.41670493481385,
+      "max_receipt_gap_s": 0.11559369399947172,
+      "max_source_stall_s": 0.11559369399947172,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792037639.1520429,
+      "last_source_stamp": 1792037647.1521893,
+      "budget_s": 0.2,
+      "ready": true
+    },
+    "lowstate": {
+      "samples": 8337,
+      "rate_hz": 1038.4632224665954,
+      "max_receipt_gap_s": 0.11146649999955116,
+      "max_source_stall_s": 0.11146649999955116,
+      "rollbacks": 0,
+      "duplicates": 336,
+      "first_source_stamp": 8002.497,
+      "last_source_stamp": 8010.499,
+      "budget_s": 0.2,
+      "ready": true
+    }
+  },
+  "lowstate": {
+    "samples": 8337,
+    "joints": 29,
+    "finite": true,
+    "tick_advancing": true,
+    "ready": true
+  },
+  "lowcmd_traffic_samples": 0,
+  "command_writers_discovered": [
+    {
+      "topic": "rt/arm_sdk",
+      "participant": "0110ddb0-2239-f4cd-a85e-d345000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "01100c61-2f27-464a-f97c-064a000001c1"
+    }
+  ],
+  "conversion_errors": 0,
+  "extrinsic_commissioned": false,
+  "host_load": {
+    "loadavg": [
+      "0.36",
+      "0.71",
+      "0.52"
+    ],
+    "cpus": 8,
+    "mem_available_kb": 14021928,
+    "gpu_load_permille": 0
+  },
+  "blocking": [
+    "extrinsic_uncommissioned"
+  ],
+  "ready": false
+}
