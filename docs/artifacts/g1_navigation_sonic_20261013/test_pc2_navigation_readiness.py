@@ -41,6 +41,22 @@ def test_stream_progress_requires_advancing_gap_free_source_stamps() -> None:
     assert not probe.stream_progress([], 0.35)["ready"]
 
 
+def test_lowstate_tolerates_repeated_ms_ticks_but_not_a_stalled_tick() -> None:
+    # pc2 lowstate: one writer at ~1040 Hz on a 1 ms tick, so ~4% of consecutive
+    # distinct samples share a tick 0.73 ms apart (measured 2026-10-15).
+    rows, t, tick = [], 10.0, 7834752
+    for i in range(2000):
+        rows.append((t, tick * 1e-3))
+        t += 0.00096
+        tick += 0 if i % 25 == 0 else 1
+    assert not probe.stream_progress(rows, 0.2)["ready"]  # sensors keep the strict rule
+    assert probe.stream_progress(rows, 0.2, repeats_ok=True)["ready"]
+    stalled = rows[:500] + [(rows[500][0] + 0.001 * i, rows[500][1]) for i in range(300)]
+    stalled += [(t + 0.3, s + 0.001) for t, s in rows[500:]]
+    result = probe.stream_progress(stalled, 0.2, repeats_ok=True)
+    assert result["max_source_stall_s"] > 0.2 and not result["ready"]
+
+
 def test_clocks_pinned_matches_jetson_clocks_state(tmp_path) -> None:
     for cpu in (0, 1):
         write(tmp_path / f"devices/system/cpu/cpu{cpu}/cpufreq/scaling_min_freq", "1728000")
@@ -82,6 +98,10 @@ def test_lowstate_health_needs_29_finite_joints_imu_and_advancing_tick() -> None
     assert not probe.lowstate_health(short, expected_joints=29)["ready"]
     frozen = [{**s, "tick": 100} for s in good]
     assert not probe.lowstate_health(frozen, expected_joints=29)["ready"]
+    repeated = [*good[:2], {**good[2], "tick": good[1]["tick"]}, *good[3:]]
+    assert probe.lowstate_health(repeated, expected_joints=29)["ready"]
+    rollback = [*good, {**good[0]}]
+    assert not probe.lowstate_health(rollback, expected_joints=29)["ready"]
 
 
 def test_verdict_blocks_on_any_unready_prerequisite() -> None:

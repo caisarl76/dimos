@@ -1,0 +1,28 @@
+{
+  "samples": 4163,
+  "tick_span_ms": 3995,
+  "repeats": 170,
+  "skipped_ticks": 3,
+  "writers": [
+    "11876261264325157702"
+  ],
+  "repeat_identical_body": 0,
+  "repeat_same_source_ts": 0,
+  "repeat_source_ts_delta_us": [
+    720,
+    728,
+    729,
+    734,
+    735,
+    742,
+    743,
+    744,
+    745,
+    747
+  ],
+  "normal_source_ts_delta_us": [
+    870,
+    997,
+    1018
+  ]
+}

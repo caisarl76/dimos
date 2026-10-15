@@ -4,21 +4,30 @@ Target: pc2 `unitree@192.168.0.223` (29 body joints, no hands). Everything goes 
 `/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/`. Existing
 controllers, source trees, Python environments and images stay unchanged.
 
-**Status, 2026-10-15:** provisioned on pc2 at the third attempt; evidence in
+**Status, 2026-10-15:** provisioned on pc2 at the fourth attempt; evidence in
 [pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
 
 - The ARM64 build passes native tests 41/42; only the FK fixture test fails. The
-  controller SHA256 is `dc59a4ab…`, identical on all three builds.
-- Image `sha256:6a27e211…` (arm64) was built, and its network-disabled smoke check
+  controller SHA256 is `dc59a4ab…`, identical on all four builds.
+- Image `sha256:06d41fe6…` (arm64) was built, and its network-disabled smoke check
   passed: graph validation and the planner codec.
 - Before and after the final run, the 1,232 fingerprints, the 71 original native
-  source files and both shared controller binaries were unchanged.
-- Attempts 1 and 2 stopped at the smoke check: `zmq` was missing, then numba had no
-  cache. Both are fixed in the package; their directories are kept as `.attemptN-*`.
-- The manipulation session was running its own controller and hold-reference tests
-  while attempts 2 and 3 ran, so provisioning load overlapped live robot control.
-- `launch.sh --check-only` has **not run**. It is paused until the robot's use is
-  coordinated with that session.
+  source files and both shared controller binaries were unchanged. No SONIC
+  controller ran during it.
+- Earlier attempts are kept as `.attemptN-*`. Attempts 1 and 2 stopped at the smoke
+  check (`zmq` missing, then no numba cache). Attempt 3 provisioned, but
+  `--check-only` failed because the sender built the Livox IMU DDS type with string
+  annotations. All three are fixed.
+- The manipulation session ran its own controller and hold-reference tests while
+  attempts 2 and 3 ran, so that provisioning load overlapped live robot control.
+- `launch.sh --check-only` ran on attempt 4. Clocks, processes, ports, LiDAR
+  (10 Hz), IMU (200 Hz), the 29 joints, conversions and `rt/lowcmd` silence passed.
+  Lowstate was blocked as repeated. It is one writer at about 1040 Hz on a 1 ms tick,
+  so about 4% of distinct samples share a tick 0.73 ms apart. The probe now tolerates
+  repeated lowstate ticks but still requires the tick to advance within 200 ms.
+  Re-run read-only on pc2, the fixed probe blocks only on `extrinsic_uncommissioned`.
+  The provisioned image still has the old probe. The next provisioning carries the
+  fix; it is needed anyway to install the calibrated extrinsic.
 
 ## Contents
 
@@ -70,6 +79,9 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
 
 ## Pending
 
-The passive readiness report (`launch.sh --check-only`) still needs pc2. The
-sensor-to-base extrinsic, the exact FK fixture and fresh operator readiness remain
-commissioning blockers.
+Commissioning blockers:
+
+- The sensor-to-base extrinsic (`torso_to_sensor` in `config/probe.json`), then
+  re-provisioning, which also picks up the fixed probe.
+- The exact FK fixture.
+- Fresh operator readiness and the manipulation session's release of the robot.

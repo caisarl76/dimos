@@ -38,8 +38,25 @@ SONIC_PROCESS = "g1_deploy_onnx_ref"
 GPU_DEVFREQ = "class/devfreq/17000000.gpu"
 
 
-def stream_progress(rows: list[tuple[float, float]], budget: float) -> dict[str, Any]:
-    """rows: (local receipt monotonic, original source stamp) in receipt order."""
+def source_stall(rows: list[tuple[float, float]]) -> float:
+    """Longest receipt time from a source stamp's first arrival until the stamp advances."""
+    if not rows:
+        return math.inf
+    worst, since = 0.0, rows[0][0]
+    for a, b in pairwise(rows):
+        if b[1] > a[1]:
+            worst, since = max(worst, b[0] - since), b[0]
+    return max(worst, rows[-1][0] - since)
+
+
+def stream_progress(
+    rows: list[tuple[float, float]], budget: float, *, repeats_ok: bool = False
+) -> dict[str, Any]:
+    """rows: (local receipt monotonic, original source stamp) in receipt order.
+
+    repeats_ok: distinct samples may share a coarse stamp (lowstate's 1 ms tick at
+    ~1040 Hz); the stamp must still advance within the budget.
+    """
     rollbacks = sum(b[1] < a[1] for a, b in pairwise(rows))
     duplicates = sum(b[1] == a[1] for a, b in pairwise(rows))
     gaps = [b[0] - a[0] for a, b in pairwise(rows)]
@@ -48,6 +65,7 @@ def stream_progress(rows: list[tuple[float, float]], budget: float) -> dict[str,
         "samples": len(rows),
         "rate_hz": (len(rows) - 1) / span if span > 0 else 0.0,
         "max_receipt_gap_s": max(gaps, default=math.inf),
+        "max_source_stall_s": source_stall(rows),
         "rollbacks": rollbacks,
         "duplicates": duplicates,
         "first_source_stamp": rows[0][1] if rows else None,
@@ -57,9 +75,10 @@ def stream_progress(rows: list[tuple[float, float]], budget: float) -> dict[str,
     result["ready"] = (
         len(rows) >= 2
         and rollbacks == 0
-        and duplicates == 0
+        and (repeats_ok or duplicates == 0)
         and rows[-1][1] > rows[0][1]
         and result["max_receipt_gap_s"] < budget
+        and result["max_source_stall_s"] < budget
     )
     return result
 
@@ -121,7 +140,7 @@ def lowstate_health(samples: list[dict[str, Any]], *, expected_joints: int) -> d
         for s in samples
     )
     ticks = [s["tick"] for s in samples]
-    advancing = len(ticks) > 1 and all(b > a for a, b in pairwise(ticks))
+    advancing = len(ticks) > 1 and ticks[-1] > ticks[0] and all(b >= a for a, b in pairwise(ticks))
     return {
         "samples": len(samples),
         "joints": len(samples[-1]["q"]) if samples else 0,
@@ -280,7 +299,10 @@ def main() -> None:
         "clocks": clocks_pinned(args.sysfs),
         "sonic_processes": running(args.proc, (SONIC_PROCESS,)),
         "ports_in_use": sorted(ports & listening_ports(args.proc)),
-        "streams": {n: stream_progress(rows, BUDGETS[n]) for n, rows in dds.streams.items()},
+        "streams": {
+            n: stream_progress(rows, BUDGETS[n], repeats_ok=n == "lowstate")
+            for n, rows in dds.streams.items()
+        },
         "lowstate": lowstate_health(dds.lowstate, expected_joints=config["body_joints"]),
         "lowcmd_traffic_samples": dds.lowcmd_traffic_samples,
         "command_writers_discovered": dds.command_writers,
