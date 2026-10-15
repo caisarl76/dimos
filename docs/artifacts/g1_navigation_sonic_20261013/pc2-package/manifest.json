@@ -1,6 +1,6 @@
 {
   "target": "pc2 unitree@192.168.0.223, /home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013",
-  "dimos_source_commit": "1d122ad275df8e0d611770dd2f931a3c9881908b",
+  "dimos_source_commit": "5a864e4c86ba75673018ae9b03126370980cc01f",
   "native": {
     "baseline": "pc2 /home/unitree/GR00T-WholeBodyControl a9d20b2 + local changes (71 files)",
     "manipulation_port_patch_sha256": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9",
@@ -24,8 +24,8 @@
   "image": "dimos-g1-sonic-navigation:20261013",
   "payload_sha256": {
     "Dockerfile": "70df39aef3d73a9d178c95736301ae0c12047ab6abf030939e0056832c2ab637",
-    "dimos-source.tar": "21b68b5eecc0956eebf6a6398bf67d53743b86ebd1165a19ed3517dc287cf91f",
-    "launch.sh": "79b71e94f9a29595718b7654d6e1da8bee9aece359d344963c760ba32eb3a94c",
+    "dimos-source.tar": "63d924110d89389ab535c1181f6faebed1dcc3c8084fe3addb3c0a41710ba3f5",
+    "launch.sh": "87409495fbefd163855883879804ebe725bd0ac792091dc04b6a94d654e48946",
     "models.sha256": "fff9d3b9f24627655c2ae99f6702f63f46112377173ab616c6f537316b07aed3",
     "native-baseline.sha256": "3a02f3567aea1ca80ba3b9ed8b2006d96bb5195cd02104c13900cbcd264b204d",
     "native-source.sha256": "481891dbec8a92f6c936a7198c9360bb7be1fb390734008edd06af4afb5203a3",
@@ -33,6 +33,7 @@
     "package/config/pc2-graph.json": "8b49d63f2e16d36b4b2ba50e8220831218016d98032f28b6859b177e71fde09b",
     "package/config/probe.json": "697c26732fefa1c434bf2acb8f5052da6155b451a43bee7ca8139ada476b603e",
     "package/demo_pc2_navigation_readiness.py": "df18a2dfd0537c7742fc301e9dfb546dd0b64463ac7940aad80f962d51a4b0d8",
+    "package/demo_pc2_operator_start.py": "ea280e15494625b35e82df202ec83248d4f5d0be3affb9b2bb2b895060da848c",
     "package/demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
     "package/run-pc2-graph.sh": "8e4c2d37532581b39bd1a3ddf5f4d3087a918385200d59d11350c56c4db1534f",
     "package/smoke.py": "f140e6cfcf976c104f2fe792ea7bfac3ea015ce4580ee52e4e8b0eec0a3f722d",
