@@ -1,0 +1,56 @@
+{
+  "host": "pc2 unitree-g1-nx (192.168.0.223)",
+  "date": "2026-10-15",
+  "runs": {
+    "attempt1": {
+      "task_dir": "sonic-navigation-20261013.attempt1-missing-pyzmq",
+      "native_tests": 42,
+      "native_failed": [
+        "FK.TestFKAndGlobalVelocities"
+      ],
+      "controller_sha256": "dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9",
+      "smoke": "failed (see provision-run.log)",
+      "image": null,
+      "sonic_controller_pids_at_start": []
+    },
+    "attempt2": {
+      "task_dir": "sonic-navigation-20261013.attempt2-numba-cache",
+      "native_tests": 42,
+      "native_failed": [
+        "FK.TestFKAndGlobalVelocities"
+      ],
+      "controller_sha256": "dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9",
+      "smoke": "failed (see provision-run.log)",
+      "image": null,
+      "sonic_controller_pids_at_start": []
+    },
+    "final": {
+      "task_dir": "sonic-navigation-20261013",
+      "native_tests": 42,
+      "native_failed": [
+        "FK.TestFKAndGlobalVelocities"
+      ],
+      "controller_sha256": "dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9",
+      "smoke": {
+        "smoke": "passed",
+        "modules": [
+          "sonicexecutionmodule",
+          "sonicnavigationrelaymodule",
+          "sonicnavigationsensorsender"
+        ],
+        "planner_packet_bytes": 1339
+      },
+      "image": {
+        "id": "sha256:6a27e2111927f2004ba95036c7dcefb8c8a32e901a6f79ed01560e614324f91d",
+        "arch": "arm64",
+        "size_gb": 6.66
+      },
+      "sonic_controller_pids_at_start": [
+        "13636"
+      ]
+    }
+  },
+  "integrity": "final run: 1,232 fingerprints, 71 original native source files and both shared controller binaries unchanged before and after; attempts 1-2 stopped at the smoke check and were rechecked unchanged",
+  "concurrent_robot_use": "The manipulation session ran its own guarded SONIC controller (native runs from 08:53:00 and 08:54:17, hold-reference tests 08:54:50-08:56:01 CST). Attempt 2 (08:49:41-08:54:56) and the final run (from 08:56:22, controller PID 13636 still running at its start) overlapped with that activity. No navigation controller, container or command was started.",
+  "not_run": "launch.sh --check-only (paused pending coordination with the other session)"
+}

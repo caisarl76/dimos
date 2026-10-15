@@ -4,9 +4,21 @@ Target: pc2 `unitree@192.168.0.223` (29 body joints, no hands). Everything goes 
 `/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/`. Existing
 controllers, source trees, Python environments and images stay unchanged.
 
-**Status, 2026-10-15:** assembled and verified offline. pc2 was unreachable ("No
-route to host"), so provisioning, the ARM64 build and the passive check have **not
-run yet**.
+**Status, 2026-10-15:** provisioned on pc2 at the third attempt; evidence in
+[pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
+
+- The ARM64 build passes native tests 41/42; only the FK fixture test fails. The
+  controller SHA256 is `dc59a4ab…`, identical on all three builds.
+- Image `sha256:6a27e211…` (arm64) was built, and its network-disabled smoke check
+  passed: graph validation and the planner codec.
+- Before and after the final run, the 1,232 fingerprints, the 71 original native
+  source files and both shared controller binaries were unchanged.
+- Attempts 1 and 2 stopped at the smoke check: `zmq` was missing, then numba had no
+  cache. Both are fixed in the package; their directories are kept as `.attemptN-*`.
+- The manipulation session was running its own controller and hold-reference tests
+  while attempts 2 and 3 ran, so provisioning load overlapped live robot control.
+- `launch.sh --check-only` has **not run**. It is paused until the robot's use is
+  coordinated with that session.
 
 ## Contents
 
@@ -58,7 +70,6 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
 
 ## Pending
 
-The ARM64 build and native tests, the image build and smoke check, the fingerprint and
-controller comparisons, and the passive readiness report all need pc2. The
+The passive readiness report (`launch.sh --check-only`) still needs pc2. The
 sensor-to-base extrinsic, the exact FK fixture and fresh operator readiness remain
 commissioning blockers.
