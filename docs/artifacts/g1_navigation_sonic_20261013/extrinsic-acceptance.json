@@ -1,0 +1,22 @@
+{
+  "accepted": true,
+  "date": "2026-10-15",
+  "decided_by": "operator (user decision in session, 2026-10-15)",
+  "mount": "g1_tf_publisher.torso_to_mid360",
+  "torso_to_sensor_xyz_xyzw": [
+    0.0002835,
+    3e-05,
+    0.41618,
+    0.9997985784932998,
+    1.2289293145202804e-18,
+    -0.020069938783589012,
+    6.122000644719466e-17
+  ],
+  "evidence": [
+    "pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic/extrinsic-4.json",
+    "pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic/extrinsic-5.json",
+    "pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic/extrinsic-6.json"
+  ],
+  "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
+  "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
+}
