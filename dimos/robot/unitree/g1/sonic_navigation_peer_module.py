@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 import math
@@ -54,6 +55,9 @@ from dimos.robot.unitree.g1.sonic_navigation_readiness import NavigationReadines
 
 if TYPE_CHECKING:
     from dimos.core.rpc_client import RPCClient
+
+
+SETTLE_WINDOW = 0.5  # seconds of pose history behind each settling rate
 
 
 class SonicNavigationPeerConfig(ModuleConfig):
@@ -96,7 +100,9 @@ class SonicNavigationPeerModule(Module):
         self._request_id: str | None = None
         self._accepted = self._cancelled = False
         self._state: str | None = None
-        self._previous_pose: tuple[float, float, float, float, float] | None = None
+        # (stamp, x, y, yaw, receipt) spanning the settling window; a standing robot's
+        # LIO pose jitters ~5 mm per sample, so rates use the pose SETTLE_WINDOW back.
+        self._poses: deque[tuple[float, float, float, float, float]] = deque()
         self._linear: float | None = None
         self._yaw_rate: float | None = None
         self._settled_since: float | None = None
@@ -238,29 +244,38 @@ class SonicNavigationPeerModule(Module):
             now = monotonic()
             self._monitor.observe("odom", msg.ts, valid=valid, received_monotonic=now)
             if not valid or not math.isfinite(msg.ts) or msg.ts <= 0:
-                self._previous_pose = None
+                self._poses.clear()
                 self._linear = self._yaw_rate = self._settled_since = None
                 self._settled_for = 0.0
                 return
-            previous = self._previous_pose
+            previous = self._poses[-1] if self._poses else None
             if previous is not None and msg.ts <= previous[0]:
                 return
             yaw = msg.yaw
-            self._previous_pose = (msg.ts, p.x, p.y, yaw, now)
             if (
                 previous is None
                 or not 0 < msg.ts - previous[0] <= 0.350
                 or now - previous[4] > 0.350
             ):
+                self._poses.clear()
+                self._poses.append((msg.ts, p.x, p.y, yaw, now))
                 self._linear = self._yaw_rate = self._settled_since = None
                 self._settled_for = 0.0
                 return
-            dt = msg.ts - previous[0]
-            self._linear = math.hypot(p.x - previous[1], p.y - previous[2]) / dt
-            self._yaw_rate = math.remainder(yaw - previous[3], 2 * math.pi) / dt
+            self._poses.append((msg.ts, p.x, p.y, yaw, now))
+            while len(self._poses) > 1 and self._poses[1][0] <= msg.ts - SETTLE_WINDOW:
+                self._poses.popleft()
+            base = self._poses[0]
+            dt = msg.ts - base[0]
+            if dt < SETTLE_WINDOW - 1e-6:  # window not yet spanned: no rate claimed
+                self._linear = self._yaw_rate = self._settled_since = None
+                self._settled_for = 0.0
+                return
+            self._linear = math.hypot(p.x - base[1], p.y - base[2]) / dt
+            self._yaw_rate = math.remainder(yaw - base[3], 2 * math.pi) / dt
             if self._linear <= 0.03 and abs(self._yaw_rate) <= 0.03:
                 if self._settled_since is None:
-                    self._settled_since = previous[4]
+                    self._settled_since = base[4]
                 self._settled_for = now - self._settled_since
             else:
                 self._settled_since = None
