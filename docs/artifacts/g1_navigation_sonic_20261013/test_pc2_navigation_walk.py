@@ -31,10 +31,13 @@ def test_cases_unlock_only_after_their_measured_prerequisites() -> None:
     assert walk.blocked("forward_010", []) == "requires idle, operator_stop"
     assert walk.blocked("forward_010", passed("idle")) == "requires operator_stop"
     assert walk.blocked("forward_010", passed("idle", "operator_stop")) is None
+    # Operator decision 2026-10-15: 0.10 m/s for 1 s applied but never stepped on pc2, so
+    # the first walking case is the simulation-verified 0.20 m/s for 2 s.
     failed = [*passed("idle", "operator_stop"), {"name": "forward_010", "passed": False}]
-    for name in ("forward_020", "turn_left_010", "turn_right_010", "cancel", "source_pause"):
-        assert walk.blocked(name, failed) == "requires forward_010"
-    assert walk.blocked("forward_020", [*failed, *passed("forward_010")]) is None
+    assert walk.blocked("forward_020", failed) is None
+    for name in ("turn_left_010", "turn_right_010", "cancel", "source_pause"):
+        assert walk.blocked(name, failed) == "requires forward_020"
+        assert walk.blocked(name, [*failed, *passed("forward_020")]) is None
     assert walk.blocked("goal", passed(*walk.CASES)) is not None  # never offered here
     assert set(walk.CASES) >= {"idle", "operator_stop", "forward_010", "forward_020"}
     assert max(abs(c.vx) for c in walk.CASES.values()) <= 0.20
@@ -125,7 +128,7 @@ def test_prior_session_counts_only_its_passed_cases_with_the_same_token(tmp_path
     prior = walk.prior_passed([old], token)
     assert [c["name"] for c in prior] == ["idle", "operator_stop"]
     assert walk.blocked("forward_010", prior) is None
-    assert walk.blocked("forward_020", prior) == "requires forward_010"
+    assert walk.blocked("turn_left_010", prior) == "requires forward_020"
     with pytest.raises(SystemExit):
         walk.prior_passed([old], "operator-ready-20000101")  # another day's readiness
 
