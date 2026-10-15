@@ -144,3 +144,12 @@ def test_probe_never_creates_writers_or_command_sockets() -> None:
         "send",
         "write",
     }
+
+
+def test_waist_conversion_follows_the_senders_relay_decimation() -> None:
+    # Converting every ~1040 Hz lowstate sample stalled the probe's own reader loop
+    # 0.2-0.3 s at a time (pc2, 2026-10-15); the sender converts every 20th tick.
+    assert probe.waist_due(1000, None)
+    assert not probe.waist_due(1019, 1000)
+    assert probe.waist_due(1020, 1000)
+    assert probe.waist_due(990, 1000)  # a rollback is converted so it is seen
