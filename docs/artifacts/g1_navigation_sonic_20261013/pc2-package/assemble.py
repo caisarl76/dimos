@@ -138,7 +138,11 @@ def main() -> None:
             target = out / "package" / path.relative_to(HERE / "package")
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
-    for name in ("demo_pc2_navigation_readiness.py", "demo_pc2_walk_agent.py"):
+    for name in (
+        "demo_pc2_navigation_readiness.py",
+        "demo_pc2_walk_agent.py",
+        "demo_pc2_operator_start.py",
+    ):
         shutil.copy2(HERE.parent / name, out / "package")
 
     files = {str(p.relative_to(out)): sha(p) for p in sorted(out.rglob("*")) if p.is_file()}

@@ -25,7 +25,7 @@ import pytest
 LAUNCH = Path(__file__).with_name("pc2-package") / "launch.sh"
 DOCKER = """#!/usr/bin/env bash
 echo "docker $*" >> "$STUB_LOG"
-[[ "$1 $2" == "container inspect" ]] && exit 1  # no task container exists
+if [[ "$1 $2" == "container inspect" ]]; then [[ "${STUB_CONTAINER:-0}" == 1 ]]; exit; fi
 if [[ "$*" == *demo_pc2_navigation_readiness.py* ]]; then
     out=$(printf '%s\\n' "$@" | sed -n 's/^type=bind,source=\\(.*\\),target=\\/verification$/\\1/p')
     printf '{"blocking": %s}\\n' "$STUB_BLOCKING" > "$out/readiness.json"
@@ -44,7 +44,10 @@ def host(tmp_path, monkeypatch):
             'if [[ -n "${STUB_SONIC_PIDS:-}" ]]; then printf "%s\\n" $STUB_SONIC_PIDS; exit 0; fi\n'
             '[[ "${STUB_SONIC:-0}" == 1 ]]\n'
         ),
-        "sha256sum": '#!/usr/bin/env bash\necho "sha256sum $*" >> "$STUB_LOG"\n',
+        "sha256sum": (
+            '#!/usr/bin/env bash\necho "sha256sum $*" >> "$STUB_LOG"\n'
+            '[[ "$1" == --check ]] || echo "${STUB_HASH:-stub}  $1"\n'
+        ),
     }.items():
         (bin_dir / name).write_text(body)
         (bin_dir / name).chmod(0o755)
@@ -163,3 +166,31 @@ def test_graph_refuses_while_a_foreign_sonic_controller_runs(host) -> None:
     assert "docker run" not in calls(root)
     assert run(env, "--commission", TOKEN, "graph", STUB_SONIC_PIDS="4343").returncode == 0
     assert "docker run" in calls(root)
+
+
+def test_start_sends_the_operator_start_only_to_this_tasks_idle_controller(host) -> None:
+    root, env = host
+    task = Path(env["SONIC_NAV_TASK_ROOT"])
+    ours = task / "native/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    (task / "provision").mkdir()
+    (task / "provision/controller.sha256").write_text(f"abc123  {ours}\n")
+    fake_process(root, 4343, ours)
+    started = "demo_pc2_operator_start.py --start-idle-planner"
+    for refused in (
+        {"STUB_SONIC_PIDS": ""},  # no controller to start
+        {"STUB_SONIC_PIDS": "4343", "STUB_HASH": "abc123", "STUB_CONTAINER": "1"},  # graph up
+        {"STUB_SONIC_PIDS": "4343", "STUB_HASH": "different"},  # not the provisioned binary
+    ):
+        assert run(env, "--commission", TOKEN, "start", **refused).returncode == 1, refused
+        assert started not in calls(root)
+    other = root / "other/g1_deploy_onnx_ref"
+    other.parent.mkdir(parents=True)
+    other.write_text("")
+    fake_process(root, 4242, other)
+    foreign = run(
+        env, "--commission", TOKEN, "start", STUB_SONIC_PIDS="4343 4242", STUB_HASH="abc123"
+    )
+    assert foreign.returncode == 1 and started not in calls(root)
+    ok = run(env, "--commission", TOKEN, "start", STUB_SONIC_PIDS="4343", STUB_HASH="abc123")
+    assert ok.returncode == 0, ok.stderr
+    assert started in calls(root) and "--network host" in calls(root)

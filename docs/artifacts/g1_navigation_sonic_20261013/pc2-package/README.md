@@ -77,7 +77,9 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
 3. Commissioning is Task 11. It needs fresh standing, clear-area, stop and
    sole-controller readiness, plus the other session's release of the robot:
    `sudo jetson_clocks`, then `launch.sh --commission operator-ready-<today> native`
-   in one terminal and `... graph` in another.
+   in one terminal, `... start` once in another (the operator start: planner IDLE),
+   then `... graph`. The graph owns the reference endpoint, so `start` refuses while
+   it runs; the 14:30 CST session started the graph first and the native waited.
    - The native component refuses unless the probe passes. The only tolerated issue is
      the uncommissioned extrinsic, because the peer refuses goals without it.
    - `--commission` starts real motor control.
