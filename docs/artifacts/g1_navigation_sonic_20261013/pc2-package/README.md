@@ -103,9 +103,10 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
 
 Commissioning blockers:
 
-- Operator acceptance of the mount: the nominal URDF value with the ~1° residual, or
-  a separate calibration. Then `torso_to_sensor` goes in `config/probe.json`, followed
-  by re-provisioning, which also picks up the fixed probe, the graph guard and the
-  agent.
+- Re-provisioning, after the manipulation session confirms the robot is idle. It
+  carries the fixed probe, the graph guard, the agent and the accepted mount. The
+  operator accepted the nominal URDF mount on 2026-10-15
+  ([extrinsic-acceptance.json](/docs/artifacts/g1_navigation_sonic_20261013/extrinsic-acceptance.json)),
+  and `config/probe.json` now carries it.
 - The exact FK fixture.
 - Fresh operator readiness and the manipulation session's release of the robot.
