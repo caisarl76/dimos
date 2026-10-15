@@ -1,0 +1,192 @@
+{
+  "operator_ready": "operator-ready-20261015",
+  "extrinsic_acceptance": {
+    "accepted": true,
+    "date": "2026-10-15",
+    "decided_by": "operator (user decision in session, 2026-10-15)",
+    "mount": "g1_tf_publisher.torso_to_mid360",
+    "torso_to_sensor_xyz_xyzw": [
+      0.0002835,
+      3e-05,
+      0.41618,
+      0.9997985784932998,
+      1.2289293145202804e-18,
+      -0.020069938783589012,
+      6.122000644719466e-17
+    ],
+    "evidence": [
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-4.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-5.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-6.json"
+    ],
+    "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
+    "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
+  },
+  "endpoints": {
+    "router": "tcp/127.0.0.1:17211",
+    "link_bind": "tcp://192.168.0.62:17103",
+    "cloud": "tcp://192.168.0.223:17101",
+    "state": "tcp://192.168.0.223:17102"
+  },
+  "cases_offered": {
+    "idle": {
+      "kind": "idle",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 3.0,
+      "requires": []
+    },
+    "operator_stop": {
+      "kind": "operator_stop",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": [
+        "idle"
+      ]
+    },
+    "forward_010": {
+      "kind": "motion",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 1.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ]
+    },
+    "forward_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.0,
+      "seconds": 2.0,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "turn_left_010": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": 0.1,
+      "seconds": 1.0,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "turn_right_010": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": -0.1,
+      "seconds": 1.0,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "cancel": {
+      "kind": "cancel",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.6,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "source_pause": {
+      "kind": "source_pause",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.5,
+      "requires": [
+        "forward_010"
+      ]
+    }
+  },
+  "harness_sha256": {
+    "demo_pc2_navigation_walk.py": "b7355c8e51f08c51b5d9633e054ee814c62f55c0f68830b73f111590a01129b5",
+    "demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
+    "demo_navigation_two_host_peer.py": "b7224a73d264fcfca4ea2e7962a0ff931291f240fa3e7c724b6d52c74e719206"
+  },
+  "dimos_commit": "ae4351d2cec1a0b30e83434815234c1ad54624b8",
+  "cases": [
+    {
+      "name": "idle",
+      "case": {
+        "kind": "idle",
+        "vx": 0.0,
+        "wz": 0.0,
+        "seconds": 3.0,
+        "requires": []
+      },
+      "started_unix": 1792047219.7472825,
+      "begin": {
+        "op": "begin",
+        "monotonic": 8303.576486275,
+        "result": {
+          "phase": "rearming",
+          "request_id": "f13897f4b72e4ea29e19f34172e0d6fc",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 0.7512236661277711,
+      "end": {
+        "op": "end",
+        "monotonic": 8308.39333648,
+        "result": {
+          "phase": "fault",
+          "request_id": "f13897f4b72e4ea29e19f34172e0d6fc",
+          "source_sequence": 32,
+          "guard_ack": 8306956208821,
+          "cancellation_pending": false,
+          "fault": "readiness_expired",
+          "pose_ready": true,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.006602122914046049,
+      "native": {
+        "samples": 111,
+        "walked": false,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 8306956208821
+      },
+      "motion": {
+        "forward_m": 0.0036736027938484212,
+        "lateral_m": -0.006517810583150835,
+        "yaw_rad": 0.023947798939219833,
+        "heading_offset_deg": -60.59329302210982
+      },
+      "command_window_s": 3.0002409799490124,
+      "observation": {
+        "note": "small movement (no walking) just moved a little.",
+        "confirmed": true
+      },
+      "measured_ok": false,
+      "passed": false
+    }
+  ],
+  "agent_attach": {
+    "op": "status",
+    "monotonic": 8094.412938172,
+    "navigation": {
+      "phase": "disarmed",
+      "request_id": null,
+      "source_sequence": -1,
+      "guard_ack": 0,
+      "cancellation_pending": false,
+      "fault": null,
+      "pose_ready": true,
+      "rejected_input": null
+    },
+    "ready": true,
+    "subscriptions_ready": true,
+    "feedback_fresh": true
+  },
+  "link_ready_after_s": 0.35072924802079797
+}
