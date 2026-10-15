@@ -174,7 +174,7 @@ def test_missing_native_frame_feedback_remains_a_hard_fault() -> None:
     assert packets[-1].startswith(b"command")
 
 
-@pytest.mark.parametrize("failure", ["feedback", "subscriptions", "native_latch", "readiness"])
+@pytest.mark.parametrize("failure", ["feedback", "subscriptions", "native_latch"])
 def test_hard_fault_closes_motion_before_cancellation(failure: str) -> None:
     packets: list[bytes] = []
     session = SonicNavigationSession(send=packets.append)
@@ -189,9 +189,6 @@ def test_hard_fault_closes_motion_before_cancellation(failure: str) -> None:
         latest = state(10)
     if failure == "native_latch":
         latest = state(10.2, latched=True, fault="planner_watchdog")
-    if failure == "readiness":
-        now = 10.35
-        latest = state(now)
     session.tick(latest, subscriptions_ready=failure != "subscriptions", now=now)
     assert session.status.phase == NavigationPhase.FAULT
     assert session.status.cancellation_pending
@@ -200,6 +197,110 @@ def test_hard_fault_closes_motion_before_cancellation(failure: str) -> None:
     session.receive(sample(3, now), now=now)
     session.tick(state(now), subscriptions_ready=True, now=now)
     assert all(not p.startswith(b"planner") or motion(p)[0] == 0 for p in packets[cut:])
+
+
+def walking(session: SonicNavigationSession, packets: list[bytes]) -> None:
+    arm(session, packets)
+    session.receive(sample(2), now=10)
+    session.tick(state(10.02), subscriptions_ready=True, now=10.02)
+    assert motion(packets[-1])[0] == 1
+
+
+def idle_since(packets: list[bytes], cut: int) -> bool:
+    planner = [p for p in packets[cut:] if p.startswith(b"planner")]
+    return bool(planner) and all(motion(p)[0] == 0 for p in planner)
+
+
+def test_readiness_lapse_from_relay_lag_is_idle_then_fresh_proof_resumes() -> None:
+    # pc2, 2026-10-15: one relay reply over Wi-Fi took >100 ms, readiness lapsed and
+    # the session faulted. A timing lapse now stops walking at the same deadline but
+    # resumes on fresh proof without an operator rearm.
+    packets: list[bytes] = []
+    session = SonicNavigationSession(send=packets.append)
+    walking(session, packets)
+    cut = len(packets)
+    session.tick(state(10.36), subscriptions_ready=True, now=10.36)  # no reply arrived
+    assert idle_since(packets, cut)
+    assert session.status.phase == NavigationPhase.ACTIVE and session.status.fault is None
+    assert not any(p.startswith(b"command") for p in packets[cut:])
+    late = NavigationInput(sample(3).twist, 3, 10.5, 10.35, True, None)  # expired in transit
+    assert not session.receive(late, now=10.4)
+    session.tick(state(10.42), subscriptions_ready=True, now=10.42)
+    assert idle_since(packets, cut) and session.status.phase == NavigationPhase.ACTIVE
+    session.receive(sample(4, 10.5), now=10.5)
+    session.tick(state(10.5), subscriptions_ready=True, now=10.5)
+    assert motion(packets[-1])[0] == 1
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["navigation_inputs_unready", "stale:base_tf", "upstream_lag:odom", "upstream_unready:odom"],
+)
+def test_peer_timing_unready_input_is_idle_not_fault(fault: str) -> None:
+    packets: list[bytes] = []
+    session = SonicNavigationSession(send=packets.append)
+    walking(session, packets)
+    cut = len(packets)
+    unready = NavigationInput(sample(3).twist, 3, 10.4, 10.4, False, fault)
+    assert not session.receive(unready, now=10.05)
+    session.tick(state(10.36), subscriptions_ready=True, now=10.36)
+    assert idle_since(packets, cut)
+    assert session.status.phase == NavigationPhase.ACTIVE and session.status.fault is None
+    session.receive(sample(4, 10.4), now=10.4)
+    session.tick(state(10.4), subscriptions_ready=True, now=10.4)
+    assert motion(packets[-1])[0] == 1
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "peer_source_rollback",
+        "peer_request_changed",
+        "cached_velocity_changed",
+        "source_stamp_rollback:odom",
+        "future_receipt:lidar_raw",
+        "clock_domain_mismatch:odom",
+        "extrinsic_unverified",
+    ],
+)
+def test_integrity_unready_input_stays_terminal(fault: str) -> None:
+    packets: list[bytes] = []
+    session = SonicNavigationSession(send=packets.append)
+    walking(session, packets)
+    session.receive(NavigationInput(sample(3).twist, 3, 10.4, 10.4, False, fault), now=10.05)
+    assert session.status.phase == NavigationPhase.FAULT and session.status.fault == fault
+
+
+def test_lapsed_readiness_never_walks_on_a_fresh_velocity() -> None:
+    packets: list[bytes] = []
+    session = SonicNavigationSession(send=packets.append)
+    walking(session, packets)
+    # Velocity proof good until 10.45; sensor readiness only until 10.2.
+    assert session.receive(NavigationInput(sample(3).twist, 3, 10.45, 10.2, True, None), now=10.1)
+    session.tick(state(10.12), subscriptions_ready=True, now=10.12)
+    assert motion(packets[-1])[0] == 1
+    cut = len(packets)
+    session.tick(state(10.25), subscriptions_ready=True, now=10.25)
+    assert idle_since(packets, cut) and session.status.phase == NavigationPhase.ACTIVE
+
+
+def test_two_seconds_without_readiness_faults_and_never_walks() -> None:
+    packets: list[bytes] = []
+    session = SonicNavigationSession(send=packets.append)
+    walking(session, packets)
+    cut = len(packets)
+    # The velocity source stays fresh; sensor readiness never returns.
+    for i in range(1, 12):
+        now = 10.2 + 0.2 * i
+        fresh_velocity = NavigationInput(
+            sample(2 + i).twist, 2 + i, now + 0.35, now - 0.01, True, None
+        )
+        session.receive(fresh_velocity, now=now)
+        session.tick(state(now), subscriptions_ready=True, now=now)
+    assert idle_since(packets, cut)
+    assert session.status.phase == NavigationPhase.FAULT
+    assert session.status.fault == "readiness_expired"
+    assert session.status.cancellation_pending and packets[-1].startswith(b"command")
 
 
 def test_concurrent_begin_and_expired_prebegin_context_rejected() -> None:
