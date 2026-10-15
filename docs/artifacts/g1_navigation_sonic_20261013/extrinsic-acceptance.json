@@ -13,9 +13,9 @@
     6.122000644719466e-17
   ],
   "evidence": [
-    "pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic/extrinsic-4.json",
-    "pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic/extrinsic-5.json",
-    "pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic/extrinsic-6.json"
+    "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-4.json",
+    "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-5.json",
+    "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-6.json"
   ],
   "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
   "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
