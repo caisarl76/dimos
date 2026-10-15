@@ -1,0 +1,82 @@
+{
+  "started_unix": 1792042893.4935255,
+  "observation_seconds": 8.0,
+  "creates_writers_or_command_sockets": false,
+  "clocks": {
+    "pinned": true,
+    "checked": 9,
+    "issues": []
+  },
+  "sonic_processes": [],
+  "ports_in_use": [],
+  "streams": {
+    "lidar_raw": {
+      "samples": 79,
+      "rate_hz": 9.971877279734304,
+      "max_receipt_gap_s": 0.1775346869999339,
+      "max_source_stall_s": 0.1775346869999339,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792042896.2389762,
+      "last_source_stamp": 1792042904.0624044,
+      "budget_s": 0.35,
+      "ready": true
+    },
+    "imu_raw": {
+      "samples": 1600,
+      "rate_hz": 200.6262581647234,
+      "max_receipt_gap_s": 0.11617111499981547,
+      "max_source_stall_s": 0.11617111499981547,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792042896.2576635,
+      "last_source_stamp": 1792042904.253417,
+      "budget_s": 0.2,
+      "ready": true
+    },
+    "lowstate": {
+      "samples": 8323,
+      "rate_hz": 1042.7996103742537,
+      "max_receipt_gap_s": 0.11235957000008057,
+      "max_source_stall_s": 0.11235957000008057,
+      "rollbacks": 0,
+      "duplicates": 335,
+      "first_source_stamp": 3999.8650000000002,
+      "last_source_stamp": 4007.8540000000003,
+      "budget_s": 0.2,
+      "ready": true
+    }
+  },
+  "lowstate": {
+    "samples": 8323,
+    "joints": 29,
+    "finite": true,
+    "tick_advancing": true,
+    "ready": true
+  },
+  "lowcmd_traffic_samples": 0,
+  "command_writers_discovered": [
+    {
+      "topic": "rt/arm_sdk",
+      "participant": "01101eaf-28ba-f2a1-8902-3e30000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "01109bb1-e408-6035-bb06-fd82000001c1"
+    }
+  ],
+  "conversion_errors": 0,
+  "extrinsic_commissioned": true,
+  "host_load": {
+    "loadavg": [
+      "1.20",
+      "1.52",
+      "1.00"
+    ],
+    "cpus": 8,
+    "mem_available_kb": 12288844,
+    "gpu_load_permille": 0
+  },
+  "blocking": [],
+  "ready": true
+}

@@ -4,30 +4,27 @@ Target: pc2 `unitree@192.168.0.223` (29 body joints, no hands). Everything goes 
 `/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/`. Existing
 controllers, source trees, Python environments and images stay unchanged.
 
-**Status, 2026-10-15:** provisioned on pc2 at the fourth attempt; evidence in
+**Status, 2026-10-15:** re-provisioned on pc2 (attempt 5, 13:35–13:40 CST), after
+the user confirmed the robot idle; evidence in
 [pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
 
-- The ARM64 build passes native tests 41/42; only the FK fixture test fails. The
-  controller SHA256 is `dc59a4ab…`, identical on all four builds.
-- Image `sha256:06d41fe6…` (arm64) was built, and its network-disabled smoke check
-  passed: graph validation and the planner codec.
-- Before and after the final run, the 1,232 fingerprints, the 71 original native
-  source files and both shared controller binaries were unchanged. No SONIC
-  controller ran during it.
-- Earlier attempts are kept as `.attemptN-*`. Attempts 1 and 2 stopped at the smoke
-  check (`zmq` missing, then no numba cache). Attempt 3 provisioned, but
-  `--check-only` failed because the sender built the Livox IMU DDS type with string
-  annotations. All three are fixed.
+- The ARM64 native tests pass 41/42; only the FK fixture test fails. The controller is
+  `dc59a4ab…`, identical on all five builds. Image `sha256:47b48f13…` (arm64); its
+  smoke check passed.
+- Fingerprints, original native source and shared controllers were unchanged before
+  and after. No controller or graph was started.
+- `launch.sh --check-only` is **ready, with nothing blocking**, in two consecutive
+  runs: the mount is accepted and lowstate's repeated ticks are tolerated.
+  - The first run, just after the build at load 1.54, blocked on a 205 ms IMU receipt
+    gap against the 200 ms budget. LiDAR and lowstate had simultaneous large gaps, so
+    it was a shared reader stall. The budget is unchanged.
+- Earlier attempts are kept as `.attemptN-*`:
+  - 1–2: smoke check (`zmq`, numba cache).
+  - 3: IMU DDS type.
+  - 4: strict lowstate probe, superseded to install the fixed probe, graph ownership
+    guard, walk agent and accepted mount.
 - The manipulation session ran its own controller and hold-reference tests while
-  attempts 2 and 3 ran, so that provisioning load overlapped live robot control.
-- `launch.sh --check-only` ran on attempt 4. Clocks, processes, ports, LiDAR
-  (10 Hz), IMU (200 Hz), the 29 joints, conversions and `rt/lowcmd` silence passed.
-  Lowstate was blocked as repeated. It is one writer at about 1040 Hz on a 1 ms tick,
-  so about 4% of distinct samples share a tick 0.73 ms apart. The probe now tolerates
-  repeated lowstate ticks but still requires the tick to advance within 200 ms.
-  Re-run read-only on pc2, the fixed probe blocks only on `extrinsic_uncommissioned`.
-  The provisioned image still has the old probe. The next provisioning carries the
-  fix; it is needed anyway to install the calibrated extrinsic.
+  attempts 2 and 3 ran.
 
 ## Contents
 
@@ -84,7 +81,7 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
   by default, which the execution owner binds. That controller was running on pc2 at
   about 13:20 CST.
 - Static mount check (`demo_pc2_extrinsic_check.py`, reader-only, three repeats in
-  [pc2-provision/…/checks/extrinsic](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic)).
+  [pc2-provision/…attempt4…/checks/extrinsic](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic)).
   It compares the nominal URDF mount (`torso_to_mid360`) with pelvis IMU gravity
   through the live waist chain:
   - Mid-360 accelerometer: pitch −1.08 to −1.10°, roll 0.02°.
@@ -103,10 +100,9 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
 
 Commissioning blockers:
 
-- Re-provisioning, after the manipulation session confirms the robot is idle. It
-  carries the fixed probe, the graph guard, the agent and the accepted mount. The
-  operator accepted the nominal URDF mount on 2026-10-15
-  ([extrinsic-acceptance.json](/docs/artifacts/g1_navigation_sonic_20261013/extrinsic-acceptance.json)),
-  and `config/probe.json` now carries it.
 - The exact FK fixture.
-- Fresh operator readiness and the manipulation session's release of the robot.
+- Fresh operator readiness and the manipulation session's release of the robot. The
+  operator runs the deployment commands: `sudo jetson_clocks`, then
+  `launch.sh --commission operator-ready-<today> native` and `... graph`, and the
+  workstation harness `demo_pc2_navigation_walk.py --operator-ready operator-ready-<today>
+  --output <artifact>/hardware/<session>`.

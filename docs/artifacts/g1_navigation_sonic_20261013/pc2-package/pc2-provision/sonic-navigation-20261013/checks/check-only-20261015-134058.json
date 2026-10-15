@@ -1,0 +1,84 @@
+{
+  "started_unix": 1792042859.0675454,
+  "observation_seconds": 8.0,
+  "creates_writers_or_command_sockets": false,
+  "clocks": {
+    "pinned": true,
+    "checked": 9,
+    "issues": []
+  },
+  "sonic_processes": [],
+  "ports_in_use": [],
+  "streams": {
+    "lidar_raw": {
+      "samples": 79,
+      "rate_hz": 9.96046857180954,
+      "max_receipt_gap_s": 0.22543839500031027,
+      "max_source_stall_s": 0.22543839500031027,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792042862.0572138,
+      "last_source_stamp": 1792042869.8808427,
+      "budget_s": 0.35,
+      "ready": true
+    },
+    "imu_raw": {
+      "samples": 1581,
+      "rate_hz": 200.0447841524451,
+      "max_receipt_gap_s": 0.20498286800011556,
+      "max_source_stall_s": 0.20498286800011556,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792042862.1033592,
+      "last_source_stamp": 1792042870.0030718,
+      "budget_s": 0.2,
+      "ready": false
+    },
+    "lowstate": {
+      "samples": 8329,
+      "rate_hz": 1041.075568422128,
+      "max_receipt_gap_s": 0.17731868900000336,
+      "max_source_stall_s": 0.17731868900000336,
+      "rollbacks": 0,
+      "duplicates": 336,
+      "first_source_stamp": 3965.61,
+      "last_source_stamp": 3973.605,
+      "budget_s": 0.2,
+      "ready": true
+    }
+  },
+  "lowstate": {
+    "samples": 8329,
+    "joints": 29,
+    "finite": true,
+    "tick_advancing": true,
+    "ready": true
+  },
+  "lowcmd_traffic_samples": 0,
+  "command_writers_discovered": [
+    {
+      "topic": "rt/arm_sdk",
+      "participant": "01101eaf-28ba-f2a1-8902-3e30000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "01109bb1-e408-6035-bb06-fd82000001c1"
+    }
+  ],
+  "conversion_errors": 0,
+  "extrinsic_commissioned": true,
+  "host_load": {
+    "loadavg": [
+      "1.54",
+      "1.62",
+      "1.00"
+    ],
+    "cpus": 8,
+    "mem_available_kb": 12283840,
+    "gpu_load_permille": 0
+  },
+  "blocking": [
+    "stream_unready:imu_raw"
+  ],
+  "ready": false
+}
