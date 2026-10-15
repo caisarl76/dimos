@@ -205,10 +205,33 @@ def test_measured_settling_uses_pose_differences_not_default_zero_twist(peer, cl
     status = peer.peer_status()
     assert status["linear_speed_mps"] == pytest.approx(0.1)
     assert status["settled_for_s"] == 0
-    for i in range(7, 13):
+    # Speed spans the last 0.5 s of poses, so a stop is recognised up to 0.5 s late.
+    for i in range(7, 18):
         clock[0] = 10 + i * 0.1
         feed_inputs(peer, 100 + i * 0.1, x=0.06)
     assert peer.peer_status()["settled_for_s"] >= 0.5
+
+
+def test_standing_robot_with_lio_jitter_settles(peer, clock):
+    # pc2, 2026-10-15: a standing G1's LIO pose jitters ~5 mm per 0.1 s sample, which
+    # consecutive differences read as 3-5 cm/s; idle and handback never settled.
+    feed_inputs(peer)
+    for i in range(1, 13):
+        clock[0] = 10 + i * 0.1
+        feed_inputs(peer, 100 + i * 0.1, x=0.005 * (-1) ** i, yaw=0.002 * (-1) ** i)
+        if i == 5:  # the first full 0.5 s window already shows 0.5 s of stillness
+            assert peer.peer_status()["settled_for_s"] >= 0.5 - 1e-9
+    status = peer.peer_status()
+    assert status["linear_speed_mps"] <= 0.03 and abs(status["yaw_rate_radps"]) <= 0.03
+    assert status["settled_for_s"] >= 0.5
+
+
+def test_walking_robot_never_reads_as_settled(peer, clock):
+    feed_inputs(peer)
+    for i in range(1, 20):
+        clock[0] = 10 + i * 0.1
+        feed_inputs(peer, 100 + i * 0.1, x=0.05 * i * 0.1)  # 0.05 m/s
+        assert peer.peer_status()["settled_for_s"] == 0
 
 
 def test_duplicate_odometry_does_not_extend_settling_interval(peer, clock):
