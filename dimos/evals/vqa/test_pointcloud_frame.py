@@ -22,6 +22,7 @@ from dimos.evals.vqa.pointcloud_frame import (
     PointCloudFrameUnavailableError,
     _align_one,
     _ImageRectifier,
+    select_quality_indices,
 )
 from dimos.memory.store.memory import MemoryStore
 from dimos.memory.store.sqlite import SqliteStore
@@ -340,10 +341,11 @@ def test_select_quality_indices_uses_mem_quality_window() -> None:
                 ts=ts,
             )
 
-        loader = PointCloudFrameLoader("quality-index-unit-test")
-        loader._images = store.stream("color_image").order_by("ts")
-
-        assert loader.select_quality_indices(0, 5, quality_window=1.0) == (1, 4)
-        assert loader.select_quality_indices(0, 5, quality_window=1.0, min_brightness=0.2) == (1, 4)
+        stream = store.stream("color_image").order_by("ts")
+        assert select_quality_indices(stream, 0, 5, quality_window=1.0) == (1, 4)
+        assert select_quality_indices(stream, 0, 5, quality_window=1.0, min_brightness=0.2) == (
+            1,
+            4,
+        )
         # Dark mid-frame (index 2) is dropped before the window pick.
-        assert loader.select_quality_indices(0, 3, quality_window=1.0, min_brightness=0.2) == (1,)
+        assert select_quality_indices(stream, 0, 3, quality_window=1.0, min_brightness=0.2) == (1,)

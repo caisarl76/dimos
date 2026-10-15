@@ -46,6 +46,7 @@ from dimos.evals.vqa.pointcloud_frame import (
     PointCloudFrame,
     PointCloudFrameLoader,
     PointCloudFrameUnavailableError,
+    select_quality_indices,
 )
 from dimos.evals.vqa.primitives.edge_tam import EdgeTAMObjectMaskPipeline
 from dimos.evals.vqa.primitives.range import LidarRangeEstimator
@@ -201,7 +202,8 @@ def generate_dataset(
     ) as loader:
         if request.quality_window is not None:
             assert request.start is not None and request.stop is not None
-            indices = loader.select_quality_indices(
+            indices = select_quality_indices(
+                loader.images,
                 request.start,
                 request.stop,
                 quality_window=request.quality_window,

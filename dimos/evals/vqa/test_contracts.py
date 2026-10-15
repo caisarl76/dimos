@@ -836,7 +836,7 @@ def test_generate_dataset_forwards_quality_window_indices(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     captured: list[int] = []
-    seen_selection: list[tuple[int, int, float, float | None]] = []
+    seen_selection: list[tuple[object, int, int, float, float | None]] = []
 
     class _FakeImage:
         pass
@@ -844,23 +844,13 @@ def test_generate_dataset_forwards_quality_window_indices(
     class _FakeLoader:
         def __init__(self, dataset: object, tolerance_s: float = 0.1) -> None:
             self.image_count = 200
+            self.images = object()
 
         def __enter__(self) -> _FakeLoader:
             return self
 
         def __exit__(self, *_args: object) -> None:
             return None
-
-        def select_quality_indices(
-            self,
-            start: int,
-            stop: int,
-            *,
-            quality_window: float,
-            min_brightness: float | None = None,
-        ) -> tuple[int, ...]:
-            seen_selection.append((start, stop, quality_window, min_brightness))
-            return (12, 22)
 
         def load_image(self, index: int) -> _FakeImage:
             return _FakeImage()
@@ -874,6 +864,17 @@ def test_generate_dataset_forwards_quality_window_indices(
 
         def stop(self) -> None:
             return None
+
+    def fake_select_quality_indices(
+        images: object,
+        start: int,
+        stop: int,
+        *,
+        quality_window: float,
+        min_brightness: float | None = None,
+    ) -> tuple[int, ...]:
+        seen_selection.append((images, start, stop, quality_window, min_brightness))
+        return (12, 22)
 
     def fake_generate_frames_dataset(
         request: GenerationRequest,
@@ -896,6 +897,9 @@ def test_generate_dataset_forwards_quality_window_indices(
         )
 
     monkeypatch.setattr("dimos.evals.vqa.generate.PointCloudFrameLoader", _FakeLoader)
+    monkeypatch.setattr(
+        "dimos.evals.vqa.generate.select_quality_indices", fake_select_quality_indices
+    )
     monkeypatch.setattr("dimos.models.vl.openai.OpenAIVlModel", _FakeModel)
     monkeypatch.setattr("dimos.models.vl.moondream.MoondreamVlModel", _FakeModel)
     monkeypatch.setattr(
@@ -917,7 +921,8 @@ def test_generate_dataset_forwards_quality_window_indices(
             output=tmp_path / "out",
         )
     )
-    assert seen_selection == [(0, 100, 0.5, 0.1)]
+    assert len(seen_selection) == 1
+    assert seen_selection[0][1:] == (0, 100, 0.5, 0.1)
     assert captured == [12, 22]
     assert result.output == tmp_path / "out"
 
