@@ -292,7 +292,12 @@ def observe_peer(
                     while not stop.wait(0.2):
                         result, t0, t1 = link.control("status", None)
                         snapshot = result["readiness"]
-                        latest.update(monotonic=t1, ready=snapshot.ready, fault=snapshot.fault)
+                        latest.update(
+                            monotonic=t1,
+                            ready=snapshot.ready,
+                            fault=snapshot.fault,
+                            request_id=result["request_id"],
+                        )
                         log.write(
                             json.dumps(
                                 {
