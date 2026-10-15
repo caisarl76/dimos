@@ -4,13 +4,21 @@ Target: pc2 `unitree@192.168.0.223` (29 body joints, no hands). Everything goes 
 `/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/`. Existing
 controllers, source trees, Python environments and images stay unchanged.
 
-**Status, 2026-10-15:** re-provisioned on pc2 (attempt 5, 13:35–13:40 CST), after
-the user confirmed the robot idle; evidence in
-[pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
+**Status, 2026-10-15:** re-provisioned on pc2 (attempt 6, 14:08–14:14 CST); evidence
+in [pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
 
 - The ARM64 native tests pass 41/42; only the FK fixture test fails. The controller is
-  `dc59a4ab…`, identical on all five builds. Image `sha256:47b48f13…` (arm64); its
+  `dc59a4ab…`, identical on all six builds. Image `sha256:f2112b50…` (arm64); its
   smoke check passed.
+- `launch.sh --check-only` was ready, with nothing blocking, in three consecutive runs
+  straight after the build (load up to 2.22). Largest gaps: IMU 83–94 ms,
+  lowstate 74–88 ms, LiDAR 122–155 ms.
+- Attempt 5 (`.attempt5-probe-waist-every-sample`): the operator's first
+  `--commission … native` at 14:02 CST was refused, correctly by the gate, but on a
+  false reading. The probe converted the waist transform on every ~1040 Hz lowstate
+  sample, 20 times the sensor sender's rate, which stalled its own reader for
+  0.1–0.33 s at a time. It now uses the sender's 50 Hz decimation; the budgets are
+  unchanged.
 - Fingerprints, original native source and shared controllers were unchanged before
   and after. No controller or graph was started.
 - `launch.sh --check-only` is **ready, with nothing blocking**, in two consecutive
