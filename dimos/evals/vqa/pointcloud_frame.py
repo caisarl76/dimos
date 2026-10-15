@@ -246,6 +246,7 @@ class PointCloudFrameLoader:
         camera_info = _camera_info_at(recorded_camera_info, observation.ts)
         return self._rectifier.rectify(image, camera_info)[0]
 
+
 def select_quality_indices(
     images: Stream[Image],
     start: int,
