@@ -33,6 +33,8 @@ from pathlib import Path
 import time
 from typing import Any
 
+from dimos.robot.unitree.g1.sonic_navigation_sensor_module import WAIST_RELAY_PERIOD_TICKS
+
 BUDGETS = {"lidar_raw": 0.350, "imu_raw": 0.200, "lowstate": 0.200}
 SONIC_PROCESS = "g1_deploy_onnx_ref"
 GPU_DEVFREQ = "class/devfreq/17000000.gpu"
@@ -81,6 +83,11 @@ def stream_progress(
         and result["max_source_stall_s"] < budget
     )
     return result
+
+
+def waist_due(tick: int, last: int | None) -> bool:
+    """Same decimation as the sensor sender's waist relay (production load, not 20x)."""
+    return last is None or not 0 <= tick - last < WAIST_RELAY_PERIOD_TICKS
 
 
 def clocks_pinned(sysfs: Path) -> dict[str, Any]:
@@ -238,6 +245,7 @@ def observe_dds(interface: str, domain: int, seconds: float) -> DdsObservation:
     publications = BuiltinDataReader(participant, BuiltinTopicDcpsPublication)
     observed = DdsObservation({n: [] for n in BUDGETS}, [], 0, [], 0)
     writers: dict[str, dict[str, Any]] = {}
+    last_waist: int | None = None
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         for sample in publications.take(256):
@@ -256,16 +264,19 @@ def observe_dds(interface: str, domain: int, seconds: float) -> DdsObservation:
                     continue
                 try:
                     if name == "lowstate":
-                        encode_waist(sample)
-                        stamp = int(sample.tick) * 1e-3
-                        imu = sample.imu_state
-                        observed.lowstate.append(
-                            {
-                                "tick": int(sample.tick),
-                                "q": [float(m.q) for m in sample.motor_state[:29]],
-                                "imu": [*imu.quaternion, *imu.gyroscope, *imu.accelerometer],
-                            }
-                        )
+                        tick = int(sample.tick)
+                        stamp = tick * 1e-3
+                        if waist_due(tick, last_waist):
+                            last_waist = tick
+                            encode_waist(sample)
+                            imu = sample.imu_state
+                            observed.lowstate.append(
+                                {
+                                    "tick": tick,
+                                    "q": [float(m.q) for m in sample.motor_state[:29]],
+                                    "imu": [*imu.quaternion, *imu.gyroscope, *imu.accelerometer],
+                                }
+                            )
                     else:
                         (encode_cloud if name == "lidar_raw" else encode_imu)(sample)
                         stamp = sample.header.stamp.sec + sample.header.stamp.nanosec * 1e-9
