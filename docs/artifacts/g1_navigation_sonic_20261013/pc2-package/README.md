@@ -4,15 +4,18 @@ Target: pc2 `unitree@192.168.0.223` (29 body joints, no hands). Everything goes 
 `/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/`. Existing
 controllers, source trees, Python environments and images stay unchanged.
 
-**Status, 2026-10-15:** re-provisioned on pc2 (attempt 6, 14:08–14:14 CST); evidence
+**Status, 2026-10-15:** re-provisioned on pc2 (attempt 7, 14:40–14:46 CST); evidence
 in [pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
 
 - The ARM64 native tests pass 41/42; only the FK fixture test fails. The controller is
-  `dc59a4ab…`, identical on all six builds. Image `sha256:f2112b50…` (arm64); its
-  smoke check passed.
-- `launch.sh --check-only` was ready, with nothing blocking, in three consecutive runs
-  straight after the build (load up to 2.22). Largest gaps: IMU 83–94 ms,
-  lowstate 74–88 ms, LiDAR 122–155 ms.
+  `dc59a4ab…`, identical on all seven builds. Image `sha256:65d9f788…`.
+- Two `launch.sh --check-only` runs were ready with nothing blocking.
+- The launcher now includes the operator `start` step. Order: `native`, `start`,
+  `graph`.
+- Attempt 6 (`.attempt6-no-operator-start`): in the operator session at 14:30 CST the
+  graph started right after the native. The native never left init and sent no
+  feedback, so the harness ran no case
+  ([hardware/session-20261015-1](/docs/artifacts/g1_navigation_sonic_20261013/hardware/session-20261015-1/results.json)).
 - Attempt 5 (`.attempt5-probe-waist-every-sample`): the operator's first
   `--commission … native` at 14:02 CST was refused, correctly by the gate, but on a
   false reading. The probe converted the waist transform on every ~1040 Hz lowstate

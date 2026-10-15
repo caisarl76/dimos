@@ -1,0 +1,129 @@
+{
+  "operator_ready": "operator-ready-20261015",
+  "extrinsic_acceptance": {
+    "accepted": true,
+    "date": "2026-10-15",
+    "decided_by": "operator (user decision in session, 2026-10-15)",
+    "mount": "g1_tf_publisher.torso_to_mid360",
+    "torso_to_sensor_xyz_xyzw": [
+      0.0002835,
+      3e-05,
+      0.41618,
+      0.9997985784932998,
+      1.2289293145202804e-18,
+      -0.020069938783589012,
+      6.122000644719466e-17
+    ],
+    "evidence": [
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-4.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-5.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-6.json"
+    ],
+    "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
+    "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
+  },
+  "endpoints": {
+    "router": "tcp/127.0.0.1:17211",
+    "link_bind": "tcp://192.168.0.62:17103",
+    "cloud": "tcp://192.168.0.223:17101",
+    "state": "tcp://192.168.0.223:17102"
+  },
+  "cases_offered": {
+    "idle": {
+      "kind": "idle",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 3.0,
+      "requires": []
+    },
+    "operator_stop": {
+      "kind": "operator_stop",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": [
+        "idle"
+      ]
+    },
+    "forward_010": {
+      "kind": "motion",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 1.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ]
+    },
+    "forward_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.0,
+      "seconds": 2.0,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "turn_left_010": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": 0.1,
+      "seconds": 1.0,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "turn_right_010": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": -0.1,
+      "seconds": 1.0,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "cancel": {
+      "kind": "cancel",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.6,
+      "requires": [
+        "forward_010"
+      ]
+    },
+    "source_pause": {
+      "kind": "source_pause",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.5,
+      "requires": [
+        "forward_010"
+      ]
+    }
+  },
+  "harness_sha256": {
+    "demo_pc2_navigation_walk.py": "b7355c8e51f08c51b5d9633e054ee814c62f55c0f68830b73f111590a01129b5",
+    "demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
+    "demo_navigation_two_host_peer.py": "b7224a73d264fcfca4ea2e7962a0ff931291f240fa3e7c724b6d52c74e719206"
+  },
+  "dimos_commit": "b8f05c87dbf7f5dd31e4e040565b5b07fba47611",
+  "cases": [],
+  "agent_attach": {
+    "op": "status",
+    "monotonic": 7055.355965302,
+    "navigation": {
+      "phase": "disarmed",
+      "request_id": null,
+      "source_sequence": -1,
+      "guard_ack": 0,
+      "cancellation_pending": false,
+      "fault": null,
+      "pose_ready": true,
+      "rejected_input": null
+    },
+    "ready": false,
+    "subscriptions_ready": true,
+    "feedback_fresh": false
+  },
+  "link_ready_after_s": 0.35043856501579285
+}
