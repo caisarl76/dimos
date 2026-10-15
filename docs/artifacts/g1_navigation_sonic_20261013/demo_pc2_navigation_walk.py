@@ -83,8 +83,10 @@ CASES = {
     # 0.10 m/s for 1 s applied but never stepped on pc2 (2026-10-15); the operator made the
     # simulation-verified 0.20 m/s for 2 s the first walking case.
     "forward_020": Case("motion", vx=0.20, seconds=2.0, requires=("idle", "operator_stop")),
-    "turn_left_010": Case("motion", wz=0.10, seconds=1.0, requires=("forward_020",)),
-    "turn_right_010": Case("motion", wz=-0.10, seconds=1.0, requires=("forward_020",)),
+    # 0.10 rad/s for 1 s barely turned (1.6 deg); the operator doubled the rate to the
+    # 0.20 rad/s cap, for the 2 s simulation ran.
+    "turn_left_020": Case("motion", wz=0.20, seconds=2.0, requires=("forward_020",)),
+    "turn_right_020": Case("motion", wz=-0.20, seconds=2.0, requires=("forward_020",)),
     "cancel": Case("cancel", vx=0.10, seconds=0.6, requires=("forward_020",)),
     "source_pause": Case("source_pause", vx=0.10, seconds=0.5, requires=("forward_020",)),
 }
@@ -150,6 +152,16 @@ def idle_ok(native: dict[str, Any], moved: dict[str, float] | None) -> bool:
         and moved is not None
         and math.hypot(moved["forward_m"], moved["lateral_m"]) < IDLE_POSITION_M
         and abs(moved["yaw_rad"]) < IDLE_YAW_RAD
+    )
+
+
+def motion_case_ok(case: Case, native: dict[str, Any], moved: dict[str, float] | None) -> bool:
+    """A pure turn is an IDLE facing change by design; only forward motion must walk."""
+    return (
+        (native["walked"] or not case.vx)
+        and native["ended_idle"]
+        and not native["latched"]
+        and motion_ok(case, moved)
     )
 
 
@@ -411,12 +423,7 @@ def run_session(args: Any) -> None:
             )
             question = "Did the robot stop walking when the source paused?"
         else:
-            ok = (
-                evidence["walked"]
-                and evidence["ended_idle"]
-                and not evidence["latched"]
-                and motion_ok(case, record["motion"])
-            )
+            ok = motion_case_ok(case, evidence, record["motion"])
             question = "Did it move as commanded, then stop and stand?"
         if case.kind != "operator_stop":
             ok = ok and record["settle_s"] is not None and record["handback_s"] is not None

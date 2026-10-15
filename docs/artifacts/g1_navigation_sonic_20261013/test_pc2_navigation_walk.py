@@ -35,13 +35,13 @@ def test_cases_unlock_only_after_their_measured_prerequisites() -> None:
     # the first walking case is the simulation-verified 0.20 m/s for 2 s.
     failed = [*passed("idle", "operator_stop"), {"name": "forward_010", "passed": False}]
     assert walk.blocked("forward_020", failed) is None
-    for name in ("turn_left_010", "turn_right_010", "cancel", "source_pause"):
+    for name in ("turn_left_020", "turn_right_020", "cancel", "source_pause"):
         assert walk.blocked(name, failed) == "requires forward_020"
         assert walk.blocked(name, [*failed, *passed("forward_020")]) is None
     assert walk.blocked("goal", passed(*walk.CASES)) is not None  # never offered here
     assert set(walk.CASES) >= {"idle", "operator_stop", "forward_010", "forward_020"}
     assert max(abs(c.vx) for c in walk.CASES.values()) <= 0.20
-    assert max(abs(c.wz) for c in walk.CASES.values()) <= 0.10
+    assert max(abs(c.wz) for c in walk.CASES.values()) <= 0.20
 
 
 def test_operator_token_must_be_today() -> None:
@@ -79,7 +79,7 @@ def test_motion_verdict_needs_correct_sign_and_bounded_magnitude() -> None:
     assert not walk.motion_ok(case, {**good, "forward_m": 0.005})  # stayed in place
     assert not walk.motion_ok(case, {**good, "forward_m": -0.05})
     assert not walk.motion_ok(case, {**good, "forward_m": 0.25})  # > 2x commanded
-    turn = walk.CASES["turn_right_010"]
+    turn = walk.CASES["turn_right_020"]
     assert walk.motion_ok(turn, {**good, "forward_m": 0.0, "yaw_rad": -0.08})
     assert not walk.motion_ok(turn, {**good, "forward_m": 0.0, "yaw_rad": 0.08})
     assert not walk.motion_ok(case, None)
@@ -128,7 +128,7 @@ def test_prior_session_counts_only_its_passed_cases_with_the_same_token(tmp_path
     prior = walk.prior_passed([old], token)
     assert [c["name"] for c in prior] == ["idle", "operator_stop"]
     assert walk.blocked("forward_010", prior) is None
-    assert walk.blocked("turn_left_010", prior) == "requires forward_020"
+    assert walk.blocked("turn_left_020", prior) == "requires forward_020"
     with pytest.raises(SystemExit):
         walk.prior_passed([old], "operator-ready-20000101")  # another day's readiness
 
@@ -141,3 +141,19 @@ def test_idle_accepts_a_one_time_stance_settle_but_not_walking() -> None:
     assert not walk.idle_ok({"walked": False}, {**settle, "forward_m": 0.025})
     assert not walk.idle_ok({"walked": False}, {**settle, "yaw_rad": math.radians(3.5)})
     assert not walk.idle_ok({"walked": False}, None)
+
+
+def test_turns_are_idle_facing_changes_and_forward_must_walk() -> None:
+    # A pure yaw command keeps the native in IDLE and leads its facing (by design), so a
+    # turn never enters walk mode; forward motion must.
+    idle_turn = {"walked": False, "ended_idle": True, "latched": False}
+    walked = {**idle_turn, "walked": True}
+    left = {"forward_m": 0.0, "lateral_m": 0.0, "yaw_rad": 0.08, "heading_offset_deg": 0.0}
+    assert walk.motion_case_ok(walk.CASES["turn_left_020"], idle_turn, left)
+    assert not walk.motion_case_ok(
+        walk.CASES["turn_left_020"], {**idle_turn, "latched": True}, left
+    )
+    assert not walk.motion_case_ok(walk.CASES["turn_right_020"], idle_turn, left)  # wrong sign
+    ahead = {**left, "forward_m": 0.07, "yaw_rad": 0.0}
+    assert walk.motion_case_ok(walk.CASES["forward_020"], walked, ahead)
+    assert not walk.motion_case_ok(walk.CASES["forward_020"], idle_turn, ahead)
