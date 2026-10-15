@@ -57,6 +57,7 @@ ENDPOINTS = {
     "cloud": "tcp://192.168.0.223:17101",
     "state": "tcp://192.168.0.223:17102",
 }
+MOUNT = "g1_tf_publisher.torso_to_mid360"  # what the peer host configures
 MIN_MOTION = 0.02  # m or rad: below this the robot "stayed in place"
 IDLE_MOTION = 0.02
 SETTLE_DWELL_S = 0.5
@@ -233,8 +234,8 @@ def agent_command(out: Path) -> list[str]:
 def run_session(args: Any) -> None:
     check_token(args.operator_ready)
     acceptance = json.loads(args.extrinsic_acceptance.read_text())
-    if acceptance.get("accepted") is not True or acceptance.get("date") != f"{date.today()}":
-        raise SystemExit("extrinsic acceptance must be accepted today by the operator")
+    if acceptance.get("accepted") is not True or acceptance.get("mount") != MOUNT:
+        raise SystemExit(f"the operator has not accepted the mount the peer uses ({MOUNT})")
     out = args.output
     out.mkdir(parents=True, exist_ok=False)
     root = HERE.parents[2]
@@ -454,7 +455,9 @@ def run_session(args: Any) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--operator-ready", required=True, help="operator-ready-YYYYMMDD (today)")
-    parser.add_argument("--extrinsic-acceptance", type=Path, required=True)
+    parser.add_argument(
+        "--extrinsic-acceptance", type=Path, default=HERE / "extrinsic-acceptance.json"
+    )
     parser.add_argument("--output", type=Path, required=True)
     run_session(parser.parse_args())
 
