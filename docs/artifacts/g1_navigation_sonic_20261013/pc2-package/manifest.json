@@ -1,6 +1,6 @@
 {
   "target": "pc2 unitree@192.168.0.223, /home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013",
-  "dimos_source_commit": "32cc2b8006e8ab25bad8c57d9123e9a70dbbd6db",
+  "dimos_source_commit": "bdb7275ad54e26eb42d7821b6ecf63973c362fd4",
   "native": {
     "baseline": "pc2 /home/unitree/GR00T-WholeBodyControl a9d20b2 + local changes (71 files)",
     "manipulation_port_patch_sha256": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9",
@@ -24,8 +24,8 @@
   "image": "dimos-g1-sonic-navigation:20261013",
   "payload_sha256": {
     "Dockerfile": "70df39aef3d73a9d178c95736301ae0c12047ab6abf030939e0056832c2ab637",
-    "dimos-source.tar": "05dea74be629e4b5ef26af2546119739afe818ed4c596963993e51812a5b5977",
-    "launch.sh": "2f119f94cb2728c4102525b5c04fdcaccd963a7d553fdb43fe6c5281b52b50ed",
+    "dimos-source.tar": "fc3cee1c0cb43183ab899e5b7b757403dff7296dd48705cb037bad5f1148b609",
+    "launch.sh": "79b71e94f9a29595718b7654d6e1da8bee9aece359d344963c760ba32eb3a94c",
     "models.sha256": "fff9d3b9f24627655c2ae99f6702f63f46112377173ab616c6f537316b07aed3",
     "native-baseline.sha256": "3a02f3567aea1ca80ba3b9ed8b2006d96bb5195cd02104c13900cbcd264b204d",
     "native-source.sha256": "481891dbec8a92f6c936a7198c9360bb7be1fb390734008edd06af4afb5203a3",
@@ -33,6 +33,7 @@
     "package/config/pc2-graph.json": "8b49d63f2e16d36b4b2ba50e8220831218016d98032f28b6859b177e71fde09b",
     "package/config/probe.json": "18b851e5e9085d3def03d8043af01ceb9958a1c2a97e5c227bc67cfef24bc897",
     "package/demo_pc2_navigation_readiness.py": "a9bcd87f1b71ede8b005c84d921f83474f600f32f6a74fd1fad2557b740c7339",
+    "package/demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
     "package/run-pc2-graph.sh": "8e4c2d37532581b39bd1a3ddf5f4d3087a918385200d59d11350c56c4db1534f",
     "package/smoke.py": "f140e6cfcf976c104f2fe792ea7bfac3ea015ce4580ee52e4e8b0eec0a3f722d",
     "package/zenoh_router.py": "725703921003bf0d16fe53c857dc39d7f3d74f245c287cc8136f82bfb9f0b621",
