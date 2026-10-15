@@ -16,7 +16,7 @@ ENV CYCLONEDDS_HOME=/opt/cyclonedds \
 WORKDIR /opt/sonic-navigation
 COPY --chown=nav:nav dimos-source.tar /tmp/dimos-source.tar
 RUN mkdir source && tar -xf /tmp/dimos-source.tar -C source && rm /tmp/dimos-source.tar && \
-    cd source && uv sync --frozen --no-dev --extra unitree-dds
+    cd source && uv sync --frozen --no-dev --extra unitree-dds --extra sonic-feedback
 COPY --chown=nav:nav package/ /opt/sonic-navigation/package/
 ENV PATH=/opt/sonic-navigation/.venv/bin:$PATH \
     PYTHONPATH=/opt/sonic-navigation/source:/opt/sonic-navigation/package
