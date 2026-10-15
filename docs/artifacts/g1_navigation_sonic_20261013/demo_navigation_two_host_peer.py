@@ -17,8 +17,8 @@
 Runs in its own process (and monotonic time namespace) with a private zenoh
 router. stdin carries JSON control lines; stdout carries JSON replies only.
 Teleop enters through MovementManager's existing tele_cmd_vel input. The torso
--> MID360 mount is the nominal URDF value, a simulation-only stand-in for the
-commissioned extrinsic.
+-> MID360 mount is the nominal URDF value: a stand-in in simulation, and on the
+robot (demo_pc2_navigation_walk.py) only after the operator accepted it that day.
 """
 
 from __future__ import annotations
@@ -185,7 +185,7 @@ def main() -> None:
     latest: dict[str, Any] = {}
     counts: dict[str, int] = {}
     tele: list[Twist | None] = [None]
-    telemetry = (args.output / "peer-telemetry.jsonl").open("a")
+    telemetry = (args.output / "peer-telemetry.jsonl").open("a", buffering=1)
     subscriptions: list[Any] = []
     coordinator = None
 
@@ -197,6 +197,14 @@ def main() -> None:
             if name == "cmd_vel":
                 telemetry.write(
                     json.dumps({"peer_monotonic": now, "cmd_vel": [msg.linear.x, msg.angular.z]})
+                    + "\n"
+                )
+            elif name == "odometry":
+                position = msg.position
+                telemetry.write(
+                    json.dumps(
+                        {"peer_monotonic": now, "odom": [position.x, position.y, msg.yaw, msg.ts]}
+                    )
                     + "\n"
                 )
             elif name == "path":
