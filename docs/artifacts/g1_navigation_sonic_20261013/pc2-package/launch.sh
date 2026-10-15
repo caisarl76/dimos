@@ -3,10 +3,13 @@
 #   launch.sh --check-only
 #       Passive: hashes, fingerprints, clocks and the DDS-reader readiness probe.
 #       Starts no controller and sends no command.
-#   launch.sh --commission operator-ready-YYYYMMDD native|graph
-#       Operator-only, today's date, after fresh standing/clear-area/stop readiness:
+#   launch.sh --commission operator-ready-YYYYMMDD native|start|graph
+#       Operator-only, today's date, after fresh standing/clear-area/stop readiness,
+#       in this order:
 #       native  - starts real SONIC motor control in this terminal (same command as the
 #                 pc2-proven guarded launcher, plus --guarded-planner).
+#       start   - sends the one operator start to that controller and waits for planner
+#                 IDLE (as the pc2-proven start-idle-planner helper); graph must be down.
 #       graph   - starts the pc2 navigation graph (sensor sender, relay, execution owner).
 set -euo pipefail
 
@@ -82,11 +85,11 @@ case "${1:-}" in
         echo 'Passive check complete; nothing was started.'
         ;;
     --commission)
-        (($# == 3)) || { echo 'Usage: launch.sh --commission operator-ready-YYYYMMDD native|graph' >&2; exit 2; }
+        (($# == 3)) || { echo 'Usage: launch.sh --commission operator-ready-YYYYMMDD native|start|graph' >&2; exit 2; }
         [[ "$2" == "operator-ready-$(date +%Y%m%d)" ]] \
             || { echo "Commissioning needs today's token: operator-ready-$(date +%Y%m%d)" >&2; exit 2; }
         ;;
-    *) echo 'Usage: launch.sh --check-only | --commission operator-ready-YYYYMMDD native|graph' >&2; exit 2 ;;
+    *) echo 'Usage: launch.sh --check-only | --commission operator-ready-YYYYMMDD native|start|graph' >&2; exit 2 ;;
 esac
 [[ "$1" == --commission ]] || exit 0
 
@@ -121,6 +124,23 @@ case "$3" in
         cd "$source_dir"
         exec "${command[@]}"
         ;;
+    start)
+        verify_package
+        foreign=$(foreign_controllers)
+        [[ -z "$foreign" ]] || { echo "Refusing: SONIC controller(s) not owned by this task: $foreign" >&2; exit 1; }
+        pid=$(pgrep -f '(^|/)g1_deploy_onnx_ref([[:space:]]|$)' || true)
+        [[ -n "$pid" ]] || { echo 'Refusing: start the native component first.' >&2; exit 1; }
+        expected=$(cut -d' ' -f1 "$task/provision/controller.sha256")
+        actual=$(sha256sum "$proc_root/$pid/exe" | cut -d' ' -f1)
+        [[ "$actual" == "$expected" ]] || { echo "Refusing: running controller is not the provisioned binary" >&2; exit 1; }
+        if docker container inspect "$container" > /dev/null 2>&1; then
+            echo 'Refusing: the graph owns the reference endpoint; stop it (stop.sh) before start.' >&2; exit 1
+        fi
+        echo "Sending the operator start to controller PID $pid; the robot can move."
+        exec docker run --rm --init --network host --user 1000:1000 --cap-drop ALL \
+            --security-opt no-new-privileges --cpus 1 --memory 1g "$image" \
+            python /opt/sonic-navigation/package/demo_pc2_operator_start.py --start-idle-planner
+        ;;
     graph)
         verify_package
         # Other controllers subscribe to 127.0.0.1:5556 by default, which the execution
@@ -143,5 +163,5 @@ case "$3" in
             --env XDG_CONFIG_HOME=/tmp/config --env HOME=/tmp \
             "$image" /opt/sonic-navigation/package/run-pc2-graph.sh
         ;;
-    *) echo 'Component must be native or graph' >&2; exit 2 ;;
+    *) echo 'Component must be native, start or graph' >&2; exit 2 ;;
 esac
