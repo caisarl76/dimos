@@ -128,3 +128,13 @@ def test_prior_session_counts_only_its_passed_cases_with_the_same_token(tmp_path
     assert walk.blocked("forward_020", prior) == "requires forward_010"
     with pytest.raises(SystemExit):
         walk.prior_passed([old], "operator-ready-20000101")  # another day's readiness
+
+
+def test_idle_accepts_a_one_time_stance_settle_but_not_walking() -> None:
+    # pc2 session 2: a ~1.2 deg heading adjustment as IDLE began, then still (operator: y).
+    settle = {"forward_m": 0.0037, "lateral_m": -0.0065, "yaw_rad": 0.024}
+    assert walk.idle_ok({"walked": False}, settle)
+    assert not walk.idle_ok({"walked": True}, settle)
+    assert not walk.idle_ok({"walked": False}, {**settle, "forward_m": 0.025})
+    assert not walk.idle_ok({"walked": False}, {**settle, "yaw_rad": math.radians(3.5)})
+    assert not walk.idle_ok({"walked": False}, None)

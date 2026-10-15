@@ -59,7 +59,8 @@ ENDPOINTS = {
 }
 MOUNT = "g1_tf_publisher.torso_to_mid360"  # what the peer host configures
 MIN_MOTION = 0.02  # m or rad: below this the robot "stayed in place"
-IDLE_MOTION = 0.02
+IDLE_POSITION_M = 0.02  # operator decision 2026-10-15: a one-time stance settle is IDLE
+IDLE_YAW_RAD = math.radians(3.0)
 SETTLE_DWELL_S = 0.5
 SETTLE_TIMEOUT_S = 3.0
 CANCEL_IDLE_S = 0.5
@@ -139,6 +140,15 @@ def motion_ok(case: Case, moved: dict[str, float] | None) -> bool:
     command, measured = (case.vx, moved["forward_m"]) if case.vx else (case.wz, moved["yaw_rad"])
     signed = measured if command > 0 else -measured
     return MIN_MOTION <= signed <= 2 * abs(command) * case.seconds
+
+
+def idle_ok(native: dict[str, Any], moved: dict[str, float] | None) -> bool:
+    return (
+        not native["walked"]
+        and moved is not None
+        and math.hypot(moved["forward_m"], moved["lateral_m"]) < IDLE_POSITION_M
+        and abs(moved["yaw_rad"]) < IDLE_YAW_RAD
+    )
 
 
 def native_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -367,13 +377,7 @@ def run_session(args: Any) -> None:
         record["command_window_s"] = command_end - command_start
         evidence = record["native"]
         if case.kind == "idle":
-            moved = record["motion"]
-            ok = (
-                not evidence["walked"]
-                and moved is not None
-                and abs(moved["forward_m"]) < IDLE_MOTION
-                and abs(moved["yaw_rad"]) < IDLE_MOTION
-            )
+            ok = idle_ok(evidence, record["motion"])
             question = "Did the robot stand still in IDLE?"
         elif case.kind == "operator_stop":
             ok = evidence["latched"] or evidence["feedback_gaps"] > 0
