@@ -199,14 +199,26 @@ def main() -> None:
                     json.dumps({"peer_monotonic": now, "cmd_vel": [msg.linear.x, msg.angular.z]})
                     + "\n"
                 )
-            elif name == "odometry":
-                position = msg.position
-                telemetry.write(
-                    json.dumps(
-                        {"peer_monotonic": now, "odom": [position.x, position.y, msg.yaw, msg.ts]}
-                    )
-                    + "\n"
-                )
+            elif name in ("odometry", "lio_odometry"):
+                # Base odometry and PointLio's own sensor pose, full 6-DoF, so walking-time
+                # base oscillation can be split into LIO error and mount/waist composition.
+                position, q = msg.position, msg.orientation
+                row: dict[str, Any] = {
+                    "peer_monotonic": now,
+                    "pose" if name == "odometry" else "lio": [
+                        position.x,
+                        position.y,
+                        position.z,
+                        q.x,
+                        q.y,
+                        q.z,
+                        q.w,
+                        msg.ts,
+                    ],
+                }
+                if name == "odometry":
+                    row["odom"] = [position.x, position.y, msg.yaw, msg.ts]
+                telemetry.write(json.dumps(row) + "\n")
             elif name == "path":
                 # An empty Path is the planner clearing after a rejected/cancelled goal.
                 if msg.poses:
@@ -222,6 +234,7 @@ def main() -> None:
                 ("cmd_vel", Twist),
                 ("global_costmap", OccupancyGrid),
                 ("odometry", Odometry),
+                ("lio_odometry", Odometry),
                 ("path", NavPath),
                 ("global_map", PointCloud2),
             }:
