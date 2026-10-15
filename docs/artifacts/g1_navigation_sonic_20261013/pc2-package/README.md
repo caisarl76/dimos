@@ -77,11 +77,35 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
      the uncommissioned extrinsic, because the peer refuses goals without it.
    - `--commission` starts real motor control.
 
+## Task 11 preparation (2026-10-15)
+
+- `launch.sh --commission … graph` now refuses while any SONIC controller other than
+  this task's binary runs. The manipulation launcher subscribes to `127.0.0.1:5556`
+  by default, which the execution owner binds. That controller was running on pc2 at
+  about 13:20 CST.
+- Static mount check (`demo_pc2_extrinsic_check.py`, reader-only, three repeats in
+  [pc2-provision/…/checks/extrinsic](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/sonic-navigation-20261013/checks/extrinsic)).
+  It compares the nominal URDF mount (`torso_to_mid360`) with pelvis IMU gravity
+  through the live waist chain:
+  - Mid-360 accelerometer: pitch −1.08 to −1.10°, roll 0.02°.
+  - LiDAR floor plane: pitch −0.69 to −0.70°, roll −0.22°.
+  - Floor against the Mid-360 IMU (mount-independent): 0.47°.
+  - The upside-down roll and the URDF pitch are confirmed. The remaining ~1° pitch
+    offset can come from the mount, pelvis IMU bias (it reads 9.65 m/s²) or the waist
+    encoders; the static check cannot separate them. It moves base x/y by about
+    7 mm (0.42 m lever) and does not change heading.
+  - Yaw is checked dynamically by the harness's forward case.
+- Walk harness: `demo_pc2_navigation_walk.py` on the workstation, plus
+  `demo_pc2_walk_agent.py`, which ships in `package/` and attaches to the graph
+  container. It offers bounded named cases in plan order.
+
 ## Pending
 
 Commissioning blockers:
 
-- The sensor-to-base extrinsic (`torso_to_sensor` in `config/probe.json`), then
-  re-provisioning, which also picks up the fixed probe.
+- Operator acceptance of the mount: the nominal URDF value with the ~1° residual, or
+  a separate calibration. Then `torso_to_sensor` goes in `config/probe.json`, followed
+  by re-provisioning, which also picks up the fixed probe, the graph guard and the
+  agent.
 - The exact FK fixture.
 - Fresh operator readiness and the manipulation session's release of the robot.
