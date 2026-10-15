@@ -1,0 +1,25 @@
+native tests: 41/42 passed; only the FK fixture test fails
+dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9  /home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/native/gear_sonic_deploy/target/release/g1_deploy_onnx_ref
+Traceback (most recent call last):
+  File "/opt/sonic-navigation/package/smoke.py", line 22, in <module>
+    from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_pc2 import (
+  File "/opt/sonic-navigation/source/dimos/robot/unitree/g1/blueprints/navigation/unitree_g1_sonic_navigation_pc2.py", line 26, in <module>
+    from dimos.robot.unitree.g1.sonic_navigation_graph import validate_sonic_navigation_graph
+  File "/opt/sonic-navigation/source/dimos/robot/unitree/g1/sonic_navigation_graph.py", line 35, in <module>
+    from dimos.mapping.costmapper import CostMapper
+  File "/opt/sonic-navigation/source/dimos/mapping/costmapper.py", line 25, in <module>
+    from dimos.mapping.pointclouds.occupancy import (
+  File "/opt/sonic-navigation/source/dimos/mapping/pointclouds/occupancy.py", line 31, in <module>
+    @njit(cache=True)  # type: ignore[untyped-decorator]
+     ^^^^^^^^^^^^^^^^
+  File "/opt/sonic-navigation/.venv/lib/python3.12/site-packages/numba/core/decorators.py", line 227, in wrapper
+    disp.enable_caching()
+  File "/opt/sonic-navigation/.venv/lib/python3.12/site-packages/numba/core/dispatcher.py", line 811, in enable_caching
+    self._cache = FunctionCache(self.py_func)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/sonic-navigation/.venv/lib/python3.12/site-packages/numba/core/caching.py", line 687, in __init__
+    self._impl = self._impl_class(py_func)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/sonic-navigation/.venv/lib/python3.12/site-packages/numba/core/caching.py", line 423, in __init__
+    raise RuntimeError("cannot cache function %r: no locator available "
+RuntimeError: cannot cache function '_height_map_kernel': no locator available for file '/opt/sonic-navigation/source/dimos/mapping/pointclouds/occupancy.py'
