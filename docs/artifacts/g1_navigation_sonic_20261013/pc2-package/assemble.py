@@ -138,7 +138,8 @@ def main() -> None:
             target = out / "package" / path.relative_to(HERE / "package")
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
-    shutil.copy2(HERE.parent / "demo_pc2_navigation_readiness.py", out / "package")
+    for name in ("demo_pc2_navigation_readiness.py", "demo_pc2_walk_agent.py"):
+        shutil.copy2(HERE.parent / name, out / "package")
 
     files = {str(p.relative_to(out)): sha(p) for p in sorted(out.rglob("*")) if p.is_file()}
     (out / "manifest.sha256").write_text(sums(files))
