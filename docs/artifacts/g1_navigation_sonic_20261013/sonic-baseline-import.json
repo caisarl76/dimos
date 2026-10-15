@@ -93,6 +93,20 @@
         }
       },
       "integration": "service imports retain PoseStamped and ObservationTimeBasis; append both independent service test groups; no behavior invented"
+    },
+    {
+      "captured_at": "2026-10-15T00:48:41.241630+00:00",
+      "reason": "Separately labelled import of the manipulation session sonic-feedback extra (pyzmq, msgpack) from the original workspace pyproject.toml/uv.lock, unchanged bytes; the SONIC modules import zmq/msgpack and the pc2 image smoke check failed without it. Navigation code untouched.",
+      "files": {
+        "pyproject.toml": {
+          "before": "5b54dc87061ecca4fbeb81b1a2b2f37f589a2f73540c05bbc66339ac11b3b7f0",
+          "after": "5b4776b374e9272082e9293a23af01371dc1d6bf54455884db40680070b0995f"
+        },
+        "uv.lock": {
+          "before": "75f1f12fca103c0fc5a916a5e118ffa45e2f5ed538a59a1339dc12b122b363fb",
+          "after": "c44f87b455a3a0fef8739783e096e8e63407f46d2f74b4f180c4fec15dc1e279"
+        }
+      }
     }
   ]
 }

@@ -2033,6 +2033,10 @@ sim = [
     { name = "playground" },
     { name = "pygame" },
 ]
+sonic-feedback = [
+    { name = "msgpack" },
+    { name = "pyzmq" },
+]
 spot = [
     { name = "bosdyn-api" },
     { name = "bosdyn-client" },
@@ -2397,6 +2401,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'planning'", specifier = ">=3.7.1" },
     { name = "mcap", marker = "extra == 'unitree-dds'", specifier = ">=1.2.0" },
     { name = "moondream", marker = "extra == 'perception'" },
+    { name = "msgpack", marker = "extra == 'sonic-feedback'", specifier = ">=1.1.2" },
     { name = "mujoco", marker = "extra == 'sim'", specifier = ">=3.3.4" },
     { name = "numba", specifier = ">=0.60.0" },
     { name = "numpy", specifier = ">=1.26.4" },
@@ -2435,6 +2440,7 @@ requires-dist = [
     { name = "python-socketio", marker = "extra == 'web'", specifier = ">=5.16.1" },
     { name = "pyturbojpeg", specifier = "==1.8.2" },
     { name = "pyyaml", marker = "extra == 'planning'", specifier = ">=6.0" },
+    { name = "pyzmq", marker = "extra == 'sonic-feedback'", specifier = ">=27.1.0" },
     { name = "qpsolvers", extras = ["proxqp"], specifier = ">=4.12.0" },
     { name = "reactivex" },
     { name = "reportlab", marker = "extra == 'apriltag'", specifier = ">=4.5.0" },
@@ -2474,7 +2480,7 @@ requires-dist = [
     { name = "yourdfpy", marker = "(platform_machine != 'aarch64' and extra == 'visualization') or (sys_platform != 'linux' and extra == 'visualization')", specifier = ">=0.0.60" },
     { name = "yourdfpy", marker = "extra == 'planning'", specifier = ">=0.0.60" },
 ]
-provides-extras = ["misc", "spot", "visualization", "learning", "agents", "web", "perception", "unitree", "unitree-dds", "control", "planning", "manipulation", "cpu", "cuda", "sim", "mapping", "drone", "dds", "webrtc", "base", "apriltag", "scene", "all"]
+provides-extras = ["misc", "spot", "visualization", "learning", "agents", "web", "perception", "unitree", "unitree-dds", "sonic-feedback", "control", "planning", "manipulation", "cpu", "cuda", "sim", "mapping", "drone", "dds", "webrtc", "base", "apriltag", "scene", "all"]
 
 [package.metadata.requires-dev]
 autofix = [{ name = "ruff", specifier = "==0.14.3" }]
