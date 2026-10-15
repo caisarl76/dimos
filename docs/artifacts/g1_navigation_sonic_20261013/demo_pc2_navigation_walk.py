@@ -80,11 +80,13 @@ CASES = {
     "idle": Case("idle", seconds=3.0),
     "operator_stop": Case("operator_stop", requires=("idle",)),
     "forward_010": Case("motion", vx=0.10, seconds=1.0, requires=("idle", "operator_stop")),
-    "forward_020": Case("motion", vx=0.20, seconds=2.0, requires=("forward_010",)),
-    "turn_left_010": Case("motion", wz=0.10, seconds=1.0, requires=("forward_010",)),
-    "turn_right_010": Case("motion", wz=-0.10, seconds=1.0, requires=("forward_010",)),
-    "cancel": Case("cancel", vx=0.10, seconds=0.6, requires=("forward_010",)),
-    "source_pause": Case("source_pause", vx=0.10, seconds=0.5, requires=("forward_010",)),
+    # 0.10 m/s for 1 s applied but never stepped on pc2 (2026-10-15); the operator made the
+    # simulation-verified 0.20 m/s for 2 s the first walking case.
+    "forward_020": Case("motion", vx=0.20, seconds=2.0, requires=("idle", "operator_stop")),
+    "turn_left_010": Case("motion", wz=0.10, seconds=1.0, requires=("forward_020",)),
+    "turn_right_010": Case("motion", wz=-0.10, seconds=1.0, requires=("forward_020",)),
+    "cancel": Case("cancel", vx=0.10, seconds=0.6, requires=("forward_020",)),
+    "source_pause": Case("source_pause", vx=0.10, seconds=0.5, requires=("forward_020",)),
 }
 
 
