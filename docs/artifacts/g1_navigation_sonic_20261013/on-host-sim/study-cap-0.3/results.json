@@ -1,0 +1,110 @@
+{
+  "status": "study_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5062224192079157,
+      "speed": 0.0011330028189250113,
+      "yaw_rate": 0.003092122234869337
+    },
+    {
+      "name": "forward_2s",
+      "passed": true,
+      "start": 1244668.781326038,
+      "end": 1244670.796196354,
+      "seconds": 2.0,
+      "forward_displacement_m": 0.23425383131115174,
+      "yaw_change_rad": 0.0011141210639239313
+    },
+    {
+      "name": "forward_2s_settled",
+      "passed": true,
+      "elapsed": 2.1244632198940963,
+      "speed": 0.004615348588166805,
+      "yaw_rate": -0.0008387638786701367
+    },
+    {
+      "name": "forward_4s",
+      "passed": true,
+      "start": 1244672.911991339,
+      "end": 1244676.906325419,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.6161599844288955,
+      "yaw_change_rad": -0.0030061345528070056
+    },
+    {
+      "name": "forward_4s_settled",
+      "passed": true,
+      "elapsed": 2.125585258938372,
+      "speed": 0.0037799568542738003,
+      "yaw_rate": 0.0004705262632874705
+    },
+    {
+      "name": "forward_6s",
+      "passed": true,
+      "start": 1244679.046344674,
+      "end": 1244685.056014003,
+      "seconds": 6.0,
+      "forward_displacement_m": 0.9513558532984463,
+      "yaw_change_rad": 0.00736665185082723
+    },
+    {
+      "name": "forward_6s_settled",
+      "passed": true,
+      "elapsed": 2.2313800710253417,
+      "speed": 0.0012737268866622328,
+      "yaw_rate": -0.026933056839011593
+    },
+    {
+      "name": "left_2s",
+      "passed": true,
+      "start": 1244687.281285982,
+      "end": 1244689.281645767,
+      "seconds": 2.0,
+      "forward_displacement_m": -0.0015121536367537513,
+      "yaw_change_rad": 0.08949791259468301
+    },
+    {
+      "name": "left_2s_settled",
+      "passed": true,
+      "elapsed": 0.7973840038757771,
+      "speed": 0.002447047932414328,
+      "yaw_rate": -0.007448640301349694
+    },
+    {
+      "name": "left_4s",
+      "passed": true,
+      "start": 1244690.090942626,
+      "end": 1244694.091275481,
+      "seconds": 4.0,
+      "forward_displacement_m": -0.0038101078370259443,
+      "yaw_change_rad": 0.07884916988826594
+    },
+    {
+      "name": "left_4s_settled",
+      "passed": true,
+      "elapsed": 1.8868022579699755,
+      "speed": 0.0048923938254984934,
+      "yaw_rate": -0.0009586135832507318
+    },
+    {
+      "name": "right_4s",
+      "passed": true,
+      "start": 1244695.981610007,
+      "end": 1244699.976168544,
+      "seconds": 4.0,
+      "forward_displacement_m": -0.0024852885088326956,
+      "yaw_change_rad": -0.14961465680543673
+    },
+    {
+      "name": "right_4s_settled",
+      "passed": true,
+      "elapsed": 2.1415408849716187,
+      "speed": 0.0011181965033135617,
+      "yaw_rate": 0.0024293627853690164
+    }
+  ],
+  "error": null,
+  "study_facing_cap": "0.3"
+}
