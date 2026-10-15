@@ -35,11 +35,14 @@ class SensorDdsFinder:
     def find_spec(name: str, path: Any = None, target: ModuleType | None = None) -> Any:
         if name not in ("cyclonedds", "unitree_sdk2py"):
             return None
+        # Only the frame executing the import statement counts (skipping import
+        # machinery), so imports made while the sender module is itself being
+        # imported, such as DimOS's own DDS probe, still see no CycloneDDS.
         frame = sys._getframe(1)
-        while frame is not None:
-            if frame.f_globals.get("__name__") == SENDER:
-                return importlib.machinery.PathFinder.find_spec(name, [str(SHIM)])
+        while frame is not None and frame.f_globals.get("__name__", "").startswith("importlib"):
             frame = frame.f_back
+        if frame is not None and frame.f_globals.get("__name__") == SENDER:
+            return importlib.machinery.PathFinder.find_spec(name, [str(SHIM)])
         return None
 
 

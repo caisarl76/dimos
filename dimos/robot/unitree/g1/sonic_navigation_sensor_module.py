@@ -189,6 +189,39 @@ def _waist_edge(msg: TFMessage) -> Transform | None:
     return edge
 
 
+def livox_imu_type() -> type:
+    """MID360S IMU DDS type: standard sensor_msgs/Imu layout, used by readers only.
+
+    Field annotations are real objects. Under `from __future__ import annotations`
+    they would be strings naming these lazily imported types, which CycloneDDS
+    cannot resolve (the pc2 readiness probe failed that way on 2026-10-15).
+    """
+    from dataclasses import dataclass
+
+    from cyclonedds.idl import IdlStruct  # type: ignore[import-not-found]
+    from cyclonedds.idl.annotations import autoid, final  # type: ignore[import-not-found]
+    from cyclonedds.idl.types import array, float64  # type: ignore[import-not-found]
+    from unitree_sdk2py.idl.geometry_msgs.msg.dds_ import (  # type: ignore[import-not-found]
+        Quaternion_,
+        Vector3_,
+    )
+    from unitree_sdk2py.idl.std_msgs.msg.dds_ import Header_  # type: ignore[import-not-found]
+
+    covariance = array[float64, 9]
+    fields = {
+        "header": Header_,
+        "orientation": Quaternion_,
+        "orientation_covariance": covariance,
+        "angular_velocity": Vector3_,
+        "angular_velocity_covariance": covariance,
+        "linear_acceleration": Vector3_,
+        "linear_acceleration_covariance": covariance,
+    }
+    namespace = {"__annotations__": fields, "__module__": __name__, "__qualname__": "Imu_"}
+    imu = type(IdlStruct)("Imu_", (IdlStruct,), namespace, typename="sensor_msgs.msg.dds_.Imu_")
+    return dataclass(final(autoid("sequential")(imu)))  # type: ignore[no-any-return]
+
+
 class SonicNavigationSensorSenderConfig(ModuleConfig):
     cloud_bind: str = Field(pattern=r"^tcp://", max_length=2048)
     state_bind: str = Field(pattern=r"^tcp://", max_length=2048)
@@ -276,42 +309,21 @@ class SonicNavigationSensorSender(Module):
 
     def _open_readers(self) -> dict[str, Any]:
         # Lazy DDS imports: present in the pc2 task image, absent from the workstation env.
-        from dataclasses import dataclass
-
         from cyclonedds.domain import DomainParticipant  # type: ignore[import-not-found]
-        from cyclonedds.idl import IdlStruct  # type: ignore[import-not-found]
-        from cyclonedds.idl.annotations import autoid, final  # type: ignore[import-not-found]
-        from cyclonedds.idl.types import array, float64  # type: ignore[import-not-found]
         from cyclonedds.qos import Policy, Qos  # type: ignore[import-not-found]
         from cyclonedds.sub import DataReader  # type: ignore[import-not-found]
         from cyclonedds.topic import Topic  # type: ignore[import-not-found]
         from unitree_sdk2py.core.channel import (  # type: ignore[import-not-found]
             ChannelFactoryInitialize,
         )
-        from unitree_sdk2py.idl.geometry_msgs.msg.dds_ import (  # type: ignore[import-not-found]
-            Quaternion_,
-            Vector3_,
-        )
         from unitree_sdk2py.idl.sensor_msgs.msg.dds_ import (  # type: ignore[import-not-found]
             PointCloud2_,
         )
-        from unitree_sdk2py.idl.std_msgs.msg.dds_ import Header_  # type: ignore[import-not-found]
         from unitree_sdk2py.idl.unitree_hg.msg.dds_ import (  # type: ignore[import-not-found]
             LowState_,
         )
 
-        @dataclass
-        @final
-        @autoid("sequential")
-        class Imu_(IdlStruct, typename="sensor_msgs.msg.dds_.Imu_"):  # type: ignore[misc,call-arg]
-            header: Header_
-            orientation: Quaternion_
-            orientation_covariance: array[float64, 9]
-            angular_velocity: Vector3_
-            angular_velocity_covariance: array[float64, 9]
-            linear_acceleration: Vector3_
-            linear_acceleration_covariance: array[float64, 9]
-
+        Imu_ = livox_imu_type()
         if self.config.network_interface:
             ChannelFactoryInitialize(self.config.dds_domain, self.config.network_interface)
         else:

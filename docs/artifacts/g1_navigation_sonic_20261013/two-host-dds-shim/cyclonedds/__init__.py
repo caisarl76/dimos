@@ -81,6 +81,7 @@ class DomainParticipant:
 class Topic:
     def __init__(self, participant: DomainParticipant, name: str, kind: Any) -> None:
         self.name = name
+        self.kind = kind  # kept so tests can resolve the IDL type like CycloneDDS does
 
 
 def _header(stamp: float) -> SimpleNamespace:
@@ -231,6 +232,7 @@ _SOURCES = {
 
 class DataReader:
     def __init__(self, participant: DomainParticipant, topic: Topic, qos: Qos | None = None):
+        self.topic = topic
         self._source = _SOURCES[topic.name]()
 
     def take(self, limit: int) -> list[Any]:

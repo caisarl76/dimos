@@ -174,30 +174,20 @@ class DdsObservation:
 
 def observe_dds(interface: str, domain: int, seconds: float) -> DdsObservation:
     """Readers only. Lazy imports: these packages exist in the pc2 task image."""
-    from dataclasses import dataclass as idl_dataclass
-
     from cyclonedds.builtin import (  # type: ignore[import-not-found]
         BuiltinDataReader,
         BuiltinTopicDcpsPublication,
     )
     from cyclonedds.domain import DomainParticipant  # type: ignore[import-not-found]
-    from cyclonedds.idl import IdlStruct  # type: ignore[import-not-found]
-    from cyclonedds.idl.annotations import autoid, final  # type: ignore[import-not-found]
-    from cyclonedds.idl.types import array, float64  # type: ignore[import-not-found]
     from cyclonedds.qos import Policy, Qos  # type: ignore[import-not-found]
     from cyclonedds.sub import DataReader  # type: ignore[import-not-found]
     from cyclonedds.topic import Topic  # type: ignore[import-not-found]
     from unitree_sdk2py.core.channel import (
         ChannelFactoryInitialize,  # type: ignore[import-not-found]
     )
-    from unitree_sdk2py.idl.geometry_msgs.msg.dds_ import (  # type: ignore[import-not-found]
-        Quaternion_,
-        Vector3_,
-    )
     from unitree_sdk2py.idl.sensor_msgs.msg.dds_ import (
         PointCloud2_,  # type: ignore[import-not-found]
     )
-    from unitree_sdk2py.idl.std_msgs.msg.dds_ import Header_  # type: ignore[import-not-found]
     from unitree_sdk2py.idl.unitree_hg.msg.dds_ import (  # type: ignore[import-not-found]
         LowCmd_,
         LowState_,
@@ -207,19 +197,10 @@ def observe_dds(interface: str, domain: int, seconds: float) -> DdsObservation:
         encode_cloud,
         encode_imu,
         encode_waist,
+        livox_imu_type,
     )
 
-    @idl_dataclass
-    @final
-    @autoid("sequential")
-    class Imu_(IdlStruct, typename="sensor_msgs.msg.dds_.Imu_"):  # type: ignore[misc,call-arg]
-        header: Header_
-        orientation: Quaternion_
-        orientation_covariance: array[float64, 9]
-        angular_velocity: Vector3_
-        angular_velocity_covariance: array[float64, 9]
-        linear_acceleration: Vector3_
-        linear_acceleration_covariance: array[float64, 9]
+    Imu_ = livox_imu_type()
 
     ChannelFactoryInitialize(domain, interface)
     participant = DomainParticipant(domain)
