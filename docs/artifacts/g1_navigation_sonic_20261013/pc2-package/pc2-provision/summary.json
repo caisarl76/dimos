@@ -218,8 +218,8 @@
       },
       "superseded": "operator session 14:30 CST: native and graph started, but the package had no operator start step; the native stayed in init (no feedback), execution unready, harness ran no case (hardware/session-20261015-1). Start step added in 5a864e4c8."
     },
-    "final": {
-      "task_dir": "sonic-navigation-20261013",
+    "attempt7": {
+      "task_dir": "sonic-navigation-20261013.attempt7-terminal-readiness",
       "started": "2026-10-15 14:40 CST",
       "finished": "14:46 CST",
       "precondition": "operator stopped graph and native; no SONIC process, no container; attempt-6 image f2112b50 removed",
@@ -240,7 +240,8 @@
       "image": {
         "id": "sha256:65d9f78808ff8c285d6b2f6dfba4d86757d34f7d9ad9f6a3ced805ddc60e2a0b",
         "arch": "arm64",
-        "size_gb": 6.66
+        "size_gb": 6.66,
+        "removed": true
       },
       "dimos_source_commit": "5a864e4c8 (payload manifest 45e693bca)",
       "check_only": {
@@ -270,10 +271,65 @@
             "1.37"
           ]
         }
+      },
+      "superseded": "operator session 2 (15:50 KST): idle ran, native never walked; a >100 ms relay reply over pc2 Wi-Fi expired readiness and faulted the session (terminal rule). Recoverable readiness in 3f986f271."
+    },
+    "final": {
+      "task_dir": "sonic-navigation-20261013",
+      "started": "2026-10-15 15:47 CST",
+      "finished": "15:53 CST",
+      "precondition": "no SONIC process, no container; attempt-7 image 65d9f788 removed",
+      "native_tests": 42,
+      "native_failed": [
+        "FK.TestFKAndGlobalVelocities"
+      ],
+      "controller_sha256": "dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9",
+      "smoke": {
+        "smoke": "passed",
+        "modules": [
+          "sonicexecutionmodule",
+          "sonicnavigationrelaymodule",
+          "sonicnavigationsensorsender"
+        ],
+        "planner_packet_bytes": 1339
+      },
+      "image": {
+        "id": "sha256:1ab0e6df56a9ca384b439b22941f9960bdce36e556d36ef17e152e23e6eeebff",
+        "arch": "arm64",
+        "size_gb": 6.66
+      },
+      "dimos_source_commit": "917cfd554 (payload manifest eda659906)",
+      "check_only": {
+        "20261015-155325": {
+          "blocking": [],
+          "max_receipt_gap_s": {
+            "lidar_raw": 0.154,
+            "imu_raw": 0.084,
+            "lowstate": 0.084
+          },
+          "loadavg": [
+            "3.01",
+            "2.23",
+            "1.27"
+          ]
+        },
+        "20261015-155346": {
+          "blocking": [],
+          "max_receipt_gap_s": {
+            "lidar_raw": 0.16,
+            "imu_raw": 0.097,
+            "lowstate": 0.086
+          },
+          "loadavg": [
+            "2.44",
+            "2.15",
+            "1.26"
+          ]
+        }
       }
     }
   },
-  "integrity": "attempts 3-7: 1,232 fingerprints, 71 original native source files and both shared controller binaries unchanged before and after; attempts 1-2 stopped at the smoke check and were rechecked unchanged",
+  "integrity": "attempts 3-8: 1,232 fingerprints, 71 original native source files and both shared controller binaries unchanged before and after; attempts 1-2 stopped at the smoke check and were rechecked unchanged",
   "concurrent_robot_use": "The manipulation session ran its own guarded SONIC controller (native runs from 08:53:00 and 08:54:17, hold-reference tests 08:54:50-08:56:01 CST). Attempt 2 (08:49:41-08:54:56) and the final run (from 08:56:22, controller PID 13636 still running at its start) overlapped with that activity. No navigation controller, container or command was started. Attempt 4 started with no SONIC controller running, before or after.",
   "check_only": {
     "launch_check_only_20261015_121108": {
