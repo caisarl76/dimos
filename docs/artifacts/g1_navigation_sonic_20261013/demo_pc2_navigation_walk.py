@@ -460,9 +460,10 @@ def run_session(args: Any) -> None:
             record = run_case(name, CASES[name])
             results["cases"].append(record)
             save()
-            print(
-                json.dumps({k: record.get(k) for k in ("name", "passed", "measured_ok", "motion")})
-            )
+            summary = {k: record.get(k) for k in ("name", "passed", "measured_ok", "motion")}
+            if "error" in record:
+                summary["refused"] = record["begin"].get("error", record["error"])
+            print(json.dumps(summary))
     finally:
         try:
             peer.call("tele", vx=0.0, wz=0.0)
