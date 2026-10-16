@@ -359,6 +359,7 @@ def run_session(args: Any) -> None:
         ):
             tele(0.0, 0.0)
             record["error"] = "begin refused or no active phase; no motion was commanded"
+            record["measured_ok"] = record["passed"] = False
             return record
         tele(0.0, 0.0)
         time.sleep(1.0)
