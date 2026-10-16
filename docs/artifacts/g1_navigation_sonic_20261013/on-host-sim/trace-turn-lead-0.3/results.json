@@ -1,0 +1,22 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.49052621400915086,
+      "speed": 0.0005888226984474058,
+      "yaw_rate": -0.0031540968070374177
+    },
+    {
+      "name": "left_4s",
+      "passed": true,
+      "start": 1299602.868893021,
+      "end": 1299606.863206419,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.0024405684184434485,
+      "yaw_change_rad": 1.0989664565760828
+    }
+  ],
+  "error": "TimeoutError: left_4s measured settling"
+}
