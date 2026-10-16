@@ -1,0 +1,41 @@
+{
+  "status": "diagnostic_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5048663939815015,
+      "speed": 0.0016764100823905709,
+      "yaw_rate": -0.003140762210534701
+    },
+    {
+      "name": "before_noisy_trace_settled",
+      "passed": true,
+      "elapsed": 0.5229041399434209,
+      "speed": 0.00223328811008675,
+      "yaw_rate": -0.003019849194026092
+    },
+    {
+      "name": "noisy_trace_replan_limit",
+      "passed": true,
+      "start": 1308676.977271656,
+      "end": 1308681.995142353,
+      "request": 1308676.928351301,
+      "first_moving": 1308676.972076221,
+      "first_applied": 1308676.977271656,
+      "proof": "live",
+      "native_state_replans": 15,
+      "navigation_active": true,
+      "yaw_noise_rad": 0.005,
+      "source": "PController.advance, 0.2 m/s, alternating +/-0.01 rad lookahead error"
+    },
+    {
+      "name": "noisy_trace_settled",
+      "passed": true,
+      "elapsed": 2.2308760499581695,
+      "speed": 0.004551893714353893,
+      "yaw_rate": -0.011500080097731553
+    }
+  ],
+  "error": null
+}
