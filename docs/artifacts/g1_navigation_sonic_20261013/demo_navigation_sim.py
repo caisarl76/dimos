@@ -68,6 +68,11 @@ if os.environ.get("SONIC_STUDY_FACING_CAP"):
     def _study_limits() -> NavigationLimits:
         limits = NavigationLimits()
         object.__setattr__(limits, "max_facing_offset", float(os.environ["SONIC_STUDY_FACING_CAP"]))
+        # The lead is min(cap, wz * lookahead): at 0.2 rad/s and 0.5 s it stays 0.1 rad
+        # whatever the cap, so a larger lead also needs a longer lookahead.
+        if os.environ.get("SONIC_STUDY_FACING_LOOKAHEAD"):
+            lookahead = float(os.environ["SONIC_STUDY_FACING_LOOKAHEAD"])
+            object.__setattr__(limits, "facing_lookahead", lookahead)
         return limits
 
     sonic_navigation_session.NavigationLimits = _study_limits  # type: ignore[assignment,misc]
@@ -305,6 +310,11 @@ def main() -> None:
         "--diagnose-noisy-follower",
         action="store_true",
         help="Isolate the translating trace; never report the full commissioning matrix passed",
+    )
+    parser.add_argument(
+        "--trace-turn",
+        action="store_true",
+        help="Study only: one 4 s left turn with every tracker conversion recorded",
     )
     parser.add_argument(
         "--study",
@@ -654,6 +664,15 @@ def main() -> None:
                     ("right_4s", 0.0, -0.2, 4.0),
                 ]
                 results["study_facing_cap"] = os.environ.get("SONIC_STUDY_FACING_CAP", "0.1")
+            if args.trace_turn:
+                motions = [("left_4s", 0.0, 0.2, 4.0)]
+                if os.environ.get("SONIC_TRACE_AFTER_FORWARD"):
+                    motions.insert(0, ("forward_2s", 0.2, 0.0, 2.0))
+                owner._navigation._tracker = ConversionTrace(
+                    owner._navigation._tracker,
+                    lambda: owner._navigation.status.source_sequence,
+                    record_conversion,
+                )
             if args.diagnose_noisy_follower or args.noise_proof:
                 motions = []
             if args.diagnose_transitions:
@@ -707,12 +726,12 @@ def main() -> None:
                     )
                     results["status"] = "diagnostic_only"
                     return
-                if not (args.diagnose_transitions or args.study):
+                if not (args.diagnose_transitions or args.study or args.trace_turn):
                     assert passed, name + " direction mismatch"
                 settle(name)
                 if args.diagnose_transitions:
                     pump(5.0)
-            if args.study:
+            if args.study or args.trace_turn:
                 owner.end_navigation()
                 wait(lambda: owner.get_navigation_status()["pose_ready"], 3.0, "study stop")
                 results["status"] = "study_only"
