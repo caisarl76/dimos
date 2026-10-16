@@ -155,7 +155,9 @@ def test_pure_turn_and_tiny_speed_are_idle():
     tracker = PlannerIntentTracker(NavigationLimits())
     turning = tracker.update(twist(0, 0.2), feedback())
     assert turning.mode == 0 and turning.speed == 0 and turning.movement == (0, 0, 0)
-    assert math.atan2(turning.facing[1], turning.facing[0]) == pytest.approx(0.1)
+    # Lead = min(cap, wz x lookahead) = 0.2 rad: the native turns in IDLE in proportion to
+    # its facing error, and a 0.1 rad lead stalled turns near 5 deg (sim and pc2, 2026-10-16).
+    assert math.atan2(turning.facing[1], turning.facing[0]) == pytest.approx(0.2)
     tiny = tracker.update(twist(0.09), feedback())
     assert tiny.mode == 0 and tiny.speed == 0 and tiny.movement == (0, 0, 0)
 
@@ -186,9 +188,16 @@ def test_tiny_turn_intent_does_not_chase_measured_heading_drift(vx):
 def test_commissioned_turn_rate_still_advances_facing_with_measured_turn():
     tracker = PlannerIntentTracker(NavigationLimits())
     first = tracker.update(twist(0, 0.1), feedback())
-    assert math.atan2(first.facing[1], first.facing[0]) == pytest.approx(0.05)
+    assert math.atan2(first.facing[1], first.facing[0]) == pytest.approx(0.1)
     second = tracker.update(twist(0, 0.1), feedback(0.025))
-    assert math.atan2(second.facing[1], second.facing[0]) == pytest.approx(0.075)
+    assert math.atan2(second.facing[1], second.facing[0]) == pytest.approx(0.125)
+
+
+def test_facing_lead_is_bounded_by_the_commissioned_offset():
+    assert NavigationLimits().facing_lookahead == 1.0
+    assert NavigationLimits(max_facing_offset=0.2).max_facing_offset == 0.2
+    with pytest.raises(ValueError, match="turning limits"):
+        NavigationLimits(max_facing_offset=0.21)
 
 
 def test_reference_reset_reanchors_held_heading():

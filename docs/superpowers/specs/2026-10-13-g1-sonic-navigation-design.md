@@ -195,10 +195,19 @@ Initial conversion parameters, all explicit configuration values:
 | `max_walk_speed` | 0.20 m/s | Admission/native cap; lower supported speeds need measured validation |
 | `max_yaw_rate` | 0.20 rad/s | Matches the configured current follower envelope |
 | `turn_deadband` | 0.01 rad/s | Treat `abs(wz) <= deadband` as zero before facing conversion |
-| `facing_lookahead` T | 0.50 s | Converts requested turn rate to a finite facing target |
-| `max_facing_offset` theta_max | 0.10 rad | Bounds each target relative to measured yaw |
+| `facing_lookahead` T | 1.00 s (amended from 0.50 s) | Converts requested turn rate to a finite facing target |
+| `max_facing_offset` theta_max | 0.20 rad (amended from 0.10 rad) | Bounds each target relative to measured yaw |
 | direction/facing update threshold | 0.02 rad | Wrapped angular difference from last emitted target |
 | speed update threshold | 0.01 m/s | Difference from last emitted target; mode/zero transitions bypass it |
+
+Amendment, 2026-10-16 (operator approved): the native turns in IDLE at a rate that
+scales with its facing error. With T = 0.50 s and theta_max = 0.10 rad, a 0.20 rad/s
+turn led by 0.1 rad and stalled near 5 deg: 8-15 deg in 4 s in simulation and
+0.7-4.5 deg on pc2. A 0.20 rad lead (T = 1.00 s) turned 38-44 deg in 4 s, 83-95% of
+the commanded rate, with overshoot under 2 deg. The live noisy-follower chatter proof
+gave 15 native replans, against 18 at 0.10 rad. Settling after a turn takes about
+3.0-3.2 s instead of about 2.2 s. Evidence:
+[on-host-sim/verify-*](/docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/verify-lead-0.20-turn-1/results.json).
 
 For a fresh command with `abs(wz) > turn_deadband`, compute
 `target_yaw = measured_yaw + clamp(wz * T, -theta_max, +theta_max)`.

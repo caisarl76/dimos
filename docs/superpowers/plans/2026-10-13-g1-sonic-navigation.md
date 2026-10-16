@@ -17,7 +17,7 @@
 - Native changes belong to `build/sonic-navigation-runtime/source`, copied from `build/sonic-grasp-runtime/source`. Persist a reviewed patch and manifests in this task's artifacts; never edit the other session's source or binary.
 - One motor controller and one execution publisher. No stock SDK/WebRTC/FastLio composition, automatic motor startup, simultaneous planner/pose references or `stop=true` navigation cancel.
 - Legacy planner header is 1,280 bytes; minimal packet is 1,323 bytes. Guarded packets add only sequence/deadline; native request ID and issue timestamp are omitted.
-- Planner modes IDLE/SLOW_WALK only; height -1; no arms/hands/VR overrides. Initial walk range 0.10–0.20 m/s, yaw rate limit 0.20 rad/s, facing lookahead 0.50 s, offset limit 0.10 rad, angular threshold 0.02 rad, speed threshold 0.01 m/s.
+- Planner modes IDLE/SLOW_WALK only; height -1; no arms/hands/VR overrides. Initial walk range 0.10–0.20 m/s, yaw rate limit 0.20 rad/s, facing lookahead 1.00 s, offset limit 0.20 rad (amended 2026-10-16 from 0.50 s / 0.10 rad: IDLE turns stalled near 5 deg; see the design amendment), angular threshold 0.02 rad, speed threshold 0.01 m/s.
 - Follower `nerf_speed=0.2/0.55`, `min_angular_velocity=0.0`, `simulation=""`, including the native MuJoCo stage. Other compositions retain the 0.2 rad/s angular minimum.
 - Source expiry 350 ms produces recoverable IDLE; continuous source outage 2 s ends/cancels navigation. Native publisher watchdog 250 ms and feedback timeout 200 ms latch admission; pose reference lease remains 200 ms.
 - Input progress budgets: LiDAR/LIO/odom 350 ms, IMU/dynamic base TF 200 ms, map/costmap 1 s. Static calibrated TF does not expire. Source stamps must advance; receipt of a duplicate is insufficient.
@@ -36,7 +36,7 @@
 
 ---
 
-## Stage A — Local controller path
+## Stage A: Local controller path
 
 Stage A has no dependency on the off-board protocol or robot networking. Its readiness/cancel fixture is explicitly test-only; production defaults stay closed without real input supervision.
 
@@ -142,7 +142,7 @@ are retained. Stage B still depends on the completed Stage A checks/review.
 
 - [x] After Task 5, obtain a fresh read-only architecture/code review of Tasks 1–5, including the imported baseline boundary, atomic input wiring, shared lease fixtures and MuJoCo evidence. The reviewer uses Astra/high and a limited context; it performs no implementation. Fix blocking findings with regression tests before starting Stage B. No additional user permission check is required for this already approved gate.
 
-## Stage B — New two-host transport and navigation graphs
+## Stage B: New two-host transport and navigation graphs
 
 ### Task 6: Readiness from existing advancing source stamps
 
@@ -198,7 +198,7 @@ are retained. Stage B still depends on the completed Stage A checks/review.
 - [ ] Drop/delay replies, stall cancel/state RPC, stop peer, freeze each sensor/LIO/map stage and restart peer/publisher. Verify bounded deadlines, immediate local gating, explicit recovery, unresolved cancel blocking pose and no old target after handback.
 - [ ] Measure worker/relay load, command age, native state/control lateness and replan triggers during the existing VLA phase. Analyze with Task 5's analyzer; require all software assertions passing before generating a robot launch package. Commit compact evidence and report; failures remain visible.
 
-## Stage C — Isolated pc2 commissioning
+## Stage C: Isolated pc2 commissioning
 
 ### Task 10: Reviewable ARM64 package and passive readiness checks
 
