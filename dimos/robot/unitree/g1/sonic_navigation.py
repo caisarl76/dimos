@@ -210,8 +210,11 @@ class NavigationLimits:
     max_walk_speed: float = 0.20
     max_yaw_rate: float = 0.20
     turn_deadband: float = 0.01
-    facing_lookahead: float = 0.50
-    max_facing_offset: float = 0.10
+    # The native turns in IDLE in proportion to its facing error: a 0.1 rad lead stalled
+    # turns near 5 deg; 0.2 rad reached 83-95% of the commanded rate in simulation with
+    # no added chatter (2026-10-16, operator approved).
+    facing_lookahead: float = 1.00
+    max_facing_offset: float = 0.20
     angular_threshold: float = 0.02
     speed_threshold: float = 0.01
 
@@ -221,7 +224,7 @@ class NavigationLimits:
                 raise ValueError(f"{name} must be positive")
         if not 0.1 <= self.min_walk_speed <= self.max_walk_speed <= 0.2:
             raise ValueError("walking limits must be inside the commissioned envelope")
-        if self.max_yaw_rate > 0.2 or self.max_facing_offset > 0.1:
+        if self.max_yaw_rate > 0.2 or self.max_facing_offset > 0.2:
             raise ValueError("turning limits exceed the commissioned envelope")
         if self.turn_deadband >= self.max_yaw_rate:
             raise ValueError("turn deadband must leave an admitted turning range")
