@@ -28,6 +28,7 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
+from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.sonic_arm_reference import (
@@ -76,7 +77,9 @@ class FakeEncoder:
 
     def encode(self, poses):
         tokens = np.full((len(poses), 64), PEER_TOKEN)
-        tokens[:, 0] += poses[:, 15] - poses[0, 15]
+        tokens[:, 0] += (poses - poses[0]).sum(
+            axis=1
+        )  # The planned offset of whichever joint moves.
         return tokens
 
 
@@ -100,7 +103,7 @@ def skill(execution, mocker):
         transport.stop()
 
 
-def run(module, angle_deg, body_q=lambda t: np.zeros(29)):
+def run(module, angle_deg, body_q=lambda t: np.zeros(29), motion="left_arm_forward"):
     """Call the skill while a feeder plays body telemetry (t = seconds since the call)."""
     module_execution = module._execution
     stopped = threading.Event()
@@ -117,15 +120,15 @@ def run(module, angle_deg, body_q=lambda t: np.zeros(29)):
     feeder = threading.Thread(target=feed, daemon=True)
     feeder.start()
     try:
-        return module.move_left_arm_forward(angle_deg)
+        return module.move_upper_body(motion, angle_deg)
     finally:
         stopped.set()
         feeder.join(2)
 
 
-def follows(t, delta=-np.radians(20)):  # Left shoulder pitch at the plan's depth mid-run.
+def follows(t, delta=-np.radians(20), joint=15):  # The moving joint at the plan's depth mid-run.
     q = np.zeros(29)
-    q[15] = delta if 0.5 < t < 0.9 else 0.0
+    q[joint] = delta if 0.5 < t < 0.9 else 0.0
     return q
 
 
@@ -148,7 +151,7 @@ def test_swing_streams_one_chunk_and_hands_back(skill):
     module, peer = skill
     result = run(module, 20.0, follows)
     assert result.success, result
-    assert result.metadata["reached_rad"] == pytest.approx(-np.radians(20), abs=1e-3)
+    assert result.metadata["reached_deg"] == pytest.approx(20.0, abs=0.1)
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "finished" and status["handback_confirmed"]
     assert status["last_chunk_sequence"] == 0  # One open-loop chunk, as commissioned.
@@ -198,7 +201,7 @@ def test_arm_that_does_not_follow_is_reported(skill):
 def test_invalid_angle_sends_nothing(skill, angle):
     module, peer = skill
     before = len(peer.snapshot())
-    assert module.move_left_arm_forward(angle).error_code == "INVALID_ANGLE"
+    assert module.move_upper_body("left_arm_forward", angle).error_code == "INVALID_ANGLE"
     assert not any(p.startswith(b"pose") for p in peer.snapshot()[before:])
     assert module._execution.get_status()["task"] is None
 
@@ -208,7 +211,7 @@ def test_movement_during_encoding_sends_nothing(skill, mocker):
     state = module._execution.get_feedback()
     moved = replace(state, body_q=(0.1,) * 29)
     mocker.patch.object(module._execution, "get_feedback", side_effect=[state, moved])
-    assert module.move_left_arm_forward(20.0).error_code == "MOVED"
+    assert module.move_upper_body("left_arm_forward", 20.0).error_code == "MOVED"
     assert module._execution.get_status()["task"] is None
 
 
@@ -216,7 +219,7 @@ def test_not_ready_execution_sends_nothing(skill, mocker):
     module, _ = skill
     status = module._execution.get_status()
     mocker.patch.object(module._execution, "get_status", return_value=status | {"ready": False})
-    assert module.move_left_arm_forward(20.0).error_code == "NOT_READY"
+    assert module.move_upper_body("left_arm_forward", 20.0).error_code == "NOT_READY"
 
 
 def test_session_failure_is_not_reported_as_success(skill):
@@ -291,7 +294,7 @@ def test_profile_too_short_for_the_plan_sends_nothing(skill, mocker):
     status = module._execution.get_status()
     short = status | {"profile": status["profile"] | {"max_observation_age": 0.5}}
     mocker.patch.object(module._execution, "get_status", return_value=short)
-    assert module.move_left_arm_forward(20.0).error_code == "NOT_READY"
+    assert module.move_upper_body("left_arm_forward", 20.0).error_code == "NOT_READY"
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
@@ -308,5 +311,35 @@ def test_failed_session_at_finish_is_not_reported_as_success(skill, mocker):
 
 def test_agent_prompt_names_only_skills_the_blueprint_has():
     named = set(re.findall(r"`(\w+)\(", G1_SONIC_ARM_SYSTEM_PROMPT))
-    skills = {k for k, v in vars(SonicArmSkillContainer).items() if getattr(v, "__skill__", False)}
+    skills = {
+        k
+        for container in (SonicArmSkillContainer, ObserveSkill)
+        for k, v in vars(container).items()
+        if getattr(v, "__skill__", False)
+    }
     assert named and named <= skills, named - skills
+
+
+@pytest.mark.parametrize(
+    ("motion", "joint", "sign"), [("left_arm_sideways", 16, 1), ("left_forearm_raise", 18, -1)]
+)
+def test_other_motions_move_their_own_joint_with_its_widened_envelope(skill, motion, joint, sign):
+    module, peer = skill
+    # 0.33 rad is past the 0.20 arm margin alone: only the moving joint's widened envelope allows it.
+    result = run(module, 19.0, partial(follows, delta=sign * 0.33, joint=joint), motion=motion)
+    assert result.success, result
+    assert result.metadata["motion"] == motion and result.metadata["reached_deg"] == pytest.approx(
+        18.9, abs=0.1
+    )
+    streamed = tokens(peer.snapshot())[:, 0]
+    assert streamed.max() - streamed.min() == pytest.approx(np.radians(19), abs=0.01)
+
+
+def test_unknown_motion_sends_nothing(skill):
+    module, peer = skill
+    assert module.move_upper_body("waist_turn_left", 10.0).error_code == "INVALID_MOTION"
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_motion_enum_matches_the_motion_table():
+    assert set(sonic_arm_skill.UpperBodyMotion.__args__) == set(sonic_arm_skill.MOTIONS)

@@ -12,24 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""G1 left-arm skill over an independently launched, guarded SONIC controller, via MCP.
+"""G1 upper-body motion skill and head camera over an independently launched, guarded SONIC controller.
 
 The operator launches and stops native control and selects planner idle; this blueprint never
 does either. Run it on the robot PC, beside the controller, with the SONIC v1.1 encoder:
 
     dimos run unitree-g1-sonic-arm \\
         --sonicarmskillcontainer.encoder-path=<deploy>/policy/sonic_v1_1/model_encoder.onnx
-    dimos mcp call move_left_arm_forward --arg angle_deg=20
+    dimos mcp call move_upper_body --arg motion=left_arm_forward --arg angle_deg=20
+    dimos mcp call observe
+
+The head camera is the G1's D435i colour stream, read through V4L2 (no depth).
 """
 
 from dimos.agents.mcp.mcp_server import McpServer
+from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.constants import STATE_DIR
 from dimos.core.coordination.blueprints import autoconnect
+from dimos.hardware.sensors.camera.module import CameraModule
+from dimos.hardware.sensors.camera.webcam import Webcam
+from dimos.msgs.geometry_msgs.Quaternion import Quaternion
+from dimos.msgs.geometry_msgs.Transform import Transform
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
+from dimos.msgs.sensor_msgs.CameraInfo import CameraInfo
 from dimos.robot.unitree.g1.sonic_arm_skill import SonicArmSkillContainer
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 
+# The D435i colour interface (USB interface 3) on the G1 PC2's internal head-camera port; by-path
+# stays fixed across reboots, unlike /dev/videoN, and by-id names collide with the depth interface.
+HEAD_CAMERA_DEVICE = "/dev/v4l/by-path/platform-3610000.usb-usb-0:3:1.3-video-index0"
+# Factory colour intrinsics at 640x480 (librealsense), distortion all zero.
+_FX, _FY, _CX, _CY = 606.62, 607.12, 325.54, 245.35
+
+
+def _head_camera() -> Webcam:
+    return Webcam(
+        camera_index=HEAD_CAMERA_DEVICE,
+        width=640,
+        height=480,
+        fps=15,
+        camera_info=CameraInfo(
+            height=480,
+            width=640,
+            distortion_model="plumb_bob",
+            D=[0.0] * 5,
+            K=[_FX, 0.0, _CX, 0.0, _FY, _CY, 0.0, 0.0, 1.0],
+            R=[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            P=[_FX, 0.0, _CX, 0.0, 0.0, _FY, _CY, 0.0, 0.0, 0.0, 1.0, 0.0],
+            frame_id="camera_optical",
+        ),
+    )
+
+
 unitree_g1_sonic_arm = autoconnect(
+    CameraModule.blueprint(
+        hardware=_head_camera,
+        # URDF d435_joint on torso_link: pitched 0.83 rad down, looking at the floor ahead.
+        transform=Transform(
+            translation=Vector3(0.0576235, 0.01753, 0.41987),
+            rotation=Quaternion(0.0, 0.40355, 0.0, 0.91496),
+            frame_id="torso_link",
+            child_frame_id="camera_link",
+        ),
+    ),
+    ObserveSkill.blueprint(),
     SonicExecutionModule.blueprint(
         # The guarded native launcher's fixed local endpoints (reference in, telemetry out).
         reference_bind="tcp://127.0.0.1:5556",

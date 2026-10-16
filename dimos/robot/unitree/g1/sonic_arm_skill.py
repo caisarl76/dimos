@@ -63,8 +63,18 @@ ArmError = Literal[
     "EXECUTION_FAILED",
     "HANDBACK_UNCONFIRMED",
     "NOT_REACHED",
+    "INVALID_MOTION",
 ]
 MAX_ANGLE_DEG = 28.0  # Commissioned at 0.5 rad (28.6 deg) on a G1.
+UpperBodyMotion = Literal["left_arm_forward", "left_arm_sideways", "left_forearm_raise"]
+# Motion -> (motor-order joint, sign of a positive angle), from the G1 model in the torso frame and
+# checked in MuJoCo at 28 deg. Shoulder roll only outward: inward drives the hand into the torso.
+# Waist turns were left out: SONIC tracked only 18-48% of an isolated waist yaw.
+MOTIONS: dict[str, tuple[int, int]] = {
+    "left_arm_forward": (LEFT_SHOULDER_PITCH, -1),  # hand forward and up
+    "left_arm_sideways": (16, +1),  # left shoulder roll: hand outward
+    "left_forearm_raise": (18, -1),  # left elbow: forearm up
+}
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _JOINTS = [name.removeprefix("g1/") for name in make_humanoid_joints("g1")]
 _GROUPS = {
@@ -108,8 +118,10 @@ class _Watch:
     base: NDArray[np.float64]
     allowed: NDArray[np.float64]
     max_dq: float
+    joint: int
+    sign: int
     returning: bool = False
-    reached: float = 0.0
+    reached: float = 0.0  # Furthest progress of the moving joint in the motion's direction, rad.
     deviation: NDArray[np.float64] = field(default_factory=lambda: np.zeros(29))
     stream_dq: tuple[float, int] = (0.0, -1)
     return_dq: tuple[float, int] = (0.0, -1)
@@ -152,7 +164,7 @@ class SonicArmSkillContainer(Module):
             if watch.returning:
                 watch.return_dq = max(watch.return_dq, (float(dq[k]), k))
                 return
-            watch.reached = min(watch.reached, float(q[LEFT_SHOULDER_PITCH]))
+            watch.reached = max(watch.reached, watch.sign * float(q[watch.joint]))
             watch.deviation = np.maximum(watch.deviation, np.abs(q))
             watch.stream_dq = max(watch.stream_dq, (float(dq[k]), k))
             if watch.abort is None:
@@ -164,29 +176,35 @@ class SonicArmSkillContainer(Module):
                     watch.abort = f"{_JOINTS[k]} speed {dq[k]:.2f} rad/s > {watch.max_dq}"
 
     @skill(uses=[CAP_MOVEMENT])
-    def move_left_arm_forward(self, angle_deg: float) -> SkillResult[ArmError]:
-        """Swing the left arm forward, hold it for 1 second, swing it back, then hand control back.
+    def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> SkillResult[ArmError]:
+        """Move one upper-body joint out by angle_deg, hold it for 1 second, move it back, then hand control back.
 
-        Moves only the left shoulder (min-jerk, 2 s out and 2 s back) while SONIC keeps the robot
-        balanced. Takes about 18 s. Requires the SONIC controller running in confirmed planner idle;
-        it never starts or stops the controller. Stops early and returns control to the planner if
-        any joint strays from the plan.
+        Motions: "left_arm_forward" swings the left arm forward (shoulder pitch),
+        "left_arm_sideways" raises the left arm out to the side (shoulder roll), and
+        "left_forearm_raise" lifts the left forearm (elbow). Min-jerk, 2 s out and 2 s back, while
+        SONIC keeps the robot balanced; about 18 s in all. Requires the SONIC controller running in
+        confirmed planner idle; it never starts or stops the controller. Stops early and returns
+        control to the planner if any joint strays from the plan.
 
         Args:
-            angle_deg: How far to swing the arm forward, in degrees (1 to 28).
+            motion: One of "left_arm_forward", "left_arm_sideways", "left_forearm_raise".
+            angle_deg: How far to move, in degrees (1 to 28).
         """
+        if motion not in MOTIONS:
+            return SkillResult.fail("INVALID_MOTION", f"motion must be one of {sorted(MOTIONS)}")
         if not 1.0 <= angle_deg <= MAX_ANGLE_DEG or not math.isfinite(angle_deg):
             return SkillResult.fail("INVALID_ANGLE", f"angle_deg must be within 1..{MAX_ANGLE_DEG}")
         if not self._busy.acquire(blocking=False):
             return SkillResult.fail("BUSY", "an arm move is already running")
+        joint, sign = MOTIONS[motion]
         try:
-            return self._move(-math.radians(angle_deg))
+            return self._move(motion, joint, sign * math.radians(angle_deg))
         finally:
             with self._lock:
                 self._watch = None
             self._busy.release()
 
-    def _move(self, delta: float) -> SkillResult[ArmError]:
+    def _move(self, motion: str, joint: int, delta: float) -> SkillResult[ArmError]:
         assert self._encoder is not None
         status = self._execution.get_status()
         profile = status["profile"]
@@ -197,14 +215,14 @@ class SonicArmSkillContainer(Module):
             return SkillResult.fail("NOT_READY", "no fresh controller feedback")
         base = np.asarray(state.body_q, np.float64)
         started = time.monotonic()
-        motion = self._encoder.encode(arm_poses(base, LEFT_SHOULDER_PITCH, delta))
+        motion_tokens = self._encoder.encode(arm_poses(base, joint, delta))
         encode_s = time.monotonic() - started
         current = self._execution.get_feedback()
         if current is None or np.abs(np.asarray(current.body_q) - base).max() > _MOVED_LIMIT:
             return SkillResult.fail(
                 "MOVED", "the body moved while the reference was encoded; nothing sent"
             )
-        tokens = token_schedule(np.asarray(state.token_state), motion)
+        tokens = token_schedule(np.asarray(state.token_state), motion_tokens)
         hands = np.r_[state.left_hand_q, state.right_hand_q]
         plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
         if profile["max_observation_age"] <= len(plan) / RATE + 0.5:
@@ -214,8 +232,14 @@ class SonicArmSkillContainer(Module):
         allowed = group_margins(
             self.config.body_margin, self.config.arm_margin, self.config.wrist_margin
         )
-        allowed[LEFT_SHOULDER_PITCH] += abs(delta)
-        watch = _Watch(base=base, allowed=allowed, max_dq=self.config.max_dq)
+        allowed[joint] += abs(delta)
+        watch = _Watch(
+            base=base,
+            allowed=allowed,
+            max_dq=self.config.max_dq,
+            joint=joint,
+            sign=1 if delta > 0 else -1,
+        )
         with self._lock:
             self._watch = watch
 
@@ -239,8 +263,9 @@ class SonicArmSkillContainer(Module):
 
         report = {
             "task_id": task_id,
-            "reached_rad": round(watch.reached, 3),
-            "planned_rad": round(delta, 3),
+            "motion": motion,
+            "reached_deg": round(math.degrees(watch.reached), 1),
+            "planned_deg": round(math.degrees(abs(delta)), 1),
             "max_deviation_rad": {
                 g: round(float(watch.deviation[i].max()), 3) for g, i in _GROUPS.items()
             },
@@ -263,12 +288,12 @@ class SonicArmSkillContainer(Module):
             outcome = f"session {task['outcome']}: {task['reason']}"
         if outcome != "finished":
             return _fail("EXECUTION_FAILED", f"{outcome}; control returned to the planner", report)
-        if watch.reached > delta / 2:  # SONIC tracked less than half the planned swing.
+        if watch.reached < abs(delta) / 2:  # SONIC tracked less than half the planned move.
             return _fail(
                 "NOT_REACHED", "the arm did not follow the reference; planner in control", report
             )
         return SkillResult.ok(
-            f"left arm swung forward to {math.degrees(-watch.reached):.1f} deg and back; planner in control",
+            f"{motion} reached {math.degrees(watch.reached):.1f} deg and returned; planner in control",
             **report,
         )
 
