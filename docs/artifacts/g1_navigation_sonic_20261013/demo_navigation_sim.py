@@ -542,7 +542,7 @@ def main() -> None:
         assert np.all(np.isfinite(row["qpos"])), "finite physics required"
         return row
 
-    def settle(name: str) -> None:
+    def settle(name: str, timeout: float = 3.0) -> None:
         nonlocal velocity
         velocity = Twist()
         started = time.monotonic()
@@ -554,14 +554,14 @@ def main() -> None:
                 proof.settled_start is not None
                 and proof.latest["monotonic"] - proof.settled_start >= 0.5
             ),
-            3.0,
+            timeout,
             name + " measured settling",
         )
         envelope()
         results["cases"].append(
             {
                 "name": name + "_settled",
-                "passed": True,
+                "passed": timeout <= 3.0 or time.monotonic() - started <= 3.0,
                 "elapsed": time.monotonic() - started,
                 "speed": proof.latest["linear_speed_mps"],
                 "yaw_rate": proof.latest["yaw_rate_radps"],
@@ -728,7 +728,8 @@ def main() -> None:
                     return
                 if not (args.diagnose_transitions or args.study or args.trace_turn):
                     assert passed, name + " direction mismatch"
-                settle(name)
+                # Trace runs measure how long settling takes; the 3 s gate is still recorded.
+                settle(name, 10.0 if args.trace_turn else 3.0)
                 if args.diagnose_transitions:
                     pump(5.0)
             if args.study or args.trace_turn:
