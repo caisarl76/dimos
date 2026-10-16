@@ -65,6 +65,7 @@ SETTLE_DWELL_S = 0.5
 SETTLE_TIMEOUT_S = 3.0
 CANCEL_IDLE_S = 0.5
 PAUSE_IDLE_S = 0.6
+STOP_WAIT_S = 30.0
 
 
 @dataclass(frozen=True)
@@ -365,9 +366,13 @@ def run_session(args: Any) -> None:
         time.sleep(1.0)
         command_start = tele(case.vx, case.wz)
         if case.kind == "operator_stop":
-            input("Press the native operator stop now, then Enter here: ")
+            # Wait for the stop itself (session 2026-10-16-3 pressed it after a fixed window).
+            print(f"Press the native operator stop (o) now; waiting up to {STOP_WAIT_S:.0f} s ...")
             command_start = time.monotonic()
-            time.sleep(3.0)
+            record["stop_observed_s"] = wait(
+                lambda: not status().get("feedback_fresh", True), STOP_WAIT_S
+            )
+            time.sleep(1.0)
         elif case.kind == "cancel":
             time.sleep(case.seconds)
             record["cancel"] = agent.call("end")
