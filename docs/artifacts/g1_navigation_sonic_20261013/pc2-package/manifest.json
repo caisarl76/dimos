@@ -1,6 +1,6 @@
 {
   "target": "pc2 unitree@192.168.0.223, /home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013",
-  "dimos_source_commit": "917cfd554cc350b47b7f67a3639a349ea1bb1fcf",
+  "dimos_source_commit": "10fdffab1020c9d28851ed0f1fe7f99cac623a08",
   "native": {
     "baseline": "pc2 /home/unitree/GR00T-WholeBodyControl a9d20b2 + local changes (71 files)",
     "manipulation_port_patch_sha256": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9",
@@ -24,7 +24,7 @@
   "image": "dimos-g1-sonic-navigation:20261013",
   "payload_sha256": {
     "Dockerfile": "70df39aef3d73a9d178c95736301ae0c12047ab6abf030939e0056832c2ab637",
-    "dimos-source.tar": "789a40a050a1d62e505eb2e8cf97d99c4233d0bce30a00fe01f1c4a3557808ae",
+    "dimos-source.tar": "fe4e788cab2f97081191c1a62ca29ac7d2794c6890922282f051097dde564f4c",
     "launch.sh": "87409495fbefd163855883879804ebe725bd0ac792091dc04b6a94d654e48946",
     "models.sha256": "fff9d3b9f24627655c2ae99f6702f63f46112377173ab616c6f537316b07aed3",
     "native-baseline.sha256": "3a02f3567aea1ca80ba3b9ed8b2006d96bb5195cd02104c13900cbcd264b204d",
