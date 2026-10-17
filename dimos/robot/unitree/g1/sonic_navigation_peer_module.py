@@ -34,6 +34,7 @@ from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import In
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.msgs.geometry_msgs.Twist import Twist
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.msgs.nav_msgs.OccupancyGrid import OccupancyGrid
 from dimos.msgs.nav_msgs.Odometry import Odometry
 from dimos.msgs.sensor_msgs.Imu import Imu
@@ -58,6 +59,10 @@ if TYPE_CHECKING:
 
 
 SETTLE_WINDOW = 0.5  # seconds of pose history behind each settling rate
+# A turn that stops abruptly overshoots and settles slowly (sim: 3.0-3.2 s); the relayed
+# turn rate may fall by at most this much per second (0.20 rad/s -> 0 over 0.6 s).
+TURN_RAMP_RATE = 0.2 / 0.6
+TURN_RAMP_GAP = 0.350  # a longer source gap already stopped pc2: no ramp across it
 
 
 class SonicNavigationPeerConfig(ModuleConfig):
@@ -157,8 +162,23 @@ class SonicNavigationPeerModule(Module):
             self._thread.join(timeout=0.6)
         super().stop()
 
+    def _ramp_turn(self, msg: Twist, now: float) -> Twist:
+        """Bound how fast the relayed yaw rate slows or reverses; never delay an increase."""
+        previous, wz = self._velocity, msg.angular.z
+        if previous is None or self._source_at is None or now - self._source_at > TURN_RAMP_GAP:
+            return msg
+        prior = previous.twist.angular.z
+        if abs(wz) >= abs(prior) and wz * prior >= 0:
+            return msg
+        step = TURN_RAMP_RATE * (now - self._source_at)
+        ramped = max(prior - step, wz) if prior > 0 else min(prior + step, wz)
+        if abs(ramped - wz) < 1e-9:
+            ramped = wz
+        return Twist(linear=msg.linear, angular=Vector3(msg.angular.x, msg.angular.y, ramped))
+
     def observe_cmd_vel(self, msg: Twist) -> None:
         with self._lock:
+            msg = self._ramp_turn(msg, monotonic())
             try:
                 self._velocity = NavigationInput(
                     msg, self._source_sequence + 1, 0.0, 0.0, False, None

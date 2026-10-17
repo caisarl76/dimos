@@ -668,6 +668,13 @@ def main() -> None:
                 motions = [("left_4s", 0.0, 0.2, 4.0)]
                 if os.environ.get("SONIC_TRACE_AFTER_FORWARD"):
                     motions.insert(0, ("forward_2s", 0.2, 0.0, 2.0))
+                if os.environ.get("SONIC_TRACE_CURVE"):  # turning while walking
+                    motions = [
+                        ("left_4s", 0.0, 0.2, 4.0),
+                        ("curve_left_010", 0.2, 0.1, 4.0),
+                        ("curve_left_020", 0.2, 0.2, 4.0),
+                        ("curve_right_020", 0.2, -0.2, 4.0),
+                    ]
                 owner._navigation._tracker = ConversionTrace(
                     owner._navigation._tracker,
                     lambda: owner._navigation.status.source_sequence,
@@ -684,7 +691,12 @@ def main() -> None:
                 before = envelope()
                 scenario = name
                 velocity = Twist(linear=Vector3(vx, 0, 0), angular=Vector3(0, 0, wz))
-                pump(seconds)
+                ramp = args.trace_turn and wz and os.environ.get("SONIC_TRACE_RAMP")
+                pump(seconds - 0.6 if ramp else seconds)
+                if ramp:  # study only: slow the turn before the stop
+                    for fraction in (0.6, 0.3):
+                        velocity = Twist(angular=Vector3(0, 0, wz * fraction))
+                        pump(0.3)
                 after = envelope()
                 heading = yaw(before["qpos"][3:7])
                 dx, dy = (
