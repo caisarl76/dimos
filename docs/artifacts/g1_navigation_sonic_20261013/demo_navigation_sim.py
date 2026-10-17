@@ -692,6 +692,17 @@ def main() -> None:
                 motions = [("left_4s", 0.0, 0.2, 4.0)]
                 if os.environ.get("SONIC_TRACE_AFTER_FORWARD"):
                     motions.insert(0, ("forward_2s", 0.2, 0.0, 2.0))
+                if os.environ.get("SONIC_TRACE_SEQUENCE"):  # e.g. "right,left,right,left"
+                    kinds = {  # (vx, wz) for 4 s
+                        "left": (0.0, 0.2),
+                        "right": (0.0, -0.2),
+                        "curve_left": (0.2, 0.2),
+                        "curve_right": (0.2, -0.2),
+                    }
+                    motions = [
+                        (f"{turn}_4s_{i}", *kinds[turn], 4.0)
+                        for i, turn in enumerate(os.environ["SONIC_TRACE_SEQUENCE"].split(","), 1)
+                    ]
                 if os.environ.get("SONIC_TRACE_CURVE"):  # turning while walking
                     motions = [
                         ("left_4s", 0.0, 0.2, 4.0),

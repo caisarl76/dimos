@@ -1,0 +1,77 @@
+{
+  "status": "study_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5076674160081893,
+      "speed": 0.0011074113863878497,
+      "yaw_rate": -0.0017790507250072661
+    },
+    {
+      "name": "curve_left_4s_1",
+      "passed": true,
+      "start": 1404401.510321165,
+      "end": 1404405.514328357,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.5337681657884782,
+      "yaw_change_rad": 1.1466632170256652
+    },
+    {
+      "name": "curve_left_4s_1_settled",
+      "passed": true,
+      "elapsed": 2.231879287166521,
+      "speed": 0.00032038896521112344,
+      "yaw_rate": 0.015950127933515978
+    },
+    {
+      "name": "curve_right_4s_2",
+      "passed": true,
+      "start": 1404407.744102945,
+      "end": 1404411.754082762,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.28925812527480155,
+      "yaw_change_rad": -1.0303679535401347
+    },
+    {
+      "name": "curve_right_4s_2_settled",
+      "passed": true,
+      "elapsed": 2.226621282985434,
+      "speed": 0.004652296683522694,
+      "yaw_rate": -0.0034486400319662302
+    },
+    {
+      "name": "curve_left_4s_3",
+      "passed": true,
+      "start": 1404413.984243457,
+      "end": 1404417.989404316,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.5558150090949178,
+      "yaw_change_rad": 1.0998672635285773
+    },
+    {
+      "name": "curve_left_4s_3_settled",
+      "passed": true,
+      "elapsed": 2.0794065159279853,
+      "speed": 0.003028878586976372,
+      "yaw_rate": 0.008290649261112877
+    },
+    {
+      "name": "curve_right_4s_4",
+      "passed": true,
+      "start": 1404420.074700573,
+      "end": 1404424.07926139,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.20160718151058377,
+      "yaw_change_rad": -1.0743904533631377
+    },
+    {
+      "name": "curve_right_4s_4_settled",
+      "passed": true,
+      "elapsed": 2.079131567152217,
+      "speed": 0.006413568648407365,
+      "yaw_rate": -0.008074618433040226
+    }
+  ],
+  "error": null
+}
