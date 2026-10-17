@@ -17,6 +17,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import replace
+import itertools
 import struct
 import threading
 from unittest.mock import call
@@ -36,6 +37,7 @@ from dimos.msgs.sensor_msgs.Imu import Imu
 from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
 from dimos.msgs.tf2_msgs.TFMessage import TFMessage
 from dimos.navigation.base import NavigationState
+from dimos.robot.unitree.g1 import sonic_navigation_peer_module as peer_module
 from dimos.robot.unitree.g1.sonic_navigation_link import (
     SonicNavigationLink,
     bound_navigation_input,
@@ -698,3 +700,44 @@ def test_new_relay_clears_foreign_request_latch_only_for_a_peer_without_one(rela
         replace(reply, request_id=None, source_sequence=1), t0=10.02, t1=10.03
     )
     assert fresh.ready and fresh.fault is None
+
+
+def relayed_wz(peer):
+    return peer.poll_reply("poll").twist.angular.z
+
+
+def test_turn_stop_ramps_the_relayed_rate_down_and_leaves_linear_alone(peer, clock):
+    # Simulation, 2026-10-17: an abrupt 0.20 rad/s -> 0 stop overshot 1.2-1.8 deg and
+    # settled in 3.0-3.2 s; slowing over 0.6 s cut that to 0-0.3 deg and 2.2 s.
+    peer.observe_cmd_vel(Twist(linear=Vector3(0.2, 0, 0), angular=Vector3(0, 0, 0.2)))
+    sequence = peer.poll_reply("poll").source_sequence
+    seen = []
+    for step in range(1, 9):
+        clock[0] = 10 + 0.1 * step
+        peer.observe_cmd_vel(Twist(linear=Vector3(0.2, 0, 0)))
+        reply = peer.poll_reply("poll")
+        assert reply.twist.linear.x == 0.2 and reply.source_sequence == sequence + step
+        seen.append(reply.twist.angular.z)
+    assert seen[0] == pytest.approx(0.2 - 0.1 * peer_module.TURN_RAMP_RATE)
+    assert all(b <= a for a, b in itertools.pairwise(seen))
+    assert seen[5] == 0.0  # 0.6 s after the stop
+
+
+def test_turn_rate_increases_and_reversals_are_bounded_only_on_the_way_down(peer, clock):
+    peer.observe_cmd_vel(Twist(angular=Vector3(0, 0, 0.05)))
+    clock[0] = 10.1
+    peer.observe_cmd_vel(Twist(angular=Vector3(0, 0, 0.2)))
+    assert relayed_wz(peer) == 0.2  # never delayed upward
+    clock[0] = 10.2
+    peer.observe_cmd_vel(Twist(angular=Vector3(0, 0, -0.2)))
+    assert relayed_wz(peer) == pytest.approx(0.2 - 0.1 * peer_module.TURN_RAMP_RATE)
+    clock[0] = 12.0  # a long gap cannot leap past the bound
+    peer.observe_cmd_vel(Twist(angular=Vector3(0, 0, -0.2)))
+    assert relayed_wz(peer) >= -0.2
+
+
+def test_ramp_restarts_after_a_source_gap(peer, clock):
+    peer.observe_cmd_vel(Twist(angular=Vector3(0, 0, 0.2)))
+    clock[0] = 10.5  # source silent past its 0.35 s deadline: pc2 already stopped
+    peer.observe_cmd_vel(Twist())
+    assert relayed_wz(peer) == 0.0
