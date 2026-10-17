@@ -65,6 +65,15 @@ TURN_RAMP_RATE = 0.2 / 0.6
 TURN_RAMP_GAP = 0.350  # a longer source gap already stopped pc2: no ramp across it
 
 
+def ramp_turn_rate(prior: float, wz: float, dt: float) -> float:
+    """The yaw rate to relay after `prior` when `wz` is requested `dt` seconds later."""
+    if abs(wz) >= abs(prior) and wz * prior >= 0:
+        return wz
+    step = TURN_RAMP_RATE * dt
+    ramped = max(prior - step, wz) if prior > 0 else min(prior + step, wz)
+    return wz if abs(ramped - wz) < 1e-9 else ramped
+
+
 class SonicNavigationPeerConfig(ModuleConfig):
     link_bind: str = Field(pattern=r"^tcp://", max_length=2048)
     extrinsic_valid: bool = Field(default=False, strict=True)
@@ -167,13 +176,9 @@ class SonicNavigationPeerModule(Module):
         previous, wz = self._velocity, msg.angular.z
         if previous is None or self._source_at is None or now - self._source_at > TURN_RAMP_GAP:
             return msg
-        prior = previous.twist.angular.z
-        if abs(wz) >= abs(prior) and wz * prior >= 0:
+        ramped = ramp_turn_rate(previous.twist.angular.z, wz, now - self._source_at)
+        if ramped == wz:
             return msg
-        step = TURN_RAMP_RATE * (now - self._source_at)
-        ramped = max(prior - step, wz) if prior > 0 else min(prior + step, wz)
-        if abs(ramped - wz) < 1e-9:
-            ramped = wz
         return Twist(linear=msg.linear, angular=Vector3(msg.angular.x, msg.angular.y, ramped))
 
     def observe_cmd_vel(self, msg: Twist) -> None:

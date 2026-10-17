@@ -1,0 +1,29 @@
+{
+  "status": "study_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.526061677839607,
+      "speed": 0.002410647119411605,
+      "yaw_rate": -0.012292145955280415
+    },
+    {
+      "name": "left_4s",
+      "passed": true,
+      "start": 1401154.633601721,
+      "end": 1401158.648778985,
+      "seconds": 4.0,
+      "forward_displacement_m": -0.005909757700261124,
+      "yaw_change_rad": 0.6739844979718137
+    },
+    {
+      "name": "left_4s_settled",
+      "passed": true,
+      "elapsed": 2.2864954120013863,
+      "speed": 0.0006168177530891318,
+      "yaw_rate": 0.012856620901865795
+    }
+  ],
+  "error": null
+}
