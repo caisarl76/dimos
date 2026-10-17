@@ -56,6 +56,7 @@ from dimos.navigation.go2.replanning_a_star.controllers import PController
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import TOPIC
 from dimos.robot.unitree.g1.sonic_navigation import NavigationInput
+from dimos.robot.unitree.g1.sonic_navigation_peer_module import ramp_turn_rate
 from dimos.robot.unitree.g1.sonic_reference import encode_command
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 
@@ -312,6 +313,11 @@ def main() -> None:
         help="Isolate the translating trace; never report the full commissioning matrix passed",
     )
     parser.add_argument(
+        "--goal-study",
+        action="store_true",
+        help="Study only: the follower drives to three nearby goals from true pose",
+    )
+    parser.add_argument(
         "--trace-turn",
         action="store_true",
         help="Study only: one 4 s left turn with every tracker conversion recorded",
@@ -404,6 +410,8 @@ def main() -> None:
     next_source = 0.0
     velocity = Twist()
     noisy_follower: PController | None = None
+    goal_target: np.ndarray | None = None
+    goal_wz = [0.0]  # last relayed yaw rate, for the peer's turn ramp
     # Quaternion.euler lazily imports SciPy. Exercise the actual advance path
     # before any live readiness lease starts; cold import is not a sensor pause.
     follower = PController(GlobalConfig(simulation=""), 0.2, 10, min_angular_velocity=0.0)
@@ -442,7 +450,23 @@ def main() -> None:
                 row = proof.update()
                 if owner is not None and now >= next_source:
                     next_source = now + 0.1
-                    if noisy_follower is not None:
+                    if goal_target is not None:
+                        w, x, y, z = row["qpos"][3:7]
+                        pose = PoseStamped(
+                            position=Vector3(*row["pelvis"]),
+                            orientation=Quaternion(x=x, y=y, z=z, w=w),
+                        )
+                        command = follower.advance(goal_target, pose)
+                        # As on the robot: the peer ramps the relayed yaw rate down.
+                        goal_wz[0] = (
+                            command.angular.z
+                            if os.environ.get("SONIC_STUDY_NO_RAMP")
+                            else ramp_turn_rate(goal_wz[0], command.angular.z, 0.1)
+                        )
+                        velocity = Twist(
+                            linear=command.linear, angular=Vector3(0.0, 0.0, goal_wz[0])
+                        )
+                    elif noisy_follower is not None:
                         noisy_tick += 1
                         measured_yaw = 0.0 if args.noise_proof == "fixed" else yaw(row["qpos"][3:7])
                         error = 0.01 if noisy_tick % 2 else -0.01
@@ -680,8 +704,60 @@ def main() -> None:
                     lambda: owner._navigation.status.source_sequence,
                     record_conversion,
                 )
-            if args.diagnose_noisy_follower or args.noise_proof:
+            if args.diagnose_noisy_follower or args.noise_proof or args.goal_study:
                 motions = []
+            if args.goal_study:
+                start = envelope()
+                heading = yaw(start["qpos"][3:7])
+                for name, distance, bearing_deg in (
+                    ("goal_ahead_1.5m", 1.5, 0.0),
+                    ("goal_left45_1.5m", 1.5, 45.0),
+                    ("goal_right60_1.2m", 1.2, -60.0),
+                ):
+                    origin = envelope()
+                    h0 = yaw(origin["qpos"][3:7])
+                    bearing = h0 + math.radians(bearing_deg)
+                    goal = np.array(origin["pelvis"][:2]) + distance * np.array(
+                        [math.cos(bearing), math.sin(bearing)]
+                    )
+                    scenario, goal_wz[0] = name, 0.0
+                    goal_target = goal
+                    began, track, reached = time.monotonic(), [], None
+                    while time.monotonic() - began < 20.0:
+                        pump(0.1)
+                        here = np.array(proof.latest["pelvis"][:2])
+                        track.append(here.tolist())
+                        if np.linalg.norm(goal - here) < 0.25:
+                            reached = time.monotonic() - began
+                            break
+                    goal_target = None
+                    end = envelope()
+                    line = goal - np.array(origin["pelvis"][:2])
+                    unit = line / np.linalg.norm(line)
+                    cross = [
+                        abs(float(np.cross(unit, np.array(p) - np.array(origin["pelvis"][:2]))))
+                        for p in track
+                    ]
+                    results["cases"].append(
+                        {
+                            "name": name,
+                            "passed": reached is not None,
+                            "start": origin["monotonic"],
+                            "end": end["monotonic"],
+                            "goal_distance_m": distance,
+                            "goal_bearing_deg": bearing_deg,
+                            "reached_s": reached,
+                            "final_error_m": float(
+                                np.linalg.norm(goal - np.array(end["pelvis"][:2]))
+                            ),
+                            "max_cross_track_m": max(cross, default=0.0),
+                            "heading_change_deg": math.degrees(
+                                math.remainder(yaw(end["qpos"][3:7]) - h0, 2 * math.pi)
+                            ),
+                        }
+                    )
+                    settle(name, 10.0)
+                results["goal_study_start_heading"] = heading
             if args.diagnose_transitions:
                 motions = [
                     (f"forward_transition_{i}", 0.2, 0.0, 2.0)
@@ -744,7 +820,7 @@ def main() -> None:
                 settle(name, 10.0 if args.trace_turn else 3.0)
                 if args.diagnose_transitions:
                     pump(5.0)
-            if args.study or args.trace_turn:
+            if args.study or args.trace_turn or args.goal_study:
                 owner.end_navigation()
                 wait(lambda: owner.get_navigation_status()["pose_ready"], 3.0, "study stop")
                 results["status"] = "study_only"
