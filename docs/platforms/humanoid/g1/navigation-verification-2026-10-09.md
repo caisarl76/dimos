@@ -609,3 +609,44 @@ Harness, evidence and per-run hashes are in
 - No goal was reached on the real recorded map, because the near-field unknowns remain.
 - The torso→MID360 mount is the nominal URDF value, not a commissioned extrinsic.
 - None of this is pc2 load or hardware evidence. The exact FK fixture and the commissioning gates remain open.
+
+## pc2 sessions and turn tuning, 2026-10-15 to 2026-10-17
+
+The robot was suspended from a ceiling support in every session, so walking was
+seen but distance and turn angle are not ground truth.
+
+- Verified on pc2: the full workstation peer, Wi-Fi link, relay, execution owner
+  and guarded native path. A walk command entered native walk mode within about
+  0.1 s, the legs stepped, and every case returned to IDLE unlatched. `idle`, the
+  native operator stop, settling and handback all passed.
+- Fixed on the way: a late relay reply over Wi-Fi is now a recoverable IDLE
+  (`3f986f271`). Peer settling uses a 0.5 s pose window, because LIO jitter on a
+  standing robot read as motion (`b014d85d1`). The launcher gained an operator
+  start step (`5a864e4c8`) and refuses to start the graph beside a foreign SONIC
+  controller (`ec2fdb3a5`).
+- Turning: the native turns in IDLE at a rate that scales with its facing error.
+  The original 0.10 rad lead stalled turns near 5 deg. The operator approved a
+  0.20 rad lead (`facing_lookahead` 1.00 s, `max_facing_offset` 0.20 rad,
+  `808ece4c8`). The workstation peer also ramps the relayed turn rate down over
+  0.6 s at a turn stop (`2bdec7165`). In simulation, 4 s turns reach 38-44 deg,
+  post-turn settling is 2.2-2.9 s, and all three goal-following cases reach
+  their goals (the old settings missed the 60 deg right goal).
+- Known native characteristic: walking curves to the right cover 20-40 cm
+  against 50-58 cm to the left for the same heading change, in both test orders.
+  The tracker's commands are mirror images, so the slowdown comes from the SONIC
+  planner or policy, or the simulated G1 model. The follower closes the loop
+  and still reaches goals. Pure turns in place show no right bias.
+- Not yet installed on pc2: the 0.20 rad lead needs re-provisioning (attempt 9),
+  and pc2 has been unreachable since 2026-10-16.
+
+Ground tests still needed, with the robot standing on the floor:
+
+- `forward_020` repeated, with tape measurements against LIO base odometry and
+  the logged sensor pose.
+- `turn_left_020` and `turn_right_020` with the 0.20 rad lead, measured against a
+  floor mark.
+- Curves or short goals both ways, to check whether the right-curve slowdown
+  seen in simulation also occurs on the robot.
+- The sideways drift during forward walking (about -4 cm per run while
+  suspended), the mount-yaw check.
+- `cancel` and `source_pause`, not yet run on the robot.
