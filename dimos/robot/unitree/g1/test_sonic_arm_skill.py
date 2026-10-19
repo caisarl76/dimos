@@ -176,7 +176,7 @@ def test_wrist_inside_its_envelope_passes(skill):
 
     result = run(skill[0], 20.0, wrist)
     assert result.success, result
-    assert result.metadata["max_deviation_rad"]["wrists"] == 0.25
+    assert result.metadata["max_deviation_rad"]["wrists_shoulder_yaw"] == 0.25
 
 
 def test_leg_outside_its_envelope_cancels_to_planner(skill):
@@ -331,6 +331,9 @@ def test_other_motions_move_their_own_joint_with_its_widened_envelope(skill, mot
     # 0.33 rad is past the 0.20 arm margin alone: only the moving joint's widened envelope allows it.
     result = run(module, 22.0, partial(follows, delta=sign * 0.33, joint=joint), motion=motion)
     assert result.success, result
+    assert (
+        result.metadata["max_deviation_rad"]["arms"] == 0.0
+    )  # The moving joint is not a deviation.
     assert result.metadata["motion"] == motion and result.metadata["reached_deg"] == pytest.approx(
         18.9, abs=0.1
     )
@@ -371,3 +374,22 @@ def test_big_strokes_slow_down_to_the_commissioned_peak_speed():
     speed = np.abs(np.diff(big[:, 18])).max() * 50
     assert speed <= PEAK_SPEED + 0.01
     assert len(big) == 50 + 2 * round(1.875 * np.radians(60) / 0.47 * 50) + 50 + 50
+
+
+@pytest.mark.parametrize(("joint", "passes"), [(24, True), (17, True), (22, False), (25, False)])
+def test_shoulder_yaw_shares_the_loose_envelope(skill, joint, passes):
+    """Shoulder yaws (17, 24) get the 0.30 rad wrist envelope; shoulder pitch/roll and elbows keep 0.20."""
+    module, _ = skill
+
+    def drift(t):
+        q = follows(t)
+        q[joint] = 0.25 if t > 0.4 else 0.0
+        return q
+
+    result = run(module, 20.0, drift)
+    if passes:
+        assert result.success, result
+    else:
+        assert (
+            result.error_code == "ENVELOPE" and sonic_arm_skill._JOINTS[joint] in result.message
+        ), result

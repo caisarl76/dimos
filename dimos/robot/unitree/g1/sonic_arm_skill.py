@@ -44,7 +44,9 @@ from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import In
 from dimos.robot.unitree.g1.sonic_arm_reference import (
+    ARM_JOINTS,
     LEFT_SHOULDER_PITCH,
+    LOOSE_JOINTS,
     RATE,
     SonicEncoder,
     arm_poses,
@@ -82,11 +84,11 @@ MOTIONS: dict[str, tuple[int, int, float, float]] = {
 }
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _JOINTS = [name.removeprefix("g1/") for name in make_humanoid_joints("g1")]
-_GROUPS = {
+_GROUPS = {  # Reporting groups, matching the envelope groups.
     "legs": list(range(12)),
     "waist": [12, 13, 14],
-    "arms": [16, 17, 18, 22, 23, 24, 25],
-    "wrists": [19, 20, 21, 26, 27, 28],
+    "arms": ARM_JOINTS,
+    "wrists_shoulder_yaw": LOOSE_JOINTS,
 }
 
 
@@ -112,8 +114,8 @@ class SonicArmExecutionSpec(Spec, Protocol):
 class SonicArmSkillConfig(ModuleConfig):
     encoder_path: Path
     body_margin: float = Field(default=0.15, gt=0, le=0.3)  # legs and waist, rad
-    arm_margin: float = Field(default=0.20, gt=0, le=0.4)  # shoulders and elbows, rad
-    wrist_margin: float = Field(default=0.30, gt=0, le=0.5)  # wrists, rad
+    arm_margin: float = Field(default=0.20, gt=0, le=0.4)  # shoulder pitch/roll and elbows, rad
+    wrist_margin: float = Field(default=0.30, gt=0, le=0.5)  # wrists and shoulder yaws, rad
     max_dq: float = Field(default=3.0, gt=0, le=5.0)  # rad/s, any joint
     return_watch_seconds: float = Field(default=3.0, ge=0, le=5.0)
 
@@ -275,7 +277,9 @@ class SonicArmSkillContainer(Module):
             "reached_deg": round(math.degrees(watch.reached), 1),
             "planned_deg": round(math.degrees(abs(delta)), 1),
             "max_deviation_rad": {
-                g: round(float(watch.deviation[i].max()), 3) for g, i in _GROUPS.items()
+                # The moving joint is the motion itself, not a deviation.
+                g: round(float(max(watch.deviation[j] for j in i if j != watch.joint)), 3)
+                for g, i in _GROUPS.items()
             },
             "stream_peak_dq": _peak(watch.stream_dq),
             "return_peak_dq": _peak(watch.return_dq),

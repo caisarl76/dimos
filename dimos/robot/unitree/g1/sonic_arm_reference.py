@@ -66,8 +66,9 @@ LEFT_SHOULDER_PITCH = 15  # Motor order; negative moves the hand forward.
 ENCODER_SHA256 = "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae"  # SONIC v1.1
 RATE = 50
 PEAK_SPEED = 0.47  # rad/s: the commissioned 0.5 rad stroke over 2 s; bigger moves take longer.
-_ARM = [15, 16, 17, 18, 22, 23, 24, 25]
-_WRIST = [19, 20, 21, 26, 27, 28]
+ARM_JOINTS = [15, 16, 18, 22, 23, 25]  # shoulder pitch and roll, elbows
+# Wrists and shoulder yaws: SONIC's decoder moves these by itself, at low torque, when an arm moves.
+LOOSE_JOINTS = [17, 19, 20, 21, 24, 26, 27, 28]
 
 
 class SonicEncoder:
@@ -153,11 +154,13 @@ def token_schedule(
 
 
 def group_margins(body: float, arm: float, wrist: float) -> NDArray[np.float64]:
-    """Per-joint envelope, motor order: legs and waist `body`, shoulders/elbows `arm`, wrists `wrist`.
+    """Per-joint envelope, motor order: legs and waist `body`, shoulder pitch/roll and elbows `arm`,
+    wrists and shoulder yaws `wrist`.
 
-    SONIC's decoder moves the wrists by itself (low torque) when an arm moves: 0.05-0.16 rad on a G1.
+    On a G1, SONIC's decoder moved the wrists 0.05-0.16 rad and the shoulder yaws up to 0.20 rad by
+    itself (about 0.2-1.4 Nm) during left-arm moves.
     """
     margins = np.full(29, body)
-    margins[_ARM] = arm
-    margins[_WRIST] = wrist
+    margins[ARM_JOINTS] = arm
+    margins[LOOSE_JOINTS] = wrist
     return margins
