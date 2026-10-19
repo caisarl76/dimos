@@ -1,0 +1,84 @@
+[
+  {
+    "Id": "sha256:58beb689244c0bf7db096223050f98b4955fd8edf85f878f37b0ba4fb0d20551",
+    "RepoTags": [
+      "dimos-g1-sonic-navigation:20261013"
+    ],
+    "RepoDigests": [
+      "dimos-g1-sonic-navigation@sha256:58beb689244c0bf7db096223050f98b4955fd8edf85f878f37b0ba4fb0d20551"
+    ],
+    "Comment": "buildkit.dockerfile.v0",
+    "Created": "2026-10-19T09:30:10.940184483+08:00",
+    "Config": {
+      "User": "nav",
+      "Env": [
+        "PATH=/opt/sonic-navigation/.venv/bin:/opt/navigation/.venv/bin:/home/nav/.nix-profile/bin:/home/nav/.cargo/bin:/home/nav/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "DEBIAN_FRONTEND=noninteractive",
+        "HOME=/home/nav",
+        "CARGO_BUILD_JOBS=2",
+        "UV_PYTHON_INSTALL_DIR=/opt/navigation/python",
+        "UV_CACHE_DIR=/opt/navigation/uv-cache",
+        "UV_LINK_MODE=copy",
+        "CYCLONEDDS_HOME=/opt/cyclonedds",
+        "LD_LIBRARY_PATH=/opt/cyclonedds/lib",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "UV_PROJECT_ENVIRONMENT=/opt/sonic-navigation/.venv",
+        "PYTHONPATH=/opt/sonic-navigation/source:/opt/sonic-navigation/package",
+        "NUMBA_CACHE_DIR=/tmp/numba-cache"
+      ],
+      "Cmd": [
+        "python",
+        "/opt/sonic-navigation/package/smoke.py"
+      ],
+      "WorkingDir": "/opt/sonic-navigation/source",
+      "Labels": {
+        "org.opencontainers.image.version": "24.04"
+      },
+      "ArgsEscaped": true
+    },
+    "Architecture": "arm64",
+    "Os": "linux",
+    "Size": 6661210025,
+    "RootFS": {
+      "Type": "layers",
+      "Layers": [
+        "sha256:1e9178dc90058fa454a60803300219ee8c17e515be8718817ed824b96fa1207b",
+        "sha256:3b3093f73d6c0a8a0cd79f7a790b10962e43a6a54b7747f227277526af5deb11",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:b700c23958f056b81544fe4c07fb629ff98b5b6390a014d37b7c1c93d4aacd76",
+        "sha256:a1cfd0d130a583e2766c7ad5be6b3daa53c3d50d7338b0009a49c6b0cc524a38",
+        "sha256:a9477b8e24cb6c1d6763c63e49a918fe906c3e6d889e128c64028d44c8e96a5d",
+        "sha256:31965c66d09f7fa690aa22a09720ad3a1e272f218942ab0d8fd57ae0e0077ccd",
+        "sha256:6e5edcaa81626366a281f1e5ae747c3f172449880f5d5f2dcb06b20d3201d7cb",
+        "sha256:86997b33c0086d825ad3e95bf3da090280834454378754026511778f5a72e997",
+        "sha256:62ba715f6fe6d70ea6ad36b46be28952caa39d5f7f8d4c8b5b56854aacef06da",
+        "sha256:3e9b89d13a5b5d7d2f9b4c1c1360f3a1e593fce025c324681915f9c8b44958d0",
+        "sha256:f9ad20470cffd666602b17bad62756507878a9d381958bb560628f01e854f901",
+        "sha256:c5133471a5d8bbd4eff8bd871d5ace50c7ef10e7539ac8779aefda106293f885",
+        "sha256:71bbca46a08c8d9ea6362048e66faac4a63d0d2cf4b78f5dfc31a3bfe47f3ccd",
+        "sha256:1c2945deb5a2cbc1bfaa7ab13dba480dea0cd85cce328cbd8f2a69d420472f1e",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:038a5e87acfe04f57f39675f0e5849f15c2a562925c109453a4a8910cfad7e1f",
+        "sha256:4cd141b4f00c12929862f28683bc5c87a445c6213f831b09f9ac59745c58df73",
+        "sha256:3c576290709b2fdc62040d3787f6fd92889aad1eb0fe68c51ace21dde6c78aea",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+      ]
+    },
+    "Metadata": {
+      "LastTagTime": "2026-10-19T01:32:25.276976524Z"
+    },
+    "Descriptor": {
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "digest": "sha256:58beb689244c0bf7db096223050f98b4955fd8edf85f878f37b0ba4fb0d20551",
+      "size": 856
+    },
+    "Identity": {
+      "Build": [
+        {
+          "Ref": "u0rao7nses4gnno60uks5thyc",
+          "CreatedAt": "2026-10-19T09:32:52.747907251+08:00"
+        }
+      ]
+    }
+  }
+]
