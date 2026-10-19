@@ -65,6 +65,7 @@ ISAAC_FROM_MOTOR = np.array(
 LEFT_SHOULDER_PITCH = 15  # Motor order; negative moves the hand forward.
 ENCODER_SHA256 = "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae"  # SONIC v1.1
 RATE = 50
+PEAK_SPEED = 0.47  # rad/s: the commissioned 0.5 rad stroke over 2 s; bigger moves take longer.
 _ARM = [15, 16, 17, 18, 22, 23, 24, 25]
 _WRIST = [19, 20, 21, 26, 27, 28]
 
@@ -110,8 +111,14 @@ def arm_poses(
     lead_s: float = 1.0,
     move_s: float = 2.0,
     hold_s: float = 1.0,
+    peak_speed: float = PEAK_SPEED,
 ) -> NDArray[np.float64]:
-    """Base pose, lead-in, move by delta, hold, move back, lead-out. [N,29] at 50 Hz."""
+    """Base pose, lead-in, move by delta, hold, move back, lead-out. [N,29] at 50 Hz.
+
+    Each stroke lasts at least move_s and long enough that the min-jerk peak speed
+    (1.875 * delta / T) stays at or below peak_speed.
+    """
+    move_s = max(move_s, 1.875 * abs(delta) / peak_speed)
     lead, move, hold = (round(s * RATE) for s in (lead_s, move_s, hold_s))
     profile = min_jerk(move)
     offset = np.r_[

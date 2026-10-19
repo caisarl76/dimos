@@ -65,15 +65,20 @@ ArmError = Literal[
     "NOT_REACHED",
     "INVALID_MOTION",
 ]
-MAX_ANGLE_DEG = 28.0  # Commissioned at 0.5 rad (28.6 deg) on a G1.
 UpperBodyMotion = Literal["left_arm_forward", "left_arm_sideways", "left_forearm_raise"]
-# Motion -> (motor-order joint, sign of a positive angle), from the G1 model in the torso frame and
-# checked in MuJoCo at 28 deg. Shoulder roll only outward: inward drives the hand into the torso.
-# Waist turns were left out: SONIC tracked only 18-48% of an isolated waist yaw.
-MOTIONS: dict[str, tuple[int, int]] = {
-    "left_arm_forward": (LEFT_SHOULDER_PITCH, -1),  # hand forward and up
-    "left_arm_sideways": (16, +1),  # left shoulder roll: hand outward
-    "left_forearm_raise": (18, -1),  # left elbow: forearm up
+# Motion -> (motor-order joint, sign of a positive angle, min deg, max deg). Directions from the G1
+# model in the torso frame. Ranges from a MuJoCo floor sweep at 10-60 deg with the stroke slowed to
+# PEAK_SPEED, and robot runs at 10/20/28 deg:
+# - forward: from 40 deg the legs passed their envelope and a foot partly unloaded.
+# - sideways: at 50-60 deg other arm joints and wrists reached 85-90% of their envelopes.
+# - forearm: tracked 95% to 60 deg with little side motion, but its joint friction against the soft
+#   arm gains costs 5-7 deg (robot: 48% at 10 deg, 65% at 20 deg).
+# Shoulder roll only outward: inward drives the hand into the torso. Waist turns were left out:
+# SONIC tracked only 18-48% of an isolated waist yaw.
+MOTIONS: dict[str, tuple[int, int, float, float]] = {
+    "left_arm_forward": (LEFT_SHOULDER_PITCH, -1, 10.0, 28.0),  # hand forward and up
+    "left_arm_sideways": (16, +1, 10.0, 40.0),  # left shoulder roll: hand outward
+    "left_forearm_raise": (18, -1, 20.0, 60.0),  # left elbow: forearm up
 }
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _JOINTS = [name.removeprefix("g1/") for name in make_humanoid_joints("g1")]
@@ -181,22 +186,25 @@ class SonicArmSkillContainer(Module):
 
         Motions: "left_arm_forward" swings the left arm forward (shoulder pitch),
         "left_arm_sideways" raises the left arm out to the side (shoulder roll), and
-        "left_forearm_raise" lifts the left forearm (elbow). Min-jerk, 2 s out and 2 s back, while
-        SONIC keeps the robot balanced; about 18 s in all. Requires the SONIC controller running in
+        "left_forearm_raise" lifts the left forearm (elbow). Min-jerk, 2 s out and 2 s back (longer
+        for big angles), while SONIC keeps the robot balanced; 18-24 s in all. Requires the SONIC controller running in
         confirmed planner idle; it never starts or stops the controller. Stops early and returns
         control to the planner if any joint strays from the plan.
 
         Args:
             motion: One of "left_arm_forward", "left_arm_sideways", "left_forearm_raise".
-            angle_deg: How far to move, in degrees (1 to 28).
+            angle_deg: How far to move, in degrees: left_arm_forward 10-28, left_arm_sideways 10-40,
+                left_forearm_raise 20-60.
         """
         if motion not in MOTIONS:
             return SkillResult.fail("INVALID_MOTION", f"motion must be one of {sorted(MOTIONS)}")
-        if not 1.0 <= angle_deg <= MAX_ANGLE_DEG or not math.isfinite(angle_deg):
-            return SkillResult.fail("INVALID_ANGLE", f"angle_deg must be within 1..{MAX_ANGLE_DEG}")
+        joint, sign, low, high = MOTIONS[motion]
+        if not low <= angle_deg <= high or not math.isfinite(angle_deg):
+            return SkillResult.fail(
+                "INVALID_ANGLE", f"{motion} angle_deg must be within {low:g}..{high:g}"
+            )
         if not self._busy.acquire(blocking=False):
             return SkillResult.fail("BUSY", "an arm move is already running")
-        joint, sign = MOTIONS[motion]
         try:
             return self._move(motion, joint, sign * math.radians(angle_deg))
         finally:

@@ -82,13 +82,13 @@ unitree_g1_sonic_arm = autoconnect(
         reference_bind="tcp://127.0.0.1:5556",
         feedback_endpoint="tcp://127.0.0.1:5557",
         journal_dir=STATE_DIR / "sonic-arm",
-        # The skill streams its 11 s plan as one open-loop chunk, as commissioned.
+        # The skill streams its plan (11 s, up to 15.4 s for big angles) as one open-loop chunk.
         profile=SonicModelProfile(
             name="g1-sonic-arm",
             source_fps=50,
             right_hand_order="native",
             handback_policy="native_planner",
-            max_observation_age=12.0,
+            max_observation_age=17.0,
         ),
     ),
     SonicArmSkillContainer.blueprint(),

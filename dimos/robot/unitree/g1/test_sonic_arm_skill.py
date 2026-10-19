@@ -32,6 +32,7 @@ from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.sonic_arm_reference import (
+    PEAK_SPEED,
     arm_poses,
     group_margins,
     min_jerk,
@@ -87,7 +88,9 @@ class FakeEncoder:
 def skill(execution, mocker):
     mocker.patch.object(sonic_arm_skill, "SonicEncoder", FakeEncoder)
     mocker.patch.object(
-        sonic_arm_skill, "arm_poses", partial(arm_poses, lead_s=0.1, move_s=0.3, hold_s=0.1)
+        sonic_arm_skill,
+        "arm_poses",
+        partial(arm_poses, lead_s=0.1, move_s=0.3, hold_s=0.1, peak_speed=100.0),
     )
     mocker.patch.object(sonic_arm_skill, "token_schedule", partial(token_schedule, blend_s=0.2))
     module = SonicArmSkillContainer(encoder_path="unused.onnx", return_watch_seconds=0.0)
@@ -326,13 +329,13 @@ def test_agent_prompt_names_only_skills_the_blueprint_has():
 def test_other_motions_move_their_own_joint_with_its_widened_envelope(skill, motion, joint, sign):
     module, peer = skill
     # 0.33 rad is past the 0.20 arm margin alone: only the moving joint's widened envelope allows it.
-    result = run(module, 19.0, partial(follows, delta=sign * 0.33, joint=joint), motion=motion)
+    result = run(module, 22.0, partial(follows, delta=sign * 0.33, joint=joint), motion=motion)
     assert result.success, result
     assert result.metadata["motion"] == motion and result.metadata["reached_deg"] == pytest.approx(
         18.9, abs=0.1
     )
     streamed = tokens(peer.snapshot())[:, 0]
-    assert streamed.max() - streamed.min() == pytest.approx(np.radians(19), abs=0.01)
+    assert streamed.max() - streamed.min() == pytest.approx(np.radians(22), abs=0.01)
 
 
 def test_unknown_motion_sends_nothing(skill):
@@ -343,3 +346,28 @@ def test_unknown_motion_sends_nothing(skill):
 
 def test_motion_enum_matches_the_motion_table():
     assert set(sonic_arm_skill.UpperBodyMotion.__args__) == set(sonic_arm_skill.MOTIONS)
+
+
+@pytest.mark.parametrize(
+    ("motion", "angle"),
+    [
+        ("left_arm_forward", 29.0),
+        ("left_arm_sideways", 9.0),
+        ("left_arm_sideways", 41.0),
+        ("left_forearm_raise", 19.0),
+        ("left_forearm_raise", 61.0),
+    ],
+)
+def test_each_motion_keeps_its_own_angle_range(skill, motion, angle):
+    module, peer = skill
+    assert module.move_upper_body(motion, angle).error_code == "INVALID_ANGLE"
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_big_strokes_slow_down_to_the_commissioned_peak_speed():
+    commissioned = arm_poses(np.zeros(29), 15, -0.5)  # 0.5 rad over 2 s: the speed cap's reference
+    assert len(commissioned) == 350
+    big = arm_poses(np.zeros(29), 18, -np.radians(60))
+    speed = np.abs(np.diff(big[:, 18])).max() * 50
+    assert speed <= PEAK_SPEED + 0.01
+    assert len(big) == 50 + 2 * round(1.875 * np.radians(60) / 0.47 * 50) + 50 + 50
