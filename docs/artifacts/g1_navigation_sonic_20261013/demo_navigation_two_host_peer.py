@@ -134,6 +134,7 @@ def costmap_summary(
             "occupied": int((cells[near] >= 100).sum()),
         },
     )
+    summary["occupied_within_0.5m"] = int((cells[dist <= 0.5] >= 100).sum())
     margin = math.ceil(0.35 / res)
     free = cells == 0
     padded = np.pad(free, margin, constant_values=False)

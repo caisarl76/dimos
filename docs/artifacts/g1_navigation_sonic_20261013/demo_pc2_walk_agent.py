@@ -16,9 +16,9 @@
 
 Run with `docker exec -i <graph container> python .../demo_pc2_walk_agent.py`. It joins
 the graph's private zenoh router as a client and reaches the one execution owner by RPC.
-It only calls the explicit begin/end navigation RPCs and read-only status; motion
-commands enter through the workstation peer. JSON lines: commands on stdin, replies
-on stdout. Native state is sampled at 25 Hz into memory and `--log`.
+It calls only begin/end navigation, one set_navigation_goal per goal case, and read-only
+status; velocity commands enter through the workstation peer. JSON lines: commands on
+stdin, replies on stdout. Native state is sampled at 25 Hz into memory and `--log`.
 """
 
 from __future__ import annotations
@@ -33,6 +33,9 @@ import threading
 import time
 from typing import Any
 
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
+from dimos.msgs.geometry_msgs.Quaternion import Quaternion
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.robot.unitree.g1.sonic_navigation import _yaw
 
 SAMPLE_PERIOD_S = 0.04
@@ -84,6 +87,16 @@ class Agent:
                 reply.update(
                     {k: status[k] for k in ("ready", "subscriptions_ready", "feedback_fresh")}
                 )
+            elif op == "goal":
+                # One goal for the current request, through the owner's only goal path.
+                request_id = self._execution.get_navigation_status()["request_id"]
+                goal = PoseStamped(
+                    position=Vector3(float(command["x"]), float(command["y"]), 0.0),
+                    orientation=Quaternion.from_euler(Vector3(0.0, 0.0, float(command["yaw"]))),
+                    frame_id="odom",
+                )
+                reply["request_id"] = request_id
+                reply["result"] = self._execution.set_navigation_goal(request_id, goal)
             elif op == "mark":
                 pass
             elif op == "since":
