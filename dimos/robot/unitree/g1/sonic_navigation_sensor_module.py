@@ -70,6 +70,11 @@ MAX_DRAIN = 64
 # Longer than every raw/base readiness budget, so a reset is always observed as stale.
 RESET_HOLDOFF_SECONDS = 0.5
 WAIST_BUDGET_SECONDS = 0.200
+# Legs and feet sit outside PointLio's 0.5 m blind sphere around the head and get mapped
+# as obstacles along the walked trail. Drop points this close to the base_link z axis
+# and below the head (base_link is the pelvis, the MID360 is ~0.45 m above it).
+SELF_RADIUS_M = 0.45
+SELF_TOP_M = 0.5
 WAIST_RELAY_PERIOD_TICKS = 20  # lowstate ms ticks; relays the 500 Hz edge at 50 Hz
 CHANNELS: dict[Stream, frozenset[bytes]] = {
     "cloud": frozenset({b"lidar_raw"}),
@@ -443,7 +448,27 @@ class SonicNavigationSensorReceiver(Module):
         if stream == "cloud":
             accepted = accepted[-1:]
         for channel, msg in accepted:
-            (self.lidar_raw if channel == b"lidar_raw" else self.imu_raw).publish(msg)
+            if channel == b"lidar_raw":
+                self.lidar_raw.publish(self._without_self(msg))
+            else:
+                self.imu_raw.publish(msg)
+
+    def _without_self(self, cloud: PointCloud2) -> PointCloud2:
+        if self._sensor_to_torso is None:
+            return cloud
+        # Before the first waist edge, a zero waist is within a few cm of the real one.
+        waist = self._waist[0] if self._waist is not None else -base_to_torso(0.0, 0.0, 0.0)
+        to_base = (self._sensor_to_torso + waist).to_matrix()
+        points = cloud.as_numpy()[0]
+        base = points @ to_base[:3, :3].T + to_base[:3, 3]
+        keep = (np.hypot(base[:, 0], base[:, 1]) >= SELF_RADIUS_M) | (base[:, 2] >= SELF_TOP_M)
+        offsets = cloud.offset_times_u32()
+        return PointCloud2.from_numpy(
+            points[keep],
+            frame_id=cloud.frame_id,
+            timestamp=cloud.ts,
+            offset_times=None if offsets is None else offsets[keep],
+        )
 
     def handle_reset(self, stream: Stream) -> None:
         with self._lock:
