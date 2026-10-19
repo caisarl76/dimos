@@ -38,7 +38,7 @@ import json
 import math
 import os
 from pathlib import Path
-import select
+import queue
 import subprocess
 import sys
 import threading
@@ -180,27 +180,50 @@ def native_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 class JsonLines:
-    """A child process speaking JSON lines: commands on stdin, replies on stdout."""
+    """A child process speaking JSON lines: commands on stdin, replies on stdout.
 
-    def __init__(self, command: list[str], log: Any, env: dict[str, str] | None = None) -> None:
+    stdout is drained continuously: DimOS logs to stdout too (also from forked
+    workers), and an undrained pipe blocked the peer host's replies (2026-10-19-5).
+    """
+
+    def __init__(
+        self,
+        command: list[str],
+        log: Any,
+        env: dict[str, str] | None = None,
+        *,
+        stdout_log: Path | None = None,
+    ) -> None:
         self.process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env
         )
         self._lock = threading.Lock()
+        self._replies: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        threading.Thread(target=self._drain, args=(stdout_log,), daemon=True).start()
+
+    def _drain(self, stdout_log: Path | None) -> None:
+        assert self.process.stdout is not None
+        sink = stdout_log.open("a", buffering=1) if stdout_log else None
+        try:
+            for line in self.process.stdout:
+                if line.startswith("{"):
+                    self._replies.put(json.loads(line))
+                elif sink is not None:
+                    sink.write(line)
+        finally:
+            self._replies.put(None)  # end of output: the child exited
+            if sink is not None:
+                sink.close()
 
     def read(self, timeout: float) -> dict[str, Any]:
-        assert self.process.stdout is not None
-        poller = select.poll()
-        poller.register(self.process.stdout, select.POLLIN)
-        until = time.monotonic() + timeout
-        while time.monotonic() < until:
-            if poller.poll(100):
-                line = self.process.stdout.readline()
-                if not line:
-                    raise RuntimeError(f"{self.process.args[0]} exited")
-                if line.startswith("{"):
-                    return json.loads(line)  # type: ignore[no-any-return]
-        raise TimeoutError(f"{self.process.args[0]} reply")
+        try:
+            reply = self._replies.get(timeout=timeout)
+        except queue.Empty:
+            raise TimeoutError(f"{self.process.args[0]} reply") from None
+        if reply is None:
+            self._replies.put(None)
+            raise RuntimeError(f"{self.process.args[0]} exited")
+        return reply
 
     def call(self, op: str, timeout: float = 10.0, **fields: Any) -> dict[str, Any]:
         with self._lock:
@@ -302,10 +325,10 @@ def run_session(args: Any) -> None:
     save()
     log = (out / "harness.log").open("a")
     env = {**os.environ, "PYTHONPATH": f"{root}:{HERE}"}
-    peer = JsonLines(peer_command(out), log, env)
+    peer = JsonLines(peer_command(out), log, env, stdout_log=out / "peer-stdout.log")
     ready = peer.read(120.0)
     assert ready["op"] == "ready", ready
-    agent = JsonLines(agent_command(out), log)
+    agent = JsonLines(agent_command(out), log, stdout_log=out / "agent-stdout.log")
     results["agent_attach"] = agent.read(30.0)
     save()
     stop = threading.Event()
