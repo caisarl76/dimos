@@ -157,3 +157,31 @@ def test_turns_are_idle_facing_changes_and_forward_must_walk() -> None:
     ahead = {**left, "forward_m": 0.07, "yaw_rad": 0.0}
     assert walk.motion_case_ok(walk.CASES["forward_020"], walked, ahead)
     assert not walk.motion_case_ok(walk.CASES["forward_020"], idle_turn, ahead)
+
+
+FLOODING_CHILD = """
+import json, sys
+for line in sys.stdin:
+    command = json.loads(line)
+    for i in range(4000):  # ~200 KB of log lines between replies, as DimOS logs to stdout
+        print("log line %05d %s" % (i, "x" * 40))
+    print(json.dumps({"op": command["op"]}), flush=True)
+"""
+
+
+def test_child_stdout_logging_cannot_block_replies(tmp_path) -> None:
+    # Session 2026-10-19-5: the peer host's logs filled the undrained stdout pipe and
+    # its next reply blocked; the harness timed out mid-case.
+    import sys
+
+    log = (tmp_path / "child.log").open("w")
+    child = walk.JsonLines(
+        [sys.executable, "-c", FLOODING_CHILD], log, stdout_log=tmp_path / "out.log"
+    )
+    try:
+        for op in ("tele", "tele", "tele"):
+            assert child.call(op, timeout=5.0)["op"] == op
+    finally:
+        child.close("stop")
+        log.close()
+    assert "log line 03999" in (tmp_path / "out.log").read_text()
