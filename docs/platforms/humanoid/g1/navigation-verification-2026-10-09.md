@@ -660,3 +660,28 @@ in the same direction shrank (right -11.3, -5.5, -4.5 deg; -11.7 again after a f
 walk). Simulation of the same sequence kept repeated turns constant at about -11 deg,
 so this is a real-robot effect; the operator judges foot friction to be the main cause.
 A turn made right after a walk is larger in both robot and simulation.
+
+### Self-filter and the first physical goal, 2026-10-19
+
+Session 10 refused `goal_1m`: the costmap held 49-50 occupied cells within
+0.5 m of the base, a blob centred on the robot with points mostly below 0.55 m.
+PointLio's 0.5 m blind sphere sits around the head, so the legs and feet were
+mapped along the walked trail. The workstation receiver now drops points within
+0.45 m of the base_link z axis and below 0.5 m above the pelvis before PointLio
+(`a2ff9a2da`); the two-host simulation matrix passed unchanged.
+
+Session 11, same pc2 install, live costmap watched in the Rerun web viewer
+(`demo_peer_rerun_view.py`):
+
+- `costmap_check` showed 0 occupied cells within 0.5 m in all four checks.
+- The first `goal_1m`, before any walking, was refused because the robot cell was
+  unknown: with self points gone, the floor under the feet is only observed from
+  elsewhere. After `forward_020` x2, `curve_left_020`, `turn_right_020` and
+  `curve_right_020` the robot cell was free.
+- `goal_1m` passed: goal 1.0 m straight ahead, reached within 0.3 m after 17.0 s,
+  final error 0.24 m, no latch, no feedback gaps. About 11 s of that was a slow
+  in-place turn of 22 deg to the right (about 2 deg/s) before walking. The walked
+  track bowed up to 0.35 m right of the straight line, away from occupied cells
+  0.63-0.77 m to its left: A* keeping clearance, not drift.
+- The final `operator_stop` ended in `feedback_lost` as designed (the native was
+  stopped), 21.6 s after Enter.
