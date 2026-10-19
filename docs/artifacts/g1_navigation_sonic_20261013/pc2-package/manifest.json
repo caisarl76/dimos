@@ -1,6 +1,6 @@
 {
   "target": "pc2 unitree@192.168.0.223, /home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013",
-  "dimos_source_commit": "1298b7d2b223111d5573ee9284005f73e86da35d",
+  "dimos_source_commit": "823f852cffc445b2ed424476afe6e1fa1876cc71",
   "native": {
     "baseline": "pc2 /home/unitree/GR00T-WholeBodyControl a9d20b2 + local changes (71 files)",
     "manipulation_port_patch_sha256": "c945aa9b359de4172ae0c776c12980d6d62420a434025c7ea366911d262db6c9",
@@ -24,7 +24,7 @@
   "image": "dimos-g1-sonic-navigation:20261013",
   "payload_sha256": {
     "Dockerfile": "70df39aef3d73a9d178c95736301ae0c12047ab6abf030939e0056832c2ab637",
-    "dimos-source.tar": "5980d48125d6971338c3cb825b743178f1b9785db8cbc24d7a4f3f5752c12e3c",
+    "dimos-source.tar": "5e9cbac6e4cd12985de1230864ac5e581ce854ede143fcec3fec4d39ac885c61",
     "launch.sh": "87409495fbefd163855883879804ebe725bd0ac792091dc04b6a94d654e48946",
     "models.sha256": "fff9d3b9f24627655c2ae99f6702f63f46112377173ab616c6f537316b07aed3",
     "native-baseline.sha256": "3a02f3567aea1ca80ba3b9ed8b2006d96bb5195cd02104c13900cbcd264b204d",
@@ -34,7 +34,7 @@
     "package/config/probe.json": "697c26732fefa1c434bf2acb8f5052da6155b451a43bee7ca8139ada476b603e",
     "package/demo_pc2_navigation_readiness.py": "df18a2dfd0537c7742fc301e9dfb546dd0b64463ac7940aad80f962d51a4b0d8",
     "package/demo_pc2_operator_start.py": "ea280e15494625b35e82df202ec83248d4f5d0be3affb9b2bb2b895060da848c",
-    "package/demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
+    "package/demo_pc2_walk_agent.py": "e1ae68ea844c3fd57a6ee8ad6a002fadc1cf9c3cb00e260f9f2726cbdfdae582",
     "package/run-pc2-graph.sh": "8e4c2d37532581b39bd1a3ddf5f4d3087a918385200d59d11350c56c4db1534f",
     "package/smoke.py": "f140e6cfcf976c104f2fe792ea7bfac3ea015ce4580ee52e4e8b0eec0a3f722d",
     "package/zenoh_router.py": "725703921003bf0d16fe53c857dc39d7f3d74f245c287cc8136f82bfb9f0b621",
