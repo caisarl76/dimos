@@ -236,6 +236,43 @@ def test_receiver_relays_allowlisted_frames_and_bounds_cloud_drain(receiver, clo
     assert module.rejected_frames == len(rejected)
 
 
+def cloud_at(sec: int, xyz: list[tuple[float, float, float]]) -> SimpleNamespace:
+    sample = dds_cloud(sec, points=len(xyz))
+    data = np.frombuffer(sample.data, dtype=[("p", "<f4", 3), ("rest", "V12")]).copy()
+    data["p"] = xyz
+    sample.data = data.tobytes()
+    return sample
+
+
+def test_receiver_drops_self_points_around_the_body_axis(receiver, clock) -> None:
+    module, out = receiver
+    # UPSIDE_DOWN sensor frame: base ~= (x, -y, 0.44 - z) at zero waist.
+    leg, foot = (0.1, 0.0, 1.0), (0.2, 0.3, 1.2)  # within 0.45 m, below the head
+    wall, overhead = (1.0, 0.0, 0.5), (0.1, 0.0, -0.3)  # outside radius, above head
+    cloud = cloud_at(100, [leg, wall, foot, overhead])
+    module.handle_frames("cloud", [[b"lidar_raw", encode_cloud(cloud)]])
+    (kept,) = out["lidar_raw"]
+    np.testing.assert_allclose(kept.as_numpy()[0], [wall, overhead], atol=1e-6)
+    np.testing.assert_array_equal(kept.offset_times_u32(), [1000, 3000])
+    assert (kept.ts, kept.frame_id) == (100.0, "mid360_link")
+
+    # Once the waist arrives the filter composes it to reach base_link.
+    module.handle_frames("state", [[b"waist_tf", waist(5.0, yaw=0.5)]])
+    module.handle_frames("cloud", [[b"lidar_raw", encode_cloud(cloud_at(101, [leg, wall]))]])
+    np.testing.assert_allclose(out["lidar_raw"][1].as_numpy()[0], [wall], atol=1e-6)
+
+
+def test_unknown_extrinsic_relays_clouds_unfiltered(clock, stopped) -> None:
+    module = SonicNavigationSensorReceiver(
+        cloud_endpoint="tcp://127.0.0.1:7101", state_endpoint="tcp://127.0.0.1:7102"
+    )
+    stopped(module)
+    out: list = []
+    module.lidar_raw.subscribe(out.append)
+    module.handle_frames("cloud", [[b"lidar_raw", encode_cloud(cloud_at(100, [(0.1, 0, 1)]))]])
+    assert len(out[0].as_numpy()[0]) == 1
+
+
 def test_base_odometry_requires_commissioned_extrinsic_and_fresh_waist(
     receiver, clock, stopped
 ) -> None:
