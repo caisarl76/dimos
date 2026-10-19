@@ -37,6 +37,9 @@ logger = setup_logger()
 
 class ReplanningAStarPlannerConfig(ModuleConfig):
     min_angular_velocity: float = Field(default=0.2, ge=0, allow_inf_nan=False)
+    # Heading error (rad) above which the robot turns in place before following the path.
+    # Past 90 deg the follower turns in place anyway.
+    initial_rotation_tolerance: float = Field(default=0.35, gt=0, le=1.5708)
     robot_width: float | None = None
     robot_rotation_diameter: float | None = None
 
@@ -74,7 +77,9 @@ class ReplanningAStarPlanner(Module, NavigationInterface):
             self.config.g.model_copy(update=overrides) if overrides else self.config.g
         )
         self._planner = GlobalPlanner(
-            effective_global_config, min_angular_velocity=self.config.min_angular_velocity
+            effective_global_config,
+            min_angular_velocity=self.config.min_angular_velocity,
+            initial_rotation_tolerance=self.config.initial_rotation_tolerance,
         )
 
     @rpc

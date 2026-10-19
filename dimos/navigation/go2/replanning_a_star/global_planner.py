@@ -74,7 +74,13 @@ class GlobalPlanner(Resource):
     _max_path_deviation: float = 0.9
     _replanning_enabled: bool = True
 
-    def __init__(self, global_config: GlobalConfig, *, min_angular_velocity: float = 0.2) -> None:
+    def __init__(
+        self,
+        global_config: GlobalConfig,
+        *,
+        min_angular_velocity: float = 0.2,
+        initial_rotation_tolerance: float = 0.35,
+    ) -> None:
         self.path = Subject()
         self.goal_reached = Subject()
 
@@ -86,6 +92,7 @@ class GlobalPlanner(Resource):
             self._navigation_map,
             self._goal_tolerance,
             min_angular_velocity=min_angular_velocity,
+            initial_rotation_tolerance=initial_rotation_tolerance,
         )
 
         stuck_threshold = self._stuck_threshold
