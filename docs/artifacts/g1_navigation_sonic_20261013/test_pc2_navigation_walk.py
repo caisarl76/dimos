@@ -185,3 +185,21 @@ def test_child_stdout_logging_cannot_block_replies(tmp_path) -> None:
         child.close("stop")
         log.close()
     assert "log line 03999" in (tmp_path / "out.log").read_text()
+
+
+def test_curves_need_forward_progress_and_the_commanded_turn_direction() -> None:
+    left, right = walk.CASES["curve_left_020"], walk.CASES["curve_right_020"]
+    assert (left.vx, left.wz, left.seconds) == (0.2, 0.2, 4.0) and right.wz == -0.2
+    assert walk.blocked("curve_left_020", passed("idle", "operator_stop")) == "requires forward_020"
+    walked = {"walked": True, "ended_idle": True, "latched": False}
+    arc = {"forward_m": 0.45, "lateral_m": 0.15, "yaw_rad": 0.9, "heading_offset_deg": 18.0}
+    assert walk.motion_case_ok(left, walked, arc)
+    assert not walk.motion_case_ok(right, walked, arc)  # turned the wrong way
+    assert not walk.motion_case_ok(left, walked, {**arc, "yaw_rad": 0.01})  # did not turn
+    assert not walk.motion_case_ok(left, walked, {**arc, "forward_m": 0.0})  # did not walk
+
+
+def test_costmap_check_is_read_only_and_always_available() -> None:
+    case = walk.CASES["costmap_check"]
+    assert (case.vx, case.wz, case.requires) == (0.0, 0.0, ())
+    assert walk.blocked("costmap_check", []) is None

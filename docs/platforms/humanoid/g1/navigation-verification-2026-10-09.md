@@ -650,3 +650,13 @@ Ground tests still needed, with the robot standing on the floor:
 - The sideways drift during forward walking (about -4 cm per run while
   suspended), the mount-yaw check.
 - `cancel` and `source_pause`, not yet run on the robot.
+
+### Released-support session, 2026-10-19
+
+With the support released and the ceiling cable slack, `forward_020` covered 18 and
+27 cm in a straight line (under 1 cm sideways), and LIO base and sensor poses agreed
+within 1-2 cm after each stop. `cancel` and `source_pause` passed again. Repeated turns
+in the same direction shrank (right -11.3, -5.5, -4.5 deg; -11.7 again after a forward
+walk). Simulation of the same sequence kept repeated turns constant at about -11 deg,
+so this is a real-robot effect; the operator judges foot friction to be the main cause.
+A turn made right after a walk is larger in both robot and simulation.
