@@ -4,17 +4,16 @@ Target: pc2 `unitree@192.168.0.223` (29 body joints, no hands). Everything goes 
 `/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/`. Existing
 controllers, source trees, Python environments and images stay unchanged.
 
-**Status, 2026-10-15:** re-provisioned on pc2 (attempt 8, 15:47–15:53 CST); evidence
+**Status, 2026-10-19:** re-provisioned on pc2 (attempt 9, 09:27-09:33 CST); evidence
 in [pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json).
 
 - The ARM64 native tests pass 41/42; only the FK fixture test fails. The controller is
-  `dc59a4ab…`, identical on all eight builds. Two `--check-only` runs were ready with
+  `dc59a4ab…`, identical on all nine builds. Two `--check-only` runs were ready with
   nothing blocking.
-- Attempt 8 carries recoverable readiness (`3f986f271`): a relay readiness lapse stops
-  walking and resumes on fresh proof; 2 s of continuous outage still ends the session.
-- Attempt 7 (`.attempt7-terminal-readiness`), operator session 2: `idle` ran and the
-  native never walked. One relay reply over pc2's Wi-Fi took more than 100 ms;
-  readiness expired and the session faulted, which was terminal under that build.
+- Attempt 9 carries the 0.20 rad facing lead (`808ece4c8`). Attempt 8
+  (`.attempt8-facing-lead-0.10`) had the original 0.10 rad lead, with which IDLE turns
+  stalled near 5 deg.
+- Launch order: `native`, `start`, `graph`.
 - Attempt 6 (`.attempt6-no-operator-start`): in the operator session at 14:30 CST the
   graph started right after the native. The native never left init and sent no
   feedback, so the harness ran no case
