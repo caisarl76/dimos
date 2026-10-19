@@ -381,7 +381,10 @@ def run_session(args: Any) -> None:
         ahead = [[x + d * math.cos(h), y + d * math.sin(h)] for d in (0.25, 0.5, 0.75, 1.0)]
         reply = peer.call("costmap", points=ahead)
         summary = reply["costmap"]
+        snapshot = out / f"costmap-{len(results['cases']) + 1:02d}.npz"
+        saved = peer.call("snapshot", path=str(snapshot)).get("saved")
         record = {"name": name, "started_unix": time.time(), "ahead_points": ahead, **reply}
+        record["snapshot"] = saved and snapshot.name
         record["passed"] = record["measured_ok"] = summary is not None
         if summary is not None:
             disk = summary.get("startup_disk", {})

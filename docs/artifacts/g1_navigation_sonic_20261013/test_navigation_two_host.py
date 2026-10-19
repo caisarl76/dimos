@@ -178,3 +178,33 @@ def test_sender_idl_types_resolve_like_cyclonedds(tmp_path, monkeypatch):
         )._open_readers()
         hints = typing.get_type_hints(readers["imu_raw"].topic.kind)
         assert set(hints) >= {"header", "angular_velocity", "linear_acceleration"}
+
+
+def test_snapshot_keeps_points_near_the_robot_with_grid_and_pose(tmp_path):
+    from dimos.msgs.geometry_msgs.Pose import Pose
+    from dimos.msgs.geometry_msgs.Vector3 import Vector3
+    from dimos.msgs.nav_msgs.OccupancyGrid import OccupancyGrid
+    from dimos.msgs.nav_msgs.Odometry import Odometry
+    from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
+
+    spec = importlib.util.spec_from_file_location(
+        "two_host_peer", HERE / "demo_navigation_two_host_peer.py"
+    )
+    peer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(peer)
+    points = np.array([[1.2, 1.0, 0.3], [2.9, 1.0, 0.1], [4.0, 1.0, 0.5]], dtype=np.float32)
+    cloud = PointCloud2.from_numpy(points, frame_id="odom")
+    grid = OccupancyGrid(
+        grid=np.full((4, 5), -1, dtype=np.int8),
+        resolution=0.05,
+        origin=Pose(position=Vector3(0.5, 0.5, 0.0)),
+        frame_id="odom",
+    )
+    odom = Odometry(pose=Pose(position=Vector3(1.0, 1.0, 0.0)), frame_id="odom")
+    path = tmp_path / "snap.npz"
+    peer.save_snapshot(str(path), cloud, grid, odom)
+    with np.load(path) as saved:
+        assert saved["points"].shape == (2, 3)  # 4.0 m away is dropped
+        assert (saved["grid"] == -1).all() and saved["grid"].shape == (4, 5)
+        assert list(saved["origin"]) == [0.5, 0.5] and float(saved["resolution"]) == 0.05
+        assert list(saved["robot"][:2]) == [1.0, 1.0]

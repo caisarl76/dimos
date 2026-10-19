@@ -82,6 +82,20 @@ def open_router(endpoint: str) -> Any:
     return zenoh.open(config)
 
 
+def save_snapshot(path: str, cloud: PointCloud2, grid: OccupancyGrid, odom: Odometry) -> None:
+    """Map points within 2 m of the robot, the costmap grid and the robot pose."""
+    points = cloud.points_f32()
+    near = np.hypot(points[:, 0] - odom.position.x, points[:, 1] - odom.position.y) <= 2.0
+    np.savez_compressed(
+        path,
+        points=points[near],
+        grid=np.asarray(grid.grid),
+        origin=[grid.origin.position.x, grid.origin.position.y],
+        resolution=grid.resolution,
+        robot=[odom.position.x, odom.position.y, odom.position.z, odom.yaw],
+    )
+
+
 def costmap_summary(
     grid: OccupancyGrid, odom: Odometry | None, points: list[list[float]]
 ) -> dict[str, Any]:
@@ -307,6 +321,20 @@ def main() -> None:
                     None if grid is None else costmap_summary(grid, odom, command.get("points", []))
                 )
                 reply(op=op, counts=seen, costmap=summary)
+            elif op == "snapshot":
+                # Read-only evidence: map points within 2 m of the robot, the costmap grid
+                # and the robot pose, to see whether near-field occupied cells are the robot.
+                with lock:
+                    cloud, grid, odom = (
+                        latest.get("global_map"),
+                        latest.get("global_costmap"),
+                        latest.get("odometry"),
+                    )
+                saved = None
+                if cloud is not None and grid is not None and odom is not None:
+                    save_snapshot(command["path"], cloud, grid, odom)
+                    saved = command["path"]
+                reply(op=op, saved=saved)
             elif op == "synthetic_costmap":
                 synthetic.set()
                 threading.Thread(target=publish_synthetic, daemon=True).start()
