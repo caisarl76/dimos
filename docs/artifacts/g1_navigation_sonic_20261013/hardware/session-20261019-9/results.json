@@ -1,0 +1,857 @@
+{
+  "operator_ready": "operator-ready-20261019",
+  "extrinsic_acceptance": {
+    "accepted": true,
+    "date": "2026-10-15",
+    "decided_by": "operator (user decision in session, 2026-10-15)",
+    "mount": "g1_tf_publisher.torso_to_mid360",
+    "torso_to_sensor_xyz_xyzw": [
+      0.0002835,
+      3e-05,
+      0.41618,
+      0.9997985784932998,
+      1.2289293145202804e-18,
+      -0.020069938783589012,
+      6.122000644719466e-17
+    ],
+    "evidence": [
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-4.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-5.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-6.json"
+    ],
+    "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
+    "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
+  },
+  "prior_passed": [
+    {
+      "session": "session-20261019-1",
+      "name": "idle"
+    },
+    {
+      "session": "session-20261019-1",
+      "name": "operator_stop"
+    },
+    {
+      "session": "session-20261019-7",
+      "name": "costmap_check"
+    },
+    {
+      "session": "session-20261019-7",
+      "name": "curve_left_020"
+    },
+    {
+      "session": "session-20261019-7",
+      "name": "costmap_check"
+    },
+    {
+      "session": "session-20261019-7",
+      "name": "idle"
+    }
+  ],
+  "endpoints": {
+    "router": "tcp/127.0.0.1:17211",
+    "link_bind": "tcp://192.168.0.62:17103",
+    "cloud": "tcp://192.168.0.223:17101",
+    "state": "tcp://192.168.0.223:17102"
+  },
+  "cases_offered": {
+    "idle": {
+      "kind": "idle",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 3.0,
+      "requires": []
+    },
+    "operator_stop": {
+      "kind": "operator_stop",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": [
+        "idle"
+      ]
+    },
+    "forward_010": {
+      "kind": "motion",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 1.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ]
+    },
+    "forward_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.0,
+      "seconds": 2.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ]
+    },
+    "turn_left_020": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": 0.2,
+      "seconds": 2.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "turn_right_020": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": -0.2,
+      "seconds": 2.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "curve_left_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.2,
+      "seconds": 4.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "curve_right_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": -0.2,
+      "seconds": 4.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "cancel": {
+      "kind": "cancel",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.6,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "source_pause": {
+      "kind": "source_pause",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.5,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "costmap_check": {
+      "kind": "costmap",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": []
+    }
+  },
+  "harness_sha256": {
+    "demo_pc2_navigation_walk.py": "4f865fda5d9e0f385f860f1ea5829e1f9d5d6bb2073c43d00368f6ab154185b5",
+    "demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
+    "demo_navigation_two_host_peer.py": "c6854f02c653b83065362364ce106f1c009368657ef51b05a0e71aa6416614a0"
+  },
+  "dimos_commit": "f80361a252ba0b7ec6960f560dae2b81c594c8a0",
+  "cases": [
+    {
+      "name": "costmap_check",
+      "started_unix": 1792399146.8497248,
+      "ahead_points": [
+        [
+          -0.15794226402726233,
+          -0.0802782955854983
+        ],
+        [
+          -0.39173247593240557,
+          -0.1688341356941451
+        ],
+        [
+          -0.6255226878375488,
+          -0.2573899758027918
+        ],
+        [
+          -0.8593128997426921,
+          -0.34594581591143864
+        ]
+      ],
+      "op": "costmap",
+      "counts": {
+        "lio_odometry": 147,
+        "odometry": 147,
+        "global_map": 146,
+        "global_costmap": 139
+      },
+      "costmap": {
+        "stamp": 1792399146.689142,
+        "shape": [
+          265,
+          226
+        ],
+        "resolution": 0.05000000074505806,
+        "sha256": "a7f602c02c0e0c23569c1240dfe2841d77e7d537091452e0ac8683849052f116",
+        "unknown": 44491,
+        "free": 10328,
+        "occupied": 4024,
+        "values": [
+          -1,
+          -1,
+          0,
+          0
+        ],
+        "robot_xy": [
+          0.07584794787788093,
+          0.008277544523148477
+        ],
+        "robot_yaw": -2.7795092047636683,
+        "robot_cell": -1,
+        "startup_disk": {
+          "radius_m": 1.2,
+          "cells": 1810,
+          "unknown": 1374,
+          "free": 396,
+          "occupied": 39
+        },
+        "clear_goal": [
+          -0.9499999936670065,
+          -0.450000012293458
+        ],
+        "unknown_goal": [
+          0.8000000324100256,
+          0.7000000048428774
+        ],
+        "occupied_goal": [
+          -0.8999999929219484,
+          0.24999999813735485
+        ]
+      },
+      "snapshot": "costmap-01.npz",
+      "passed": true,
+      "measured_ok": true
+    },
+    {
+      "name": "forward_020",
+      "case": {
+        "kind": "motion",
+        "vx": 0.2,
+        "wz": 0.0,
+        "seconds": 2.0,
+        "requires": [
+          "idle",
+          "operator_stop"
+        ]
+      },
+      "started_unix": 1792399161.3367226,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1360.536241108,
+        "result": {
+          "phase": "rearming",
+          "request_id": "314b9073bd814b5fbbf5d735a6cb29a5",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.8523882559966296,
+      "end": {
+        "op": "end",
+        "monotonic": 1365.464982057,
+        "result": {
+          "phase": "stopping",
+          "request_id": "314b9073bd814b5fbbf5d735a6cb29a5",
+          "source_sequence": 47,
+          "guard_ack": 1360542245441,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.5650527479592711,
+      "native": {
+        "samples": 127,
+        "walked": true,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 1365466377240
+      },
+      "motion": {
+        "forward_m": 0.25500319709016783,
+        "lateral_m": -0.01506856047558,
+        "yaw_rad": -0.044611497270366396,
+        "heading_offset_deg": -3.381769807601274
+      },
+      "command_window_s": 2.000236085150391,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "curve_left_020",
+      "case": {
+        "kind": "motion",
+        "vx": 0.2,
+        "wz": 0.2,
+        "seconds": 4.0,
+        "requires": [
+          "forward_020"
+        ]
+      },
+      "started_unix": 1792399171.6282203,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1370.827577693,
+        "result": {
+          "phase": "rearming",
+          "request_id": "0b8da73ba5bd4b41abae12b763c1b3e8",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.6521377509925514,
+      "end": {
+        "op": "end",
+        "monotonic": 1377.547450813,
+        "result": {
+          "phase": "stopping",
+          "request_id": "0b8da73ba5bd4b41abae12b763c1b3e8",
+          "source_sequence": 169,
+          "guard_ack": 1370832280315,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.678295599995181,
+      "native": {
+        "samples": 170,
+        "walked": true,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 12082261037
+      },
+      "motion": {
+        "forward_m": 0.4256113398138256,
+        "lateral_m": 0.18893626702264008,
+        "yaw_rad": 1.06051246150194,
+        "heading_offset_deg": 23.937266248869193
+      },
+      "command_window_s": 4.00023915595375,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "curve_right_020",
+      "case": {
+        "kind": "motion",
+        "vx": 0.2,
+        "wz": -0.2,
+        "seconds": 4.0,
+        "requires": [
+          "forward_020"
+        ]
+      },
+      "started_unix": 1792399186.7052486,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1385.904755878,
+        "result": {
+          "phase": "rearming",
+          "request_id": "a30d4b3854ae4dbcbd8d9205760c79c7",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.4519737001974136,
+      "end": {
+        "op": "end",
+        "monotonic": 1392.430513824,
+        "result": {
+          "phase": "stopping",
+          "request_id": "a30d4b3854ae4dbcbd8d9205760c79c7",
+          "source_sequence": 317,
+          "guard_ack": 1385908733991,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.5760719340760261,
+      "native": {
+        "samples": 164,
+        "walked": true,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 6522947007
+      },
+      "motion": {
+        "forward_m": 0.3315992907703337,
+        "lateral_m": -0.23300040313847403,
+        "yaw_rad": -1.0366072603454803,
+        "heading_offset_deg": -35.09404530353933
+      },
+      "command_window_s": 4.000224893912673,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "costmap_check",
+      "started_unix": 1792399207.7055445,
+      "ahead_points": [
+        [
+          -1.0672445986955927,
+          -0.7190754814677391
+        ],
+        [
+          -1.3062716611563188,
+          -0.7923289005783593
+        ],
+        [
+          -1.5452987236170448,
+          -0.8655823196889794
+        ],
+        [
+          -1.7843257860777708,
+          -0.9388357387995996
+        ]
+      ],
+      "op": "costmap",
+      "counts": {
+        "lio_odometry": 753,
+        "odometry": 753,
+        "global_map": 753,
+        "global_costmap": 746,
+        "cmd_vel": 462
+      },
+      "costmap": {
+        "stamp": 1792399207.545567,
+        "shape": [
+          297,
+          228
+        ],
+        "resolution": 0.05000000074505806,
+        "sha256": "bae25cc8f6fdd7ef193fafef87bc49acbf0d8a4a90e13a4a46d7e70e2fc9cb8e",
+        "unknown": 43928,
+        "free": 14893,
+        "occupied": 7375,
+        "values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "robot_xy": [
+          -0.8282175362348667,
+          -0.645822062357119
+        ],
+        "robot_yaw": -2.844215307262205,
+        "robot_cell": 0,
+        "startup_disk": {
+          "radius_m": 1.2,
+          "cells": 1811,
+          "unknown": 276,
+          "free": 1383,
+          "occupied": 115
+        },
+        "clear_goal": [
+          -1.7999997194856405,
+          -0.39999998919665813
+        ],
+        "unknown_goal": [
+          -0.499999700114131,
+          0.3000000212341547
+        ],
+        "occupied_goal": [
+          -0.39999969862401485,
+          -1.5500000063329935
+        ]
+      },
+      "snapshot": "costmap-05.npz",
+      "passed": true,
+      "measured_ok": true
+    },
+    {
+      "name": "curve_left_020",
+      "case": {
+        "kind": "motion",
+        "vx": 0.2,
+        "wz": 0.2,
+        "seconds": 4.0,
+        "requires": [
+          "forward_020"
+        ]
+      },
+      "started_unix": 1792399213.0979471,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1412.297174629,
+        "result": {
+          "phase": "rearming",
+          "request_id": "b6f6713ddfb6425690678a09cee57474",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.051365297054872,
+      "end": {
+        "op": "end",
+        "monotonic": 1418.417054341,
+        "result": {
+          "phase": "stopping",
+          "request_id": "b6f6713ddfb6425690678a09cee57474",
+          "source_sequence": 576,
+          "guard_ack": 1412299340135,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.7880329808685929,
+      "native": {
+        "samples": 160,
+        "walked": true,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 25986510178
+      },
+      "motion": {
+        "forward_m": 0.4609283039456843,
+        "lateral_m": 0.24383188977756515,
+        "yaw_rad": 1.1562989436583972,
+        "heading_offset_deg": 27.87891968239139
+      },
+      "command_window_s": 4.000216293148696,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "curve_right_020",
+      "case": {
+        "kind": "motion",
+        "vx": 0.2,
+        "wz": -0.2,
+        "seconds": 4.0,
+        "requires": [
+          "forward_020"
+        ]
+      },
+      "started_unix": 1792399224.3650393,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1423.564324801,
+        "result": {
+          "phase": "rearming",
+          "request_id": "5a8dabff4ec8407b9c6f79b9c34d05cb",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.5022224788554013,
+      "end": {
+        "op": "end",
+        "monotonic": 1430.13498153,
+        "result": {
+          "phase": "stopping",
+          "request_id": "5a8dabff4ec8407b9c6f79b9c34d05cb",
+          "source_sequence": 693,
+          "guard_ack": 1423567952077,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.5624684521462768,
+      "native": {
+        "samples": 166,
+        "walked": true,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 11718461924
+      },
+      "motion": {
+        "forward_m": 0.2655525198300994,
+        "lateral_m": -0.1918790594436889,
+        "yaw_rad": -1.1785809454291591,
+        "heading_offset_deg": -35.85057268806082
+      },
+      "command_window_s": 4.0002009209711105,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "costmap_check",
+      "started_unix": 1792399240.415093,
+      "ahead_points": [
+        [
+          -1.6812001488653654,
+          -1.325895958374536
+        ],
+        [
+          -1.922122370172253,
+          -1.3926528552508526
+        ],
+        [
+          -2.1630445914791405,
+          -1.459409752127169
+        ],
+        [
+          -2.403966812786028,
+          -1.5261666490034855
+        ]
+      ],
+      "op": "costmap",
+      "counts": {
+        "lio_odometry": 1080,
+        "odometry": 1080,
+        "global_map": 1079,
+        "global_costmap": 1072,
+        "cmd_vel": 789
+      },
+      "costmap": {
+        "stamp": 1792399240.2320929,
+        "shape": [
+          310,
+          230
+        ],
+        "resolution": 0.05000000074505806,
+        "sha256": "91062fd27fb0097c1969a1941f8797843d960f78ee64f64465e7371def3419cd",
+        "unknown": 45943,
+        "free": 16022,
+        "occupied": 7642,
+        "values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "robot_xy": [
+          -1.440277927558478,
+          -1.2591390614982194
+        ],
+        "robot_yaw": -2.8712853570983876,
+        "robot_cell": 0,
+        "startup_disk": {
+          "radius_m": 1.2,
+          "cells": 1809,
+          "unknown": 8,
+          "free": 1655,
+          "occupied": 98
+        },
+        "clear_goal": [
+          -2.2499999161809683,
+          -1.8499999064952135
+        ],
+        "unknown_goal": [
+          -0.44999988935887814,
+          -0.7999998908489943
+        ],
+        "occupied_goal": [
+          -0.4999998901039362,
+          -1.5999999027699232
+        ]
+      },
+      "snapshot": "costmap-08.npz",
+      "passed": true,
+      "measured_ok": true
+    },
+    {
+      "name": "idle",
+      "case": {
+        "kind": "idle",
+        "vx": 0.0,
+        "wz": 0.0,
+        "seconds": 3.0,
+        "requires": []
+      },
+      "started_unix": 1792399243.528233,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1442.727445151,
+        "result": {
+          "phase": "rearming",
+          "request_id": "2aca1eeb5d824c76b72b8db3466c8ac0",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.4849938452243805e-06,
+      "end": {
+        "op": "end",
+        "monotonic": 1446.79525875,
+        "result": {
+          "phase": "stopping",
+          "request_id": "2aca1eeb5d824c76b72b8db3466c8ac0",
+          "source_sequence": 860,
+          "guard_ack": 1442729151120,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.6216708680149168,
+      "native": {
+        "samples": 109,
+        "walked": false,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 16660183455
+      },
+      "motion": {
+        "forward_m": -0.001875392560772449,
+        "lateral_m": -0.004112797675227907,
+        "yaw_rad": 0.018652237107144032,
+        "heading_offset_deg": -114.51248782083834
+      },
+      "command_window_s": 3.0001834300346673,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "operator_stop",
+      "case": {
+        "kind": "operator_stop",
+        "vx": 0.0,
+        "wz": 0.0,
+        "seconds": 0.0,
+        "requires": [
+          "idle"
+        ]
+      },
+      "started_unix": 1792399253.8582542,
+      "begin": {
+        "op": "begin",
+        "monotonic": 1453.057247073,
+        "result": {
+          "phase": "rearming",
+          "request_id": "74708d0837424285a014ea5d3870c7bb",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "stop_observed_s": 29.709879603935406,
+      "settle_s": 0.05007866304367781,
+      "end": {
+        "op": "end",
+        "monotonic": 1484.884892771,
+        "result": {
+          "phase": "fault",
+          "request_id": "74708d0837424285a014ea5d3870c7bb",
+          "source_sequence": 1230,
+          "guard_ack": 1453060205812,
+          "cancellation_pending": true,
+          "fault": "feedback_lost",
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": null,
+      "native": {
+        "samples": 879,
+        "walked": false,
+        "ended_idle": false,
+        "latched": false,
+        "feedback_gaps": 167,
+        "applied_sequence_advance": 30547868040
+      },
+      "motion": {
+        "forward_m": -1.705991989855175,
+        "lateral_m": -0.5262677085316902,
+        "yaw_rad": -0.014937397962850874,
+        "heading_offset_deg": -162.85595079448004
+      },
+      "command_window_s": 30.70997601398267,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    }
+  ],
+  "agent_attach": {
+    "op": "status",
+    "monotonic": 1321.104027261,
+    "navigation": {
+      "phase": "disarmed",
+      "request_id": null,
+      "source_sequence": -1,
+      "guard_ack": 0,
+      "cancellation_pending": false,
+      "fault": null,
+      "pose_ready": true,
+      "rejected_input": null
+    },
+    "ready": false,
+    "subscriptions_ready": false,
+    "feedback_fresh": false
+  },
+  "link_ready_after_s": 1.9047281371895224
+}
