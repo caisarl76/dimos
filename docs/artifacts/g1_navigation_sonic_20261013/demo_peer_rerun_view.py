@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Live Rerun web view of the workstation peer: costmaps, voxel map, odometry, path.
+"""Live Rerun web view of the workstation peer: costmaps, voxel map, robot, path.
 
 A separate read-only process. It joins the peer host's private zenoh router as a
 client and subscribes to a few topics, so the validated peer graph is unchanged.
@@ -24,10 +24,15 @@ server to the page through `?url=`.
 """
 
 import argparse
+import math
 import signal
 from typing import Any
 
+import rerun as rr
+
+from dimos.msgs.nav_msgs.Odometry import Odometry
 from dimos.protocol.pubsub.impl.zenohpubsub import Zenoh
+from dimos.robot.unitree.g1.config import G1
 from dimos.robot.unitree.g1.g1_rerun import g1_costmap
 from dimos.visualization.rerun.bridge import RerunBridgeModule
 from dimos.visualization.rerun.constants import RERUN_GRPC_PORT, RERUN_WEB_VIEWER_PORT
@@ -42,6 +47,24 @@ def costmap(grid: Any) -> Any:
     return g1_costmap(grid, z_offset=FLOOR_Z + 0.02)
 
 
+def robot_marker(odom: Odometry) -> Any:
+    """The planner's footprint (G1 width clearance) and a heading arrow, on the floor."""
+    assert G1.width_clearance is not None
+    radius, z = G1.width_clearance / 2, FLOOR_Z + 0.05
+    x, y, yaw = odom.x, odom.y, odom.yaw
+
+    def at(r: float, a: float) -> list[float]:
+        return [x + r * math.cos(a), y + r * math.sin(a), z]
+
+    circle = [at(radius, 2 * math.pi * i / 32) for i in range(33)]
+    tip = at(0.5, yaw)
+    heading = [[x, y, z], tip]
+    head = [at(0.38, yaw + 0.25), tip, at(0.38, yaw - 0.25)]
+    return rr.LineStrips3D(
+        [circle, heading, head], colors=[[0, 200, 255], [255, 200, 0], [255, 200, 0]], radii=0.015
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--router", default=ROUTER)
@@ -52,6 +75,7 @@ def main() -> None:
         topics=TOPICS,
         visual_override={
             "world/global_costmap": costmap,
+            "world/odometry": robot_marker,
             # The planner's inflated view; drawn just above the raw costmap.
             "world/navigation_costmap": lambda grid: g1_costmap(grid, z_offset=FLOOR_Z + 0.04),
         },
