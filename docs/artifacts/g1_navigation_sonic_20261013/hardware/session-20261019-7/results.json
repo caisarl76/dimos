@@ -1,0 +1,477 @@
+{
+  "operator_ready": "operator-ready-20261019",
+  "extrinsic_acceptance": {
+    "accepted": true,
+    "date": "2026-10-15",
+    "decided_by": "operator (user decision in session, 2026-10-15)",
+    "mount": "g1_tf_publisher.torso_to_mid360",
+    "torso_to_sensor_xyz_xyzw": [
+      0.0002835,
+      3e-05,
+      0.41618,
+      0.9997985784932998,
+      1.2289293145202804e-18,
+      -0.020069938783589012,
+      6.122000644719466e-17
+    ],
+    "evidence": [
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-4.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-5.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-6.json"
+    ],
+    "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
+    "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
+  },
+  "prior_passed": [
+    {
+      "session": "session-20261019-1",
+      "name": "idle"
+    },
+    {
+      "session": "session-20261019-1",
+      "name": "operator_stop"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "turn_right_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "turn_right_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "turn_right_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "turn_right_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "forward_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "turn_left_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "turn_left_020"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "cancel"
+    },
+    {
+      "session": "session-20261019-6",
+      "name": "source_pause"
+    }
+  ],
+  "endpoints": {
+    "router": "tcp/127.0.0.1:17211",
+    "link_bind": "tcp://192.168.0.62:17103",
+    "cloud": "tcp://192.168.0.223:17101",
+    "state": "tcp://192.168.0.223:17102"
+  },
+  "cases_offered": {
+    "idle": {
+      "kind": "idle",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 3.0,
+      "requires": []
+    },
+    "operator_stop": {
+      "kind": "operator_stop",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": [
+        "idle"
+      ]
+    },
+    "forward_010": {
+      "kind": "motion",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 1.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ]
+    },
+    "forward_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.0,
+      "seconds": 2.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ]
+    },
+    "turn_left_020": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": 0.2,
+      "seconds": 2.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "turn_right_020": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": -0.2,
+      "seconds": 2.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "curve_left_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.2,
+      "seconds": 4.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "curve_right_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": -0.2,
+      "seconds": 4.0,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "cancel": {
+      "kind": "cancel",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.6,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "source_pause": {
+      "kind": "source_pause",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.5,
+      "requires": [
+        "forward_020"
+      ]
+    },
+    "costmap_check": {
+      "kind": "costmap",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": []
+    }
+  },
+  "harness_sha256": {
+    "demo_pc2_navigation_walk.py": "b62f1346cee9152f682fb7555d041e6a7292ad496759c110020d443c353f86f9",
+    "demo_pc2_walk_agent.py": "ee96e222aaf2cc0ba416c22bd73409a932dce68d89a4370e2e7e1f00980966df",
+    "demo_navigation_two_host_peer.py": "2dbdf16b064bbe798e8fa4ef21f8c2f269f2a6e42b5ece3ad1a16bd7a40f6efc"
+  },
+  "dimos_commit": "9c7f1336c689eb019b634b00b946dba9ec5cc4fe",
+  "cases": [
+    {
+      "name": "costmap_check",
+      "started_unix": 1792398600.0357566,
+      "ahead_points": [
+        [
+          -0.1793712457777143,
+          -0.028803495080823638
+        ],
+        [
+          -0.4271370119216577,
+          -0.06215203518537332
+        ],
+        [
+          -0.6749027780656011,
+          -0.095500575289923
+        ],
+        [
+          -0.9226685442095445,
+          -0.1288491153944727
+        ]
+      ],
+      "op": "costmap",
+      "counts": {
+        "lio_odometry": 134,
+        "odometry": 134,
+        "global_map": 134,
+        "global_costmap": 128
+      },
+      "costmap": {
+        "stamp": 1792398599.9469917,
+        "shape": [
+          246,
+          240
+        ],
+        "resolution": 0.05000000074505806,
+        "sha256": "9002af663f71cd4290c6d951499a6e580518ad0fcd347e22335bb706a95691f1",
+        "unknown": 42375,
+        "free": 10623,
+        "occupied": 4919,
+        "values": [
+          -1,
+          -1,
+          0,
+          0
+        ],
+        "robot_xy": [
+          0.06839452036622908,
+          0.0045450450237260465
+        ],
+        "robot_yaw": -3.0077996888387313,
+        "robot_cell": -1,
+        "startup_disk": {
+          "radius_m": 1.2,
+          "cells": 1813,
+          "unknown": 1371,
+          "free": 390,
+          "occupied": 43
+        },
+        "clear_goal": [
+          -1.1000000070780516,
+          -0.049999793991446495
+        ],
+        "unknown_goal": [
+          1.050000024959445,
+          0.2000002097338438
+        ],
+        "occupied_goal": [
+          -0.8500000033527613,
+          0.4500002134591341
+        ]
+      },
+      "passed": true,
+      "measured_ok": true
+    },
+    {
+      "name": "curve_left_020",
+      "case": {
+        "kind": "motion",
+        "vx": 0.2,
+        "wz": 0.2,
+        "seconds": 4.0,
+        "requires": [
+          "forward_020"
+        ]
+      },
+      "started_unix": 1792398626.749459,
+      "begin": {
+        "op": "begin",
+        "monotonic": 825.94610957,
+        "result": {
+          "phase": "rearming",
+          "request_id": "f345450688b148eaa45c0221e0622604",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.6521482679527253,
+      "end": {
+        "op": "end",
+        "monotonic": 832.665486729,
+        "result": {
+          "phase": "stopping",
+          "request_id": "f345450688b148eaa45c0221e0622604",
+          "source_sequence": 65,
+          "guard_ack": 825948635969,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 1.1294387041125447,
+      "native": {
+        "samples": 182,
+        "walked": true,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 832667434176
+      },
+      "motion": {
+        "forward_m": 0.5231492611289399,
+        "lateral_m": 0.3221544916649191,
+        "yaw_rad": 1.0649001784694976,
+        "heading_offset_deg": 31.62469617089747
+      },
+      "command_window_s": 4.000255436170846,
+      "observation": {
+        "note": "costmap_check",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    },
+    {
+      "name": "costmap_check",
+      "started_unix": 1792398645.1650414,
+      "ahead_points": [
+        [
+          -0.5283632836358406,
+          -0.604445497838849
+        ],
+        [
+          -0.6288119211112997,
+          -0.8333779578119245
+        ],
+        [
+          -0.7292605585867586,
+          -1.062310417785
+        ],
+        [
+          -0.8297091960622177,
+          -1.2912428777580756
+        ]
+      ],
+      "op": "costmap",
+      "counts": {
+        "lio_odometry": 584,
+        "odometry": 584,
+        "global_map": 584,
+        "global_costmap": 578,
+        "cmd_vel": 183
+      },
+      "costmap": {
+        "stamp": 1792398645.068478,
+        "shape": [
+          246,
+          282
+        ],
+        "resolution": 0.05000000074505806,
+        "sha256": "92a9caaec2a76b751a375a4a5cc1087169718014fe2d4476e2edecaaf19417f5",
+        "unknown": 46022,
+        "free": 14515,
+        "occupied": 7314,
+        "values": [
+          100,
+          0,
+          0,
+          100
+        ],
+        "robot_xy": [
+          -0.4279146461603816,
+          -0.37551303786577356
+        ],
+        "robot_yaw": -1.9842720259073596,
+        "robot_cell": -1,
+        "startup_disk": {
+          "radius_m": 1.2,
+          "cells": 1809,
+          "unknown": 654,
+          "free": 917,
+          "occupied": 199
+        },
+        "clear_goal": [
+          -1.250000836327672,
+          0.2000002097338438
+        ],
+        "unknown_goal": [
+          0.4999991897493601,
+          -0.7499998044222593
+        ],
+        "occupied_goal": [
+          -1.250000836327672,
+          -0.9499998074024916
+        ]
+      },
+      "passed": true,
+      "measured_ok": true
+    },
+    {
+      "name": "idle",
+      "case": {
+        "kind": "idle",
+        "vx": 0.0,
+        "wz": 0.0,
+        "seconds": 3.0,
+        "requires": []
+      },
+      "started_unix": 1792398658.3119087,
+      "begin": {
+        "op": "begin",
+        "monotonic": 857.508516648,
+        "result": {
+          "phase": "rearming",
+          "request_id": "5c7871a168dc479ba494ecb4a2e72ceb",
+          "source_sequence": -1,
+          "guard_ack": 0,
+          "cancellation_pending": false,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "settle_s": 1.4461111277341843e-06,
+      "end": {
+        "op": "end",
+        "monotonic": 861.575186868,
+        "result": {
+          "phase": "stopping",
+          "request_id": "5c7871a168dc479ba494ecb4a2e72ceb",
+          "source_sequence": 354,
+          "guard_ack": 857514377702,
+          "cancellation_pending": true,
+          "fault": null,
+          "pose_ready": false,
+          "rejected_input": null
+        }
+      },
+      "handback_s": 0.5208765938878059,
+      "native": {
+        "samples": 105,
+        "walked": false,
+        "ended_idle": true,
+        "latched": false,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 28909002816
+      },
+      "motion": {
+        "forward_m": -0.00013232195708426852,
+        "lateral_m": 0.0017527380188527154,
+        "yaw_rad": 0.005001266880100275,
+        "heading_offset_deg": 94.31732256304812
+      },
+      "command_window_s": 3.000249420059845,
+      "observation": {
+        "note": "",
+        "confirmed": true
+      },
+      "measured_ok": true,
+      "passed": true
+    }
+  ],
+  "agent_attach": {
+    "op": "status",
+    "monotonic": 789.52439504,
+    "navigation": {
+      "phase": "disarmed",
+      "request_id": null,
+      "source_sequence": -1,
+      "guard_ack": 0,
+      "cancellation_pending": false,
+      "fault": null,
+      "pose_ready": true,
+      "rejected_input": null
+    },
+    "ready": true,
+    "subscriptions_ready": true,
+    "feedback_fresh": true
+  },
+  "link_ready_after_s": 0.3506988761946559
+}
