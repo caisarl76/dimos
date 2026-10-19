@@ -16,7 +16,9 @@
 
 A separate read-only process. It joins the peer host's private zenoh router as a
 client and subscribes to a few topics, so the validated peer graph is unchanged.
-Start it beside a walk-harness session and open http://localhost:9878.
+Start it beside a walk-harness session and open the URL it prints. A bare
+http://localhost:9878 loads an unconnected viewer: rerun only passes the data
+server to the page through `?url=`.
 
     python docs/artifacts/g1_navigation_sonic_20261013/demo_peer_rerun_view.py
 """
@@ -28,7 +30,7 @@ from typing import Any
 from dimos.protocol.pubsub.impl.zenohpubsub import Zenoh
 from dimos.robot.unitree.g1.g1_rerun import g1_costmap
 from dimos.visualization.rerun.bridge import RerunBridgeModule
-from dimos.visualization.rerun.constants import RERUN_WEB_VIEWER_PORT
+from dimos.visualization.rerun.constants import RERUN_GRPC_PORT, RERUN_WEB_VIEWER_PORT
 
 ROUTER = "tcp/127.0.0.1:17211"  # demo_pc2_navigation_walk.py peer router
 TOPICS = ["global_costmap", "navigation_costmap", "global_map", "path", "odometry", "tf"]
@@ -59,7 +61,8 @@ def main() -> None:
         web_port=args.web_port,
     )
     bridge.start()
-    print(f"Rerun web viewer: http://localhost:{args.web_port}", flush=True)
+    data = f"rerun%2Bhttp://localhost:{RERUN_GRPC_PORT}/proxy"
+    print(f"Rerun web viewer: http://localhost:{args.web_port}/?url={data}", flush=True)
     signal.signal(signal.SIGINT, lambda *_: None)
     signal.signal(signal.SIGTERM, lambda *_: None)
     signal.pause()
