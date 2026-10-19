@@ -1,0 +1,141 @@
+{
+  "status": "study_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5269448598846793,
+      "speed": 0.0007405422879063646,
+      "yaw_rate": -0.005200605625832226
+    },
+    {
+      "name": "right_2s_1",
+      "passed": true,
+      "start": 1571081.840233115,
+      "end": 1571083.855050763,
+      "seconds": 2.0,
+      "forward_displacement_m": -0.013412899285733389,
+      "yaw_change_rad": -0.16511773589075202
+    },
+    {
+      "name": "right_2s_1_settled",
+      "passed": true,
+      "elapsed": 2.517105528153479,
+      "speed": 0.003906428380625529,
+      "yaw_rate": -0.016735947478649926
+    },
+    {
+      "name": "right_2s_2",
+      "passed": true,
+      "start": 1571086.365126949,
+      "end": 1571088.365165535,
+      "seconds": 2.0,
+      "forward_displacement_m": -0.020513110611029582,
+      "yaw_change_rad": -0.1977045733440063
+    },
+    {
+      "name": "right_2s_2_settled",
+      "passed": true,
+      "elapsed": 2.8344244989566505,
+      "speed": 0.004264812856187297,
+      "yaw_rate": -0.019412243336955324
+    },
+    {
+      "name": "right_2s_3",
+      "passed": true,
+      "start": 1571091.20535373,
+      "end": 1571093.226079836,
+      "seconds": 2.0,
+      "forward_displacement_m": -0.027027039799925455,
+      "yaw_change_rad": -0.23648041857795188
+    },
+    {
+      "name": "right_2s_3_settled",
+      "passed": true,
+      "elapsed": 2.603881580987945,
+      "speed": 0.005922075102406195,
+      "yaw_rate": 0.004441810027500988
+    },
+    {
+      "name": "forward_2s_4",
+      "passed": true,
+      "start": 1571095.820829933,
+      "end": 1571097.830749102,
+      "seconds": 2.0,
+      "forward_displacement_m": 0.13170953023418694,
+      "yaw_change_rad": -0.02285581762954625
+    },
+    {
+      "name": "forward_2s_4_settled",
+      "passed": true,
+      "elapsed": 2.120666034054011,
+      "speed": 0.0034842663942188474,
+      "yaw_rate": 0.00837277633724709
+    },
+    {
+      "name": "right_2s_5",
+      "passed": true,
+      "start": 1571099.935539435,
+      "end": 1571101.96024631,
+      "seconds": 2.0,
+      "forward_displacement_m": 0.0009435544737816188,
+      "yaw_change_rad": -0.3126493305432214
+    },
+    {
+      "name": "right_2s_5_settled",
+      "passed": true,
+      "elapsed": 2.1844234720338136,
+      "speed": 0.002471844494413377,
+      "yaw_rate": -0.004513652932805945
+    },
+    {
+      "name": "forward_2s_6",
+      "passed": true,
+      "start": 1571104.141104894,
+      "end": 1571106.130113643,
+      "seconds": 2.0,
+      "forward_displacement_m": 0.23462687511369676,
+      "yaw_change_rad": -0.0011742299950695534
+    },
+    {
+      "name": "forward_2s_6_settled",
+      "passed": true,
+      "elapsed": 2.366301380097866,
+      "speed": 0.007745760942853524,
+      "yaw_rate": -0.016652165378730297
+    },
+    {
+      "name": "left_2s_7",
+      "passed": true,
+      "start": 1571108.515164148,
+      "end": 1571110.505613807,
+      "seconds": 2.0,
+      "forward_displacement_m": -0.02508619629274554,
+      "yaw_change_rad": 0.4252020721960198
+    },
+    {
+      "name": "left_2s_7_settled",
+      "passed": false,
+      "elapsed": 9.560042595956475,
+      "speed": 0.0007181751219567835,
+      "yaw_rate": 0.02572236338257222
+    },
+    {
+      "name": "left_2s_8",
+      "passed": true,
+      "start": 1571120.065973275,
+      "end": 1571122.0856466,
+      "seconds": 2.0,
+      "forward_displacement_m": -0.011327387724533336,
+      "yaw_change_rad": 0.3634541933015409
+    },
+    {
+      "name": "left_2s_8_settled",
+      "passed": true,
+      "elapsed": 1.988086226163432,
+      "speed": 0.007459935413767108,
+      "yaw_rate": 0.010052648984754517
+    }
+  ],
+  "error": null
+}
