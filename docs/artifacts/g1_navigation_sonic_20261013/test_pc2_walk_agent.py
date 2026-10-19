@@ -90,3 +90,33 @@ def test_missing_feedback_is_recorded_not_invented() -> None:
     execution.feedback = None
     row = agent.Agent(execution, clock=lambda: 1.0).sample()
     assert row["feedback"] is False and row["mode"] is None and row["yaw"] is None
+
+
+def test_goal_is_bound_to_the_current_request_and_refusals_are_replies() -> None:
+    execution = FakeExecution()
+    execution.goals = []
+    execution.request_id = "req-1"
+
+    def set_navigation_goal(request_id, goal):
+        if execution.phase != "active":
+            raise ValueError("goal belongs to an inactive navigation request")
+        execution.goals.append((request_id, goal))
+        return True
+
+    execution.set_navigation_goal = set_navigation_goal
+    execution.get_navigation_status = lambda: {
+        "phase": execution.phase,
+        "fault": None,
+        "pose_ready": True,
+        "request_id": "req-1",
+    }
+    walk = agent.Agent(execution, clock=lambda: 7.0)
+    refused = walk.handle({"op": "goal", "x": 1.0, "y": 2.0, "yaw": 0.5})
+    assert "inactive" in refused["error"] and execution.goals == []
+    execution.phase = "active"
+    reply = walk.handle({"op": "goal", "x": 1.0, "y": 2.0, "yaw": 0.5})
+    assert reply["result"] is True and reply["request_id"] == "req-1"
+    ((request_id, goal),) = execution.goals
+    assert request_id == "req-1" and goal.frame_id == "odom"
+    assert (goal.position.x, goal.position.y) == (1.0, 2.0)
+    assert abs(goal.orientation.euler[2] - 0.5) < 1e-6

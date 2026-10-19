@@ -66,6 +66,8 @@ SETTLE_TIMEOUT_S = 3.0
 CANCEL_IDLE_S = 0.5
 PAUSE_IDLE_S = 0.6
 STOP_WAIT_S = 30.0
+GOAL_M = 1.0
+GOAL_TOLERANCE_M = 0.3
 
 
 @dataclass(frozen=True)
@@ -95,6 +97,9 @@ CASES = {
     "source_pause": Case("source_pause", vx=0.10, seconds=0.5, requires=("forward_020",)),
     # Read-only: the live costmap around the robot, before any physical goal is designed.
     "costmap_check": Case("costmap"),
+    # One short physical goal (plan Task 11), only after the robot has walked both curves
+    # so the near field is observed; no cell is ever cleared to admit it.
+    "goal_1m": Case("goal", seconds=20.0, requires=("curve_left_020", "curve_right_020")),
 }
 
 
@@ -121,6 +126,19 @@ def prior_passed(sessions: list[Path], token: str) -> list[dict[str, Any]]:
             raise SystemExit(f"{session} was run under {result['operator_ready']}, not {token}")
         cases += [{**c, "session": session.name} for c in result["cases"] if c["passed"]]
     return cases
+
+
+def goal_admissible(summary: dict[str, Any] | None) -> str | None:
+    """Why a 1 m goal straight ahead may not be sent now, or None."""
+    if summary is None:
+        return "no costmap yet"
+    if summary.get("robot_cell") != 0:
+        return f"robot cell not known free ({summary.get('robot_cell')})"
+    if any(value != 0 for value in summary.get("values", [None])):
+        return f"cells 0.25-1.0 m ahead not all free ({summary.get('values')})"
+    if summary.get("occupied_within_0.5m", 1):
+        return f"occupied cells within 0.5 m ({summary.get('occupied_within_0.5m')})"
+    return None
 
 
 def motion(rows: list[dict[str, Any]], t0: float, t1: float) -> dict[str, float] | None:
@@ -375,9 +393,21 @@ def run_session(args: Any) -> None:
                     rows.append(row)
         return rows
 
+    def latest_odom() -> list[float]:
+        """Newest odometry row, read from the end of the telemetry file."""
+        with (out / "peer-telemetry.jsonl").open("rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, stream.tell() - 65536))
+            lines = stream.read().decode(errors="replace").splitlines()
+        for line in reversed(lines[1:]):
+            row = json.loads(line)
+            if "odom" in row:
+                return row["odom"]  # type: ignore[no-any-return]
+        raise RuntimeError("no recent odometry")
+
     def costmap_record(name: str) -> dict[str, Any]:
         """Read-only: no begin, no motion. Cells straight ahead plus the peer summary."""
-        x, y, h, _ = odometry(0.0)[-1]["odom"]
+        x, y, h, _ = latest_odom()
         ahead = [[x + d * math.cos(h), y + d * math.sin(h)] for d in (0.25, 0.5, 0.75, 1.0)]
         reply = peer.call("costmap", points=ahead)
         summary = reply["costmap"]
@@ -398,6 +428,68 @@ def run_session(args: Any) -> None:
                     }
                 )
             )
+        return record
+
+    def goal_record(name: str, case: Case) -> dict[str, Any]:
+        """Pre-checks, then one goal GOAL_M ahead through set_navigation_goal; cancel after."""
+        record = costmap_record(name)
+        record["passed"] = record["measured_ok"] = False
+        reason = goal_admissible(record.get("costmap"))
+        if (
+            reason is None
+            and input("Is the area 1 m ahead physically clear? [y/n] ").strip().lower() != "y"
+        ):
+            reason = "operator did not confirm clearance"
+        if reason is not None:
+            record["error"] = f"goal refused before begin: {reason}"
+            record["begin"] = {"error": record["error"]}
+            return record
+        started, mark = time.monotonic(), agent.call("mark")["monotonic"]
+        record["begin"] = agent.call("begin")
+        if (
+            "error" in record["begin"]
+            or wait(lambda: status()["navigation"]["phase"] == "active", 1.5) is None
+        ):
+            tele(0.0, 0.0)
+            record["error"] = "begin refused or no active phase; no goal was sent"
+            return record
+        tele(0.0, 0.0)
+        time.sleep(1.0)
+        x, y, h, _ = latest_odom()
+        goal = (x + GOAL_M * math.cos(h), y + GOAL_M * math.sin(h))
+        record["goal_xy"], record["start_xy"] = list(goal), [x, y]
+        # A* commands reach cmd_vel only once teleop stops (MovementManager cooldown).
+        peer.call("tele_stop")
+        record["goal"] = agent.call("goal", x=goal[0], y=goal[1], yaw=h)
+        reached = None
+        if record["goal"].get("result") is True:
+            reached = wait(
+                lambda: math.dist(latest_odom()[:2], goal) < GOAL_TOLERANCE_M, case.seconds
+            )
+        record["reached_s"] = reached
+        record["cancel"] = agent.call("end")
+        tele(0.0, 0.0)
+        record["settle_s"] = settled()
+        record["handback_s"] = wait(lambda: status()["navigation"]["pose_ready"], 6.0)
+        record["native"] = native_summary(agent.call("since", monotonic=mark)["rows"])
+        end = latest_odom()
+        record["final_error_m"] = math.dist(end[:2], goal)
+        unit = ((goal[0] - x) / GOAL_M, (goal[1] - y) / GOAL_M)
+        record["max_cross_track_m"] = max(
+            (
+                abs(unit[0] * (r["odom"][1] - y) - unit[1] * (r["odom"][0] - x))
+                for r in odometry(started)
+            ),
+            default=0.0,
+        )
+        record["observation"] = observe("Did the robot walk to the goal and stop there?")
+        ok = (
+            reached is not None
+            and not record["native"]["latched"]
+            and record["settle_s"] is not None
+        )
+        record["measured_ok"] = bool(ok)
+        record["passed"] = bool(ok) and record["observation"]["confirmed"]
         return record
 
     def tele(vx: float, wz: float) -> float:
@@ -522,6 +614,8 @@ def run_session(args: Any) -> None:
                 continue
             if CASES[name].kind == "costmap":
                 record = costmap_record(name)
+            elif CASES[name].kind == "goal":
+                record = goal_record(name, CASES[name])
             else:
                 record = run_case(name, CASES[name])
             results["cases"].append(record)

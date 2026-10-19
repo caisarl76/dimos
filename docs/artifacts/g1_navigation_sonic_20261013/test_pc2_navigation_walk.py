@@ -203,3 +203,15 @@ def test_costmap_check_is_read_only_and_always_available() -> None:
     case = walk.CASES["costmap_check"]
     assert (case.vx, case.wz, case.requires) == (0.0, 0.0, ())
     assert walk.blocked("costmap_check", []) is None
+
+
+def test_goal_needs_a_walked_robot_a_free_robot_cell_and_a_clear_corridor() -> None:
+    case = walk.CASES["goal_1m"]
+    assert case.requires == ("curve_left_020", "curve_right_020")
+    clear = {"robot_cell": 0, "values": [0, 0, 0, 0], "occupied_within_0.5m": 0}
+    assert walk.goal_admissible(clear) is None
+    assert walk.goal_admissible(None) == "no costmap yet"
+    assert "robot cell" in walk.goal_admissible({**clear, "robot_cell": -1})
+    assert "ahead" in walk.goal_admissible({**clear, "values": [0, -1, 0, 0]})
+    assert "ahead" in walk.goal_admissible({**clear, "values": [0, 0, 100, 0]})
+    assert "within 0.5 m" in walk.goal_admissible({**clear, "occupied_within_0.5m": 2})
