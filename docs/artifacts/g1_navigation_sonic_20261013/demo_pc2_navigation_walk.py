@@ -88,8 +88,13 @@ CASES = {
     # 0.20 rad/s cap, for the 2 s simulation ran.
     "turn_left_020": Case("motion", wz=0.20, seconds=2.0, requires=("forward_020",)),
     "turn_right_020": Case("motion", wz=-0.20, seconds=2.0, requires=("forward_020",)),
+    # 4 s so the gait is past start-up; right/left compare the simulation's right slowdown.
+    "curve_left_020": Case("motion", vx=0.20, wz=0.20, seconds=4.0, requires=("forward_020",)),
+    "curve_right_020": Case("motion", vx=0.20, wz=-0.20, seconds=4.0, requires=("forward_020",)),
     "cancel": Case("cancel", vx=0.10, seconds=0.6, requires=("forward_020",)),
     "source_pause": Case("source_pause", vx=0.10, seconds=0.5, requires=("forward_020",)),
+    # Read-only: the live costmap around the robot, before any physical goal is designed.
+    "costmap_check": Case("costmap"),
 }
 
 
@@ -142,9 +147,14 @@ def motion(rows: list[dict[str, Any]], t0: float, t1: float) -> dict[str, float]
 def motion_ok(case: Case, moved: dict[str, float] | None) -> bool:
     if moved is None:
         return False
-    command, measured = (case.vx, moved["forward_m"]) if case.vx else (case.wz, moved["yaw_rad"])
-    signed = measured if command > 0 else -measured
-    return MIN_MOTION <= signed <= 2 * abs(command) * case.seconds
+
+    def within(command: float, measured: float) -> bool:
+        signed = measured if command > 0 else -measured
+        return MIN_MOTION <= signed <= 2 * abs(command) * case.seconds
+
+    linear = not case.vx or within(case.vx, moved["forward_m"])
+    turn = not case.wz or within(case.wz, moved["yaw_rad"])
+    return linear and turn
 
 
 def idle_ok(native: dict[str, Any], moved: dict[str, float] | None) -> bool:
@@ -365,6 +375,28 @@ def run_session(args: Any) -> None:
                     rows.append(row)
         return rows
 
+    def costmap_record(name: str) -> dict[str, Any]:
+        """Read-only: no begin, no motion. Cells straight ahead plus the peer summary."""
+        x, y, h, _ = odometry(0.0)[-1]["odom"]
+        ahead = [[x + d * math.cos(h), y + d * math.sin(h)] for d in (0.25, 0.5, 0.75, 1.0)]
+        reply = peer.call("costmap", points=ahead)
+        summary = reply["costmap"]
+        record = {"name": name, "started_unix": time.time(), "ahead_points": ahead, **reply}
+        record["passed"] = record["measured_ok"] = summary is not None
+        if summary is not None:
+            disk = summary.get("startup_disk", {})
+            print(
+                json.dumps(
+                    {
+                        "robot_cell": summary.get("robot_cell"),
+                        "within_1.2m": {k: disk.get(k) for k in ("unknown", "free", "occupied")},
+                        "ahead_0.25_to_1.0m": summary.get("values"),
+                        "clear_goal": summary.get("clear_goal"),
+                    }
+                )
+            )
+        return record
+
     def tele(vx: float, wz: float) -> float:
         peer.call("tele", vx=vx, wz=wz)
         return time.monotonic()
@@ -485,7 +517,10 @@ def run_session(args: Any) -> None:
             if not (link_ready() and state.get("ready")):
                 print("Not ready: the peer link and the execution owner must both be ready.")
                 continue
-            record = run_case(name, CASES[name])
+            if CASES[name].kind == "costmap":
+                record = costmap_record(name)
+            else:
+                record = run_case(name, CASES[name])
             results["cases"].append(record)
             save()
             summary = {k: record.get(k) for k in ("name", "passed", "measured_ok", "motion")}
