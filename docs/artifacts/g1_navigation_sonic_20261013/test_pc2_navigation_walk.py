@@ -215,3 +215,16 @@ def test_goal_needs_a_walked_robot_a_free_robot_cell_and_a_clear_corridor() -> N
     assert "ahead" in walk.goal_admissible({**clear, "values": [0, -1, 0, 0]})
     assert "ahead" in walk.goal_admissible({**clear, "values": [0, 0, 100, 0]})
     assert "within 0.5 m" in walk.goal_admissible({**clear, "occupied_within_0.5m": 2})
+
+
+def test_rear_occupancy_is_ignored_only_when_opted_in() -> None:
+    clear = {"robot_cell": 0, "values": [0, 0, 0, 0], "occupied_within_0.5m": 0}
+    crane = {**clear, "occupied_within_0.5m": 3, "occupied_within_0.5m_behind": 3}
+    assert "within 0.5 m" in walk.goal_admissible(crane)
+    assert walk.goal_admissible(crane, ignore_rear=True) is None
+    mixed = {**crane, "occupied_within_0.5m": 5}
+    assert "2 ahead" in walk.goal_admissible(mixed, ignore_rear=True)
+    # An old summary without the split never counts as clear behind.
+    assert "within 0.5 m" in walk.goal_admissible(
+        {**clear, "occupied_within_0.5m": 3}, ignore_rear=True
+    )

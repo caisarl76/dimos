@@ -135,6 +135,11 @@ def costmap_summary(
         },
     )
     summary["occupied_within_0.5m"] = int((cells[dist <= 0.5] >= 100).sum())
+    # The rear half-disk, for a support crane standing behind the robot (opt-in in the harness).
+    ahead = (wx - odom.position.x) * math.cos(odom.yaw) + (wy - odom.position.y) * math.sin(
+        odom.yaw
+    )
+    summary["occupied_within_0.5m_behind"] = int((cells[(dist <= 0.5) & (ahead < 0)] >= 100).sum())
     margin = math.ceil(0.35 / res)
     free = cells == 0
     padded = np.pad(free, margin, constant_values=False)

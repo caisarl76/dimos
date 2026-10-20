@@ -208,3 +208,28 @@ def test_snapshot_keeps_points_near_the_robot_with_grid_and_pose(tmp_path):
         assert (saved["grid"] == -1).all() and saved["grid"].shape == (4, 5)
         assert list(saved["origin"]) == [0.5, 0.5] and float(saved["resolution"]) == 0.05
         assert list(saved["robot"][:2]) == [1.0, 1.0]
+
+
+def test_costmap_summary_splits_near_occupancy_behind_the_robot():
+    import math
+
+    from dimos.msgs.geometry_msgs.Pose import Pose
+    from dimos.msgs.geometry_msgs.Quaternion import Quaternion
+    from dimos.msgs.geometry_msgs.Vector3 import Vector3
+    from dimos.msgs.nav_msgs.OccupancyGrid import OccupancyGrid
+    from dimos.msgs.nav_msgs.Odometry import Odometry
+
+    spec = importlib.util.spec_from_file_location(
+        "two_host_peer", HERE / "demo_navigation_two_host_peer.py"
+    )
+    peer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(peer)
+    cells = np.zeros((40, 40), dtype=np.int8)  # 2 m x 2 m, origin -1,-1, robot at 0,0
+    cells[20, 20 + 6] = 100  # 0.3 m along +x
+    cells[20 - 6, 20] = 100  # 0.3 m along -y
+    grid = OccupancyGrid(grid=cells, resolution=0.05, origin=Pose(position=Vector3(-1, -1, 0)))
+    facing_y = Quaternion.from_euler(Vector3(0, 0, math.pi / 2))
+    odom = Odometry(pose=Pose(position=Vector3(0, 0, 0), orientation=facing_y), frame_id="odom")
+    summary = peer.costmap_summary(grid, odom, [])
+    assert summary["occupied_within_0.5m"] == 2
+    assert summary["occupied_within_0.5m_behind"] == 1  # the -y cell, behind a +y heading
