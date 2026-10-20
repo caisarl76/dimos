@@ -77,6 +77,7 @@ class Case:
     wz: float = 0.0
     seconds: float = 0.0
     requires: tuple[str, ...] = ()
+    bearing: float = 0.0  # goal direction, rad left of the robot heading
 
 
 CASES = {
@@ -100,7 +101,21 @@ CASES = {
     # One short physical goal (plan Task 11), only after the robot has walked both curves
     # so the near field is observed; no cell is ever cleared to admit it.
     "goal_1m": Case("goal", seconds=20.0, requires=("curve_left_020", "curve_right_020")),
+    # Starts 30 deg off the path: past the planner's default 20 deg in-place turn, inside
+    # the SONIC peer's 45 deg walk-off tolerance.
+    "goal_1m_left30": Case(
+        "goal",
+        seconds=20.0,
+        requires=("curve_left_020", "curve_right_020"),
+        bearing=math.radians(30),
+    ),
 }
+
+
+def goal_pose(x: float, y: float, h: float, bearing: float) -> tuple[tuple[float, float], float]:
+    """The point GOAL_M away along `bearing` from heading `h`, and that direction."""
+    yaw = h + bearing
+    return (x + GOAL_M * math.cos(yaw), y + GOAL_M * math.sin(yaw)), yaw
 
 
 def check_token(token: str) -> None:
@@ -416,9 +431,10 @@ def run_session(args: Any) -> None:
                 return row["odom"]  # type: ignore[no-any-return]
         raise RuntimeError("no recent odometry")
 
-    def costmap_record(name: str) -> dict[str, Any]:
-        """Read-only: no begin, no motion. Cells straight ahead plus the peer summary."""
+    def costmap_record(name: str, bearing: float = 0.0) -> dict[str, Any]:
+        """Read-only: no begin, no motion. Cells along `bearing` plus the peer summary."""
         x, y, h, _ = latest_odom()
+        h += bearing
         ahead = [[x + d * math.cos(h), y + d * math.sin(h)] for d in (0.25, 0.5, 0.75, 1.0)]
         reply = peer.call("costmap", points=ahead)
         summary = reply["costmap"]
@@ -442,13 +458,20 @@ def run_session(args: Any) -> None:
         return record
 
     def goal_record(name: str, case: Case) -> dict[str, Any]:
-        """Pre-checks, then one goal GOAL_M ahead through set_navigation_goal; cancel after."""
-        record = costmap_record(name)
+        """Pre-checks, then one goal GOAL_M along the case bearing through set_navigation_goal;
+        cancel after."""
+        record = costmap_record(name, case.bearing)
         record["passed"] = record["measured_ok"] = False
         reason = goal_admissible(record.get("costmap"), ignore_rear=args.ignore_rear_occupancy)
         if (
             reason is None
-            and input("Is the area 1 m ahead physically clear? [y/n] ").strip().lower() != "y"
+            and input(
+                f"Is the area 1 m ahead, {math.degrees(case.bearing):.0f} deg left, "
+                "physically clear? [y/n] "
+            )
+            .strip()
+            .lower()
+            != "y"
         ):
             reason = "operator did not confirm clearance"
         if reason is not None:
@@ -467,11 +490,11 @@ def run_session(args: Any) -> None:
         tele(0.0, 0.0)
         time.sleep(1.0)
         x, y, h, _ = latest_odom()
-        goal = (x + GOAL_M * math.cos(h), y + GOAL_M * math.sin(h))
+        goal, goal_yaw = goal_pose(x, y, h, case.bearing)
         record["goal_xy"], record["start_xy"] = list(goal), [x, y]
         # A* commands reach cmd_vel only once teleop stops (MovementManager cooldown).
         peer.call("tele_stop")
-        record["goal"] = agent.call("goal", x=goal[0], y=goal[1], yaw=h)
+        record["goal"] = agent.call("goal", x=goal[0], y=goal[1], yaw=goal_yaw)
         reached = None
         if record["goal"].get("result") is True:
             reached = wait(
