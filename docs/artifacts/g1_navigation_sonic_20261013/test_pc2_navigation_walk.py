@@ -217,6 +217,16 @@ def test_goal_needs_a_walked_robot_a_free_robot_cell_and_a_clear_corridor() -> N
     assert "within 0.5 m" in walk.goal_admissible({**clear, "occupied_within_0.5m": 2})
 
 
+def test_left30_goal_is_one_metre_along_a_30_degree_bearing() -> None:
+    case = walk.CASES["goal_1m_left30"]
+    assert case.kind == "goal" and case.requires == walk.CASES["goal_1m"].requires
+    assert walk.CASES["goal_1m"].bearing == 0.0
+    (gx, gy), yaw = walk.goal_pose(1.0, 2.0, math.pi / 2, case.bearing)
+    # Facing +y, 30 deg left is toward -x.
+    assert (gx, gy) == pytest.approx((1.0 - 0.5, 2.0 + math.sqrt(3) / 2))
+    assert yaw == pytest.approx(math.pi / 2 + math.radians(30))
+
+
 def test_rear_occupancy_is_ignored_only_when_opted_in() -> None:
     clear = {"robot_cell": 0, "values": [0, 0, 0, 0], "occupied_within_0.5m": 0}
     crane = {**clear, "occupied_within_0.5m": 3, "occupied_within_0.5m_behind": 3}
