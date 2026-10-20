@@ -233,3 +233,31 @@ def test_costmap_summary_splits_near_occupancy_behind_the_robot():
     summary = peer.costmap_summary(grid, odom, [])
     assert summary["occupied_within_0.5m"] == 2
     assert summary["occupied_within_0.5m_behind"] == 1  # the -y cell, behind a +y heading
+
+
+def test_peer_call_skips_a_late_reply_to_an_earlier_timed_out_call(monkeypatch):
+    monkeypatch.syspath_prepend(str(HERE))
+    import subprocess
+
+    from demo_navigation_two_host import PeerHost
+
+    # A child that answers "tele" twice (the second one late) and then "stop".
+    child = (
+        "import json, sys\n"
+        "for line in sys.stdin:\n"
+        "    op = json.loads(line)['op']\n"
+        "    if op == 'stop':\n"
+        "        print(json.dumps({'op': 'tele'}), flush=True)\n"
+        "    print('a DimOS log line', flush=True)\n"
+        "    print(json.dumps({'op': op}), flush=True)\n"
+    )
+    peer = object.__new__(PeerHost)
+    peer.process = subprocess.Popen(
+        [sys.executable, "-c", child], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True
+    )
+    peer._start_reader()
+    try:
+        assert peer.call("tele")["op"] == "tele"
+        assert peer.call("stop")["op"] == "stop"
+    finally:
+        peer.process.kill()
