@@ -685,3 +685,29 @@ Session 11, same pc2 install, live costmap watched in the Rerun web viewer
   0.63-0.77 m to its left: A* keeping clearance, not drift.
 - The final `operator_stop` ended in `feedback_lost` as designed (the native was
   stopped), 21.6 s after Enter.
+
+### Support crane and the second physical goal, 2026-10-20
+
+Session 2026-10-20-4 (commit `6a179cf38`, self-filter and the 45 deg
+initial-rotation tolerance) refused `goal_1m` six times on 71 to 3 occupied
+cells within 0.5 m: a band 15-45 cm above the floor, about 1 m wide, along and
+behind the walked path. The robot's own 0.45 m disk was clear in the last
+snapshot, so this was not the self-filter. The support crane the robot hangs
+from stands 50-80 cm away. The harness now has `--ignore-rear-occupancy`, off by
+default, which leaves the rear half of the 0.5 m disk out of the `goal_1m`
+pre-check (`2e672912e`). Replayed on session 4's snapshots it would have admitted
+the last three attempts (31, 31, 3 cells, all behind) and still refused the first
+three (8-9 cells ahead).
+
+Session 2026-10-20-5, with the option on:
+
+- `goal_1m` was refused twice for an unknown robot cell before walking and twice
+  for one occupied cell ahead, then passed after `curve_left_020`: reached within
+  0.3 m 8.6 s after the goal was sent, 0.29 m short of the point, cross-track
+  0.14 m, no latch or feedback gaps. The planner went straight to path following
+  (first heading error about 14 deg, under the old 20 deg threshold too), so the
+  45 deg tolerance was not exercised.
+- `forward_020` covered 13, 16, 24 and 23 cm; `curve_left_020` 44 cm and 62 deg.
+- `source_pause` was refused at begin by the pc2 execution ("fresh navigation
+  readiness required") with the peer ready and the link round trip at most 26 ms;
+  the next case's begin succeeded.
