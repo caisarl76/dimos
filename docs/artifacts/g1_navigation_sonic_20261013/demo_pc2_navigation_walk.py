@@ -128,16 +128,26 @@ def prior_passed(sessions: list[Path], token: str) -> list[dict[str, Any]]:
     return cases
 
 
-def goal_admissible(summary: dict[str, Any] | None) -> str | None:
-    """Why a 1 m goal straight ahead may not be sent now, or None."""
+def goal_admissible(summary: dict[str, Any] | None, ignore_rear: bool = False) -> str | None:
+    """Why a 1 m goal straight ahead may not be sent now, or None.
+
+    ignore_rear (opt-in, for the support crane behind the robot) leaves occupied
+    cells in the rear half of the 0.5 m disk out of the near-field check.
+    """
     if summary is None:
         return "no costmap yet"
     if summary.get("robot_cell") != 0:
         return f"robot cell not known free ({summary.get('robot_cell')})"
     if any(value != 0 for value in summary.get("values", [None])):
         return f"cells 0.25-1.0 m ahead not all free ({summary.get('values')})"
-    if summary.get("occupied_within_0.5m", 1):
-        return f"occupied cells within 0.5 m ({summary.get('occupied_within_0.5m')})"
+    near = summary.get("occupied_within_0.5m", 1)
+    if ignore_rear and near:
+        ahead = near - summary.get("occupied_within_0.5m_behind", 0)
+        if ahead:
+            return f"occupied cells within 0.5 m ({ahead} ahead, rear ignored)"
+        return None
+    if near:
+        return f"occupied cells within 0.5 m ({near})"
     return None
 
 
@@ -329,6 +339,7 @@ def run_session(args: Any) -> None:
     root = HERE.parents[2]
     results: dict[str, Any] = {
         "operator_ready": args.operator_ready,
+        "ignore_rear_occupancy": args.ignore_rear_occupancy,
         "extrinsic_acceptance": acceptance,
         "prior_passed": [{"session": c["session"], "name": c["name"]} for c in prior],
         "endpoints": ENDPOINTS,
@@ -434,7 +445,7 @@ def run_session(args: Any) -> None:
         """Pre-checks, then one goal GOAL_M ahead through set_navigation_goal; cancel after."""
         record = costmap_record(name)
         record["passed"] = record["measured_ok"] = False
-        reason = goal_admissible(record.get("costmap"))
+        reason = goal_admissible(record.get("costmap"), ignore_rear=args.ignore_rear_occupancy)
         if (
             reason is None
             and input("Is the area 1 m ahead physically clear? [y/n] ").strip().lower() != "y"
@@ -653,6 +664,11 @@ def main() -> None:
         action="append",
         default=[],
         help="earlier session today whose passed cases count as prerequisites",
+    )
+    parser.add_argument(
+        "--ignore-rear-occupancy",
+        action="store_true",
+        help="goal_1m: ignore occupied cells behind the robot within 0.5 m (support crane)",
     )
     run_session(parser.parse_args())
 
