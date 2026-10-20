@@ -36,7 +36,7 @@ import json
 import math
 import os
 from pathlib import Path
-import select
+import queue
 import signal
 import socket
 import subprocess
@@ -233,29 +233,44 @@ class PeerHost:
             stderr=log,
             text=True,
         )
+        self._start_reader()
         self.ready = self.read(120.0)
         assert self.ready["op"] == "ready", self.ready
 
-    def read(self, timeout: float) -> dict[str, Any]:
-        assert self.process.stdout is not None
-        until = time.monotonic() + timeout
-        poller = select.poll()
-        poller.register(self.process.stdout, select.POLLIN)
-        while time.monotonic() < until:
-            if poller.poll(100):
-                line = self.process.stdout.readline()
-                if not line:
-                    raise RuntimeError("peer host exited")
+    def _start_reader(self) -> None:
+        """Drain stdout on a thread. poll() on the pipe plus a buffered readline() left a
+        reply that arrived in the same chunk as a log line unread until more output came;
+        that timed out a call on 2026-10-21. Log lines are dropped, as before."""
+        self._replies: queue.Queue[dict[str, Any] | None] = queue.Queue()
+
+        def drain() -> None:
+            assert self.process.stdout is not None
+            for line in self.process.stdout:
                 if line.startswith("{"):
-                    return json.loads(line)  # type: ignore[no-any-return]
-        raise TimeoutError("peer host reply")
+                    self._replies.put(json.loads(line))
+            self._replies.put(None)
+
+        threading.Thread(target=drain, daemon=True).start()
+
+    def read(self, timeout: float) -> dict[str, Any]:
+        try:
+            reply = self._replies.get(timeout=timeout)
+        except queue.Empty:
+            raise TimeoutError("peer host reply") from None
+        if reply is None:
+            self._replies.put(None)
+            raise RuntimeError("peer host exited")
+        return reply
 
     def call(self, op: str, **fields: Any) -> dict[str, Any]:
         assert self.process.stdin is not None
         self.process.stdin.write(json.dumps({"op": op, **fields}) + "\n")
         self.process.stdin.flush()
-        reply = self.read(10.0)
-        assert reply["op"] == op, reply
+        until = time.monotonic() + 10.0
+        # A reply to an earlier call that timed out can still arrive; skip it. One such
+        # late reply aborted cleanup and orphaned the simulator and controller (2026-10-21).
+        while (reply := self.read(max(0.0, until - time.monotonic())))["op"] != op:
+            pass
         return reply
 
     def stop(self, *, kill: bool = False) -> None:
@@ -653,6 +668,8 @@ def run_two_host(args: Any) -> None:
             "readiness_margin_s": value.readiness_deadline - now,
             "ready": value.ready,
             "fault": value.fault,
+            "vx": value.twist.linear.x,
+            "wz": value.twist.angular.z,
         }
         inputs_seen.append(row)
         inputs_log.write(json.dumps(row) + "\n")
@@ -1086,10 +1103,15 @@ def run_two_host(args: Any) -> None:
                 pump(0.6)  # zero teleop keeps the source fresh while the stand-in map takes over
                 counts = peer.call("costmap")["counts"]
                 robot = before["robot_xy"]
+                # Study override: a goal this far left of the heading (the robot run's
+                # goal_1m_left30 uses 30); the default stays straight ahead.
+                bearing = math.radians(
+                    float(os.environ.get("SONIC_TWO_HOST_GOAL_BEARING_DEG", "0"))
+                )
                 goal = PoseStamped(
                     position=Vector3(
-                        robot[0] + 1.5 * math.cos(before["robot_yaw"]),
-                        robot[1] + 1.5 * math.sin(before["robot_yaw"]),
+                        robot[0] + 1.5 * math.cos(before["robot_yaw"] + bearing),
+                        robot[1] + 1.5 * math.sin(before["robot_yaw"] + bearing),
                         0.0,
                     ),
                     orientation=Quaternion(w=1.0),
@@ -1111,12 +1133,23 @@ def run_two_host(args: Any) -> None:
                 forward = (end_pose["pelvis"][0] - start_pose["pelvis"][0]) * math.cos(heading) + (
                     end_pose["pelvis"][1] - start_pose["pelvis"][1]
                 ) * math.sin(heading)
+                first = next(
+                    (
+                        {"vx": r["vx"], "wz": r["wz"]}
+                        for r in inputs_seen
+                        if r["scenario"] == scenario and (r["vx"] or r["wz"])
+                    ),
+                    None,
+                )
                 case(
                     "synthetic_clear_goal_followed_through_link",
                     accepted is True
                     and gained["plan"] > 0
                     and gained["cmd_vel"] > 0
                     and forward > 0.001,
+                    goal_bearing_deg=math.degrees(bearing),
+                    # Below the planner's initial-rotation tolerance the first command walks.
+                    first_command=first,
                     elapsed_to_motion=elapsed,
                     gained=gained,
                     forward_displacement_m=forward,
