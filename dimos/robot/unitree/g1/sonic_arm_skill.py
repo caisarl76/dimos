@@ -23,12 +23,14 @@ retreats along the plan's own way home instead of handing a raised arm to the na
 observed_at uses this host's monotonic clock: run on the same host as the execution module. Never
 starts or stops native control. Cancels to the planner if a joint leaves its per-group envelope or
 exceeds `max_dq`. The motion skills run in the background and report through the tool stream;
-stop_arm retreats the same way a safety stop does.
+stop_arm retreats the same way a safety stop does. run_arms starts several robots' arms together:
+all-or-nothing up to the first chunk, then any one's stop or failure retreats the others.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 import math
 from pathlib import Path
@@ -133,6 +135,9 @@ _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _MAX_CHUNK_ROWS = 1000  # SonicTaskSession accepts chunks of at most 1000 rows (20 s).
 _CHUNK_OVERLAP = 25  # rows the first chunk runs past the split, so it never runs dry
 _HOLD_BOUNDS = (1.0, 20.0)  # seconds
+# rad: a planned joint this far from its pose at the chunk-0 send has started moving; above sensor
+# noise and idle drift.
+_ONSET_RAD = 0.03
 _NO_PATH_CHECK = "collision_model_path is not configured; joint targets need the path check"
 
 
@@ -220,6 +225,7 @@ class _Watch:
     allowed: NDArray[np.float64]
     max_dq: float
     delta: NDArray[np.float64]  # The planned displacement of every joint at the deepest keyframe.
+    moving: NDArray[np.bool_]  # The joints any keyframe moves.
     returning: bool = False
     reached: float = 0.0  # Furthest progress along the planned displacement, as a fraction.
     reached_q: NDArray[np.float64] = field(default_factory=lambda: np.zeros(29))
@@ -228,6 +234,22 @@ class _Watch:
     return_dq: tuple[float, int] = (0.0, -1)
     abort: str | None = None
     overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
+    # Start timing, all on the execution host's monotonic clock: just before and just after the
+    # chunk-0 submit_chunk call, and the receipt time of the first sample that moved a planned joint
+    # _ONSET_RAD from onset_q, the latest sample received before the send.
+    send_at: float | None = None
+    ack_at: float | None = None
+    onset_q: NDArray[np.float64] | None = None
+    onset_at: float = -math.inf
+    moved_at: float | None = None
+
+
+@dataclass
+class _Group:
+    """What an arm started together with others shares with them."""
+
+    barrier: threading.Barrier  # Every arm submits chunk 0 only once all are armed.
+    peers: list[tuple[str, _Watch]]  # The other arms' names and watches.
 
 
 @dataclass
@@ -284,15 +306,26 @@ class SonicArm:
             watch = self._watch
             if watch is None:
                 return
-            q = np.asarray(feedback.body_q) - watch.base
+            body = np.asarray(feedback.body_q, np.float64)
+            q = body - watch.base
             dq = np.abs(np.asarray(feedback.body_dq))
             k = int(dq.argmax())
             if watch.returning:
                 watch.return_dq = max(watch.return_dq, (float(dq[k]), k))
                 return
+            # Receipt time, not this handler's: samples queue before they get here.
+            received = feedback.received_monotonic
+            if watch.send_at is None or received <= watch.send_at:
+                if received >= watch.onset_at:
+                    watch.onset_q, watch.onset_at = body, received
+            elif watch.onset_q is not None and (
+                watch.moved_at is None or received < watch.moved_at
+            ):
+                if (np.abs(body - watch.onset_q)[watch.moving] >= _ONSET_RAD).any():
+                    watch.moved_at = received
             progress = float(q @ watch.delta / (watch.delta @ watch.delta))
             if progress > watch.reached:
-                watch.reached, watch.reached_q = progress, np.asarray(feedback.body_q, np.float64)
+                watch.reached, watch.reached_q = progress, body
             watch.deviation = np.maximum(watch.deviation, np.abs(q))
             watch.stream_dq = max(watch.stream_dq, (float(dq[k]), k))
             if dq[k] > watch.max_dq:
@@ -377,7 +410,6 @@ class SonicArm:
                 return None  # Already on the way home.
             return retreat_rows(*route)
 
-
         longest_chunk = max(end - start for start, end in chunks)
         longest_retreat = max(len(u) + pad for u in units)
         if (
@@ -403,7 +435,13 @@ class SonicArm:
             chunks=chunks,
             retreat=retreat,
             profile=profile,
-            watch=_Watch(base=base, allowed=allowed, max_dq=self.config.max_dq, delta=delta),
+            watch=_Watch(
+                base=base,
+                allowed=allowed,
+                max_dq=self.config.max_dq,
+                delta=delta,
+                moving=np.any(deltas != 0, axis=0),
+            ),
             keyframes=len(keyframes),
             encode_s=encode_s,
             report_extra=report_extra,
@@ -419,8 +457,29 @@ class SonicArm:
         if np.abs(np.asarray(current.body_q) - prepared.base).max() > _MOVED_LIMIT:
             raise RuntimeError("the body moved before the task started; nothing sent")
 
-    def execute(self, prepared: _Prepared) -> SkillResult:
-        """Start the task, stream the prepared move and report."""
+    def execute(self, prepared: _Prepared, group: _Group | None = None) -> SkillResult:
+        """Start the task, stream the prepared move and report.
+
+        Any non-success sets this arm's watch.abort, so peers still streaming in its group retreat.
+        """
+        try:
+            return self._execute(prepared, group)
+        except BaseException as exc:
+            if group is not None:
+                group.barrier.abort()  # A peer still arming calls its start off at once.
+            self._fail(prepared.watch, str(exc) or type(exc).__name__)
+            raise
+
+    def _fail(self, watch: _Watch, reason: str) -> None:
+        with self._lock:
+            if watch.abort is None:
+                watch.abort = reason
+
+    def _cancel(self, task_id: str) -> None:
+        with suppress(Exception):  # The execution module fails the session on its own faults.
+            self._execution.cancel_task(task_id)
+
+    def _execute(self, prepared: _Prepared, group: _Group | None) -> SkillResult:
         self.recheck(prepared)
         label, base, deltas, delta = prepared.label, prepared.base, prepared.deltas, prepared.delta
         plan, chunks, profile, watch = (
@@ -436,14 +495,17 @@ class SonicArm:
         except Exception as exc:
             raise RuntimeError(f"execution refused the task: {exc}; nothing sent") from exc
         try:
-            outcome = self._stream(task_id, plan, chunks, prepared.retreat, profile, watch)
+            outcome = self._stream(task_id, plan, chunks, prepared.retreat, profile, watch, group)
         except Exception as exc:
             outcome = f"{type(exc).__name__}: {exc}"
-            try:
-                self._execution.cancel_task(task_id)
-            except Exception:
-                pass  # The execution module fails the session on its own faults.
+            self._cancel(task_id)
+        if outcome != "finished":
+            self._fail(watch, outcome)
         task = self._wait_done(profile)
+        if task is None or not task["handback_confirmed"]:
+            self._fail(watch, "planner handback unconfirmed")
+        elif task["outcome"] != "finished":
+            self._fail(watch, f"session {task['outcome']}: {task['reason']}")
         with self._lock:
             watch.returning = True
         if task is not None and task["handback_confirmed"]:
@@ -505,15 +567,31 @@ class SonicArm:
         retreat: Callable[[int], NDArray[np.float64] | None],
         profile: dict[str, Any],
         watch: _Watch,
+        group: _Group | None = None,
     ) -> str:
+        barrier = None if group is None else group.barrier
+        peers = [] if group is None else group.peers
         startup = time.monotonic() + profile["seed_seconds"] + profile["arm_timeout"] + 1.0
         while (task := self._task())["phase"] != "waiting_for_chunk":
-            if task["phase"] == "done" or time.monotonic() > startup:
-                return f"stream did not arm ({task['reason']})"
+            called_off = barrier is not None and barrier.broken
+            if called_off or task["phase"] == "done" or time.monotonic() > startup:
+                if barrier is not None:
+                    barrier.abort()  # The peers give up at once, not at their barrier timeout.
+                    if task["phase"] != "done":
+                        self._cancel(task_id)  # Nothing sent: the session hands back as usual.
+                reason = "the joint start was called off" if called_off else task["reason"]
+                return f"stream did not arm ({reason})"
             time.sleep(0.01)
-        plan_start = next_check = time.monotonic()
+        if barrier is not None:
+            try:  # Released together; inside the session's first-chunk timeout.
+                barrier.wait(timeout=profile["first_chunk_timeout"] / 2)
+            except threading.BrokenBarrierError:
+                self._cancel(task_id)
+                return "another robot did not arm"
+        plan_start = next_check = watch.send_at = time.monotonic()
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
+        watch.ack_at = time.monotonic()
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
@@ -521,6 +599,9 @@ class SonicArm:
             with self._lock:
                 if self.stop.is_set() and watch.abort is None:
                     watch.abort = "stop requested"  # Retreats like a safety stop.
+                for name, peer in peers:  # A peer's stop or failure retreats this arm too.
+                    if watch.abort is None and (peer_abort := peer.abort) is not None:
+                        watch.abort = f"{name}: {peer_abort}"
                 abort, overspeed_at = watch.abort, watch.overspeed_at
             if abort is not None and retreat_start is None:
                 if (rows := retreat(int((now - plan_start) * RATE))) is not None:
@@ -563,6 +644,81 @@ class SonicArm:
         return None
 
 
+def run_arms(jobs: Sequence[tuple[SonicArm, Callable[[], _Prepared]]]) -> SkillResult:
+    """Run each arm's prepared move; several arms start together and stop together.
+
+    One job is the single-arm path. With several, every prepare and then every recheck runs before
+    any task starts, so a refusal sends nothing to any robot. Each arm then streams on its own
+    thread; all submit chunk 0 once all are armed, and any arm's stop or failure retreats the rest.
+    """
+    if len(jobs) == 1:
+        arm, prepare = jobs[0]
+        return arm.execute(prepare())
+    prepared: list[_Prepared] = []
+    for arm, prepare in jobs:
+        try:
+            prepared.append(prepare())
+        except Exception as exc:
+            raise RuntimeError(f"{arm.name}: {exc}; nothing sent to any robot") from exc
+    for (arm, _), move in zip(jobs, prepared, strict=True):
+        try:  # Each pose may have moved while a later arm was encoding.
+            arm.recheck(move)
+        except Exception as exc:
+            raise RuntimeError(f"{arm.name}: {exc}; nothing sent to any robot") from exc
+    names = [arm.name for arm, _ in jobs]
+    watches = [move.watch for move in prepared]
+    barrier = threading.Barrier(len(jobs))
+    outcomes: list[SkillResult | BaseException | None] = [None] * len(jobs)
+
+    def run(i: int) -> None:
+        peers = [
+            (name, watch)
+            for j, (name, watch) in enumerate(zip(names, watches, strict=True))
+            if j != i
+        ]
+        try:
+            outcomes[i] = jobs[i][0].execute(prepared[i], _Group(barrier, peers))
+        except BaseException as exc:
+            outcomes[i] = exc
+
+    threads = [
+        threading.Thread(target=run, args=(i,), name=f"arm-{name}", daemon=True)
+        for i, name in enumerate(names)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    results = [o for o in outcomes if isinstance(o, SkillResult)]
+    if len(results) < len(jobs):
+        raise RuntimeError(
+            "; ".join(
+                f"{name}: {o.message if isinstance(o, SkillResult) else str(o) or type(o).__name__}"
+                for name, o in zip(names, outcomes, strict=True)
+            )
+        )
+    sends = [w.send_at for w in watches if w.send_at is not None]  # Every returned arm sent.
+    moves = [w.moved_at for w in watches if w.moved_at is not None]
+    first = min(sends)
+
+    def since(t: float | None) -> float | None:
+        return None if t is None else round(t - first, 3)
+
+    submit_skew = round(max(sends) - min(sends), 3)
+    start_skew = round(max(moves) - min(moves), 3) if len(moves) == len(watches) else None
+    logger.info("Arm group start skew", submit_skew_s=submit_skew, start_skew_s=start_skew)
+    metadata: dict[str, Any] = {
+        name: result.metadata
+        | {"send_at": since(w.send_at), "ack_at": since(w.ack_at), "moved_at": since(w.moved_at)}
+        for name, result, w in zip(names, results, watches, strict=True)
+    }
+    metadata |= {"submit_skew_s": submit_skew, "start_skew_s": start_skew}
+    return SkillResult(
+        "; ".join(f"{name}: {r.message}" for name, r in zip(names, results, strict=True)),
+        metadata=metadata,
+    )
+
+
 class ArmLauncher:
     """Background launch, tool-stream reporting and stop of arm motions, over the host's arms.
 
@@ -580,13 +736,14 @@ class ArmLauncher:
         # Serializes every change of the running motion: start, refusal, rebind and cleanup.
         self._lifecycle = threading.Lock()
         self._running: str | None = None  # The running motion's skill (and tool-stream) name.
+        self._launched: Sequence[SonicArm] = ()  # The running motion's arms.
         super().__init__(*args, **kwargs)
 
     def _request_stop(self) -> str:
         with self._lifecycle:
             if self._running is None:
                 return "No arm motion is running."
-            for arm in self._arms():
+            for arm in self._launched:
                 arm.stop.set()
         return "Stopping: the arm returns smoothly to its start pose; a tool update reports the result."
 
@@ -617,14 +774,13 @@ class ArmLauncher:
             self._running = tool
             for arm in selected:
                 arm.reset()
+            self._launched = selected
             threading.Thread(
                 target=self._finish, args=(tool, work, selected), name=f"arm-{tool}", daemon=True
             ).start()
         return f"{tool} started; a tool update reports the result. Call stop_arm to stop early."
 
-    def _finish(
-        self, tool: str, work: Callable[[], SkillResult], arms: Sequence[SonicArm]
-    ) -> None:
+    def _finish(self, tool: str, work: Callable[[], SkillResult], arms: Sequence[SonicArm]) -> None:
         started = time.monotonic()
         try:
             result = work()
