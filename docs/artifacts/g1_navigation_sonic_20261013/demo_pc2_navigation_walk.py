@@ -167,6 +167,26 @@ def prior_passed(sessions: list[Path], token: str) -> list[dict[str, Any]]:
     return cases
 
 
+BEGIN_RETRY_S = 0.3
+# A Wi-Fi round-trip burst can leave pc2's readiness lease lapsed for a moment
+# (2026-10-20 source_pause); the execution then refuses begin with this message.
+TRANSIENT_BEGIN = "fresh navigation readiness required"
+
+
+def begin_with_retry(
+    call: Callable[[], dict[str, Any]], sleep: Callable[[float], None]
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """begin, once more after BEGIN_RETRY_S if refused for a readiness lapse only.
+
+    Returns the reply and the refused first reply when it retried.
+    """
+    reply = call()
+    if TRANSIENT_BEGIN not in str(reply.get("error", "")):
+        return reply, None
+    sleep(BEGIN_RETRY_S)
+    return call(), reply
+
+
 def goal_admissible(
     summary: dict[str, Any] | None, ignore_rear: bool = False, *, obstacle: bool = False
 ) -> str | None:
@@ -560,7 +580,9 @@ def run_session(args: Any) -> None:
             record["begin"] = {"error": record["error"]}
             return record
         started, mark = time.monotonic(), agent.call("mark")["monotonic"]
-        record["begin"] = agent.call("begin")
+        record["begin"], record["begin_refused_first"] = begin_with_retry(
+            lambda: agent.call("begin"), time.sleep
+        )
         if (
             "error" in record["begin"]
             or wait(lambda: status()["navigation"]["phase"] == "active", 1.5) is None
@@ -678,7 +700,9 @@ def run_session(args: Any) -> None:
     def run_case(name: str, case: Case) -> dict[str, Any]:
         started, mark = time.monotonic(), agent.call("mark")["monotonic"]
         record: dict[str, Any] = {"name": name, "case": asdict(case), "started_unix": time.time()}
-        record["begin"] = agent.call("begin")
+        record["begin"], record["begin_refused_first"] = begin_with_retry(
+            lambda: agent.call("begin"), time.sleep
+        )
         if (
             "error" in record["begin"]
             or wait(lambda: status()["navigation"]["phase"] == "active", 1.5) is None
