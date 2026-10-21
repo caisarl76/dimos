@@ -116,6 +116,20 @@ def chunk_rows(plan_rows: int, hold_start: int) -> list[tuple[int, int]]:
     return chunks
 
 
+def retreat_row(progress: NDArray[np.float64], row: int) -> int:
+    """Where to resume after a safety stop at `row`: the first row of the way back whose progress
+    toward the target is no further than the arm's, so the rest of the plan returns it smoothly to
+    the start and blends back to the planner token. Handing back mid-pose instead lets the native
+    planner snap the arm home: in MuJoCo an overhead stop whipped the shoulder at 23 rad/s, tilted
+    the body 11.5 deg and lifted both feet. progress: [N] fraction of the planned displacement per
+    token-plan row (0 at the start pose)."""
+    hold_end = len(progress) - 1 - int(np.argmax(progress[::-1]))
+    if row > hold_end:
+        return row  # Already on the way back.
+    back = np.nonzero(progress[hold_end + 1 :] <= progress[row] + 1e-9)[0]
+    return hold_end + 1 + int(back[0]) if len(back) else row
+
+
 _JOINTS = [name.removeprefix("g1/") for name in make_humanoid_joints("g1")]
 _GROUPS = {  # Reporting groups, matching the envelope groups.
     "legs": list(range(12)),
@@ -168,6 +182,7 @@ class _Watch:
     stream_dq: tuple[float, int] = (0.0, -1)
     return_dq: tuple[float, int] = (0.0, -1)
     abort: str | None = None
+    overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
 
 
 class SonicArmSkillContainer(Module):
@@ -214,6 +229,8 @@ class SonicArmSkillContainer(Module):
                 watch.reached, watch.reached_q = progress, np.asarray(feedback.body_q, np.float64)
             watch.deviation = np.maximum(watch.deviation, np.abs(q))
             watch.stream_dq = max(watch.stream_dq, (float(dq[k]), k))
+            if dq[k] > watch.max_dq:
+                watch.overspeed_at = time.monotonic()
             if watch.abort is None:
                 outside = np.nonzero(np.abs(q) > watch.allowed)[0]
                 if len(outside):
@@ -357,7 +374,6 @@ class SonicArmSkillContainer(Module):
             raise ValueError("the arm is already there; nothing to move")
         poses = stroke_plan(base, delta)
         # First row at full depth, in token-plan rows (token_schedule prepends a 2 s blend).
-        hold_start = 2 * RATE + int(np.argmax(np.abs(poses - base).sum(axis=1)))
         if self._checker is not None and (contact := self._checker.first_contact(poses)):
             raise RuntimeError(
                 f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
@@ -371,6 +387,10 @@ class SonicArmSkillContainer(Module):
         tokens = token_schedule(np.asarray(state.token_state), motion_tokens)
         hands = np.r_[state.left_hand_q, state.right_hand_q]
         plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
+        # Token-plan rows: token_schedule adds the same blend at each end of the poses.
+        pad = (len(plan) - len(poses)) // 2
+        hold_start = pad + int(np.argmax(np.abs(poses - base).sum(axis=1)))
+        progress = np.r_[np.zeros(pad), (poses - base) @ delta / (delta @ delta), np.zeros(pad)]
         if (
             profile["max_observation_age"] <= len(plan) / RATE + 0.5
             or profile["max_duration"] <= len(plan) / RATE + 5.0
@@ -388,7 +408,9 @@ class SonicArmSkillContainer(Module):
         except Exception as exc:
             raise RuntimeError(f"execution refused the task: {exc}; nothing sent") from exc
         try:
-            outcome = self._stream(task_id, plan, chunk_rows(len(plan), hold_start), profile, watch)
+            outcome = self._stream(
+                task_id, plan, chunk_rows(len(plan), hold_start), progress, profile, watch
+            )
         except Exception as exc:
             outcome = f"{type(exc).__name__}: {exc}"
             try:
@@ -450,6 +472,7 @@ class SonicArmSkillContainer(Module):
         task_id: str,
         plan: NDArray[np.float64],
         chunks: list[tuple[int, int]],
+        progress: NDArray[np.float64],
         profile: dict[str, Any],
         watch: _Watch,
     ) -> str:
@@ -461,25 +484,34 @@ class SonicArmSkillContainer(Module):
         plan_start = next_check = time.monotonic()
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
-        pending = chunks[1:]
+        pending, sequence = chunks[1:], 0
+        retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
-            with self._lock:
-                abort = watch.abort
-            if abort is not None:
-                self._execution.cancel_task(task_id)
-                return "envelope"
             now = time.monotonic()
+            with self._lock:
+                abort, overspeed_at = watch.abort, watch.overspeed_at
+            if abort is not None and retreat_start is None:
+                row = int((now - plan_start) * RATE)
+                back = retreat_row(progress, row)
+                pending = []  # The way back replaces the rest of the plan.
+                if back > row:
+                    sequence += 1
+                    task = self._execution.submit_chunk(task_id, sequence, now, plan[back:])
+                    plan_start = now - back / RATE  # plan rows keep their timing from here on
+                retreat_start = now
+            elif retreat_start is not None and overspeed_at > retreat_start:
+                self._execution.cancel_task(task_id)  # A joint ran away during the way back.
+                return "envelope"
             if (now - plan_start) * RATE >= len(plan) - 2:
                 # The plan already blended back to the planner token.
                 self._execution.finish_task(task_id)
-                return "finished"  # Checked against the session's own outcome afterwards.
+                # Checked against the session's own outcome afterwards.
+                return "finished" if retreat_start is None else "envelope"
             if pending and now >= plan_start + pending[0][0] / RATE:
                 start, end = pending.pop(0)
+                sequence += 1
                 task = self._execution.submit_chunk(
-                    task_id,
-                    len(chunks) - len(pending) - 1,
-                    plan_start + start / RATE,
-                    plan[start:end],
+                    task_id, sequence, plan_start + start / RATE, plan[start:end]
                 )
             elif now >= next_check:
                 task, next_check = self._task(), now + 0.1

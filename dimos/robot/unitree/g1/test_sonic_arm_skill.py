@@ -180,20 +180,59 @@ def test_wrist_inside_its_envelope_passes(skill):
     assert result.metadata["max_deviation_rad"]["wrists_shoulder_yaw"] == 0.25
 
 
-def test_leg_outside_its_envelope_cancels_to_planner(skill):
-    module, _ = skill
+def test_leg_outside_its_envelope_returns_smoothly_then_hands_back(skill):
+    module, peer = skill
 
     def knee(t):
         q = follows(t)
         q[3] = 0.2 if t > 0.4 else 0.0
         return q
 
-    started = time.monotonic()
     result = run(module, 20.0, knee)
     assert "stopped early" in result.message and "left_knee" in result.message, result
     status = module._execution.get_status()["task"]
-    assert status["outcome"] == "cancelled" and status["handback_confirmed"]
-    assert time.monotonic() - started < 0.4 + 1.2  # Cancelled before the plan ended.
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
+    # The stream itself returned to the planner token: no mid-pose snap by the native planner.
+    streamed = tokens(peer.snapshot())[:, 0]
+    assert streamed[-1] == pytest.approx(PEER_TOKEN, abs=1e-3)
+    assert np.abs(np.diff(streamed)).max() <= 0.05 + 1e-6
+
+
+def test_overspeed_during_the_way_back_hands_back_at_once(skill):
+    module, _ = skill
+    stopped = threading.Event()
+
+    def feed():
+        start = time.monotonic()
+        while not stopped.is_set():
+            state = module._execution.get_feedback()
+            if state is not None:
+                t = time.monotonic() - start
+                q = np.zeros(29)
+                q[3] = 0.2 if t > 0.4 else 0.0  # leaves the envelope: the way back starts
+                dq = np.zeros(29)
+                dq[5] = 5.0 if t > 0.55 else 0.0  # then a joint runs away
+                module.handle_feedback(replace(state, body_q=tuple(q), body_dq=tuple(dq)))
+            time.sleep(0.01)
+
+    feeder = threading.Thread(target=feed, daemon=True)
+    feeder.start()
+    try:
+        result = module.move_upper_body("left_arm_forward", 20.0)
+    finally:
+        stopped.set()
+        feeder.join(2)
+    assert "stopped early" in result.message, result
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "cancelled" and status["handback_confirmed"], status
+
+
+def test_retreat_resumes_at_the_matching_point_of_the_way_back():
+    progress = np.array([0, 0, 0.2, 0.5, 0.8, 1, 1, 0.8, 0.5, 0.2, 0, 0])
+    assert sonic_arm_skill.retreat_row(progress, 3) == 8  # outward at 0.5 -> back at 0.5
+    assert sonic_arm_skill.retreat_row(progress, 1) == 10  # before moving -> straight to the end
+    assert sonic_arm_skill.retreat_row(progress, 5) == 7  # holding -> start of the way back
+    assert sonic_arm_skill.retreat_row(progress, 8) == 8  # already on the way back
 
 
 def test_arm_that_does_not_follow_is_reported(skill):
