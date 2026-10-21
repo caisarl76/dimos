@@ -59,18 +59,6 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.spec.utils import Spec
 
-ArmError = Literal[
-    "INVALID_ANGLE",
-    "BUSY",
-    "NOT_READY",
-    "MOVED",
-    "ENVELOPE",
-    "EXECUTION_FAILED",
-    "HANDBACK_UNCONFIRMED",
-    "NOT_REACHED",
-    "INVALID_MOTION",
-    "UNSAFE_PATH",
-]
 UpperBodyMotion = Literal["left_arm_forward", "left_arm_sideways", "left_forearm_raise"]
 # Motion -> (motor-order joint, sign of a positive angle, min deg, max deg). Directions from the G1
 # model in the torso frame. Ranges from a MuJoCo floor sweep at 10-60 deg with the stroke slowed to
@@ -139,10 +127,6 @@ _GROUPS = {  # Reporting groups, matching the envelope groups.
 
 def _peak(peak: tuple[float, int]) -> dict[str, Any]:
     return {"rad_s": round(peak[0], 3), "joint": _JOINTS[peak[1]] if peak[0] > 0 else None}
-
-
-def _fail(code: ArmError, message: str, report: dict[str, Any]) -> SkillResult[ArmError]:
-    return SkillResult[ArmError](False, message, code, metadata=report)
 
 
 class SonicArmExecutionSpec(Spec, Protocol):
@@ -239,7 +223,7 @@ class SonicArmSkillContainer(Module):
                     watch.abort = f"{_JOINTS[k]} speed {dq[k]:.2f} rad/s > {watch.max_dq}"
 
     @skill(uses=[CAP_MOVEMENT])
-    def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> SkillResult[ArmError]:
+    def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> SkillResult:
         """Move one upper-body joint out by angle_deg, hold it for 1 second, move it back, then hand control back.
 
         Motions: "left_arm_forward" swings the left arm forward (shoulder pitch),
@@ -255,12 +239,10 @@ class SonicArmSkillContainer(Module):
                 left_forearm_raise 20-60.
         """
         if motion not in MOTIONS:
-            return SkillResult.fail("INVALID_MOTION", f"motion must be one of {sorted(MOTIONS)}")
+            raise ValueError(f"motion must be one of {sorted(MOTIONS)}")
         joint, sign, low, high = MOTIONS[motion]
         if not low <= angle_deg <= high or not math.isfinite(angle_deg):
-            return SkillResult.fail(
-                "INVALID_ANGLE", f"{motion} angle_deg must be within {low:g}..{high:g}"
-            )
+            raise ValueError(f"{motion} angle_deg must be within {low:g}..{high:g}")
         delta = np.zeros(29)
         delta[joint] = sign * math.radians(angle_deg)
         allowed = group_margins(
@@ -269,7 +251,7 @@ class SonicArmSkillContainer(Module):
         return self._run(motion, lambda base: delta, allowed, require_check=False)
 
     @skill(uses=[CAP_MOVEMENT])
-    def move_left_arm_pose(self, pose: LeftArmPose) -> SkillResult[ArmError]:
+    def move_left_arm_pose(self, pose: LeftArmPose) -> SkillResult:
         """Move the left arm to a full-range pose, hold it for 1 second, bring it back, then hand control back.
 
         Poses: "left_arm_forward_horizontal" (straight arm pointing forward at shoulder height),
@@ -286,7 +268,7 @@ class SonicArmSkillContainer(Module):
                 "left_hand_over_head", "left_hand_over_head_sideways".
         """
         if pose not in POSES:
-            return SkillResult.fail("INVALID_MOTION", f"pose must be one of {sorted(POSES)}")
+            raise ValueError(f"pose must be one of {sorted(POSES)}")
         return self._run_targets(pose, np.asarray(POSES[pose]), require_check=False)
 
     @skill(uses=[CAP_MOVEMENT])
@@ -296,7 +278,7 @@ class SonicArmSkillContainer(Module):
         shoulder_roll_deg: float,
         shoulder_yaw_deg: float,
         elbow_deg: float,
-    ) -> SkillResult[ArmError]:
+    ) -> SkillResult:
         """Move the left arm to the given joint angles, hold for 1 second, bring it back, then hand control back.
 
         Angles are absolute, in degrees. Hanging rest is about pitch 11, roll 11, yaw 0, elbow 34.
@@ -316,16 +298,14 @@ class SonicArmSkillContainer(Module):
         values = (shoulder_pitch_deg, shoulder_roll_deg, shoulder_yaw_deg, elbow_deg)
         for (joint, (low, high)), value in zip(JOINT_BOUNDS.items(), values, strict=True):
             if not math.isfinite(value) or not low <= value <= high:
-                return SkillResult.fail(
-                    "INVALID_ANGLE", f"{joint} must be within {low:g}..{high:g} deg"
-                )
+                raise ValueError(f"{joint} must be within {low:g}..{high:g} deg")
         target = np.radians(np.asarray(values, np.float64))
         label = "joints(" + ", ".join(f"{v:g}" for v in values) + ")"
         return self._run_targets(label, target, require_check=True)
 
     def _run_targets(
         self, label: str, target: NDArray[np.float64], *, require_check: bool
-    ) -> SkillResult[ArmError]:
+    ) -> SkillResult:
         def delta_of(base: NDArray[np.float64]) -> NDArray[np.float64]:
             delta = np.zeros(29)
             delta[_LEFT_ARM_TARGET] = target - base[_LEFT_ARM_TARGET]
@@ -343,14 +323,13 @@ class SonicArmSkillContainer(Module):
         allowed: NDArray[np.float64],
         *,
         require_check: bool,
-    ) -> SkillResult[ArmError]:
+    ) -> SkillResult:
         if require_check and self._checker is None:
-            return SkillResult.fail(
-                "NOT_READY",
+            raise RuntimeError(
                 "collision_model_path is not configured; joint targets need the path check",
             )
         if not self._busy.acquire(blocking=False):
-            return SkillResult.fail("BUSY", "an arm move is already running")
+            raise RuntimeError("an arm move is already running")
         try:
             return self._move(label, delta_of, allowed)
         finally:
@@ -363,25 +342,24 @@ class SonicArmSkillContainer(Module):
         label: str,
         delta_of: Callable[[NDArray[np.float64]], NDArray[np.float64]],
         allowed: NDArray[np.float64],
-    ) -> SkillResult[ArmError]:
+    ) -> SkillResult:
         assert self._encoder is not None
         status = self._execution.get_status()
         profile = status["profile"]
         if not status["ready"]:
-            return SkillResult.fail("NOT_READY", "SONIC must be running in confirmed planner idle")
+            raise RuntimeError("SONIC is not in confirmed planner idle; nothing sent")
         state = self._execution.get_feedback()
         if state is None or state.token_state is None:
-            return SkillResult.fail("NOT_READY", "no fresh controller feedback")
+            raise RuntimeError("no fresh controller feedback; nothing sent")
         base = np.asarray(state.body_q, np.float64)
         delta = delta_of(base)
         if not np.abs(delta).max() > math.radians(1):
-            return SkillResult.fail("INVALID_ANGLE", "the arm is already there; nothing to move")
+            raise ValueError("the arm is already there; nothing to move")
         poses = stroke_plan(base, delta)
         # First row at full depth, in token-plan rows (token_schedule prepends a 2 s blend).
         hold_start = 2 * RATE + int(np.argmax(np.abs(poses - base).sum(axis=1)))
         if self._checker is not None and (contact := self._checker.first_contact(poses)):
-            return SkillResult.fail(
-                "UNSAFE_PATH",
+            raise RuntimeError(
                 f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
             )
         started = time.monotonic()
@@ -389,9 +367,7 @@ class SonicArmSkillContainer(Module):
         encode_s = time.monotonic() - started
         current = self._execution.get_feedback()
         if current is None or np.abs(np.asarray(current.body_q) - base).max() > _MOVED_LIMIT:
-            return SkillResult.fail(
-                "MOVED", "the body moved while the reference was encoded; nothing sent"
-            )
+            raise RuntimeError("the body moved while the reference was encoded; nothing sent")
         tokens = token_schedule(np.asarray(state.token_state), motion_tokens)
         hands = np.r_[state.left_hand_q, state.right_hand_q]
         plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
@@ -399,8 +375,7 @@ class SonicArmSkillContainer(Module):
             profile["max_observation_age"] <= len(plan) / RATE + 0.5
             or profile["max_duration"] <= len(plan) / RATE + 5.0
         ):
-            return SkillResult.fail(
-                "NOT_READY",
+            raise RuntimeError(
                 "the execution profile's observation age and duration must cover the plan",
             )
         allowed = allowed + np.abs(delta)
@@ -411,7 +386,7 @@ class SonicArmSkillContainer(Module):
         try:
             task_id = self._execution.start_task()["task_id"]
         except Exception as exc:
-            return SkillResult.fail("NOT_READY", f"execution refused the task: {exc}; nothing sent")
+            raise RuntimeError(f"execution refused the task: {exc}; nothing sent") from exc
         try:
             outcome = self._stream(task_id, plan, chunk_rows(len(plan), hold_start), profile, watch)
         except Exception as exc:
@@ -451,30 +426,24 @@ class SonicArmSkillContainer(Module):
         if len(moved) == 1:  # move_upper_body: the swing in degrees, as before.
             report["reached_deg"] = round(math.degrees(watch.reached * abs(delta[moved[0]])), 1)
             report["planned_deg"] = round(math.degrees(abs(delta[moved[0]])), 1)
+        journal = report["journal_path"]
         if task is None or not task["handback_confirmed"]:
-            return _fail(
-                "HANDBACK_UNCONFIRMED",
-                f"planner handback unconfirmed ({outcome}); check the controller",
-                report,
-            )
-        if outcome == "envelope":
-            return _fail(
-                "ENVELOPE", f"stopped early: {watch.abort}; control returned to the planner", report
+            raise RuntimeError(
+                f"planner handback unconfirmed ({outcome}); check the controller. Journal: {journal}"
             )
         if outcome == "finished" and task["outcome"] != "finished":
             outcome = f"session {task['outcome']}: {task['reason']}"
-        if outcome != "finished":
-            return _fail("EXECUTION_FAILED", f"{outcome}; control returned to the planner", report)
-        if watch.reached < 0.5:  # SONIC tracked less than half the planned move.
-            return _fail(
-                "NOT_REACHED", "the arm did not follow the reference; planner in control", report
-            )
-        reached = (
-            f"reached {report['reached_deg']:.1f} deg"
-            if len(moved) == 1
-            else f"reached {100 * watch.reached:.0f}% of the planned pose"
-        )
-        return SkillResult.ok(f"{label} {reached} and returned; planner in control", **report)
+        if outcome not in ("finished", "envelope"):
+            raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
+        if outcome == "envelope":
+            message = f"{label} stopped early: {watch.abort}"
+        elif watch.reached < 0.5:  # SONIC tracked less than half the planned move.
+            message = f"{label} did not follow the reference: reached {100 * watch.reached:.0f}% of the plan"
+        elif len(moved) == 1:
+            message = f"{label} reached {report['reached_deg']:.1f} deg and returned"
+        else:
+            message = f"{label} reached {100 * watch.reached:.0f}% of the planned pose and returned"
+        return SkillResult(f"{message}; control returned to SONIC's planner", metadata=report)
 
     def _stream(
         self,

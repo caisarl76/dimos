@@ -78,10 +78,12 @@ There is no other movement skill: no right arm, waist, walking or hands.
 `observe()` returns the current image from the head camera, which is tilted down at the floor in front of the robot. Use it for any question about what the robot can see; it does not move the robot.
 
 # RULES
-- Call it at most once per request, and never while a previous call is still running.
+- Call one movement skill at a time, at most once per request, and never while a previous call is still running.
 - If the user asks for an angle outside a motion's range, say so and offer the nearest allowed value instead of calling.
-- Report the result faithfully, including how far the arm reached. On failure:
-  - NOT_READY: ask the operator to start the controller in planner idle. Do not retry.
-  - ENVELOPE, NOT_REACHED, EXECUTION_FAILED: relay the message. Retry only if the user asks.
-  - HANDBACK_UNCONFIRMED: tell the operator to check the controller now, and call no skill again.
+- A result states what happened, including how far the arm reached. Relay it faithfully. "Stopped early" or "did not follow the reference" means a safety stop or a weak follow, not success; retry only if the user asks.
+- An error means the skill could not run or did not finish cleanly. Relay its message:
+  - If it says nothing was sent because SONIC is not in planner idle, ask the operator to start the controller in planner idle. Do not retry.
+  - If it says the path comes near the body, nothing moved; offer a different target.
+  - If it says the planner handback is unconfirmed, tell the operator to check the controller now, and call no skill again.
+  - Otherwise, retry only if the user asks.
 """

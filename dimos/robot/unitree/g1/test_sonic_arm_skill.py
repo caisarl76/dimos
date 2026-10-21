@@ -154,7 +154,7 @@ def test_pure_reference_parts():
 def test_swing_streams_one_chunk_and_hands_back(skill):
     module, peer = skill
     result = run(module, 20.0, follows)
-    assert result.success, result
+    assert "returned" in result.message, result
     assert result.metadata["reached_deg"] == pytest.approx(20.0, abs=0.1)
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "finished" and status["handback_confirmed"]
@@ -176,7 +176,7 @@ def test_wrist_inside_its_envelope_passes(skill):
         return q
 
     result = run(skill[0], 20.0, wrist)
-    assert result.success, result
+    assert "returned" in result.message, result
     assert result.metadata["max_deviation_rad"]["wrists_shoulder_yaw"] == 0.25
 
 
@@ -190,7 +190,7 @@ def test_leg_outside_its_envelope_cancels_to_planner(skill):
 
     started = time.monotonic()
     result = run(module, 20.0, knee)
-    assert result.error_code == "ENVELOPE" and "left_knee" in result.message, result
+    assert "stopped early" in result.message and "left_knee" in result.message, result
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "cancelled" and status["handback_confirmed"]
     assert time.monotonic() - started < 0.4 + 1.2  # Cancelled before the plan ended.
@@ -198,14 +198,15 @@ def test_leg_outside_its_envelope_cancels_to_planner(skill):
 
 def test_arm_that_does_not_follow_is_reported(skill):
     result = run(skill[0], 20.0)
-    assert result.error_code == "NOT_REACHED", result
+    assert "did not follow the reference" in result.message, result
 
 
 @pytest.mark.parametrize("angle", [0.0, 29.0, float("nan")])
 def test_invalid_angle_sends_nothing(skill, angle):
     module, peer = skill
     before = len(peer.snapshot())
-    assert module.move_upper_body("left_arm_forward", angle).error_code == "INVALID_ANGLE"
+    with pytest.raises(ValueError, match="angle_deg"):
+        module.move_upper_body("left_arm_forward", angle)
     assert not any(p.startswith(b"pose") for p in peer.snapshot()[before:])
     assert module._execution.get_status()["task"] is None
 
@@ -215,7 +216,8 @@ def test_movement_during_encoding_sends_nothing(skill, mocker):
     state = module._execution.get_feedback()
     moved = replace(state, body_q=(0.1,) * 29)
     mocker.patch.object(module._execution, "get_feedback", side_effect=[state, moved])
-    assert module.move_upper_body("left_arm_forward", 20.0).error_code == "MOVED"
+    with pytest.raises(RuntimeError, match="moved"):
+        module.move_upper_body("left_arm_forward", 20.0)
     assert module._execution.get_status()["task"] is None
 
 
@@ -223,7 +225,8 @@ def test_not_ready_execution_sends_nothing(skill, mocker):
     module, _ = skill
     status = module._execution.get_status()
     mocker.patch.object(module._execution, "get_status", return_value=status | {"ready": False})
-    assert module.move_upper_body("left_arm_forward", 20.0).error_code == "NOT_READY"
+    with pytest.raises(RuntimeError, match="planner idle|observation age"):
+        module.move_upper_body("left_arm_forward", 20.0)
 
 
 def test_session_failure_is_not_reported_as_success(skill):
@@ -237,9 +240,9 @@ def test_session_failure_is_not_reported_as_success(skill):
 
     dropper = threading.Thread(target=drop_feedback, daemon=True)
     dropper.start()
-    result = run(module, 20.0, follows)
+    with pytest.raises(RuntimeError, match="control returned to the planner"):
+        run(module, 20.0, follows)
     dropper.join(2)
-    assert result.error_code == "EXECUTION_FAILED", result
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "failed" and status["handback_confirmed"]
 
@@ -298,7 +301,8 @@ def test_profile_too_short_for_the_plan_sends_nothing(skill, mocker):
     status = module._execution.get_status()
     short = status | {"profile": status["profile"] | {"max_observation_age": 0.5}}
     mocker.patch.object(module._execution, "get_status", return_value=short)
-    assert module.move_upper_body("left_arm_forward", 20.0).error_code == "NOT_READY"
+    with pytest.raises(RuntimeError, match="planner idle|observation age"):
+        module.move_upper_body("left_arm_forward", 20.0)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
@@ -309,8 +313,8 @@ def test_failed_session_at_finish_is_not_reported_as_success(skill, mocker):
     mocker.patch.object(
         execution, "finish_task", side_effect=lambda task_id: fail(task_id, "injected")
     )
-    result = run(module, 20.0, follows)
-    assert result.error_code == "EXECUTION_FAILED" and "injected" in result.message, result
+    with pytest.raises(RuntimeError, match="injected"):
+        run(module, 20.0, follows)
 
 
 def test_agent_prompt_names_only_skills_the_blueprint_has():
@@ -331,7 +335,7 @@ def test_other_motions_move_their_own_joint_with_its_widened_envelope(skill, mot
     module, peer = skill
     # 0.33 rad is past the 0.20 arm margin alone: only the moving joint's widened envelope allows it.
     result = run(module, 22.0, partial(follows, delta=sign * 0.33, joint=joint), motion=motion)
-    assert result.success, result
+    assert "returned" in result.message, result
     assert (
         result.metadata["max_deviation_rad"]["arms"] == 0.0
     )  # The moving joint is not a deviation.
@@ -344,7 +348,8 @@ def test_other_motions_move_their_own_joint_with_its_widened_envelope(skill, mot
 
 def test_unknown_motion_sends_nothing(skill):
     module, peer = skill
-    assert module.move_upper_body("waist_turn_left", 10.0).error_code == "INVALID_MOTION"
+    with pytest.raises(ValueError, match="motion must be one of"):
+        module.move_upper_body("waist_turn_left", 10.0)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
@@ -364,7 +369,8 @@ def test_motion_enum_matches_the_motion_table():
 )
 def test_each_motion_keeps_its_own_angle_range(skill, motion, angle):
     module, peer = skill
-    assert module.move_upper_body(motion, angle).error_code == "INVALID_ANGLE"
+    with pytest.raises(ValueError, match="angle_deg"):
+        module.move_upper_body(motion, angle)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
@@ -389,11 +395,10 @@ def test_shoulder_yaw_shares_the_loose_envelope(skill, joint, passes):
 
     result = run(module, 20.0, drift)
     if passes:
-        assert result.success, result
+        assert "returned" in result.message, result
     else:
-        assert (
-            result.error_code == "ENVELOPE" and sonic_arm_skill._JOINTS[joint] in result.message
-        ), result
+        assert "stopped early" in result.message, result
+        assert sonic_arm_skill._JOINTS[joint] in result.message, result
 
 
 class FakeChecker:
@@ -446,7 +451,7 @@ def test_full_range_pose_moves_every_left_arm_joint_together(skill):
     result = call_with_feed(
         module, lambda: module.move_left_arm_pose("left_hand_over_head"), reaching(target)
     )
-    assert result.success, result
+    assert "returned" in result.message, result
     assert result.metadata["reached_fraction"] == pytest.approx(0.8, abs=0.01)
     assert result.metadata["planned_deg"]["left_shoulder_pitch"] == pytest.approx(
         np.degrees(-2.8), abs=0.1
@@ -464,7 +469,7 @@ def test_pose_envelope_lets_the_arm_and_other_arm_coordinate(skill):
         lambda: module.move_left_arm_pose("left_arm_side_horizontal"),
         reaching(target, extra={15: -0.35, 23: 0.30}),
     )
-    assert result.success, result
+    assert "returned" in result.message, result
 
 
 def test_pose_envelope_still_guards_the_legs(skill):
@@ -475,12 +480,13 @@ def test_pose_envelope_still_guards_the_legs(skill):
         lambda: module.move_left_arm_pose("left_arm_side_horizontal"),
         reaching(target, extra={3: 0.2}),
     )
-    assert result.error_code == "ENVELOPE" and "left_knee" in result.message, result
+    assert "stopped early" in result.message and "left_knee" in result.message, result
 
 
 def test_joint_targets_need_the_path_check(skill):
     module, peer = skill
-    assert module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0).error_code == "NOT_READY"
+    with pytest.raises(RuntimeError, match="collision_model_path"):
+        module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
@@ -490,15 +496,16 @@ def test_joint_targets_need_the_path_check(skill):
 def test_joint_targets_outside_the_box_send_nothing(skill, angles):
     module, peer = skill
     module._checker = FakeChecker()
-    assert module.move_left_arm_joints(*angles).error_code == "INVALID_ANGLE"
+    with pytest.raises(ValueError, match="must be within"):
+        module.move_left_arm_joints(*angles)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
 def test_unsafe_joint_target_path_is_refused_before_sending(skill):
     module, peer = skill
     module._checker = FakeChecker("torso_link")
-    result = module.move_left_arm_joints(11.0, -10.0, 0.0, 34.0)
-    assert result.error_code == "UNSAFE_PATH" and "torso_link" in result.message, result
+    with pytest.raises(RuntimeError, match="torso_link; nothing sent"):
+        module.move_left_arm_joints(11.0, -10.0, 0.0, 34.0)
     assert module._checker.calls == 1
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
@@ -510,7 +517,7 @@ def test_checked_joint_target_runs(skill):
     result = call_with_feed(
         module, lambda: module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0), reaching(target)
     )
-    assert result.success, result
+    assert "returned" in result.message, result
     assert module._checker.calls == 1
 
 
