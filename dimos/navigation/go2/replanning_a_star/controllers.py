@@ -18,7 +18,6 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from dimos.core.global_config import GlobalConfig
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.msgs.geometry_msgs.Twist import Twist
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
@@ -36,7 +35,7 @@ class Controller(Protocol):
 
 
 class PController:
-    _global_config: GlobalConfig
+    _simulation: bool
     _speed: float
     _control_frequency: float
 
@@ -48,7 +47,7 @@ class PController:
 
     def __init__(
         self,
-        global_config: GlobalConfig,
+        simulation: bool,
         speed: float,
         control_frequency: float,
         *,
@@ -57,7 +56,7 @@ class PController:
         if not math.isfinite(min_angular_velocity) or min_angular_velocity < 0:
             raise ValueError("min_angular_velocity must be finite and nonnegative")
         self._min_angular_velocity = min_angular_velocity
-        self._global_config = global_config
+        self._simulation = simulation
         self._speed = speed
         self._control_frequency = control_frequency
 
@@ -115,7 +114,7 @@ class PController:
 
     def _angular_twist(self, angular_velocity: float) -> Twist:
         # In simulation, we need stroger values
-        if self._global_config.simulation and abs(angular_velocity) < 0.8:
+        if self._simulation and abs(angular_velocity) < 0.8:
             angular_velocity = 0.8 * np.sign(angular_velocity)
 
         return Twist(
@@ -132,14 +131,14 @@ class PdController(PController):
 
     def __init__(
         self,
-        global_config: GlobalConfig,
+        simulation: bool,
         speed: float,
         control_frequency: float,
         *,
         min_angular_velocity: float = 0.2,
     ) -> None:
         super().__init__(
-            global_config, speed, control_frequency, min_angular_velocity=min_angular_velocity
+            simulation, speed, control_frequency, min_angular_velocity=min_angular_velocity
         )
 
         self._prev_yaw_error = 0.0

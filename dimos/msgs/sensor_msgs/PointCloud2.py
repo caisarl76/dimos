@@ -82,17 +82,20 @@ class SectorJson(TypedDict):
 
 class PointCloud2(Timestamped):
     msg_name = "sensor_msgs.PointCloud2"
+    seq: int = 0
 
     def __init__(
         self,
         pointcloud: o3d.geometry.PointCloud | o3d.t.geometry.PointCloud | None = None,
         frame_id: str = "world",
         ts: float | None = None,
+        seq: int = 0,
     ) -> None:
         import open3d as o3d  # type: ignore[import-untyped]
 
         self.ts = ts  # type: ignore[assignment]
         self.frame_id = frame_id
+        self.seq = seq
 
         # Store internally as tensor pointcloud for speed
         if pointcloud is None:
@@ -547,7 +550,7 @@ class PointCloud2(Timestamped):
 
         # Header
         msg.header = Header()
-        msg.header.seq = 0
+        msg.header.seq = self.seq
         msg.header.frame_id = frame_id or self.frame_id
 
         msg.header.stamp.sec = int(self.ts)
@@ -682,6 +685,7 @@ class PointCloud2(Timestamped):
                 ts=msg.header.stamp.sec + msg.header.stamp.nsec / 1e9
                 if hasattr(msg, "header") and msg.header.stamp.sec > 0
                 else None,
+                seq=msg.header.seq if hasattr(msg, "header") else 0,
             )
 
         # Parse field offsets. The message is self-describing; a known field is
@@ -696,9 +700,12 @@ class PointCloud2(Timestamped):
             "offset_time": PointField.UINT32,
             "tag": PointField.UINT8,
             "line": PointField.UINT8,
+            # ROS-style per-point fields (the Go2 L1): seconds after the stamp, and ring.
+            "time": PointField.FLOAT32,
+            "ring": PointField.UINT16,
         }
         x_offset = y_offset = z_offset = rgb_offset = intensity_offset = None
-        offset_time_offset = tag_offset = line_offset = None
+        offset_time_offset = tag_offset = line_offset = time_offset = ring_offset = None
         for msgfield in msg.fields:
             if _expected_datatype.get(msgfield.name) != msgfield.datatype:
                 continue
@@ -718,6 +725,10 @@ class PointCloud2(Timestamped):
                 tag_offset = msgfield.offset
             elif msgfield.name == "line":
                 line_offset = msgfield.offset
+            elif msgfield.name == "time":
+                time_offset = msgfield.offset
+            elif msgfield.name == "ring":
+                ring_offset = msgfield.offset
 
         if any(offset is None for offset in [x_offset, y_offset, z_offset]):
             raise ValueError("PointCloud2 message missing X, Y, or Z msgfields")
@@ -790,6 +801,15 @@ class PointCloud2(Timestamped):
                 _extract_scalar_field(offset_time_offset, "<u4").reshape(-1, 1),
                 dtype=o3c.uint32,
             )
+        elif time_offset is not None:
+            # u32 ns holds 4.29 s; a scan the L1 stalled through spans longer.
+            seconds = _extract_scalar_field(time_offset, "<f4")
+            pcd_t.point["offset_times"] = o3c.Tensor(
+                np.round(np.clip(np.nan_to_num(seconds), 0.0, 4.29) * 1e9)
+                .astype(np.uint32)
+                .reshape(-1, 1),
+                dtype=o3c.uint32,
+            )
         if tag_offset is not None:
             pcd_t.point["tags"] = o3c.Tensor(
                 _extract_scalar_field(tag_offset, "u1").reshape(-1, 1), dtype=o3c.uint8
@@ -797,6 +817,11 @@ class PointCloud2(Timestamped):
         if line_offset is not None:
             pcd_t.point["lines"] = o3c.Tensor(
                 _extract_scalar_field(line_offset, "u1").reshape(-1, 1), dtype=o3c.uint8
+            )
+        elif ring_offset is not None:
+            pcd_t.point["lines"] = o3c.Tensor(
+                _extract_scalar_field(ring_offset, "<u2").astype(np.uint8).reshape(-1, 1),
+                dtype=o3c.uint8,
             )
 
         # Extract RGB colors if present
@@ -822,6 +847,7 @@ class PointCloud2(Timestamped):
             ts=msg.header.stamp.sec + msg.header.stamp.nsec / 1e9
             if hasattr(msg, "header") and msg.header.stamp.sec > 0
             else None,
+            seq=msg.header.seq if hasattr(msg, "header") else 0,
         )
 
     def _create_xyz_fields(self) -> list:  # type: ignore[type-arg]

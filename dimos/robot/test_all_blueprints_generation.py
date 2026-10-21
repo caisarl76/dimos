@@ -44,7 +44,7 @@ BLUEPRINT_METHODS = {
     "configurators",
     "validators",
 }
-_EXCLUDED_MODULE_NAMES = {"Module", "ModuleBase", "StreamModule"}
+_EXCLUDED_MODULE_NAMES = {"Module", "ModuleBase", "StreamModule", "ConnectionModule"}
 
 
 def test_all_blueprints_is_current() -> None:

@@ -19,7 +19,6 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from dimos.core.global_config import GlobalConfig
 from dimos.msgs.geometry_msgs.Pose import Pose
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
@@ -37,7 +36,7 @@ def first_command(heading: float, **kwargs: float) -> Twist:
         origin=Pose(position=Vector3(-2.5, -2.5, 0.0)),
     )
     planner = LocalPlanner(
-        GlobalConfig(), SimpleNamespace(binary_costmap=free), goal_tolerance=0.2, **kwargs
+        SimpleNamespace(binary_costmap=free), goal_tolerance=0.2, robot_width=0.3, **kwargs
     )
     planner.handle_odom(PoseStamped(position=Vector3(0.0, 0.0, 0.0)))
     yaw = Quaternion.from_euler(Vector3(0.0, 0.0, heading))
