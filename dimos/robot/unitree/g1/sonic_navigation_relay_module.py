@@ -37,6 +37,9 @@ from dimos.robot.unitree.g1.sonic_navigation_link import (
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
+# Inside the execution owner's 0.5 s goal deadline (navigation_rpc_timeout_seconds).
+GOAL_BUSY_BUDGET_SECONDS = 0.25
+GOAL_BUSY_RETRY_SECONDS = 0.025
 
 
 class SonicNavigationRelayConfig(ModuleConfig):
@@ -213,6 +216,22 @@ class SonicNavigationRelayModule(Module):
             return f"previous request {self._request_id} not cancel-confirmed"
         return None
 
+    def _goal_control(self, request_id: str, goal: PoseStamped) -> dict[str, Any]:
+        """Send the goal, again while the peer reports its control slot busy.
+
+        The peer serves one control request at a time and answers others with
+        control_busy without processing them, so a resend is safe. Status calls
+        (the execution's after a stop, read-only observers) hold that slot for at
+        least one serve tick; without the resend a goal arriving then was refused
+        (robot sessions 2026-10-21-6 and -8, two-host-sim/agent-skills-1).
+        """
+        until = monotonic() + GOAL_BUSY_BUDGET_SECONDS
+        while True:
+            result, _, _ = self._link.control("goal", request_id, goal)
+            if result.get("fault") != "control_busy" or monotonic() >= until:
+                return result
+            self._stopping.wait(GOAL_BUSY_RETRY_SECONDS)
+
     @rpc
     def set_navigation_goal(self, request_id: str, goal: PoseStamped) -> bool:
         with self._lock:
@@ -228,7 +247,7 @@ class SonicNavigationRelayModule(Module):
             self._cancel_confirmed = False
             self._request_generation += 1
         try:
-            result, _, _ = self._link.control("goal", request_id, goal)
+            result = self._goal_control(request_id, goal)
             with self._lock:
                 accepted = (
                     result["request_id"] == request_id

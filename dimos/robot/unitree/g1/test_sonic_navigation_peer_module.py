@@ -816,3 +816,30 @@ def test_base_relative_goal_needs_a_pose(peers, mocker):
     assert peer.set_goal("request-1", goal) is False
     assert "no current pose" in refusal_reasons(logger)[0]
     planner.set_goal.assert_not_called()
+
+
+def test_relay_retries_a_goal_the_peer_was_too_busy_to_take(relays, mocker):
+    """A status call holding the peer's single control slot is not a refusal: the
+    goal was never processed, so the relay sends it again within its budget."""
+    relay = relays()
+    mocker.patch.object(relay, "_publish_input")
+    busy = ({"request_id": None, "accepted": False, "fault": "control_busy"}, 0.0, 0.0)
+    taken = ({"request_id": "request-1", "accepted": True, "fault": None}, 0.0, 0.0)
+    control = mocker.patch.object(relay._link, "control", side_effect=[busy, busy, taken])
+    goal = PoseStamped(frame_id="odom", position=Vector3(0.5, 0, 0))
+    assert relay.set_navigation_goal("request-1", goal) is True
+    assert control.call_count == 3
+
+
+def test_relay_gives_up_on_a_peer_that_stays_busy(relays, mocker):
+    from dimos.robot.unitree.g1 import sonic_navigation_relay_module
+
+    logger = mocker.patch.object(sonic_navigation_relay_module, "logger")
+    relay = relays()
+    mocker.patch.object(relay, "_publish_input")
+    busy = ({"request_id": None, "accepted": False, "fault": "control_busy"}, 0.0, 0.0)
+    control = mocker.patch.object(relay._link, "control", return_value=busy)
+    goal = PoseStamped(frame_id="odom", position=Vector3(0.5, 0, 0))
+    assert relay.set_navigation_goal("request-1", goal) is False
+    assert 2 <= control.call_count <= 12
+    assert "control_busy" in refusal_reasons(logger)[-1]
