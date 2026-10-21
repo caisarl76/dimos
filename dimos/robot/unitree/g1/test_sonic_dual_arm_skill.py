@@ -30,8 +30,12 @@ import numpy as np
 import pytest
 
 from dimos.agents.mcp.tool_stream import TOOL_STREAM_STOPPED_METHOD
+from dimos.core.global_config import GlobalConfig
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill, sonic_dual_arm_skill
+from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_dual_agentic import (
+    unitree_g1_sonic_arm_dual_agentic,
+)
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm_dual import (
     unitree_g1_sonic_arm_dual,
 )
@@ -298,3 +302,8 @@ def test_refusal_never_releases_the_running_motion(real_launch_skill, mocker):
     assert message.count("and returned") == 2, message
     wait_until(lambda: module._running is None)
     assert stop_tool.call_count == 1
+
+
+def test_dual_blueprints_set_only_known_global_config_fields() -> None:
+    for bp in (unitree_g1_sonic_arm_dual, unitree_g1_sonic_arm_dual_agentic):
+        assert set(bp.global_config_overrides) <= set(GlobalConfig.model_fields)

@@ -28,4 +28,4 @@ from dimos.robot.unitree.g1.system_prompt import G1_SONIC_DUAL_ARM_SYSTEM_PROMPT
 unitree_g1_sonic_arm_dual_agentic = autoconnect(
     unitree_g1_sonic_arm_dual,
     McpClient.blueprint(system_prompt=G1_SONIC_DUAL_ARM_SYSTEM_PROMPT),
-).global_config(mcp_timeout=60)  # A full-range overhead pose takes about 40 s.
+)
