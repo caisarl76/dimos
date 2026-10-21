@@ -29,7 +29,7 @@ is < 0.5 s. Submit skew is the gap between the two chunk-0 sends.
 | `move_left_arm_pose(both, left_arm_side_horizontal)` | start 0.000 s / submit 0.001 s; 91 % / 92 %, returned | start 0.017 s / submit 0.001 s; 91 % / 91 %, returned |
 | `perform_gesture(both, wave)` | start 0.252 s / submit 0.001 s; 98 % / 99 %, returned | start 0.249 s / submit 0.001 s; 98 % / 99 %, returned |
 | `move_upper_body(223, left_arm_forward, 20)` | 223 reached 16.7°; 222 never armed | same; 222 never armed |
-| `perform_gesture(both, wave)` + `stop_arm` | invalid: stop sent 8 s after the call, during encoding, so "nothing sent" (correct, but not the check) | stop 6 s after both armed: both "stopped early: stop requested", returned; peak 0.90 / 0.85 rad/s, tilt ≤ 1.55°, 8 contacts |
+| `perform_gesture(both, wave)` + `stop_arm` | invalid: stop sent 8 s after the call, during encoding, so "nothing sent" (correct, but not the check) | stop 6 s after both armed: both "stopped early: stop requested", returned; peak 0.90 / 0.85 rad/s, tilt ≤ 1.55°, 8 contacts (these three figures are from the local sim_*.npz, not committed) |
 | agent-send "both robots wave" | `perform_gesture(both, wave)`, start 0.015 s; 99 % / 99 % | start 0.329 s; 98 % / 98 % |
 | 223 stand-in killed, then `move_left_arm_pose(both, …)` | "223: SONIC is not in confirmed planner idle; nothing sent; nothing sent to any robot"; 222 moved 0.008 rad | same; 222 moved 0.012 rad |
 
@@ -45,10 +45,9 @@ Stand-in totals over each whole run (both runs):
 - **Idle robot during a single-robot command.** 222's left arm moved 0.021 rad during the 223-only
   move, all of it shoulder yaw. 222 never armed (its stand-in log shows no arming), and an idle
   stand-in drifts 0.012–0.024 rad on its own after a motion. That is settling, not a reference.
-- **Wave start skew.** Wave skew is 0.25–0.33 s even though DimOS sends both chunks within 1 ms.
-  The pose skew is ≤ 0.017 s. The wave's first segment is planned from each robot's measured start
-  pose, which differs after earlier motions, so the 0.03 rad onset is reached at different times. It is
-  within the 0.5 s target, but this is the margin to watch on hardware.
+- **Wave start skew.** Wave skew is 0.25–0.33 s and is unexplained so far. Submit skew is 1 ms, so
+  it is the physical onset, not DimOS timing. The pose skew is ≤ 0.017 s. It is within the 0.5 s
+  target, and it is the margin to watch on hardware.
 - **Encoding time.** Encoding both waves takes longer than 8 s on this workstation. A `stop_arm`
   in that window refuses before anything is sent.
 - **Bugs found and fixed during this run.** The dual agentic blueprint set the removed GlobalConfig

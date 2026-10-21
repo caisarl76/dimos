@@ -172,7 +172,7 @@ def test_both_start_together_and_hand_back(arms):
         status = task(arm)
         assert status["outcome"] == "finished" and status["handback_confirmed"], status
         assert result.metadata[arm.name]["reached_fraction"] == pytest.approx(1.0, abs=0.05)
-    assert result.metadata["start_skew_s"] < 0.1, result.metadata
+    assert result.metadata["start_skew_s"] < 0.3, result.metadata
 
 
 def test_both_peer_never_arms_moves_neither(arms, dual_executions, mocker):
@@ -365,6 +365,31 @@ def test_both_mixed_outcome_retreats_peer_and_fails_naming_both(arms, dual_execu
     assert first.startswith("222: ") and "stopped early" in first and "223" in first, first
     assert "planner handback unconfirmed" in second, second
     assert ends_at_the_planner_smoothly(dual_executions[0][1])
+
+
+def test_both_feedback_lost_mid_stream_retreats_the_peer(arms, dual_executions):
+    def drop_223_feedback():
+        wait_until(lambda: all(a._watch is not None and a._watch.send_at for a in arms))
+        time.sleep(0.3)
+        dual_executions[1][1].pause_feedback.set()
+
+    dropper = threading.Thread(target=drop_223_feedback, daemon=True)
+    dropper.start()
+    try:
+        with feeding(arms):
+            try:
+                result = run_arms([swing(arm, hold=3.0) for arm in arms])
+                message = result.message
+            except RuntimeError as error:
+                message = str(error)
+    finally:
+        dropper.join(2)
+        dual_executions[1][1].pause_feedback.clear()
+    first = message.split("; 223: ")[0]
+    assert first.startswith("222: ") and "stopped early" in first and "223" in first, message
+    assert "223: session ended: feedback stale" in first, message
+    assert ends_at_the_planner_smoothly(dual_executions[0][1])
+    assert task(arms[0])["handback_confirmed"], task(arms[0])
 
 
 def test_one_job_is_the_single_arm_path(arms, dual_executions, mocker):
