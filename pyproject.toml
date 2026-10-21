@@ -284,6 +284,12 @@ unitree-dds = [
     "mcap>=1.2.0",  # decode Go2 DDS mcap recordings (go2 dds store)
 ]
 
+# Read-only feedback from an independently operated C++ GEAR-SONIC runtime.
+sonic-feedback = [
+    "pyzmq>=27.1.0",
+    "msgpack>=1.1.2",
+]
+
 # Coordinators, arm hardware adapters, and keyboard/Cartesian control.
 control = [
     "piper-sdk",
