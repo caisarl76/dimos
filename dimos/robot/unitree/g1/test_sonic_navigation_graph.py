@@ -110,6 +110,27 @@ def test_valid_graphs_pass_independently() -> None:
     check(with_service, "pc2", PC2_KWARGS)
 
 
+def test_agentic_pc2_graph_adds_skills_and_an_explicit_mcp_server() -> None:
+    from dimos.agents.mcp.mcp_server import McpServer
+    from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_pc2_agentic import (
+        unitree_g1_sonic_navigation_pc2_agentic,
+    )
+    from dimos.robot.unitree.g1.sonic_navigation_skills import SonicNavigationSkills
+
+    explicit = {**PC2_KWARGS, McpServer.name: {"host": "192.168.0.223"}}
+    check(unitree_g1_sonic_navigation_pc2_agentic, "pc2", explicit)
+    for host in ("0.0.0.0", "::"):
+        with pytest.raises(ValueError, match="McpServer host"):
+            check(
+                unitree_g1_sonic_navigation_pc2_agentic,
+                "pc2",
+                {**PC2_KWARGS, McpServer.name: {"host": host}},
+            )
+    with_skills = autoconnect(unitree_g1_sonic_navigation_peer, SonicNavigationSkills.blueprint())
+    with pytest.raises(ValueError, match="not allowed"):
+        check(with_skills, "peer", PEER_KWARGS)
+
+
 def test_graphs_are_role_specific() -> None:
     with pytest.raises(ValueError, match="not allowed"):
         check(unitree_g1_sonic_navigation_peer, "pc2", PC2_KWARGS)

@@ -29,6 +29,7 @@ from dataclasses import dataclass
 import re
 from typing import Any, Literal
 
+from dimos.agents.mcp.mcp_server import McpServer
 from dimos.core.coordination.blueprints import Blueprint
 from dimos.core.module import ModuleBase
 from dimos.hardware.sensors.lidar.pointlio.module import PointLio
@@ -44,6 +45,7 @@ from dimos.robot.unitree.g1.sonic_navigation_sensor_module import (
     SonicNavigationSensorReceiver,
     SonicNavigationSensorSender,
 )
+from dimos.robot.unitree.g1.sonic_navigation_skills import SonicNavigationSkills
 from dimos.robot.unitree.g1.sonic_service_module import SonicServiceModule
 
 Role = Literal["peer", "pc2"]
@@ -97,7 +99,7 @@ ROLES: Mapping[Role, _RoleGraph] = {
         required=frozenset(
             {SonicNavigationSensorSender, SonicNavigationRelayModule, SonicExecutionModule}
         ),
-        optional=frozenset({SonicServiceModule}),
+        optional=frozenset({SonicServiceModule, SonicNavigationSkills, McpServer}),
         edges=frozenset(
             {
                 (
@@ -192,7 +194,11 @@ def validate_sonic_navigation_graph(
         claimed = kwargs.get(SonicNavigationPeerModule, {}).get("extrinsic_valid", False)
         if claimed and kwargs.get(SonicNavigationSensorReceiver, {}).get("torso_to_sensor") is None:
             problems.append("extrinsic_valid requires a commissioned torso_to_sensor extrinsic")
-    elif kwargs.get(SonicExecutionModule, {}).get("navigation_enabled") is not True:
-        problems.append("SonicExecutionModule navigation_enabled must be True")
+    else:
+        if kwargs.get(SonicExecutionModule, {}).get("navigation_enabled") is not True:
+            problems.append("SonicExecutionModule navigation_enabled must be True")
+        # The skills reach robot motion: serve them on one chosen interface only.
+        if McpServer in kwargs and kwargs[McpServer].get("host") in (None, "0.0.0.0", "::", ""):
+            problems.append("McpServer host must be an explicit interface address")
     if problems:
         raise ValueError(f"SONIC navigation {role} graph rejected: " + "; ".join(problems))
