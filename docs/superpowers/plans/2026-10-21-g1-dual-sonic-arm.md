@@ -95,11 +95,12 @@ Starts from the Tier-1 task-4 commit.
     - `stop_arm` sets `self._arm.stop`;
     - `handle_feedback` delegates. `_launch` and `_busy` stay on the container.
   - **Stop/reset/cleanup ownership.** `SonicArm` gains `reset(self) -> None` (clears `stop`, sets `_watch = None`) and `clear_watch(self) -> None`. Tier-1's `_launch` changes to `_launch(self, tool: str, arms: Sequence[SonicArm], work: Callable[[], SkillResult]) -> str`:
-    1. Acquire `_busy`; if it is held, refuse as Tier 1 does.
+    1. Acquire `_busy`; if it is held, refuse **exactly as Tier 1's final `_launch` does**: if the same tool is already running, call `start_tool(tool)` and return "already running" normally, with no `stop_tool`; a different arm skill raises before `start_tool`. **A refusal never closes, stops or releases anything a running motion holds** (tool stream, capability hold, `_busy`, an arm's `stop` or watch). This applies to every refusal path in the dual container too: `both`, single-robot, and a second call while either robot moves.
     2. Call `reset()` on each selected arm **after** acquiring `_busy` and **before** starting the thread. A `stop_arm` that arrives once the thread runs is kept, because nothing clears `stop` after this point.
     3. In the thread's `finally`, call `clear_watch()` on each selected arm, then release `_busy` and `stop_tool`.
 
     `stop_arm` only sets `stop` when `_busy` is held. In the single container, `arms` is `[self._arm]`.
+  - Inherited unchanged from Tier 1 (do not re-implement): `first_contact(poses, every=5, start=base)` on every path check, retreat units included; chunk splits from `token_still(tokens)`; `retreat_poses` returning only the reachable part; `ceil(T*RATE)+1`-row segments.
   - Tier-1 tasks 5-6 add skills that only call `_run`/`_launch`, so they keep merging.
 
 - [ ] **Step 1: Write the failing tests.**
@@ -190,7 +191,8 @@ Tests use two `ScriptedPeer`s and two `SonicExecutionModule`s (the `execution_co
     - `perform_gesture(robot: Robot, name: GestureName)`.
 
     Each validates as Tier 1 does, then runs `run_arms` over the selected arm(s). A single arm is the one-job case: no barrier and no name prefix.
-  - `@skill stop_arm() -> str` (no `uses`): sets `stop` on every arm, with Tier-1's messages.
+  - `@skill stop_arm() -> str` (no `uses`): sets `stop` on every arm, with Tier-1's messages. It never touches the running tool stream or capability hold.
+  - Test `test_refusal_never_releases_the_running_motion`: while `perform_gesture("both", "wave")` runs under the real `_launch`, call `perform_gesture("both", "wave")` again (it returns "already running"), then `move_upper_body("222", …)` (it raises). Assert the first motion's `stop_tool` was not called by either refusal, `_busy` is still held, neither arm's `stop` is set, and the first motion then completes with both robots `"returned"`.
   - `unitree_g1_sonic_arm_dual`:
     - `autoconnect(` two `SonicExecutionModule.blueprint(instance_name="g1_222" | "g1_223", reference_bind=…, feedback_endpoint=…, journal_dir=…, profile=<same SonicModelProfile as unitree_g1_sonic_arm at that commit>)`, `DualSonicArmSkillContainer.blueprint()`, `McpServer.blueprint())`;
     - `.remappings`: `("g1_222", "feedback", "feedback_222")`, `("g1_223", "feedback", "feedback_223")`, `("g1_222", "execution_status", "execution_status_222")`, `("g1_223", "execution_status", "execution_status_223")`, `(DualSonicArmSkillContainer, "_execution_222", "g1_222")`, `(DualSonicArmSkillContainer, "_execution_223", "g1_223")`.
