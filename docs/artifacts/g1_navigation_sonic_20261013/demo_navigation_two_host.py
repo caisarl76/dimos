@@ -63,6 +63,7 @@ from dimos.robot.unitree.g1.sonic_navigation import NavigationInput
 from dimos.robot.unitree.g1.sonic_navigation_link import SonicNavigationLink
 from dimos.robot.unitree.g1.sonic_navigation_relay_module import SonicNavigationRelayModule
 from dimos.robot.unitree.g1.sonic_navigation_sensor_module import SonicNavigationSensorSender
+from dimos.robot.unitree.g1.sonic_navigation_skills import SonicNavigationSkills
 from dimos.robot.unitree.g1.sonic_reference import encode_command
 
 HERE = Path(__file__).resolve().parent
@@ -1633,6 +1634,76 @@ def run_two_host(args: Any) -> None:
                 walking_after_teleop=not no_resume,
                 stopped_at_end=run["stopped_at_end"],
             )
+            # Agent skills (sonic_navigation_skills) against the live execution owner and
+            # relay; McpServer would expose the same calls over MCP on pc2.
+            scenario = "agent_skills"
+            agent = SonicNavigationSkills()
+            agent._execution = execution
+            agent._peer = pc2.get_instance(SonicNavigationRelayModule)
+            try:
+                refusal = agent.walk_to(2.0, 0.0)
+                pump(1.0)
+                case(
+                    "agent_walk_to_needs_operator_begin",
+                    "operator" in refusal and not moving(),
+                    reply=refusal,
+                )
+                execution.begin_navigation()
+                wait(lambda: nav()["phase"] == "active", 1.5, "agent skills begin")
+                row = envelope()
+                x, y, h = row["pelvis"][0], row["pelvis"][1], yaw(row["qpos"][3:7])
+                peer.call("synthetic_obstacles", obstacles=corridor((x, y, h)))
+                pump(1.0)
+                target = (x + 2.0 * math.cos(h), y + 2.0 * math.sin(h))
+                tele_stop()
+                reply = agent.walk_to(2.0, 0.0)
+                started, reached = time.monotonic(), None
+                while time.monotonic() - started < 40.0:
+                    pump(0.1)
+                    if math.dist(proof.latest["pelvis"][:2], target) < 0.3:
+                        reached = time.monotonic() - started
+                        break
+                status = agent.navigation_status()
+                case(
+                    "agent_walk_to_reaches_a_relative_target",
+                    "Walking" in reply and reached is not None,
+                    reply=reply,
+                    reached_s=reached,
+                    status=status,
+                )
+                tele(0.0, 0.0)
+                execution.end_navigation()
+                wait(lambda: nav()["pose_ready"], 6.0, "agent walk cancel")
+                settle("agent_walk_to")
+                execution.begin_navigation()
+                wait(lambda: nav()["phase"] == "active", 1.5, "agent stop begin")
+                row = envelope()
+                start = (row["pelvis"][0], row["pelvis"][1])
+                peer.call(
+                    "synthetic_obstacles",
+                    obstacles=corridor((*start, yaw(row["qpos"][3:7]))),
+                )
+                pump(1.0)
+                tele_stop()
+                agent.walk_to(2.0, 0.0)
+                wait(
+                    lambda: math.dist(proof.latest["pelvis"][:2], start) >= 0.4,
+                    20.0,
+                    "agent walk before stop",
+                )
+                stop_reply = agent.stop_walking()
+                wait(lambda: nav()["pose_ready"], 6.0, "agent stop handback")
+                pump(1.0)
+                case(
+                    "agent_stop_walking_ends_navigation",
+                    nav()["phase"] in ("disarmed", "fault") and not moving(),
+                    reply=stop_reply,
+                    phase=nav()["phase"],
+                )
+                tele(0.0, 0.0)
+                settle("agent_stop_walking")
+            finally:
+                agent.stop()
             execution.begin_navigation()
             wait(lambda: nav()["phase"] == "active", 1.5, "after obstacle cases")
             execution.end_navigation()
