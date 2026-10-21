@@ -1,0 +1,181 @@
+{
+  "operator_ready": "operator-ready-20261021",
+  "ignore_rear_occupancy": true,
+  "extrinsic_acceptance": {
+    "accepted": true,
+    "date": "2026-10-15",
+    "decided_by": "operator (user decision in session, 2026-10-15)",
+    "mount": "g1_tf_publisher.torso_to_mid360",
+    "torso_to_sensor_xyz_xyzw": [
+      0.0002835,
+      3e-05,
+      0.41618,
+      0.9997985784932998,
+      1.2289293145202804e-18,
+      -0.020069938783589012,
+      6.122000644719466e-17
+    ],
+    "evidence": [
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-4.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-5.json",
+      "pc2-package/pc2-provision/sonic-navigation-20261013.attempt4-strict-lowstate-probe/checks/extrinsic/extrinsic-6.json"
+    ],
+    "residual": "static check: Mid-360 vs pelvis gravity pitch -1.08..-1.10 deg (a-priori limit 1.0 deg missed), floor -0.69..-0.70 deg, floor vs Mid-360 0.47 deg; source (mount, pelvis IMU bias, waist encoders) not separable statically; ~7 mm base x/y, no heading effect",
+    "dynamic_check": "mount yaw from forward_010 lateral/forward ratio (heading_offset_deg)"
+  },
+  "prior_passed": [
+    {
+      "session": "session-20261021-1",
+      "name": "idle"
+    },
+    {
+      "session": "session-20261021-1",
+      "name": "operator_stop"
+    }
+  ],
+  "endpoints": {
+    "router": "tcp/127.0.0.1:17211",
+    "link_bind": "tcp://192.168.0.62:17103",
+    "cloud": "tcp://192.168.0.223:17101",
+    "state": "tcp://192.168.0.223:17102"
+  },
+  "cases_offered": {
+    "idle": {
+      "kind": "idle",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 3.0,
+      "requires": [],
+      "bearing": 0.0
+    },
+    "operator_stop": {
+      "kind": "operator_stop",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": [
+        "idle"
+      ],
+      "bearing": 0.0
+    },
+    "forward_010": {
+      "kind": "motion",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 1.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ],
+      "bearing": 0.0
+    },
+    "forward_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.0,
+      "seconds": 2.0,
+      "requires": [
+        "idle",
+        "operator_stop"
+      ],
+      "bearing": 0.0
+    },
+    "turn_left_020": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": 0.2,
+      "seconds": 2.0,
+      "requires": [
+        "forward_020"
+      ],
+      "bearing": 0.0
+    },
+    "turn_right_020": {
+      "kind": "motion",
+      "vx": 0.0,
+      "wz": -0.2,
+      "seconds": 2.0,
+      "requires": [
+        "forward_020"
+      ],
+      "bearing": 0.0
+    },
+    "curve_left_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": 0.2,
+      "seconds": 4.0,
+      "requires": [
+        "forward_020"
+      ],
+      "bearing": 0.0
+    },
+    "curve_right_020": {
+      "kind": "motion",
+      "vx": 0.2,
+      "wz": -0.2,
+      "seconds": 4.0,
+      "requires": [
+        "forward_020"
+      ],
+      "bearing": 0.0
+    },
+    "cancel": {
+      "kind": "cancel",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.6,
+      "requires": [
+        "forward_020"
+      ],
+      "bearing": 0.0
+    },
+    "source_pause": {
+      "kind": "source_pause",
+      "vx": 0.1,
+      "wz": 0.0,
+      "seconds": 0.5,
+      "requires": [
+        "forward_020"
+      ],
+      "bearing": 0.0
+    },
+    "costmap_check": {
+      "kind": "costmap",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 0.0,
+      "requires": [],
+      "bearing": 0.0
+    },
+    "goal_1m": {
+      "kind": "goal",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 20.0,
+      "requires": [
+        "curve_left_020",
+        "curve_right_020"
+      ],
+      "bearing": 0.0
+    },
+    "goal_1m_left30": {
+      "kind": "goal",
+      "vx": 0.0,
+      "wz": 0.0,
+      "seconds": 20.0,
+      "requires": [
+        "curve_left_020",
+        "curve_right_020"
+      ],
+      "bearing": 0.5235987755982988
+    }
+  },
+  "harness_sha256": {
+    "demo_pc2_navigation_walk.py": "da7f799aa66942937006a9b6dcef85c4498d166461375f1d00a2619f3c876eb5",
+    "demo_pc2_walk_agent.py": "e1ae68ea844c3fd57a6ee8ad6a002fadc1cf9c3cb00e260f9f2726cbdfdae582",
+    "demo_navigation_two_host_peer.py": "faddf9ef57681c7b162744e9b322cfadbe9b0158030d70d0efc4fa666fc4951f"
+  },
+  "dimos_commit": "a22ce3a7b9263c1f37b511ddfcbb1a8d2a6f8690",
+  "cases": []
+}
