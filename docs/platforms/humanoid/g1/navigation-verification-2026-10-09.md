@@ -11,7 +11,7 @@ startup has been issued. No planner goal has been submitted.
 That paragraph and the sections after the final verdict are the chronological
 record. The final verdict for navigation through SONIC comes first.
 
-## Final verdict, 2026-10-21
+## Final verdict, 2026-10-21 (updated in the evening)
 
 **Scope.** DimOS navigation through one guarded SONIC controller (plan Task 11).
 The workstation peer runs the sensor receiver, PointLIO, the ray-traced voxel
@@ -22,8 +22,8 @@ sections (2026-10-09 to 10-12) is a separate path and stays unverified.
 
 | Layer | Verdict | Evidence |
 |---|---|---|
-| Software | **Pass, one gate open** | 812 tests across `dimos/robot/unitree/g1`, `dimos/navigation` and the task artifacts; mypy clean (73 files). The exact legacy FK regression (Task 3) stays blocked: no authentic fixture exists ([fk-resolution.md](/docs/artifacts/g1_navigation_sonic_20261013/fk-resolution.md)). |
-| Simulation | **Pass** | The two-host MuJoCo matrix (85 cases): sensor and map freezes, link delay and hold, cancel, the native and publisher watchdogs, seeded-pose handback, peer and publisher restarts, and synthetic goals straight ahead and 30 deg off the heading. The 3 s settle gate is marginal since the 0.20 rad facing lead: settling takes 2.2-4.2 s and most runs miss it once. |
+| Software | **Pass, one gate open** | After merging `main` (`ba04019c1`): 781 tests across `dimos/robot/unitree/g1`, `dimos/navigation` and the task artifacts; mypy clean (72 files). The exact legacy FK regression (Task 3) stays blocked: no authentic fixture exists ([fk-resolution.md](/docs/artifacts/g1_navigation_sonic_20261013/fk-resolution.md)). |
+| Simulation | **Pass** | The two-host MuJoCo matrix (92 cases): sensor and map freezes, link delay and hold, cancel, the native and publisher watchdogs, seeded-pose handback, peer and publisher restarts, synthetic goals straight ahead and 30 deg off the heading, and closed-loop corridor obstacle cases ([obstacles-4](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/obstacles-4/results.json)). The 3 s settle gate is marginal since the 0.20 rad facing lead: settling takes 2.2-4.2 s and most runs miss it once. |
 | Hardware | **Pass for the cases below** | pc2 sessions 2026-10-15 to 10-21, with the robot on the floor and a slack support cable from a crane. |
 
 Hardware cases (distances and angles are LIO base odometry, not tape-measured):
@@ -36,20 +36,25 @@ Hardware cases (distances and angles are LIO base odometry, not tape-measured):
 | `curve_left_020`, `curve_right_020` (4 s) | Left 44-48 cm, right 30-41 cm, about 60 deg of turn |
 | `cancel` | IDLE 0.051 s after the cancel |
 | `source_pause` | Passed (2026-10-19, 10-21-3, 10-21-5) |
-| `goal_1m` | Reached within 0.3 m twice: 17.0 s (2026-10-19-11) and 8.6 s (2026-10-20-5) |
+| `goal_1m` | Reached within 0.3 m four times: 17.0 s (2026-10-19-11), 8.6 s (2026-10-20-5), 6.0 s (2026-10-21-6), 6.6 s (2026-10-21-8) |
 | `goal_1m_left30` | Reached in 8.1 s (2026-10-21-5); walked off at once, no turn in place |
+| `goal_detour` (box placed 0.6-2.0 m ahead, goal 2 m) | Detoured round the box and reached the goal in 22.7 s (2026-10-21-6). The base passed 0.247 m from the nearest box cell; the operator saw no contact |
+| `goal_obstacle_appears` (box placed mid-walk, goal 2 m) | Detected, replanned and reached the goal in 30.6 s, 0.27 m from the box (2026-10-21-8) |
 
 The plan's first steps of +0.10 m/s and ±0.10 rad/s were replaced by 0.20 m/s and
 0.20 rad/s by operator decision: 0.10 m/s for 1 s did not step and 0.10 rad/s
 turned 1.6 deg.
 
-**Simulation only.** The seeded-pose handback route, the publisher and native
-watchdogs, and peer loss. Navigation-to-IDLE handback was measured on the robot
-in every case.
+The obstacle cases pass at 0.20 m from the base centre to the nearest box cell
+(about the G1 shoulder half-width), set by the operator after `goal_detour`.
 
-**Not verified on the robot.** Tape-measured distances and angles, obstacle
-avoidance and replanning, teleop preemption of a goal, and routes longer than
-1 m.
+**Simulation only.** The seeded-pose handback route, the publisher and native
+watchdogs, peer loss, and teleop cancelling a goal (`goal_teleop_cancel` is in
+the walk harness, not yet run on the robot). Navigation-to-IDLE handback was
+measured on the robot in every case.
+
+**Not verified on the robot.** Tape-measured distances and angles, routes longer
+than 2 m, and obstacles beyond a single box.
 
 **Known limitations.**
 
@@ -67,6 +72,14 @@ avoidance and replanning, teleop preemption of a goal, and routes longer than
 - Odometry is session-local: there is no saved map or relocalization.
 - Wi-Fi round-trip bursts over 100 ms lapse readiness. Motion takes a recoverable
   IDLE, and one `begin` was refused (2026-10-20).
+- In open space the voronoi A* gives an isolated obstacle a very wide berth: a
+  9.5 m simulated path to a goal 2 m away, and a 6.3 m robot track for the 2 m
+  `goal_detour`. Walls make its paths sensible (about 1.1x the straight line).
+- A goal is sometimes refused by the pc2 relay from its own state ("rejected or
+  admission closed", twice on the robot); the retry after the cancel works. The
+  cause is not identified yet: the relay now logs a reason, from attempt 11.
+- MovementManager cancels a running goal on any teleop message; the goal does not
+  resume when teleop stops.
 
 **Close-out, 2026-10-21 13:46 CST.** The operator shut the robot down. No
 task process ran on either host. `launch.sh --check-only` reported ready with
@@ -74,6 +87,12 @@ nothing blocking. The 1,232 environment fingerprints, shared controllers, task
 controller binary, models, 71 original GR00T native source files and 87 task
 native source files all matched
 ([closeout-20261021](/docs/artifacts/g1_navigation_sonic_20261013/hardware/closeout-20261021/closeout.json)).
+Sessions 2026-10-21-6 and -8 ran after it, for the obstacle cases.
+
+**pc2 state, 2026-10-21 evening.** Re-provisioning (attempt 11, `00a4238d2`, the
+merged code with refusal reasons) was interrupted when pc2 went offline. Attempt
+10 is kept as `.attempt10-no-refusal-reasons`, but its image was removed, so pc2
+has no runnable stack until attempt 11 completes.
 
 ## Early results, 2026-10-09 to 2026-10-12
 
@@ -815,3 +834,45 @@ limit, a burst roughly every 250 ms from 07:22:20 to 07:22:22.3 UTC, ending at
 the refused begin (07:22:22.5). Other graph runs logged 0-23 such events and no
 refusals. The execution refused correctly; the workstation's own records did not
 show it because they measure only the workstation side.
+
+### Obstacle cases, the main merge and refusal reasons, 2026-10-21
+
+The branch merged `main` (`ba04019c1`). PointLIO and the ray map now build with nix
+into `<source_dir>/result/bin`; without nix on the workstation they were built with
+cargo 1.92 and linked there (gitignored). The two-host simulation passed 84 of 85
+afterwards (the miss was the marginal left-turn settle gate). The peer validator now
+also requires the 0.2 m/s follower cap, which `main` moved into the planner's own
+configuration (`ec1ee5c06`).
+
+The replayed MID360S scans never see the MuJoCo world, so in the simulation the
+planner's pose did not follow the robot (under 2 cm while it walked 1.1 m). For
+closed-loop cases the harness freezes PointLIO and the peer publishes its outputs
+from MuJoCo truth, which the production receiver composes back into the pelvis pose
+(tested); a synthetic costmap with oriented boxes replaces the frozen CostMapper.
+In a 2.4 m corridor (`17b4ddbae`):
+
+- `corridor_detour`: a box blocking 45% of the corridor 1.5-2.1 m ahead, goal 3.5 m
+  ahead: reached in 22.4 s, 0.54 m from the nearest obstacle.
+- `obstacle_appears`: the box dropped 1.0 m ahead after 0.5 m of walking: detected,
+  replanned, reached in 26.3 s, 0.51 m clear.
+- `teleop_preempts_and_cancels_goal`: only teleop commands were relayed during the
+  takeover, and nothing resumed after it.
+
+The walk harness gained the robot counterparts (`e7737df1b`, `fa1665606`):
+`goal_detour`, `goal_obstacle_appears` and `goal_teleop_cancel`, each a 2 m goal
+after `goal_1m`. The support crane follows the robot and its trail is mapped along
+the walked path, so clearance is measured against a map taken before the trail: the
+pre-goal map for a placed box, a snapshot 2.5 s after the drop prompt for a dropped
+one.
+
+- Session 2026-10-21-6: `goal_detour` walked round the box and reached the goal
+  in 22.7 s; the base passed 0.247 m from the box, and the operator saw no contact.
+  The operator then set the pass line at 0.20 m.
+- Session 2026-10-21-8: `goal_obstacle_appears` reached the goal in 30.6 s, 0.27 m
+  from the box placed mid-walk.
+
+In both sessions one goal was refused at pc2 before the workstation peer saw it, and
+the retry after the cancel worked. Every refusal now names its reason: the peer and
+relay log it and the execution's error says "(peer refused)", "(request changed)"
+or "(phase ...)" (`8e91e3220`). The relay and execution part reaches pc2 with
+attempt 11.
