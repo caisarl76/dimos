@@ -10,4 +10,8 @@ for _ in $(seq 50); do
     python -c 'import socket; socket.create_connection(("127.0.0.1", 17111), 0.1)' 2>/dev/null && break
     sleep 0.1
 done
-dimos run unitree-g1-sonic-navigation-pc2 --config "$package/config/pc2-graph.json"
+if [[ "${1:-}" == agentic ]]; then
+    dimos run unitree-g1-sonic-navigation-pc2-agentic --config "$package/config/pc2-graph-agentic.json"
+else
+    dimos run unitree-g1-sonic-navigation-pc2 --config "$package/config/pc2-graph.json"
+fi
