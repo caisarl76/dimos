@@ -1,0 +1,45 @@
+{
+  "status": "study_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.51259939186275,
+      "speed": 0.0017886812029819423,
+      "yaw_rate": -0.006325070073466953
+    },
+    {
+      "name": "left_6s_1",
+      "passed": true,
+      "start": 1775226.8511784,
+      "end": 1775232.856192383,
+      "seconds": 6.0,
+      "forward_displacement_m": -0.002967185758560308,
+      "yaw_change_rad": 0.7936662641955505
+    },
+    {
+      "name": "left_6s_1_settled",
+      "passed": true,
+      "elapsed": 2.983953090850264,
+      "speed": 0.004284043227833324,
+      "yaw_rate": 0.0034545704708983872
+    },
+    {
+      "name": "right_6s_2",
+      "passed": true,
+      "start": 1775235.843732531,
+      "end": 1775241.838190888,
+      "seconds": 6.0,
+      "forward_displacement_m": 0.003199440410429865,
+      "yaw_change_rad": -0.9126124695503754
+    },
+    {
+      "name": "right_6s_2_settled",
+      "passed": true,
+      "elapsed": 2.179044087883085,
+      "speed": 0.005456370304560286,
+      "yaw_rate": -0.01928621935537273
+    }
+  ],
+  "error": null
+}
