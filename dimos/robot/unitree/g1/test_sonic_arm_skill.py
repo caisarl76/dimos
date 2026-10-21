@@ -497,7 +497,7 @@ def mcp(real_launch_skill, tool_transport, monkeypatch):
     tool_transport.publish.side_effect = mcp_server._fan_out_to_sse_queues
     rpc_calls = {name: getattr(module, name) for name in skills}
 
-    def call(name, **arguments):
+    def call(name, /, **arguments):
         params = {"name": name, "arguments": arguments}
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}
         response = asyncio.run(mcp_server.handle_request(request, list(skills.values()), rpc_calls))

@@ -36,7 +36,7 @@ import math
 from pathlib import Path
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -178,6 +178,83 @@ def _check_hold(hold_seconds: float) -> None:
     low, high = _HOLD_BOUNDS
     if not math.isfinite(hold_seconds) or not low <= hold_seconds <= high:
         raise ValueError(f"hold_seconds must be within {low:g}..{high:g}")
+
+
+class ArmMove(NamedTuple):
+    """What a skill asks of an arm: SonicArm.prepare's label, keyframes, envelope and check mode."""
+
+    label: str
+    keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]]
+    allowed: NDArray[np.float64]
+    require_check: bool
+
+
+def upper_body_move(config: SonicArmSkillConfig, motion: str, angle_deg: float) -> ArmMove:
+    """Validate a move_upper_body call."""
+    if motion not in MOTIONS:
+        raise ValueError(f"motion must be one of {sorted(MOTIONS)}")
+    joint, sign, low, high = MOTIONS[motion]
+    if not low <= angle_deg <= high or not math.isfinite(angle_deg):
+        raise ValueError(f"{motion} angle_deg must be within {low:g}..{high:g}")
+    delta = np.zeros(29)
+    delta[joint] = sign * math.radians(angle_deg)
+    allowed = group_margins(config.body_margin, config.arm_margin, config.wrist_margin)
+    return ArmMove(motion, lambda base: [Keyframe(base + delta, 1.0)], allowed, False)
+
+
+def _target_move(
+    config: SonicArmSkillConfig,
+    label: str,
+    target: NDArray[np.float64],
+    hold_seconds: float,
+    require_check: bool,
+) -> ArmMove:
+    def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+        goal = base.copy()
+        goal[_LEFT_ARM_TARGET] = target
+        return [Keyframe(goal, hold_seconds)]
+
+    allowed = pose_margins(config.body_margin, config.pose_arm_margin, config.other_arm_margin)
+    return ArmMove(label, keyframes_of, allowed, require_check)
+
+
+def left_arm_pose_move(config: SonicArmSkillConfig, pose: str, hold_seconds: float) -> ArmMove:
+    """Validate a move_left_arm_pose call."""
+    if pose not in POSES:
+        raise ValueError(f"pose must be one of {sorted(POSES)}")
+    _check_hold(hold_seconds)
+    return _target_move(config, pose, np.asarray(POSES[pose]), hold_seconds, False)
+
+
+def left_arm_joints_move(
+    config: SonicArmSkillConfig, values: tuple[float, float, float, float], hold_seconds: float
+) -> ArmMove:
+    """Validate a move_left_arm_joints call (the caller checks its arms have a path checker)."""
+    for (joint, (low, high)), value in zip(JOINT_BOUNDS.items(), values, strict=True):
+        if not math.isfinite(value) or not low <= value <= high:
+            raise ValueError(f"{joint} must be within {low:g}..{high:g} deg")
+    _check_hold(hold_seconds)
+    target = np.radians(np.asarray(values, np.float64))
+    label = "joints(" + ", ".join(f"{v:g}" for v in values) + ")"
+    return _target_move(config, label, target, hold_seconds, True)
+
+
+def gesture_move(config: SonicArmSkillConfig, name: str) -> ArmMove:
+    """Validate a perform_gesture call."""
+    if name not in GESTURES:
+        raise ValueError(f"name must be one of {sorted(GESTURES)}")
+
+    def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+        keyframes = gesture_keyframes(name, base)
+        seconds = len(keyframe_plan(base, keyframes).poses) / RATE
+        if seconds > GESTURE_MAX_S:
+            raise ValueError(
+                f"{name} would take {seconds:.0f} s, more than {GESTURE_MAX_S:g} s; nothing sent"
+            )
+        return keyframes
+
+    allowed = pose_margins(config.body_margin, config.pose_arm_margin, config.other_arm_margin)
+    return ArmMove(name, keyframes_of, allowed, False)
 
 
 _JOINTS = [name.removeprefix("g1/") for name in make_humanoid_joints("g1")]
@@ -857,19 +934,8 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         """
 
         def prepare() -> Callable[[], SkillResult]:
-            if motion not in MOTIONS:
-                raise ValueError(f"motion must be one of {sorted(MOTIONS)}")
-            joint, sign, low, high = MOTIONS[motion]
-            if not low <= angle_deg <= high or not math.isfinite(angle_deg):
-                raise ValueError(f"{motion} angle_deg must be within {low:g}..{high:g}")
-            delta = np.zeros(29)
-            delta[joint] = sign * math.radians(angle_deg)
-            allowed = group_margins(
-                self.config.body_margin, self.config.arm_margin, self.config.wrist_margin
-            )
-            return lambda: self._run(
-                motion, lambda base: [Keyframe(base + delta, 1.0)], allowed, require_check=False
-            )
+            move = upper_body_move(self.config, motion, angle_deg)
+            return lambda: self._run_move(move)
 
         return self._launch("move_upper_body", prepare)
 
@@ -893,11 +959,8 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         """
 
         def prepare() -> Callable[[], SkillResult]:
-            if pose not in POSES:
-                raise ValueError(f"pose must be one of {sorted(POSES)}")
-            _check_hold(hold_seconds)
-            target = np.asarray(POSES[pose])
-            return lambda: self._run_targets(pose, target, hold_seconds, require_check=False)
+            move = left_arm_pose_move(self.config, pose, hold_seconds)
+            return lambda: self._run_move(move)
 
         return self._launch("move_left_arm_pose", prepare)
 
@@ -932,13 +995,8 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         def prepare() -> Callable[[], SkillResult]:
             if self._arm is None or self._arm._checker is None:
                 raise RuntimeError(_NO_PATH_CHECK)
-            for (joint, (low, high)), value in zip(JOINT_BOUNDS.items(), values, strict=True):
-                if not math.isfinite(value) or not low <= value <= high:
-                    raise ValueError(f"{joint} must be within {low:g}..{high:g} deg")
-            _check_hold(hold_seconds)
-            target = np.radians(np.asarray(values, np.float64))
-            label = "joints(" + ", ".join(f"{v:g}" for v in values) + ")"
-            return lambda: self._run_targets(label, target, hold_seconds, require_check=True)
+            move = left_arm_joints_move(self.config, values, hold_seconds)
+            return lambda: self._run_move(move)
 
         return self._launch("move_left_arm_joints", prepare)
 
@@ -959,22 +1017,8 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         """
 
         def prepare() -> Callable[[], SkillResult]:
-            if name not in GESTURES:
-                raise ValueError(f"name must be one of {sorted(GESTURES)}")
-
-            def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
-                keyframes = gesture_keyframes(name, base)
-                seconds = len(keyframe_plan(base, keyframes).poses) / RATE
-                if seconds > GESTURE_MAX_S:
-                    raise ValueError(
-                        f"{name} would take {seconds:.0f} s, more than {GESTURE_MAX_S:g} s; nothing sent"
-                    )
-                return keyframes
-
-            allowed = pose_margins(
-                self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
-            )
-            return lambda: self._run(name, keyframes_of, allowed, require_check=False)
+            move = gesture_move(self.config, name)
+            return lambda: self._run_move(move)
 
         return self._launch("perform_gesture", prepare)
 
@@ -986,23 +1030,10 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         """
         return self._request_stop()
 
-    def _run_targets(
-        self,
-        label: str,
-        target: NDArray[np.float64],
-        hold_seconds: float,
-        *,
-        require_check: bool,
-    ) -> SkillResult:
-        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
-            goal = base.copy()
-            goal[_LEFT_ARM_TARGET] = target
-            return [Keyframe(goal, hold_seconds)]
-
-        allowed = pose_margins(
-            self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
+    def _run_move(self, move: ArmMove) -> SkillResult:
+        return self._run(
+            move.label, move.keyframes_of, move.allowed, require_check=move.require_check
         )
-        return self._run(label, keyframes_of, allowed, require_check=require_check)
 
     def _run(
         self,
