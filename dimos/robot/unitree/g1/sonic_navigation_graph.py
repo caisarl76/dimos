@@ -34,6 +34,7 @@ from dimos.core.module import ModuleBase
 from dimos.hardware.sensors.lidar.pointlio.module import PointLio
 from dimos.mapping.costmapper import CostMapper
 from dimos.mapping.ray_tracing.module import RayTracingVoxelMap
+from dimos.navigation.go2.replanning_a_star.local_planner import LocalPlanner
 from dimos.navigation.go2.replanning_a_star.module import ReplanningAStarPlanner
 from dimos.navigation.movement_manager.movement_manager import MovementManager
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
@@ -184,6 +185,10 @@ def validate_sonic_navigation_graph(
             problems.append("CostMapper initial_safe_radius_meters must be 0")
         if kwargs.get(ReplanningAStarPlanner, {}).get("min_angular_velocity") != 0:
             problems.append("ReplanningAStarPlanner min_angular_velocity must be 0")
+        # The pc2 execution rejects walking above 0.2 m/s, so an uncapped follower never moves.
+        nerf = kwargs.get(ReplanningAStarPlanner, {}).get("nerf_speed", 1.0)
+        if not isinstance(nerf, (int, float)) or LocalPlanner._speed * nerf > 0.2 + 1e-9:
+            problems.append("ReplanningAStarPlanner nerf_speed must cap the follower at 0.2 m/s")
         claimed = kwargs.get(SonicNavigationPeerModule, {}).get("extrinsic_valid", False)
         if claimed and kwargs.get(SonicNavigationSensorReceiver, {}).get("torso_to_sensor") is None:
             problems.append("extrinsic_valid requires a commissioned torso_to_sensor extrinsic")
