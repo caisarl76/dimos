@@ -33,6 +33,7 @@ from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import In
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
+from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Twist import Twist
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.msgs.nav_msgs.OccupancyGrid import OccupancyGrid
@@ -357,9 +358,30 @@ class SonicNavigationPeerModule(Module):
             return f"previous request {self._request_id} not cancelled (state {self._state})"
         return None
 
+    def _in_odom(self, goal: PoseStamped) -> PoseStamped | None:
+        """A base-relative goal (an agent's "2 m ahead") in odom from the latest pose."""
+        if goal.frame_id != self.config.base_frame:
+            return goal
+        if not self._poses:
+            return None
+        _, x, y, yaw, _ = self._poses[-1]
+        c, s = math.cos(yaw), math.sin(yaw)
+        dx, dy = goal.position.x, goal.position.y
+        return PoseStamped(
+            ts=goal.ts,
+            frame_id=self.config.odom_frame,
+            position=Vector3(x + c * dx - s * dy, y + s * dx + c * dy, 0.0),
+            orientation=Quaternion.from_euler(Vector3(0.0, 0.0, yaw + goal.orientation.euler[2])),
+        )
+
     def set_goal(self, request_id: str, goal: PoseStamped) -> bool:
         with self._lock:
-            reason = self._goal_refusal(request_id, goal)
+            converted = self._in_odom(goal)
+            if converted is None:
+                reason: str | None = "no current pose for a base-relative goal"
+            else:
+                goal = converted
+                reason = self._goal_refusal(request_id, goal)
             if reason is not None:
                 logger.warning("Navigation goal refused", reason=reason, request_id=request_id)
                 return False

@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import replace
 import itertools
+import math
 import struct
 import threading
 from unittest.mock import call
@@ -787,3 +788,31 @@ def test_relay_logs_why_it_refuses_a_goal(relays, mocker):
     reasons = refusal_reasons(logger)
     assert reasons[0] == "cancellation pending"
     assert "peer" in reasons[1] and "goal_rejected" in reasons[1]
+
+
+def test_peer_turns_a_base_relative_goal_into_odom(peers):
+    peer, planner = peers()
+    feed_inputs(peer, x=1.0, yaw=math.pi / 2)  # robot at (1, 0) facing +y
+    goal = PoseStamped(
+        frame_id="base_link",
+        position=Vector3(2.0, 0.5, 0.0),  # 2 m ahead, 0.5 m left
+        orientation=Quaternion.from_euler(Vector3(0, 0, 0.3)),
+    )
+    assert peer.set_goal("request-1", goal) is True
+    (sent,), _ = planner.set_goal.call_args
+    assert sent.frame_id == "odom"
+    assert (sent.position.x, sent.position.y) == pytest.approx((1.0 - 0.5, 2.0))
+    assert sent.orientation.euler[2] == pytest.approx(math.pi / 2 + 0.3)
+
+
+def test_base_relative_goal_needs_a_pose(peers, mocker):
+    from dimos.robot.unitree.g1 import sonic_navigation_peer_module
+
+    logger = mocker.patch.object(sonic_navigation_peer_module, "logger")
+    peer, planner = peers()
+    feed_inputs(peer)
+    peer._poses.clear()  # readiness can hold while the pose window was just reset
+    goal = PoseStamped(frame_id="base_link", position=Vector3(1.0, 0, 0))
+    assert peer.set_goal("request-1", goal) is False
+    assert "no current pose" in refusal_reasons(logger)[0]
+    planner.set_goal.assert_not_called()
