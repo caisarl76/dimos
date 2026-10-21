@@ -652,11 +652,18 @@ def test_inflight_goal_cannot_reopen_gate_after_end(navigating):
             module.end_navigation()
             wait_until(lambda: module.get_feedback().planner_guard.mode == 0, timeout=1)
             release.set()
-            with pytest.raises(RuntimeError, match="admission closed"):
+            with pytest.raises(RuntimeError, match=r"admission closed \(phase "):
                 pending.result(timeout=1)
         assert module.get_navigation_status()["phase"] != "active"
     finally:
         release.set()
+
+
+def test_peer_refused_goal_says_so(navigating):
+    module, _, control, _ = navigating
+    control.set_navigation_goal.return_value = False
+    with pytest.raises(RuntimeError, match=r"rejected or admission closed \(peer refused\)"):
+        module.set_navigation_goal(module.get_navigation_status()["request_id"], PoseStamped())
 
 
 def test_execution_fault_closes_navigation_before_peer_reply(navigating, mocker):

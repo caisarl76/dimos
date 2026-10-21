@@ -34,6 +34,9 @@ from dimos.robot.unitree.g1.sonic_navigation_link import (
     bound_navigation_input,
     readiness_deadline,
 )
+from dimos.utils.logging_config import setup_logger
+
+logger = setup_logger()
 
 
 class SonicNavigationRelayConfig(ModuleConfig):
@@ -197,16 +200,25 @@ class SonicNavigationRelayModule(Module):
                 pass  # No refreshed proof: the existing source/readiness deadlines expire.
             self._stopping.wait(max(0.0, started + 0.100 - monotonic()))
 
+    def _goal_refusal(self, request_id: str) -> str | None:
+        if self._reset_fault is not None:
+            return f"reset fault {self._reset_fault}"
+        if self._cancel_pending:
+            return "cancellation pending"
+        if self._goal_pending:
+            return "goal pending"
+        if request_id in self._retired_requests:
+            return "retired request"
+        if self._request_id not in (None, request_id) and not self._cancel_confirmed:
+            return f"previous request {self._request_id} not cancel-confirmed"
+        return None
+
     @rpc
     def set_navigation_goal(self, request_id: str, goal: PoseStamped) -> bool:
         with self._lock:
-            if (
-                self._reset_fault is not None
-                or self._cancel_pending
-                or self._goal_pending
-                or request_id in self._retired_requests
-                or (self._request_id not in (None, request_id) and not self._cancel_confirmed)
-            ):
+            reason = self._goal_refusal(request_id)
+            if reason is not None:
+                logger.warning("Navigation goal refused", reason=reason, request_id=request_id)
                 return False
             if self._request_id is not None and self._request_id != request_id:
                 self._cancel_previous_request_id = self._request_id
@@ -226,6 +238,15 @@ class SonicNavigationRelayModule(Module):
                     and self._request_id == request_id
                 )
                 if not accepted:
+                    logger.warning(
+                        "Navigation goal refused",
+                        reason=(
+                            f"peer reply: request {result['request_id']}, accepted "
+                            f"{result['accepted']}, fault {result['fault']}, cancel pending "
+                            f"{self._cancel_pending}, current request {self._request_id}"
+                        ),
+                        request_id=request_id,
+                    )
                     self._cancel_pending = True
                     self._publish_input(self._closed_input("goal_unresolved"))
                 return accepted

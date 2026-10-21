@@ -741,3 +741,49 @@ def test_ramp_restarts_after_a_source_gap(peer, clock):
     clock[0] = 10.5  # source silent past its 0.35 s deadline: pc2 already stopped
     peer.observe_cmd_vel(Twist())
     assert relayed_wz(peer) == 0.0
+
+
+def refusal_reasons(logger) -> list[str]:
+    return [call.kwargs["reason"] for call in logger.warning.call_args_list]
+
+
+def test_peer_logs_why_it_refuses_a_goal(peer, mocker):
+    from dimos.robot.unitree.g1 import sonic_navigation_peer_module
+
+    logger = mocker.patch.object(sonic_navigation_peer_module, "logger")
+    goal = PoseStamped(frame_id="odom", position=Vector3(1.0, 0, 0))
+    assert peer.set_goal("request-1", goal) is False  # no inputs yet
+    feed_inputs(peer)
+    assert peer.set_goal("request-1", PoseStamped(frame_id="map", position=Vector3())) is False
+    assert peer.set_goal("request-1", goal) is True
+    assert peer.set_goal("request-2", goal) is False  # request-1 never cancelled
+    reasons = refusal_reasons(logger)
+    assert len(reasons) == 3
+    assert reasons[0].startswith("not ready")
+    assert "frame" in reasons[1]
+    assert "request-1" in reasons[2] and "not cancelled" in reasons[2]
+
+
+def test_relay_logs_why_it_refuses_a_goal(relays, mocker):
+    from dimos.robot.unitree.g1 import sonic_navigation_relay_module
+
+    logger = mocker.patch.object(sonic_navigation_relay_module, "logger")
+    relay = relays()
+    mocker.patch.object(relay, "_publish_input")
+    goal = PoseStamped(frame_id="odom", position=Vector3(0.5, 0, 0))
+    relay._cancel_pending = True
+    assert relay.set_navigation_goal("request-1", goal) is False
+    relay._cancel_pending = False
+    mocker.patch.object(
+        relay._link,
+        "control",
+        return_value=(
+            {"request_id": "request-1", "accepted": False, "fault": "goal_rejected"},
+            0.0,
+            0.0,
+        ),
+    )
+    assert relay.set_navigation_goal("request-1", goal) is False
+    reasons = refusal_reasons(logger)
+    assert reasons[0] == "cancellation pending"
+    assert "peer" in reasons[1] and "goal_rejected" in reasons[1]

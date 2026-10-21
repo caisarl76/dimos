@@ -53,6 +53,9 @@ from dimos.robot.unitree.g1.sonic_navigation_link import (
     encode_poll_payload,
 )
 from dimos.robot.unitree.g1.sonic_navigation_readiness import NavigationReadiness
+from dimos.utils.logging_config import setup_logger
+
+logger = setup_logger()
 
 if TYPE_CHECKING:
     from dimos.core.rpc_client import RPCClient
@@ -340,15 +343,25 @@ class SonicNavigationPeerModule(Module):
                 "fault": None,
             }
 
+    def _goal_refusal(self, request_id: str, goal: PoseStamped) -> str | None:
+        if not request_id:
+            return "empty request id"
+        if request_id in self._retired_requests:
+            return "retired request"
+        if goal.frame_id != self.config.odom_frame:
+            return f"goal frame {goal.frame_id!r} is not {self.config.odom_frame!r}"
+        snapshot = self._monitor.snapshot(now=monotonic())
+        if not snapshot.ready:
+            return f"not ready ({snapshot.fault})"
+        if self._request_id not in (None, request_id) and not self._cancelled:
+            return f"previous request {self._request_id} not cancelled (state {self._state})"
+        return None
+
     def set_goal(self, request_id: str, goal: PoseStamped) -> bool:
         with self._lock:
-            if (
-                not request_id
-                or request_id in self._retired_requests
-                or goal.frame_id != self.config.odom_frame
-                or not self._monitor.snapshot(now=monotonic()).ready
-                or (self._request_id not in (None, request_id) and not self._cancelled)
-            ):
+            reason = self._goal_refusal(request_id, goal)
+            if reason is not None:
+                logger.warning("Navigation goal refused", reason=reason, request_id=request_id)
                 return False
             if self._request_id is not None and self._request_id != request_id:
                 self._retired_requests.add(self._request_id)
@@ -357,6 +370,10 @@ class SonicNavigationPeerModule(Module):
             self._state = None
         assert self._planner_spec is not None
         accepted = self._planner_spec.set_goal(goal) is True
+        if not accepted:
+            logger.warning(
+                "Navigation goal refused", reason="planner rejected", request_id=request_id
+            )
         with self._lock:
             self._accepted = accepted
         return accepted
