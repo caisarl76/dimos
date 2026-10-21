@@ -46,7 +46,6 @@ import numpy as np
 import zmq
 
 from dimos.core.core import rpc
-from dimos.core.global_config import GlobalConfig
 from dimos.core.transport_factory import make_transport
 from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
@@ -414,7 +413,7 @@ def main() -> None:
     goal_wz = [0.0]  # last relayed yaw rate, for the peer's turn ramp
     # Quaternion.euler lazily imports SciPy. Exercise the actual advance path
     # before any live readiness lease starts; cold import is not a sensor pause.
-    follower = PController(GlobalConfig(simulation=""), 0.2, 10, min_angular_velocity=0.0)
+    follower = PController(False, 0.2, 10, min_angular_velocity=0.0)
     follower.advance(
         np.array([1.0, 0.01]),
         PoseStamped(position=Vector3(), orientation=Quaternion(w=1.0)),

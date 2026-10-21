@@ -63,6 +63,7 @@ unitree_g1_sonic_navigation_peer = (
         ReplanningAStarPlanner.blueprint(
             robot_width=G1.width_clearance,
             robot_rotation_diameter=g1_rotation_diameter,
+            nerf_speed=sonic_follower_nerf_speed,
             min_angular_velocity=0.0,
             initial_rotation_tolerance=sonic_initial_rotation_tolerance,
         ),
@@ -80,7 +81,6 @@ unitree_g1_sonic_navigation_peer = (
     .global_config(
         n_workers=5,
         robot_model="unitree_g1",
-        nerf_speed=sonic_follower_nerf_speed,
         simulation="",
         viewer="none",
     )

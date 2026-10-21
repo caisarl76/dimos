@@ -45,9 +45,8 @@ def make_planner():
 
 @pytest.mark.parametrize("controller_type", [PController, PdController])
 def test_min_angular_velocity_is_instance_scoped(controller_type):
-    config = GlobalConfig(simulation="")
-    default = controller_type(config, 0.2, 10.0)
-    smooth = controller_type(config, 0.2, 10.0, min_angular_velocity=0.0)
+    default = controller_type(False, 0.2, 10.0)
+    smooth = controller_type(False, 0.2, 10.0, min_angular_velocity=0.0)
     # A PD sample seeded at this error isolates its proportional response.
     default.reset_yaw_error(0.01)
     smooth.reset_yaw_error(0.01)
@@ -66,12 +65,13 @@ def test_invalid_angular_minimum_rejected(value):
     with pytest.raises(ValidationError):
         ReplanningAStarPlannerConfig(min_angular_velocity=value)
     with pytest.raises(ValueError):
-        PController(GlobalConfig(), 0.2, 10.0, min_angular_velocity=value)
+        PController(False, 0.2, 10.0, min_angular_velocity=value)
 
 
 def test_sonic_follower_envelope(make_planner):
     module = make_planner(
-        g=GlobalConfig(simulation="", nerf_speed=0.2 / 0.55),
+        g=GlobalConfig(simulation=""),
+        nerf_speed=0.2 / 0.55,
         min_angular_velocity=0.0,
     )
     controller = module._planner._local_planner._controller
