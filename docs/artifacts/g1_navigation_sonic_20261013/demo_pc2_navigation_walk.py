@@ -197,16 +197,35 @@ def goal_admissible(
     return None
 
 
-def track_clearance(
-    track: list[tuple[float, float]], grid: Any, origin: tuple[float, float], resolution: float
-) -> float | None:
-    """Closest approach of the base track to any occupied costmap cell centre."""
+def occupied_ahead(
+    grid: Any,
+    origin: tuple[float, float],
+    resolution: float,
+    pose: tuple[float, float, float],
+    *,
+    ahead: tuple[float, float] = (0.3, 3.0),
+    lateral: float = 1.5,
+) -> Any:
+    """Occupied cell centres in the region ahead of pose (x, y, heading).
+
+    The support crane follows the robot, so it stays behind the start and its trail
+    is mapped along the walked path afterwards: measure the box in a map taken
+    before that, ahead of the robot.
+    """
     rows, cols = np.nonzero(np.asarray(grid) >= 100)
-    if not len(rows) or not track:
-        return None
     cells = np.stack(
         [origin[0] + (cols + 0.5) * resolution, origin[1] + (rows + 0.5) * resolution], axis=1
     )
+    x, y, h = pose
+    along = (cells[:, 0] - x) * math.cos(h) + (cells[:, 1] - y) * math.sin(h)
+    across = -(cells[:, 0] - x) * math.sin(h) + (cells[:, 1] - y) * math.cos(h)
+    return cells[(along >= ahead[0]) & (along <= ahead[1]) & (np.abs(across) <= lateral)]
+
+
+def track_clearance(track: list[tuple[float, float]], cells: Any) -> float | None:
+    """Closest approach of the base track to the given cell centres."""
+    if not len(cells) or not track:
+        return None
     distances, _ = cKDTree(cells).query(np.asarray(track, dtype=float))
     return float(np.min(distances))
 
@@ -555,6 +574,7 @@ def run_session(args: Any) -> None:
         peer.call("tele_stop")
         record["goal"] = agent.call("goal", x=goal[0], y=goal[1], yaw=goal_yaw)
         reached, events, goal_started = None, {}, time.monotonic()
+        drop_pose: list[float] = []
         while record["goal"].get("result") is True:
             now = time.monotonic()
             if now - goal_started >= case.seconds:
@@ -566,7 +586,15 @@ def run_session(args: Any) -> None:
             walked = math.dist(position, (x, y))
             if case.event == "drop" and "drop" not in events and walked >= 0.5:
                 events["drop"] = now - goal_started
+                drop_pose = latest_odom()[:3]
                 print("\a>>> PLACE THE BOX NOW, about 1 m ahead of the robot, across its path <<<")
+            if "drop" in events and "box_snapshot" not in events:
+                # Once placed and mapped, before the crane trail reaches that area.
+                if now - goal_started - events["drop"] >= 2.5:
+                    events["box_snapshot"] = now - goal_started
+                    box_map = out / f"costmap-{len(results['cases']) + 1:02d}-box.npz"
+                    if peer.call("snapshot", path=str(box_map)).get("saved"):
+                        record["snapshot_box"] = box_map.name
             if case.event == "teleop":
                 # Teleop cancels the goal (MovementManager); the robot must then stay put.
                 if "teleop_on" not in events and walked >= 0.3:
@@ -595,16 +623,25 @@ def run_session(args: Any) -> None:
         )
         sound = not record["native"]["latched"] and record["settle_s"] is not None
         if case.event in ("placed", "drop"):
-            after = out / f"costmap-{len(results['cases']) + 1:02d}-after.npz"
-            if peer.call("snapshot", path=str(after)).get("saved"):
-                with np.load(after) as snap:
-                    record["clearance_m"] = track_clearance(
-                        [(r["odom"][0], r["odom"][1]) for r in rows],
+            # The box measured in a map from before the crane trail covers the path:
+            # the pre-goal map for a placed box, the post-drop map for a dropped one.
+            pose: tuple[float, float, float] | None
+            if case.event == "placed":
+                map_name, pose = record.get("snapshot"), (x, y, h)
+            else:
+                map_name = record.get("snapshot_box")
+                pose = (drop_pose[0], drop_pose[1], drop_pose[2]) if drop_pose else None
+            if map_name and pose is not None:
+                with np.load(out / map_name) as snap:
+                    cells = occupied_ahead(
                         snap["grid"],
                         (float(snap["origin"][0]), float(snap["origin"][1])),
                         float(snap["resolution"]),
+                        pose,
                     )
-                record["snapshot_after"] = after.name
+                record["clearance_m"] = track_clearance(
+                    [(r["odom"][0], r["odom"][1]) for r in rows], cells
+                )
             # Robot half-width (0.3 m) less one 0.05 m costmap cell.
             clear_ok = (record.get("clearance_m") or 0.0) >= 0.25
             if case.event == "placed":
