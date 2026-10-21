@@ -45,6 +45,9 @@ import threading
 import time
 from typing import Any
 
+import numpy as np
+from scipy.spatial import cKDTree
+
 from dimos.robot.unitree.g1.sonic_navigation_link import SonicNavigationLink
 
 HERE = Path(__file__).resolve().parent
@@ -78,6 +81,10 @@ class Case:
     seconds: float = 0.0
     requires: tuple[str, ...] = ()
     bearing: float = 0.0  # goal direction, rad left of the robot heading
+    distance: float = GOAL_M  # goal distance along the bearing
+    # Goal variants: "placed" (a box already across the path), "drop" (the operator
+    # places it mid-walk), "teleop" (a teleop turn mid-goal).
+    event: str = ""
 
 
 CASES = {
@@ -109,13 +116,27 @@ CASES = {
         requires=("curve_left_020", "curve_right_020"),
         bearing=math.radians(30),
     ),
+    # Obstacle cases, after the simulation ones (two-host-sim/obstacles-4). The box must
+    # be tall and wide enough to show in the costmap: about 40 cm tall, 40-60 cm wide.
+    "goal_detour": Case("goal", seconds=60.0, requires=("goal_1m",), distance=2.0, event="placed"),
+    "goal_obstacle_appears": Case(
+        "goal", seconds=60.0, requires=("goal_1m",), distance=2.0, event="drop"
+    ),
+    # MovementManager cancels the goal on any teleop message; the robot must stay put.
+    "goal_teleop_cancel": Case(
+        "goal", seconds=20.0, requires=("goal_1m",), distance=2.0, event="teleop"
+    ),
 }
+# Probes along the path for a placed obstacle: 0.6-1.8 m, then the goal cell.
+OBSTACLE_PROBES = [0.6 + 0.1 * i for i in range(13)]
 
 
-def goal_pose(x: float, y: float, h: float, bearing: float) -> tuple[tuple[float, float], float]:
-    """The point GOAL_M away along `bearing` from heading `h`, and that direction."""
+def goal_pose(
+    x: float, y: float, h: float, bearing: float, *, distance: float = GOAL_M
+) -> tuple[tuple[float, float], float]:
+    """The point `distance` away along `bearing` from heading `h`, and that direction."""
     yaw = h + bearing
-    return (x + GOAL_M * math.cos(yaw), y + GOAL_M * math.sin(yaw)), yaw
+    return (x + distance * math.cos(yaw), y + distance * math.sin(yaw)), yaw
 
 
 def check_token(token: str) -> None:
@@ -143,18 +164,28 @@ def prior_passed(sessions: list[Path], token: str) -> list[dict[str, Any]]:
     return cases
 
 
-def goal_admissible(summary: dict[str, Any] | None, ignore_rear: bool = False) -> str | None:
-    """Why a 1 m goal straight ahead may not be sent now, or None.
+def goal_admissible(
+    summary: dict[str, Any] | None, ignore_rear: bool = False, *, obstacle: bool = False
+) -> str | None:
+    """Why a goal along the probed cells may not be sent now, or None.
 
     ignore_rear (opt-in, for the support crane behind the robot) leaves occupied
-    cells in the rear half of the 0.5 m disk out of the near-field check.
+    cells in the rear half of the 0.5 m disk out of the near-field check. With
+    obstacle, the probes before the last must show the placed box and the last
+    (the goal cell) must be free; otherwise every probe must be free.
     """
     if summary is None:
         return "no costmap yet"
     if summary.get("robot_cell") != 0:
         return f"robot cell not known free ({summary.get('robot_cell')})"
-    if any(value != 0 for value in summary.get("values", [None])):
-        return f"cells 0.25-1.0 m ahead not all free ({summary.get('values')})"
+    values = summary.get("values", [None])
+    if obstacle:
+        if not any(v is not None and v >= 100 for v in values[:-1]):
+            return f"placed obstacle not seen on the path ({values[:-1]})"
+        if values[-1] != 0:
+            return f"goal cell not known free ({values[-1]})"
+    elif any(value != 0 for value in values):
+        return f"cells 0.25-1.0 m ahead not all free ({values})"
     near = summary.get("occupied_within_0.5m", 1)
     if ignore_rear and near:
         ahead = near - summary.get("occupied_within_0.5m_behind", 0)
@@ -164,6 +195,20 @@ def goal_admissible(summary: dict[str, Any] | None, ignore_rear: bool = False) -
     if near:
         return f"occupied cells within 0.5 m ({near})"
     return None
+
+
+def track_clearance(
+    track: list[tuple[float, float]], grid: Any, origin: tuple[float, float], resolution: float
+) -> float | None:
+    """Closest approach of the base track to any occupied costmap cell centre."""
+    rows, cols = np.nonzero(np.asarray(grid) >= 100)
+    if not len(rows) or not track:
+        return None
+    cells = np.stack(
+        [origin[0] + (cols + 0.5) * resolution, origin[1] + (rows + 0.5) * resolution], axis=1
+    )
+    distances, _ = cKDTree(cells).query(np.asarray(track, dtype=float))
+    return float(np.min(distances))
 
 
 def motion(rows: list[dict[str, Any]], t0: float, t1: float) -> dict[str, float] | None:
@@ -431,11 +476,15 @@ def run_session(args: Any) -> None:
                 return row["odom"]  # type: ignore[no-any-return]
         raise RuntimeError("no recent odometry")
 
-    def costmap_record(name: str, bearing: float = 0.0) -> dict[str, Any]:
+    def costmap_record(
+        name: str, bearing: float = 0.0, probes: list[float] | None = None
+    ) -> dict[str, Any]:
         """Read-only: no begin, no motion. Cells along `bearing` plus the peer summary."""
         x, y, h, _ = latest_odom()
         h += bearing
-        ahead = [[x + d * math.cos(h), y + d * math.sin(h)] for d in (0.25, 0.5, 0.75, 1.0)]
+        ahead = [
+            [x + d * math.cos(h), y + d * math.sin(h)] for d in probes or (0.25, 0.5, 0.75, 1.0)
+        ]
         reply = peer.call("costmap", points=ahead)
         summary = reply["costmap"]
         snapshot = out / f"costmap-{len(results['cases']) + 1:02d}.npz"
@@ -450,7 +499,7 @@ def run_session(args: Any) -> None:
                     {
                         "robot_cell": summary.get("robot_cell"),
                         "within_1.2m": {k: disk.get(k) for k in ("unknown", "free", "occupied")},
-                        "ahead_0.25_to_1.0m": summary.get("values"),
+                        "probes_ahead": summary.get("values"),
                         "clear_goal": summary.get("clear_goal"),
                     }
                 )
@@ -458,21 +507,31 @@ def run_session(args: Any) -> None:
         return record
 
     def goal_record(name: str, case: Case) -> dict[str, Any]:
-        """Pre-checks, then one goal GOAL_M along the case bearing through set_navigation_goal;
-        cancel after."""
-        record = costmap_record(name, case.bearing)
-        record["passed"] = record["measured_ok"] = False
-        reason = goal_admissible(record.get("costmap"), ignore_rear=args.ignore_rear_occupancy)
-        if (
-            reason is None
-            and input(
-                f"Is the area 1 m ahead, {math.degrees(case.bearing):.0f} deg left, "
-                "physically clear? [y/n] "
+        """Pre-checks, then one goal `case.distance` along the case bearing through
+        set_navigation_goal, with the case's mid-goal event; cancel after."""
+        if case.event == "placed":
+            input(
+                "Place a box (about 40 cm tall, 40-60 cm wide) about 1.2 m ahead, across "
+                "the straight path, then press Enter. "
             )
-            .strip()
-            .lower()
-            != "y"
-        ):
+        probes = [*OBSTACLE_PROBES, case.distance] if case.event == "placed" else None
+        record = costmap_record(name, case.bearing, probes)
+        record["passed"] = record["measured_ok"] = False
+        reason = goal_admissible(
+            record.get("costmap"),
+            ignore_rear=args.ignore_rear_occupancy,
+            obstacle=case.event == "placed",
+        )
+        clear = {
+            "placed": f"Apart from the box, is the area {case.distance:.0f} m ahead clear?",
+            "drop": f"Is the area {case.distance:.0f} m ahead clear, with a box in hand to "
+            "place about 1 m ahead of the robot when prompted?",
+        }.get(
+            case.event,
+            f"Is the area {case.distance:.0f} m ahead, {math.degrees(case.bearing):.0f} deg "
+            "left, physically clear?",
+        )
+        if reason is None and input(f"{clear} [y/n] ").strip().lower() != "y":
             reason = "operator did not confirm clearance"
         if reason is not None:
             record["error"] = f"goal refused before begin: {reason}"
@@ -490,17 +549,37 @@ def run_session(args: Any) -> None:
         tele(0.0, 0.0)
         time.sleep(1.0)
         x, y, h, _ = latest_odom()
-        goal, goal_yaw = goal_pose(x, y, h, case.bearing)
+        goal, goal_yaw = goal_pose(x, y, h, case.bearing, distance=case.distance)
         record["goal_xy"], record["start_xy"] = list(goal), [x, y]
         # A* commands reach cmd_vel only once teleop stops (MovementManager cooldown).
         peer.call("tele_stop")
         record["goal"] = agent.call("goal", x=goal[0], y=goal[1], yaw=goal_yaw)
-        reached = None
-        if record["goal"].get("result") is True:
-            reached = wait(
-                lambda: math.dist(latest_odom()[:2], goal) < GOAL_TOLERANCE_M, case.seconds
-            )
-        record["reached_s"] = reached
+        reached, events, goal_started = None, {}, time.monotonic()
+        while record["goal"].get("result") is True:
+            now = time.monotonic()
+            if now - goal_started >= case.seconds:
+                break
+            position = latest_odom()[:2]
+            if math.dist(position, goal) < GOAL_TOLERANCE_M:
+                reached = now - goal_started
+                break
+            walked = math.dist(position, (x, y))
+            if case.event == "drop" and "drop" not in events and walked >= 0.5:
+                events["drop"] = now - goal_started
+                print("\a>>> PLACE THE BOX NOW, about 1 m ahead of the robot, across its path <<<")
+            if case.event == "teleop":
+                # Teleop cancels the goal (MovementManager); the robot must then stay put.
+                if "teleop_on" not in events and walked >= 0.3:
+                    events["teleop_on"] = now - goal_started
+                    tele(0.0, 0.2)
+                elif "teleop_off" not in events and "teleop_on" in events:
+                    if now - goal_started - events["teleop_on"] >= 2.0:
+                        events["teleop_off"] = now - goal_started
+                        peer.call("tele_stop")
+                elif "teleop_off" in events and now - goal_started - events["teleop_off"] >= 3.0:
+                    break
+            time.sleep(0.05)
+        record["reached_s"], record["events"] = reached, events
         record["cancel"] = agent.call("end")
         tele(0.0, 0.0)
         record["settle_s"] = settled()
@@ -508,20 +587,43 @@ def run_session(args: Any) -> None:
         record["native"] = native_summary(agent.call("since", monotonic=mark)["rows"])
         end = latest_odom()
         record["final_error_m"] = math.dist(end[:2], goal)
-        unit = ((goal[0] - x) / GOAL_M, (goal[1] - y) / GOAL_M)
+        unit = ((goal[0] - x) / case.distance, (goal[1] - y) / case.distance)
+        rows = odometry(started)
         record["max_cross_track_m"] = max(
-            (
-                abs(unit[0] * (r["odom"][1] - y) - unit[1] * (r["odom"][0] - x))
-                for r in odometry(started)
-            ),
+            (abs(unit[0] * (r["odom"][1] - y) - unit[1] * (r["odom"][0] - x)) for r in rows),
             default=0.0,
         )
-        record["observation"] = observe("Did the robot walk to the goal and stop there?")
-        ok = (
-            reached is not None
-            and not record["native"]["latched"]
-            and record["settle_s"] is not None
-        )
+        sound = not record["native"]["latched"] and record["settle_s"] is not None
+        if case.event in ("placed", "drop"):
+            after = out / f"costmap-{len(results['cases']) + 1:02d}-after.npz"
+            if peer.call("snapshot", path=str(after)).get("saved"):
+                with np.load(after) as snap:
+                    record["clearance_m"] = track_clearance(
+                        [(r["odom"][0], r["odom"][1]) for r in rows],
+                        snap["grid"],
+                        (float(snap["origin"][0]), float(snap["origin"][1])),
+                        float(snap["resolution"]),
+                    )
+                record["snapshot_after"] = after.name
+            # Robot half-width (0.3 m) less one 0.05 m costmap cell.
+            clear_ok = (record.get("clearance_m") or 0.0) >= 0.25
+            if case.event == "placed":
+                ok = reached is not None and clear_ok
+            else:  # replanned and arrived, or stopped short: either way clear of the box
+                ok = "drop" in events and clear_ok
+            question = "Did the robot avoid the box without touching it?"
+        elif case.event == "teleop":
+            off = goal_started + events.get("teleop_off", math.inf)
+            late = [r for r in rows if r["peer_monotonic"] >= off + 0.5]
+            drift = math.dist(late[0]["odom"][:2], late[-1]["odom"][:2]) if late else math.inf
+            record["moved_after_teleop_m"] = drift
+            ok = "teleop_off" in events and reached is None and drift < 0.05
+            question = "Did the robot turn under teleop, then stand still (goal cancelled)?"
+        else:
+            ok = reached is not None
+            question = "Did the robot walk to the goal and stop there?"
+        record["observation"] = observe(question)
+        ok = ok and sound
         record["measured_ok"] = bool(ok)
         record["passed"] = bool(ok) and record["observation"]["confirmed"]
         return record
