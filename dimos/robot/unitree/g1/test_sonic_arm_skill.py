@@ -71,6 +71,9 @@ def execution_config(peer, tmp_path):
             first_chunk_timeout=1.0,
             handback_timeout=0.4,
             max_observation_age=3.0,
+            # Execution module, skill, scripted peer and feeders share one process here, and the
+            # event loop occasionally stalls ~170 ms (about 1 run in 30): allow up to the 200 ms lease.
+            max_tick_gap=0.19,
         ),
     )
 
