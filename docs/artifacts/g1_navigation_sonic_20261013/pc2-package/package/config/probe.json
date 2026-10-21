@@ -7,7 +7,8 @@
     "native_feedback": 5557,
     "sensor_cloud": 17101,
     "sensor_state": 17102,
-    "graph_zenoh_router": 17111
+    "graph_zenoh_router": 17111,
+    "mcp_server": 9990
   },
   "torso_to_sensor": [
     0.0002835,

@@ -88,6 +88,21 @@ keeps `--disable-dex3-hands`, the 200 ms reference timeout, CSV logs and the
      the uncommissioned extrinsic, because the peer refuses goals without it.
    - `--commission` starts real motor control.
 
+## Agent skills: `graph-agentic`
+
+`launch.sh --commission operator-ready-<today> graph-agentic` starts the same graph as
+`graph`, plus `SonicNavigationSkills` and an MCP server on pc2's LAN address
+(`192.168.0.223:9990`, `package/config/pc2-graph-agentic.json`). Use it in place of
+`graph`, in the same order: `native`, `start`, then `graph-agentic`.
+
+- The skills are `walk_to(forward_m, left_m)`, `stop_walking()` and
+  `navigation_status()`. They act only inside a navigation request the operator
+  began, and never begin one themselves.
+- The validator refuses an MCP server bound to all interfaces. `--check-only`
+  checks that port 9990 is free.
+- On the workstation, once the walk harness has begun a request:
+  `MCPCLIENT__MCP_SERVER_URL=http://192.168.0.223:9990/mcp dimos run unitree-g1-sonic-navigation-agent`.
+
 ## Task 11 preparation (2026-10-15)
 
 - `launch.sh --commission … graph` now refuses while any SONIC controller other than

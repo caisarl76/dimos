@@ -148,7 +148,14 @@ def fake_process(root: Path, pid: int, exe: Path) -> None:
     (root / "proc" / str(pid) / "exe").symlink_to(exe)
 
 
-def test_graph_refuses_while_a_foreign_sonic_controller_runs(host) -> None:
+@pytest.mark.parametrize(
+    ("component", "entry"),
+    [
+        ("graph", "run-pc2-graph.sh\n"),
+        ("graph-agentic", "run-pc2-graph.sh agentic\n"),
+    ],
+)
+def test_graph_refuses_while_a_foreign_sonic_controller_runs(host, component, entry) -> None:
     # The manipulation controller subscribes to 127.0.0.1:5556 by default, which the
     # graph's execution owner binds: it must never feed a controller it does not own.
     root, env = host
@@ -161,11 +168,33 @@ def test_graph_refuses_while_a_foreign_sonic_controller_runs(host) -> None:
     )
     fake_process(root, 4242, other)
     fake_process(root, 4343, ours)
-    refused = run(env, "--commission", TOKEN, "graph", STUB_SONIC_PIDS="4343 4242")
+    refused = run(env, "--commission", TOKEN, component, STUB_SONIC_PIDS="4343 4242")
     assert refused.returncode == 1 and "4242" in refused.stderr
     assert "docker run" not in calls(root)
-    assert run(env, "--commission", TOKEN, "graph", STUB_SONIC_PIDS="4343").returncode == 0
-    assert "docker run" in calls(root)
+    assert run(env, "--commission", TOKEN, component, STUB_SONIC_PIDS="4343").returncode == 0
+    assert "docker run" in calls(root) and calls(root).endswith(entry)
+
+
+def test_agentic_graph_config_is_the_pc2_graph_plus_an_explicit_mcp_server() -> None:
+    from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_pc2_agentic import (
+        unitree_g1_sonic_navigation_pc2_agentic as blueprint,
+    )
+    from dimos.robot.unitree.g1.sonic_navigation_graph import validate_sonic_navigation_graph
+
+    config_dir = LAUNCH.parent / "package/config"
+    plain = json.loads((config_dir / "pc2-graph.json").read_text())
+    agentic = json.loads((config_dir / "pc2-graph-agentic.json").read_text())
+    mcp = agentic.pop("mcpserver")
+    assert agentic == plain
+    pc2_address = plain["sonicnavigationsensorsender"]["cloud_bind"].split("//")[1].split(":")[0]
+    assert mcp["host"] == pc2_address
+    probe = json.loads((config_dir / "probe.json").read_text())
+    assert probe["local_ports"]["mcp_server"] == mcp["port"]  # check-only finds it free
+    module_kwargs = {
+        atom.name: {**atom.kwargs, **{**plain, "mcpserver": mcp}.get(atom.name, {})}
+        for atom in blueprint.active_blueprints
+    }
+    validate_sonic_navigation_graph(blueprint, module_kwargs, role="pc2")
 
 
 def test_start_sends_the_operator_start_only_to_this_tasks_idle_controller(host) -> None:

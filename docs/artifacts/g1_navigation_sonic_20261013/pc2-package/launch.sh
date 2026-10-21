@@ -3,7 +3,7 @@
 #   launch.sh --check-only
 #       Passive: hashes, fingerprints, clocks and the DDS-reader readiness probe.
 #       Starts no controller and sends no command.
-#   launch.sh --commission operator-ready-YYYYMMDD native|start|graph
+#   launch.sh --commission operator-ready-YYYYMMDD native|start|graph|graph-agentic
 #       Operator-only, today's date, after fresh standing/clear-area/stop readiness,
 #       in this order:
 #       native  - starts real SONIC motor control in this terminal (same command as the
@@ -11,6 +11,9 @@
 #       start   - sends the one operator start to that controller and waits for planner
 #                 IDLE (as the pc2-proven start-idle-planner helper); graph must be down.
 #       graph   - starts the pc2 navigation graph (sensor sender, relay, execution owner).
+#       graph-agentic - the same graph plus the agent navigation skills, served by an MCP
+#                 server on pc2's LAN address (config/pc2-graph-agentic.json) for a
+#                 workstation agent. The skills act only inside a request begun here.
 set -euo pipefail
 
 verify_root=/home/unitree/dimos-navigation-verify-20261009
@@ -85,11 +88,11 @@ case "${1:-}" in
         echo 'Passive check complete; nothing was started.'
         ;;
     --commission)
-        (($# == 3)) || { echo 'Usage: launch.sh --commission operator-ready-YYYYMMDD native|start|graph' >&2; exit 2; }
+        (($# == 3)) || { echo 'Usage: launch.sh --commission operator-ready-YYYYMMDD native|start|graph|graph-agentic' >&2; exit 2; }
         [[ "$2" == "operator-ready-$(date +%Y%m%d)" ]] \
             || { echo "Commissioning needs today's token: operator-ready-$(date +%Y%m%d)" >&2; exit 2; }
         ;;
-    *) echo 'Usage: launch.sh --check-only | --commission operator-ready-YYYYMMDD native|start|graph' >&2; exit 2 ;;
+    *) echo 'Usage: launch.sh --check-only | --commission operator-ready-YYYYMMDD native|start|graph|graph-agentic' >&2; exit 2 ;;
 esac
 [[ "$1" == --commission ]] || exit 0
 
@@ -141,7 +144,7 @@ case "$3" in
             --security-opt no-new-privileges --cpus 1 --memory 1g "$image" \
             python /opt/sonic-navigation/package/demo_pc2_operator_start.py --start-idle-planner
         ;;
-    graph)
+    graph | graph-agentic)
         verify_package
         # Other controllers subscribe to 127.0.0.1:5556 by default, which the execution
         # owner binds: never start the graph beside a controller this task does not own.
@@ -154,14 +157,16 @@ case "$3" in
         fi
         out="$task/runs/graph-$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$out/journal"
-        echo "Starting the pc2 navigation graph; journal and logs: $out"
+        agentic=""
+        [[ "$3" == graph-agentic ]] && agentic=agentic
+        echo "Starting the pc2 navigation graph${agentic:+ with agent skills}; journal and logs: $out"
         exec docker run --rm --init --name "$container" --network host --user 1000:1000 \
             --cap-drop ALL --security-opt no-new-privileges --cpus 2 --memory 4g \
             --ulimit memlock=67108864:67108864 \
             --mount "type=bind,source=$out,target=/verification" \
             --env XDG_STATE_HOME=/verification/state --env XDG_CACHE_HOME=/tmp/cache \
             --env XDG_CONFIG_HOME=/tmp/config --env HOME=/tmp \
-            "$image" /opt/sonic-navigation/package/run-pc2-graph.sh
+            "$image" /opt/sonic-navigation/package/run-pc2-graph.sh ${agentic:+agentic}
         ;;
-    *) echo 'Component must be native, start or graph' >&2; exit 2 ;;
+    *) echo 'Component must be native, start, graph or graph-agentic' >&2; exit 2 ;;
 esac
