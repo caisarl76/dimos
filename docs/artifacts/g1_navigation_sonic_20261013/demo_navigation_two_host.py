@@ -233,14 +233,14 @@ class PeerHost:
             stderr=log,
             text=True,
         )
-        self._start_reader()
+        self._start_reader(log)
         self.ready = self.read(120.0)
         assert self.ready["op"] == "ready", self.ready
 
-    def _start_reader(self) -> None:
+    def _start_reader(self, log: Any = None) -> None:
         """Drain stdout on a thread. poll() on the pipe plus a buffered readline() left a
         reply that arrived in the same chunk as a log line unread until more output came;
-        that timed out a call on 2026-10-21. Log lines are dropped, as before."""
+        that timed out a call on 2026-10-21. DimOS logs to stdout: other lines go to log."""
         self._replies: queue.Queue[dict[str, Any] | None] = queue.Queue()
 
         def drain() -> None:
@@ -248,6 +248,9 @@ class PeerHost:
             for line in self.process.stdout:
                 if line.startswith("{"):
                     self._replies.put(json.loads(line))
+                elif log is not None:
+                    log.write(line)
+                    log.flush()
             self._replies.put(None)
 
         threading.Thread(target=drain, daemon=True).start()
@@ -390,6 +393,35 @@ def worker_pid(coordinator: ModuleCoordinator, module: str) -> int:
             assert worker.pid is not None
             return worker.pid
     raise LookupError(module)
+
+
+def rect(
+    pose: tuple[float, float, float], *, ahead: tuple[float, float], left: tuple[float, float]
+) -> list[float]:
+    """An oriented box [cx, cy, half_x, half_y, yaw] spanning `ahead` (along heading) and
+    `left` (to the left of it) metres in the frame of pose (x, y, heading)."""
+    x, y, h = pose
+    a, b = (ahead[0] + ahead[1]) / 2, (left[0] + left[1]) / 2
+    c, s = math.cos(h), math.sin(h)
+    return [
+        x + a * c - b * s,
+        y + a * s + b * c,
+        (ahead[1] - ahead[0]) / 2,
+        (left[1] - left[0]) / 2,
+        h,
+    ]
+
+
+def clearance(track: list[tuple[float, float]], box: list[float]) -> float:
+    """Closest approach of the pelvis track to an oriented box's edge; 0 inside it."""
+    bx, by, hx, hy, yaw = box
+    c, s = math.cos(yaw), math.sin(yaw)
+    gaps = []
+    for x, y in track:
+        along = (x - bx) * c + (y - by) * s
+        across = -(x - bx) * s + (y - by) * c
+        gaps.append(math.hypot(max(abs(along) - hx, 0.0), max(abs(across) - hy, 0.0)))
+    return min(gaps)
 
 
 def sha(path: Path) -> str:
@@ -1431,6 +1463,178 @@ def run_two_host(args: Any) -> None:
             wait(lambda: nav()["phase"] == "active", 1.5, "restarted publisher rearm")
             pump(1.0)
             case("no_old_target_after_publisher_restart", not moving())
+
+            # Obstacle cases (simulation only). The replayed scans never see the MuJoCo
+            # world, so PointLIO's pose cannot follow the robot: freeze it and let the peer
+            # publish its outputs from MuJoCo truth, and replace the frozen CostMapper with
+            # a synthetic costmap carrying obstacle boxes. Last in the matrix, because a
+            # resumed PointLIO would replay older stamps and latch the peer.
+            scenario = "obstacle_setup"
+            execution.end_navigation()
+            wait(lambda: nav()["pose_ready"], 6.0, "obstacle setup cancel")
+            tele(0.0, 0.0)  # keeps the source fresh until each goal is sent
+            obstacle_pids = peer.call("pids")
+            stop_pid(obstacle_pids["natives"]["pointlio_native"])
+            stop_pid(
+                next(w["pid"] for w in obstacle_pids["workers"] if "CostMapper" in w["modules"])
+            )
+            peer.call("truth_lio", on=True)
+            peer.call("synthetic_obstacles", obstacles=[])
+            peer.call("synthetic_costmap")
+            settle("obstacle_setup")
+            wait(link_ready, 30.0, "truth pose readiness")
+
+            def goal_run(name: str, distance: float, during: Any = None) -> dict[str, Any]:
+                """One goal `distance` m straight ahead; the pelvis track until arrival."""
+                nonlocal scenario
+                scenario = name
+                execution.begin_navigation()
+                wait(lambda: nav()["phase"] == "active", 1.5, name + " begin")
+                row = envelope()
+                x, y, h = row["pelvis"][0], row["pelvis"][1], yaw(row["qpos"][3:7])
+                start = (x, y, h)
+                if during is not None:
+                    during(None, start)
+                pump(1.0)  # the planner sees the costmap the case just set
+                goal_xy = (x + distance * math.cos(h), y + distance * math.sin(h))
+                plans = peer.call("costmap")["counts"].get("plan", 0)
+                tele_stop()
+                accepted = execution.set_navigation_goal(
+                    nav()["request_id"],
+                    PoseStamped(
+                        position=Vector3(*goal_xy, 0.0),
+                        orientation=Quaternion.from_euler(Vector3(0.0, 0.0, h)),
+                        frame_id="odom",
+                    ),
+                )
+                started, reached = time.monotonic(), None
+                track: list[tuple[float, float]] = []
+                while accepted and time.monotonic() - started < 60.0:
+                    pump(0.1)
+                    track.append((proof.latest["pelvis"][0], proof.latest["pelvis"][1]))
+                    if during is not None and during(track, start):
+                        break  # the case has seen what it needs
+                    if math.dist(track[-1], goal_xy) < 0.3:
+                        reached = time.monotonic() - started
+                        break
+                replans = peer.call("costmap")["counts"].get("plan", 0) - plans
+                stopped = not moving()
+                execution.end_navigation()
+                tele(0.0, 0.0)
+                wait(lambda: nav()["pose_ready"], 6.0, name + " cancel")
+                settle(name)
+                return {
+                    "accepted": accepted,
+                    "reached_s": reached,
+                    "plans": replans,
+                    "stopped_at_end": stopped,
+                    "track": track,
+                    "start": start,
+                }
+
+            # Robot half-width clearance (0.3 m) less one 0.05 m costmap cell.
+            min_gap = 0.25
+            # A 2.4 m corridor along the start heading. In open space the voronoi planner
+            # follows the medial axis far around an isolated box (a 9.5 m path to a goal
+            # 2 m away, 2026-10-21); walls make the medial axis the corridor centre.
+            boxes: dict[str, list[list[float]]] = {}
+
+            def corridor(pose: tuple[float, float, float]) -> list[list[float]]:
+                return [
+                    rect(pose, ahead=(-1.0, 4.5), left=(1.2, 1.4)),
+                    rect(pose, ahead=(-1.0, 4.5), left=(-1.4, -1.2)),
+                ]
+
+            def blocker(pose: tuple[float, float, float], start: float) -> list[float]:
+                # Blocks 45% of the corridor from the right wall.
+                return rect(pose, ahead=(start, start + 0.6), left=(-1.2, -0.12))
+
+            def gaps(track: list[tuple[float, float]], name: str) -> float:
+                return min(clearance(track, box) for box in boxes[name]) if track else 0.0
+
+            def detour(track: Any, start: tuple[float, float, float]) -> None:
+                if track is None:
+                    boxes["detour"] = [*corridor(start), blocker(start, 1.5)]
+                    peer.call("synthetic_obstacles", obstacles=boxes["detour"])
+
+            run = goal_run("corridor_detour", 3.5, detour)
+            gap = gaps(run["track"], "detour")
+            case(
+                "corridor_detour",
+                run["accepted"] is True and run["reached_s"] is not None and gap >= min_gap,
+                reached_s=run["reached_s"],
+                clearance_m=gap,
+                plans=run["plans"],
+                obstacles=boxes["detour"],
+            )
+
+            def appears(track: Any, start: tuple[float, float, float]) -> None:
+                if track is None:
+                    boxes["appears"] = corridor(start)
+                    peer.call("synthetic_obstacles", obstacles=boxes["appears"])
+                elif "dropped" not in boxes and math.dist(track[-1], start[:2]) >= 0.5:
+                    x, y = track[-1]
+                    boxes["dropped"] = [blocker((x, y, start[2]), 1.0)]
+                    boxes["appears"] = boxes["appears"] + boxes["dropped"]
+                    peer.call("synthetic_obstacles", obstacles=boxes["appears"])
+
+            run = goal_run("obstacle_appears", 3.5, appears)
+            gap = gaps(run["track"], "appears")
+            case(
+                "obstacle_appears_replans_or_stops_clear",
+                "dropped" in boxes
+                and gap >= min_gap
+                and (run["reached_s"] is not None or run["stopped_at_end"]),
+                outcome="reached" if run["reached_s"] is not None else "stopped",
+                reached_s=run["reached_s"],
+                clearance_m=gap,
+                plans=run["plans"],
+                obstacles=boxes["appears"],
+            )
+
+            # MovementManager cancels the goal on any teleop message (DimOS semantics):
+            # the operator's input wins and the robot does not walk off again by itself.
+            window: dict[str, float] = {}
+
+            def preempt(track: Any, start: tuple[float, float, float]) -> bool:
+                if track is None:
+                    peer.call("synthetic_obstacles", obstacles=corridor(start))
+                elif "on" not in window and math.dist(track[-1], start[:2]) >= 0.2:
+                    window["on"] = time.monotonic()
+                    tele(0.0, 0.2)
+                elif "on" in window and "off" not in window:
+                    if time.monotonic() - window["on"] >= 2.0:
+                        window["off"] = time.monotonic()
+                        tele_stop()
+                return "off" in window and time.monotonic() - window["off"] >= 3.0
+
+            run = goal_run("teleop_preempts_goal", 3.0, preempt)
+            mine = [r for r in inputs_seen if r["scenario"] == "teleop_preempts_goal"]
+            # Skip the first 0.3 s of the window: the switch reaches pc2 over the link.
+            during_teleop = [
+                r
+                for r in mine
+                if window.get("on", math.inf) + 0.3 <= r["monotonic"] <= window.get("off", 0.0)
+            ]
+            after_teleop = [r for r in mine if r["monotonic"] > window.get("off", math.inf) + 0.5]
+            teleop_only = bool(during_teleop) and all(
+                r["vx"] == 0.0 and abs(r["wz"] - 0.2) < 0.02 for r in during_teleop
+            )
+            no_resume = all(r["vx"] == 0.0 for r in after_teleop)
+            case(
+                "teleop_preempts_and_cancels_goal",
+                "off" in window
+                and teleop_only
+                and no_resume
+                and run["reached_s"] is None
+                and run["stopped_at_end"],
+                relayed_during_teleop=len(during_teleop),
+                teleop_only=teleop_only,
+                walking_after_teleop=not no_resume,
+                stopped_at_end=run["stopped_at_end"],
+            )
+            execution.begin_navigation()
+            wait(lambda: nav()["phase"] == "active", 1.5, "after obstacle cases")
             execution.end_navigation()
             wait(lambda: nav()["pose_ready"], 6.0, "final cancel")
             settle("final")

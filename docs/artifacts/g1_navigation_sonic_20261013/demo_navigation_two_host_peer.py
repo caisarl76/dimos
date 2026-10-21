@@ -41,6 +41,8 @@ import zenoh
 from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
 from dimos.core.coordination.module_coordinator import ModuleCoordinator
 from dimos.msgs.geometry_msgs.Pose import Pose
+from dimos.msgs.geometry_msgs.Quaternion import Quaternion
+from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.geometry_msgs.Twist import Twist
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.msgs.nav_msgs.OccupancyGrid import OccupancyGrid
@@ -50,12 +52,64 @@ from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
 from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_peer import (
     unitree_g1_sonic_navigation_peer,
 )
-from dimos.robot.unitree.g1.g1_tf_publisher import torso_to_mid360
+from dimos.robot.unitree.g1.g1_tf_publisher import (
+    _WAIST_PITCH_IDX,
+    _WAIST_ROLL_IDX,
+    _WAIST_YAW_IDX,
+    base_to_torso,
+    torso_to_mid360,
+)
 from dimos.robot.unitree.g1.sonic_navigation_peer_module import SonicNavigationPeerModule
 from dimos.robot.unitree.g1.sonic_navigation_readiness import INPUT_BUDGETS
 from dimos.robot.unitree.g1.sonic_navigation_sensor_module import SonicNavigationSensorReceiver
 
 NATIVE_NAMES = ("pointlio_native", "voxel_ray_tracing")
+SYNTHETIC_CELLS, SYNTHETIC_RESOLUTION = 200, 0.05  # a 10 m square around the robot
+
+
+def truth_sensor_pose(row: dict[str, Any], mount: Transform) -> Transform:
+    """Simulation only: odom->mid360_link from the MuJoCo pelvis and waist joints.
+
+    odom is the MuJoCo world. The chain matches the robot (pelvis, waist, mount), so the
+    production receiver composes it back into the pelvis pose.
+    """
+    qpos = row["qpos"]
+    w, x, y, z = qpos[3:7]
+    joints = qpos[7:]
+    pelvis = Transform(
+        translation=Vector3(*qpos[:3]),
+        rotation=Quaternion(x, y, z, w),
+        frame_id="odom",
+        child_frame_id="base_link",
+    )
+    waist = base_to_torso(joints[_WAIST_YAW_IDX], joints[_WAIST_ROLL_IDX], joints[_WAIST_PITCH_IDX])
+    return pelvis + waist + mount
+
+
+def synthetic_grid(x: float, y: float, obstacles: list[list[float]], ts: float) -> OccupancyGrid:
+    """Simulation-only costmap: free around (x, y), with oriented boxes occupied.
+
+    Each obstacle is [cx, cy, half_x, half_y, yaw]: half extents along the box's own axes.
+    """
+    half = SYNTHETIC_CELLS * SYNTHETIC_RESOLUTION / 2
+    ox, oy = x - half, y - half
+    cells = np.zeros((SYNTHETIC_CELLS, SYNTHETIC_CELLS), dtype=np.int8)
+    rows, cols = np.indices(cells.shape)
+    cx = ox + (cols + 0.5) * SYNTHETIC_RESOLUTION
+    cy = oy + (rows + 0.5) * SYNTHETIC_RESOLUTION
+    for bx, by, hx, hy, yaw in obstacles:
+        c, s = math.cos(yaw), math.sin(yaw)
+        along = (cx - bx) * c + (cy - by) * s
+        across = -(cx - bx) * s + (cy - by) * c
+        cells[(np.abs(along) <= hx) & (np.abs(across) <= hy)] = 100
+    return OccupancyGrid(
+        grid=cells,
+        resolution=SYNTHETIC_RESOLUTION,
+        origin=Pose(position=Vector3(ox, oy, 0.0)),
+        frame_id="odom",
+        ts=ts,
+    )
+
 
 if os.environ.get("SONIC_TWO_HOST_OUTPUT"):
     # Workers re-import this entry module: audit link control calls (behavior unchanged).
@@ -263,27 +317,51 @@ def main() -> None:
         costmap_out = coordinator.transports[("global_costmap", OccupancyGrid)]
         stop = threading.Event()
         synthetic = threading.Event()
+        obstacles: list[list[float]] = []
+        truth = threading.Event()
+        lio_out = coordinator.transports[("lio_odometry", Odometry)]
+        lio_cloud_out = coordinator.transports[("lidar", PointCloud2)]
 
         def publish_synthetic() -> None:
-            # Simulation-only stand-in for a frozen CostMapper: an all-free 6 m square
-            # around the robot, stamped with the latest real map stamp so its progress
-            # still tracks the real ray map. Production never clears cells.
+            # Simulation-only stand-in for a frozen CostMapper: a free 6 m square around
+            # the robot plus any obstacle boxes, stamped with the latest real map stamp so
+            # its progress still tracks the real ray map. Production never clears cells.
             while synthetic.is_set() and not stop.wait(0.2):
                 with lock:
                     cloud, odom = latest.get("global_map"), latest.get("odometry")
+                    boxes = list(obstacles)
                 if cloud is None or odom is None:
                     continue
-                origin = Pose(position=Vector3(odom.position.x - 3.0, odom.position.y - 3.0, 0.0))
                 costmap_out.broadcast(
-                    None,
-                    OccupancyGrid(
-                        grid=np.zeros((120, 120), dtype=np.int8),
-                        resolution=0.05,
-                        origin=origin,
-                        frame_id="odom",
-                        ts=cloud.ts,
-                    ),
+                    None, synthetic_grid(odom.position.x, odom.position.y, boxes, cloud.ts)
                 )
+
+        def publish_truth(scan: PointCloud2) -> None:
+            # Simulation-only stand-in for a frozen PointLIO: the replayed scans do not
+            # see the MuJoCo world, so its pose cannot follow the robot. Publish its two
+            # outputs from MuJoCo truth instead, stamped with each scan.
+            if not truth.is_set():
+                return
+            row = json.loads((args.output / "physics-latest.json").read_text())
+            sensor = truth_sensor_pose(row, mount)
+            lio_out.broadcast(
+                None,
+                Odometry(
+                    ts=scan.ts,
+                    frame_id="odom",
+                    child_frame_id="mid360_link",
+                    pose=Pose(position=sensor.translation, orientation=sensor.rotation),
+                ),
+            )
+            matrix = sensor.to_matrix()
+            points = scan.as_numpy()[0] @ matrix[:3, :3].T + matrix[:3, 3]
+            lio_cloud_out.broadcast(
+                None, PointCloud2.from_numpy(points, frame_id="odom", timestamp=scan.ts)
+            )
+
+        subscriptions.append(
+            coordinator.transports[("lidar_raw", PointCloud2)].subscribe(publish_truth)
+        )
 
         def publish_teleop() -> None:
             while not stop.wait(0.1):
@@ -344,6 +422,13 @@ def main() -> None:
             elif op == "synthetic_costmap":
                 synthetic.set()
                 threading.Thread(target=publish_synthetic, daemon=True).start()
+                reply(op=op)
+            elif op == "synthetic_obstacles":
+                with lock:
+                    obstacles[:] = command["obstacles"]
+                reply(op=op)
+            elif op == "truth_lio":
+                (truth.set if command["on"] else truth.clear)()
                 reply(op=op)
             elif op == "synthetic_stop":
                 synthetic.clear()

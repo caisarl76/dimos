@@ -261,3 +261,96 @@ def test_peer_call_skips_a_late_reply_to_an_earlier_timed_out_call(monkeypatch):
         assert peer.call("stop")["op"] == "stop"
     finally:
         peer.process.kill()
+
+
+def load_peer_host():
+    spec = importlib.util.spec_from_file_location(
+        "two_host_peer", HERE / "demo_navigation_two_host_peer.py"
+    )
+    peer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(peer)
+    return peer
+
+
+def test_truth_pose_composes_back_to_the_simulated_pelvis(mocker):
+    """The sim-only PointLIO stand-in must reproduce the robot's frame chain: the
+    production receiver turns its sensor pose back into the MuJoCo pelvis pose."""
+    import math
+    from types import SimpleNamespace
+
+    from dimos.msgs.geometry_msgs.Pose import Pose
+    from dimos.msgs.geometry_msgs.Quaternion import Quaternion
+    from dimos.msgs.geometry_msgs.Vector3 import Vector3
+    from dimos.msgs.nav_msgs.Odometry import Odometry
+    from dimos.robot.unitree.g1.g1_tf_publisher import torso_to_mid360
+    from dimos.robot.unitree.g1.sonic_navigation_sensor_module import (
+        SonicNavigationSensorReceiver,
+        encode_waist,
+    )
+
+    peer = load_peer_host()
+    yaw = 0.7
+    joints = [0.0] * 29
+    joints[12], joints[13], joints[14] = 0.3, 0.05, -0.08  # waist yaw, roll, pitch
+    q = Quaternion.from_euler(Vector3(0.02, -0.03, yaw))
+    row = {"qpos": [1.5, -0.4, 0.79, q.w, q.x, q.y, q.z, *joints]}
+    mount = torso_to_mid360()
+    sensor = peer.truth_sensor_pose(row, mount)
+
+    t, r = mount.translation, mount.rotation
+    receiver = SonicNavigationSensorReceiver(
+        cloud_endpoint="tcp://127.0.0.1:7101",
+        state_endpoint="tcp://127.0.0.1:7102",
+        torso_to_sensor=(t.x, t.y, t.z, r.x, r.y, r.z, r.w),
+    )
+    mocker.patch(
+        "dimos.robot.unitree.g1.sonic_navigation_sensor_module.monotonic", return_value=10.0
+    )
+    out: list = []
+    receiver.odometry.subscribe(out.append)
+    lowstate = SimpleNamespace(tick=5000, motor_state=[SimpleNamespace(q=j) for j in joints])
+    receiver.handle_frames("state", [[b"waist_tf", encode_waist(lowstate)]])
+    receiver.observe_lio_odometry(
+        Odometry(
+            ts=100.0,
+            frame_id="odom",
+            child_frame_id="mid360_link",
+            pose=Pose(position=sensor.translation, orientation=sensor.rotation),
+        )
+    )
+    receiver.stop()
+    (base,) = out
+    assert (base.x, base.y, base.position.z) == pytest.approx((1.5, -0.4, 0.79), abs=1e-6)
+    assert base.yaw == pytest.approx(yaw, abs=1e-6)
+    assert not math.isclose(sensor.translation.z, 0.79)  # the sensor sits above the pelvis
+
+
+def test_synthetic_grid_marks_oriented_boxes_only():
+    import math
+
+    peer = load_peer_host()
+    # A 0.4 x 0.2 m box centred at (1.6, 2.0), long side along +y.
+    grid = peer.synthetic_grid(1.0, 2.0, [[1.6, 2.0, 0.2, 0.1, math.pi / 2]], ts=5.0)
+    cells = np.asarray(grid.grid)
+    assert cells.shape == (200, 200) and grid.ts == 5.0 and grid.frame_id == "odom"
+    assert (grid.origin.position.x, grid.origin.position.y) == (-4.0, -3.0)
+    occupied = np.argwhere(cells == 100)
+    xs = grid.origin.position.x + (occupied[:, 1] + 0.5) * 0.05
+    ys = grid.origin.position.y + (occupied[:, 0] + 0.5) * 0.05
+    assert len(occupied) == 32  # 4 x 8 cells at 0.05 m
+    assert xs.min() > 1.49 and xs.max() < 1.71 and ys.min() > 1.79 and ys.max() < 2.21
+    assert (cells[cells != 100] == 0).all()
+
+
+def test_corridor_geometry_for_obstacle_cases(monkeypatch):
+    import math
+
+    monkeypatch.syspath_prepend(str(HERE))
+    from demo_navigation_two_host import clearance, rect
+
+    # Facing +y from (1, 1): 1.5-2.1 m ahead, from 1.2 m right to 0.12 m right.
+    box = rect((1.0, 1.0, math.pi / 2), ahead=(1.5, 2.1), left=(-1.2, -0.12))
+    assert box == pytest.approx([1.0 + 0.66, 1.0 + 1.8, 0.3, 0.54, math.pi / 2])
+    # Straight ahead along the centre line passes 0.12 m from the box's left edge.
+    assert clearance([(1.0, 1.0 + d / 10) for d in range(40)], box) == pytest.approx(0.12)
+    assert clearance([(1.0 + 0.5, 1.0 + 1.8)], box) == 0.0  # inside
