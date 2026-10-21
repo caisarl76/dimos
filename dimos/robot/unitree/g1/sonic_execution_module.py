@@ -385,14 +385,16 @@ class SonicExecutionModule(Module):
             accepted = await asyncio.wait_for(
                 asyncio.shield(future), timeout=self.config.navigation_rpc_timeout_seconds
             )
-            if (
-                accepted is not True
-                or self._navigation.status.request_id != request_id
-                or self._navigation.status.phase
-                not in (NavigationPhase.REARMING, NavigationPhase.ACTIVE)
-            ):
-                raise RuntimeError("navigation goal rejected or admission closed")
-            return True
+            status = self._navigation.status
+            if accepted is not True:
+                reason = "peer refused"
+            elif status.request_id != request_id:
+                reason = "request changed"
+            elif status.phase not in (NavigationPhase.REARMING, NavigationPhase.ACTIVE):
+                reason = f"phase {status.phase.value}"
+            else:
+                return True
+            raise RuntimeError(f"navigation goal rejected or admission closed ({reason})")
         except Exception:
             self._navigation.end(now=time.monotonic())
             raise

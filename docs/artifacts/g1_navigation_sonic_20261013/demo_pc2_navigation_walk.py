@@ -127,6 +127,9 @@ CASES = {
         "goal", seconds=20.0, requires=("goal_1m",), distance=2.0, event="teleop"
     ),
 }
+# Base centre to the nearest box cell, about the G1 shoulder half-width (operator
+# decision 2026-10-21; session 6 passed a box at 0.247 m without contact).
+MIN_CLEARANCE_M = 0.20
 # Probes along the path for a placed obstacle: 0.6-1.8 m, then the goal cell.
 OBSTACLE_PROBES = [0.6 + 0.1 * i for i in range(13)]
 
@@ -642,8 +645,7 @@ def run_session(args: Any) -> None:
                 record["clearance_m"] = track_clearance(
                     [(r["odom"][0], r["odom"][1]) for r in rows], cells
                 )
-            # Robot half-width (0.3 m) less one 0.05 m costmap cell.
-            clear_ok = (record.get("clearance_m") or 0.0) >= 0.25
+            clear_ok = (record.get("clearance_m") or 0.0) >= MIN_CLEARANCE_M
             if case.event == "placed":
                 ok = reached is not None and clear_ok
             else:  # replanned and arrived, or stopped short: either way clear of the box
