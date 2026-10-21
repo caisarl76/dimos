@@ -20,7 +20,8 @@ telemetry on 127.0.0.1:5557 and reads references from 127.0.0.1:5556. Before `di
 1. Start the controller on each PC2 and confirm planner idle.
 2. Open the tunnels, one per robot (-R carries the PC2's reference port to this process, -L its
    telemetry here). ExitOnForwardFailure makes ssh exit if the PC2's 5556 is still held (e.g. by
-   start-idle-planner.py) instead of silently running without the reference forward:
+   start-idle-planner.py) instead of silently running without the reference forward. ServerAlive* drops a dead link within
+   ~10 s, so the robot's reference lease expires and DimOS sees stale feedback:
 
        ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:15556 -L 15557:127.0.0.1:5557 pc2_222
        ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:16556 -L 16557:127.0.0.1:5557 pc2_223
@@ -37,7 +38,7 @@ telemetry on 127.0.0.1:5557 and reads references from 127.0.0.1:5556. Before `di
    max-dq 2.0 rad/s is the validated value (sim acceptance); the config default is 3.0.
 
 If a skill says "SONIC is not in confirmed planner idle" while the planner is idle, check the
-execution status from `dimos shell` (e.g. `g1_222.get_status()`: `subscriptions_ready`,
+execution status from `dimos shell` (e.g. `app.g1_222.get_status()`: `subscriptions_ready`,
 `feedback_fresh`, `feedback_age_s`, `ready`); usually a tunnel forward is missing.
 
 To restart one robot's controller: `dimos stop`, stop that robot's tunnel, then repeat the bring-up
