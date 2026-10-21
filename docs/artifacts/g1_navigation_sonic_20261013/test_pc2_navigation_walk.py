@@ -268,11 +268,17 @@ def test_placed_obstacle_must_be_seen_and_the_goal_cell_free() -> None:
     assert "ahead" in walk.goal_admissible(seen)
 
 
-def test_track_clearance_is_the_nearest_occupied_cell() -> None:
+def test_track_clearance_is_the_nearest_occupied_cell_ahead() -> None:
     import numpy as np
 
-    grid = np.zeros((40, 40), dtype=np.int8)
-    grid[20, 30] = 100  # cell centre (1.525, 1.025) for origin (0, 0), 0.05 m
-    track = [(0.0, 1.025), (1.0, 1.025)]
-    assert walk.track_clearance(track, grid, (0.0, 0.0), 0.05) == pytest.approx(0.525)
-    assert walk.track_clearance(track, np.zeros((4, 4), dtype=np.int8), (0.0, 0.0), 0.05) is None
+    grid = np.zeros((80, 80), dtype=np.int8)
+    grid[40, 70] = 100  # box cell centre (1.525, 0.025) for origin (-2, -2), 0.05 m
+    grid[40, 25] = 100  # crane cell centre (-0.725, 0.025), behind a start at the origin
+    cells = walk.occupied_ahead(grid, (-2.0, -2.0), 0.05, (0.0, 0.0, 0.0))
+    assert cells.ravel().tolist() == pytest.approx([1.525, 0.025])
+    # Facing -x, the crane cell is the one ahead.
+    behind = walk.occupied_ahead(grid, (-2.0, -2.0), 0.05, (0.0, 0.0, math.pi))
+    assert behind.ravel().tolist() == pytest.approx([-0.725, 0.025])
+    track = [(0.0, 0.5), (1.5, 0.5)]
+    assert walk.track_clearance(track, cells) == pytest.approx(math.hypot(0.025, 0.475))
+    assert walk.track_clearance(track, np.zeros((0, 2))) is None
