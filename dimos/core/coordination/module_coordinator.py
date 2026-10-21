@@ -1205,6 +1205,16 @@ def _connect_module_refs(
             if ref_key in external_refs:
                 mod_and_mod_ref_to_proxy[ref_key] = external_refs.pop(ref_key)
                 continue
+            named_instance = blueprint.remapping_map.get(ref_key)
+            if isinstance(named_instance, str):
+                known = {a.name for a in (*blueprint.active_blueprints, *existing_atoms)}
+                if named_instance not in known:
+                    raise ValueError(
+                        f"{bp.name}.{module_ref.name} is remapped to instance "
+                        f"{named_instance!r}, but no module has that name."
+                    )
+                mod_and_mod_ref_to_proxy[ref_key] = named_instance
+                continue
             spec = mod_and_mod_ref_to_proxy.get((bp.name, module_ref.name), module_ref.spec)
 
             result = _resolve_single_ref(
