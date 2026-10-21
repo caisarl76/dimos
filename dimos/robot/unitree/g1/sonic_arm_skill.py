@@ -28,13 +28,13 @@ stop_arm retreats the same way a safety stop does.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 import math
 from pathlib import Path
 import threading
 import time
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -64,6 +64,7 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
+from dimos.robot.unitree.g1.sonic_session import validate_actions
 from dimos.spec.utils import Spec
 from dimos.utils.logging_config import setup_logger
 
@@ -229,37 +230,55 @@ class _Watch:
     overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
 
 
-class SonicArmSkillContainer(Module):
-    """Arm-reference skills over the guarded SONIC controller (no hands required)."""
+@dataclass
+class _Prepared:
+    """A planned move, checked and encoded; nothing has been sent."""
 
-    config: SonicArmSkillConfig
-    feedback: In[SonicFeedback]
-    _execution: SonicArmExecutionSpec
+    label: str
+    base: NDArray[np.float64]
+    deltas: NDArray[np.float64]
+    delta: NDArray[np.float64]
+    plan: NDArray[np.float64]
+    chunks: list[tuple[int, int]]
+    retreat: Callable[[int], NDArray[np.float64] | None]
+    profile: dict[str, Any]
+    watch: _Watch
+    keyframes: int
+    encode_s: float
+    report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None
 
-    def __init__(self, **kwargs: Any) -> None:
+
+class SonicArm:
+    """One robot's arm engine: plans, checks and streams a move through its execution module."""
+
+    def __init__(
+        self,
+        name: str,
+        config: SonicArmSkillConfig,
+        execution: SonicArmExecutionSpec,
+        encoder: SonicEncoder,
+        checker: ArmCollisionChecker | None,
+    ) -> None:
+        self.name = name
+        self.config = config
+        self._execution = execution
+        self._encoder = encoder
+        self._checker = checker
         self._lock = threading.Lock()
-        # Serializes every change of the running motion: start, refusal, rebind and cleanup.
-        self._lifecycle = threading.Lock()
-        self._running: str | None = None  # The running motion's skill (and tool-stream) name.
-        self._stop = threading.Event()
         self._watch: _Watch | None = None
-        self._encoder: SonicEncoder | None = None
-        self._checker: ArmCollisionChecker | None = None
-        super().__init__(**kwargs)
+        self.stop = threading.Event()
 
-    @rpc
-    def start(self) -> None:
-        self._encoder = SonicEncoder(self.config.encoder_path)
-        if self.config.collision_model_path is not None:
-            self._checker = ArmCollisionChecker(self.config.collision_model_path)
-        super().start()
+    def reset(self) -> None:
+        """Forget the previous motion: clear its stop request and watch."""
+        self.stop.clear()
+        with self._lock:
+            self._watch = None
 
-    @rpc
-    def stop(self) -> None:
-        super().stop()
+    def clear_watch(self) -> None:
+        with self._lock:
+            self._watch = None
 
-    @rpc
-    async def handle_feedback(self, feedback: SonicFeedback) -> None:
+    def handle_feedback(self, feedback: SonicFeedback) -> None:
         """Track the active move's envelope, reach and speeds from every telemetry sample."""
         with self._lock:
             watch = self._watch
@@ -285,6 +304,383 @@ class SonicArmSkillContainer(Module):
                     watch.abort = f"{_JOINTS[j]} left its envelope ({q[j]:+.3f} rad)"
                 elif dq[k] > watch.max_dq:
                     watch.abort = f"{_JOINTS[k]} speed {dq[k]:.2f} rad/s > {watch.max_dq}"
+
+    def prepare(
+        self,
+        label: str,
+        keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]],
+        allowed: NDArray[np.float64],
+        *,
+        require_check: bool,
+        report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
+    ) -> _Prepared:
+        """Plan, check and encode a move. Raises with nothing sent."""
+        if require_check and self._checker is None:
+            raise RuntimeError(_NO_PATH_CHECK)
+        status = self._execution.get_status()
+        profile = status["profile"]
+        if not status["ready"]:
+            raise RuntimeError("SONIC is not in confirmed planner idle; nothing sent")
+        state = self._execution.get_feedback()
+        if state is None or state.token_state is None:
+            raise RuntimeError("no fresh controller feedback; nothing sent")
+        base = np.asarray(state.body_q, np.float64)
+        keyframes = keyframes_of(base)
+        targets = np.asarray([k.target for k in keyframes], np.float64).reshape(-1, 29)
+        deltas = targets - base
+        if not np.abs(deltas).max() > math.radians(1):
+            raise ValueError("the arm is already there; nothing to move")
+        # Token-plan rows: token_schedule adds the same blend at each end of the poses.
+        pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+        kplan = keyframe_plan(base, keyframes, split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad)
+        # Where a safety stop at each segment resumes. A unit that is the tail of the plan reuses
+        # the plan's own tokens.
+        units = [retreat_poses(kplan, s) for s in range(len(kplan.segments))]
+        is_tail = [np.array_equal(u, kplan.poses[len(kplan.poses) - len(u) :]) for u in units]
+        if any(len(u) + pad > _MAX_CHUNK_ROWS for u in units):
+            raise ValueError("a retreat is longer than one session chunk")
+        extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
+        if self._checker is not None:
+            for path in (kplan.poses, *extra.values()):
+                if contact := self._checker.first_contact(path, start=base):
+                    raise RuntimeError(
+                        f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
+                    )
+        started = time.monotonic()
+        motion_tokens = self._encoder.encode(kplan.poses)
+        unit_tokens = {key: self._encoder.encode(u) for key, u in extra.items()}
+        encode_s = time.monotonic() - started
+        if self.stop.is_set():
+            raise RuntimeError("stopped on request; nothing sent")
+        current = self._execution.get_feedback()
+        if current is None or np.abs(np.asarray(current.body_q) - base).max() > _MOVED_LIMIT:
+            raise RuntimeError("the body moved while the reference was encoded; nothing sent")
+        captured = np.asarray(state.token_state)
+        tokens = token_schedule(captured, motion_tokens)
+        hands = np.r_[state.left_hand_q, state.right_hand_q]
+        plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
+        chunks = chunk_rows(len(plan), token_still(tokens))
+
+        def retreat_rows(segment: int, offset: int) -> NDArray[np.float64]:
+            unit = units[segment]
+            unit_rows = (
+                motion_tokens[len(motion_tokens) - len(unit) :]
+                if is_tail[segment]
+                else unit_tokens[unit.tobytes()]
+            )
+            rows = token_schedule(captured, unit_rows)[pad + offset :]
+            return np.hstack([rows, np.tile(hands, (len(rows), 1))])
+
+        def retreat(token_row: int) -> NDArray[np.float64] | None:
+            route = retreat_route(kplan, max(token_row - pad, 0))
+            if route is None:
+                return None  # Already on the way home.
+            return retreat_rows(*route)
+
+
+        longest_chunk = max(end - start for start, end in chunks)
+        longest_retreat = max(len(u) + pad for u in units)
+        if (
+            profile["max_observation_age"] <= longest_chunk / RATE + 0.5
+            or profile["max_duration"] <= len(plan) / RATE + longest_retreat / RATE + 2.0
+        ):
+            raise RuntimeError(
+                "the execution profile's observation age and duration must cover the plan",
+            )
+        delta = deltas[np.argmax(np.linalg.norm(deltas, axis=1))]
+        allowed = allowed + np.abs(deltas).max(axis=0)
+        token_bound = profile["token_bound"]
+        for start, end in chunks:  # What the session would reject is refused with nothing sent.
+            validate_actions(plan[start:end], token_bound)
+        for segment in range(len(units)):
+            validate_actions(retreat_rows(segment, 0), token_bound)
+        return _Prepared(
+            label=label,
+            base=base,
+            deltas=deltas,
+            delta=delta,
+            plan=plan,
+            chunks=chunks,
+            retreat=retreat,
+            profile=profile,
+            watch=_Watch(base=base, allowed=allowed, max_dq=self.config.max_dq, delta=delta),
+            keyframes=len(keyframes),
+            encode_s=encode_s,
+            report_extra=report_extra,
+        )
+
+    def recheck(self, prepared: _Prepared) -> None:
+        """The checks made after encoding, again just before the task starts."""
+        if not self._execution.get_status()["ready"]:
+            raise RuntimeError("SONIC is not in confirmed planner idle; nothing sent")
+        current = self._execution.get_feedback()
+        if current is None or current.token_state is None:
+            raise RuntimeError("no fresh controller feedback; nothing sent")
+        if np.abs(np.asarray(current.body_q) - prepared.base).max() > _MOVED_LIMIT:
+            raise RuntimeError("the body moved before the task started; nothing sent")
+
+    def execute(self, prepared: _Prepared) -> SkillResult:
+        """Start the task, stream the prepared move and report."""
+        self.recheck(prepared)
+        label, base, deltas, delta = prepared.label, prepared.base, prepared.deltas, prepared.delta
+        plan, chunks, profile, watch = (
+            prepared.plan,
+            prepared.chunks,
+            prepared.profile,
+            prepared.watch,
+        )
+        with self._lock:
+            self._watch = watch
+        try:
+            task_id = self._execution.start_task()["task_id"]
+        except Exception as exc:
+            raise RuntimeError(f"execution refused the task: {exc}; nothing sent") from exc
+        try:
+            outcome = self._stream(task_id, plan, chunks, prepared.retreat, profile, watch)
+        except Exception as exc:
+            outcome = f"{type(exc).__name__}: {exc}"
+            try:
+                self._execution.cancel_task(task_id)
+            except Exception:
+                pass  # The execution module fails the session on its own faults.
+        task = self._wait_done(profile)
+        with self._lock:
+            watch.returning = True
+        if task is not None and task["handback_confirmed"]:
+            time.sleep(self.config.return_watch_seconds)
+
+        moved = np.nonzero(np.any(deltas != 0, axis=0))[0]
+        report = {
+            "task_id": task_id,
+            "motion": label,
+            "reached_fraction": round(watch.reached, 2),
+            "planned_deg": {_JOINTS[j]: round(math.degrees(base[j] + delta[j]), 1) for j in moved},
+            "reached_deg": {
+                _JOINTS[j]: round(math.degrees(watch.reached_q[j]), 1)
+                if watch.reached > 0
+                else None
+                for j in moved
+            },
+            "max_deviation_rad": {
+                # The moving joints are the motion itself, not deviations.
+                g: round(float(max([watch.deviation[j] for j in i if j not in moved] or [0.0])), 3)
+                for g, i in _GROUPS.items()
+            },
+            "stream_peak_dq": _peak(watch.stream_dq),
+            "return_peak_dq": _peak(watch.return_dq),
+            "keyframes": prepared.keyframes,
+            "chunks": len(chunks),
+            "encode_s": round(prepared.encode_s, 2),
+            "journal_path": self._execution.get_status()["journal_path"],
+        }
+        if prepared.report_extra is not None:
+            report.update(prepared.report_extra(base))
+        if len(moved) == 1:  # move_upper_body: the swing in degrees, as before.
+            report["reached_deg"] = round(math.degrees(watch.reached * abs(delta[moved[0]])), 1)
+            report["planned_deg"] = round(math.degrees(abs(delta[moved[0]])), 1)
+        journal = report["journal_path"]
+        if task is None or not task["handback_confirmed"]:
+            raise RuntimeError(
+                f"planner handback unconfirmed ({outcome}); check the controller. Journal: {journal}"
+            )
+        if outcome == "finished" and task["outcome"] != "finished":
+            outcome = f"session {task['outcome']}: {task['reason']}"
+        if outcome not in ("finished", "envelope"):
+            raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
+        if outcome == "envelope":
+            message = f"{label} stopped early: {watch.abort}"
+        elif watch.reached < 0.5:  # SONIC tracked less than half the planned move.
+            message = f"{label} did not follow the reference: reached {100 * watch.reached:.0f}% of the plan"
+        elif len(moved) == 1:
+            message = f"{label} reached {report['reached_deg']:.1f} deg and returned"
+        else:
+            message = f"{label} reached {100 * watch.reached:.0f}% of the planned pose and returned"
+        return SkillResult(f"{message}; control returned to SONIC's planner", metadata=report)
+
+    def _stream(
+        self,
+        task_id: str,
+        plan: NDArray[np.float64],
+        chunks: list[tuple[int, int]],
+        retreat: Callable[[int], NDArray[np.float64] | None],
+        profile: dict[str, Any],
+        watch: _Watch,
+    ) -> str:
+        startup = time.monotonic() + profile["seed_seconds"] + profile["arm_timeout"] + 1.0
+        while (task := self._task())["phase"] != "waiting_for_chunk":
+            if task["phase"] == "done" or time.monotonic() > startup:
+                return f"stream did not arm ({task['reason']})"
+            time.sleep(0.01)
+        plan_start = next_check = time.monotonic()
+        start, end = chunks[0]
+        task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
+        pending, sequence = chunks[1:], 0
+        retreat_start: float | None = None  # set once a safety stop starts the smooth way back
+        while True:
+            now = time.monotonic()
+            with self._lock:
+                if self.stop.is_set() and watch.abort is None:
+                    watch.abort = "stop requested"  # Retreats like a safety stop.
+                abort, overspeed_at = watch.abort, watch.overspeed_at
+            if abort is not None and retreat_start is None:
+                if (rows := retreat(int((now - plan_start) * RATE))) is not None:
+                    pending = []  # The way back replaces the rest of the plan.
+                    sequence += 1
+                    task = self._execution.submit_chunk(task_id, sequence, now, rows)
+                    plan, plan_start = rows, now
+                retreat_start = now
+            elif retreat_start is not None and overspeed_at > retreat_start:
+                self._execution.cancel_task(task_id)  # A joint ran away during the way back.
+                return "envelope"
+            if (now - plan_start) * RATE >= len(plan) - 2:
+                # The plan already blended back to the planner token.
+                self._execution.finish_task(task_id)
+                # Checked against the session's own outcome afterwards.
+                return "finished" if retreat_start is None else "envelope"
+            if pending and now >= plan_start + pending[0][0] / RATE:
+                start, end = pending.pop(0)
+                sequence += 1
+                task = self._execution.submit_chunk(
+                    task_id, sequence, plan_start + start / RATE, plan[start:end]
+                )
+            elif now >= next_check:
+                task, next_check = self._task(), now + 0.1
+            if task["phase"] not in ("waiting_for_chunk", "running"):
+                return f"session ended: {task['reason']}"
+            time.sleep(0.005)
+
+    def _task(self) -> dict[str, Any]:
+        task: dict[str, Any] = self._execution.get_status()["task"]
+        return task
+
+    def _wait_done(self, profile: dict[str, Any]) -> dict[str, Any] | None:
+        deadline = time.monotonic() + profile["handback_timeout"] + 1.0
+        while time.monotonic() < deadline:
+            task = self._task()
+            if task["phase"] == "done":
+                return task
+            time.sleep(0.01)
+        return None
+
+
+class ArmLauncher:
+    """Background launch, tool-stream reporting and stop of arm motions, over the host's arms.
+
+    The host provides `_arms()` and the Module tool-stream methods.
+    """
+
+    if TYPE_CHECKING:
+
+        def _arms(self) -> Sequence[SonicArm]: ...
+        def start_tool(self, name: str) -> None: ...
+        def tool_update(self, name: str, message: str) -> None: ...
+        def stop_tool(self, name: str) -> None: ...
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # Serializes every change of the running motion: start, refusal, rebind and cleanup.
+        self._lifecycle = threading.Lock()
+        self._running: str | None = None  # The running motion's skill (and tool-stream) name.
+        super().__init__(*args, **kwargs)
+
+    def _request_stop(self) -> str:
+        with self._lifecycle:
+            if self._running is None:
+                return "No arm motion is running."
+            for arm in self._arms():
+                arm.stop.set()
+        return "Stopping: the arm returns smoothly to its start pose; a tool update reports the result."
+
+    def _launch(
+        self,
+        tool: str,
+        prepare: Callable[[], Callable[[], SkillResult]],
+        arms: Sequence[SonicArm] | None = None,
+    ) -> str:
+        """Start a motion in the background; its result is the tool stream's final update.
+
+        Checks for a running motion before validating, and never closes or releases what it holds:
+        a same-tool retry through MCP has already taken over the capability hold, and start_tool
+        rebinds the live stream to it, so the running motion's stream stop releases it.
+        """
+        selected = self._arms() if arms is None else arms
+        with self._lifecycle:
+            if self._running == tool:
+                self.start_tool(tool)
+                return (
+                    f"{tool} is already running; its result will follow as a tool update. "
+                    "Call stop_arm to stop it."
+                )
+            if self._running is not None:
+                raise RuntimeError("an arm move is already running")
+            work = prepare()
+            self.start_tool(tool)
+            self._running = tool
+            for arm in selected:
+                arm.reset()
+            threading.Thread(
+                target=self._finish, args=(tool, work, selected), name=f"arm-{tool}", daemon=True
+            ).start()
+        return f"{tool} started; a tool update reports the result. Call stop_arm to stop early."
+
+    def _finish(
+        self, tool: str, work: Callable[[], SkillResult], arms: Sequence[SonicArm]
+    ) -> None:
+        started = time.monotonic()
+        try:
+            result = work()
+            elapsed_ms = (time.monotonic() - started) * 1000.0
+            text = replace(result, duration_ms=elapsed_ms).agent_encode()[0]["text"]
+        except Exception as exc:
+            text = f"{tool} failed: {exc}"
+        except BaseException as exc:
+            text = f"{tool} failed: {type(exc).__name__}"
+            raise  # After the cleanup below, so the motion never stays held.
+        finally:
+            logger.info("Arm skill result", tool=tool, result=text)
+            # One critical section: a call arriving now either rebinds a stream that still has
+            # this update to come, or finds nothing running and opens a fresh one.
+            with self._lifecycle:
+                try:
+                    self.tool_update(tool, text)
+                finally:
+                    self.stop_tool(tool)
+                    self._running = None
+                    for arm in arms:
+                        arm.clear_watch()
+
+
+class SonicArmSkillContainer(ArmLauncher, Module):
+    """Arm-reference skills over the guarded SONIC controller (no hands required)."""
+
+    config: SonicArmSkillConfig
+    feedback: In[SonicFeedback]
+    _execution: SonicArmExecutionSpec
+
+    def __init__(self, **kwargs: Any) -> None:
+        self._arm: SonicArm | None = None
+        super().__init__(**kwargs)
+
+    def _arms(self) -> Sequence[SonicArm]:
+        return [self._arm] if self._arm is not None else []
+
+    @rpc
+    def start(self) -> None:
+        encoder = SonicEncoder(self.config.encoder_path)
+        checker = None
+        if self.config.collision_model_path is not None:
+            checker = ArmCollisionChecker(self.config.collision_model_path)
+        self._arm = SonicArm("g1", self.config, self._execution, encoder, checker)
+        super().start()
+
+    @rpc
+    def stop(self) -> None:
+        super().stop()
+
+    @rpc
+    async def handle_feedback(self, feedback: SonicFeedback) -> None:
+        """Track the active move's envelope, reach and speeds from every telemetry sample."""
+        if self._arm is not None:
+            self._arm.handle_feedback(feedback)
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
     def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> str:
@@ -378,7 +774,7 @@ class SonicArmSkillContainer(Module):
         values = (shoulder_pitch_deg, shoulder_roll_deg, shoulder_yaw_deg, elbow_deg)
 
         def prepare() -> Callable[[], SkillResult]:
-            if self._checker is None:
+            if self._arm is None or self._arm._checker is None:
                 raise RuntimeError(_NO_PATH_CHECK)
             for (joint, (low, high)), value in zip(JOINT_BOUNDS.items(), values, strict=True):
                 if not math.isfinite(value) or not low <= value <= high:
@@ -432,60 +828,7 @@ class SonicArmSkillContainer(Module):
 
         The stopped motion's tool update reports how far it got.
         """
-        with self._lifecycle:
-            if self._running is None:
-                return "No arm motion is running."
-            self._stop.set()
-        return "Stopping: the arm returns smoothly to its start pose; a tool update reports the result."
-
-    def _launch(self, tool: str, prepare: Callable[[], Callable[[], SkillResult]]) -> str:
-        """Start a motion in the background; its result is the tool stream's final update.
-
-        Checks for a running motion before validating, and never closes or releases what it holds:
-        a same-tool retry through MCP has already taken over the capability hold, and start_tool
-        rebinds the live stream to it, so the running motion's stream stop releases it.
-        """
-        with self._lifecycle:
-            if self._running == tool:
-                self.start_tool(tool)
-                return (
-                    f"{tool} is already running; its result will follow as a tool update. "
-                    "Call stop_arm to stop it."
-                )
-            if self._running is not None:
-                raise RuntimeError("an arm move is already running")
-            work = prepare()
-            self.start_tool(tool)
-            self._running = tool
-            self._stop.clear()
-            threading.Thread(
-                target=self._finish, args=(tool, work), name=f"arm-{tool}", daemon=True
-            ).start()
-        return f"{tool} started; a tool update reports the result. Call stop_arm to stop early."
-
-    def _finish(self, tool: str, work: Callable[[], SkillResult]) -> None:
-        started = time.monotonic()
-        try:
-            result = work()
-            elapsed_ms = (time.monotonic() - started) * 1000.0
-            text = replace(result, duration_ms=elapsed_ms).agent_encode()[0]["text"]
-        except Exception as exc:
-            text = f"{tool} failed: {exc}"
-        except BaseException as exc:
-            text = f"{tool} failed: {type(exc).__name__}"
-            raise  # After the cleanup below, so the motion never stays held.
-        finally:
-            logger.info("Arm skill result", tool=tool, result=text)
-            # One critical section: a call arriving now either rebinds a stream that still has
-            # this update to come, or finds nothing running and opens a fresh one.
-            with self._lifecycle:
-                try:
-                    self.tool_update(tool, text)
-                finally:
-                    self.stop_tool(tool)
-                    self._running = None
-                    with self._lock:
-                        self._watch = None
+        return self._request_stop()
 
     def _run_targets(
         self,
@@ -514,221 +857,12 @@ class SonicArmSkillContainer(Module):
         require_check: bool,
         report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
     ) -> SkillResult:
-        if require_check and self._checker is None:
-            raise RuntimeError(_NO_PATH_CHECK)
-        return self._move(label, keyframes_of, allowed, report_extra)
-
-    def _move(
-        self,
-        label: str,
-        keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]],
-        allowed: NDArray[np.float64],
-        report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
-    ) -> SkillResult:
-        assert self._encoder is not None
-        status = self._execution.get_status()
-        profile = status["profile"]
-        if not status["ready"]:
-            raise RuntimeError("SONIC is not in confirmed planner idle; nothing sent")
-        state = self._execution.get_feedback()
-        if state is None or state.token_state is None:
-            raise RuntimeError("no fresh controller feedback; nothing sent")
-        base = np.asarray(state.body_q, np.float64)
-        keyframes = keyframes_of(base)
-        targets = np.asarray([k.target for k in keyframes], np.float64).reshape(-1, 29)
-        deltas = targets - base
-        if not np.abs(deltas).max() > math.radians(1):
-            raise ValueError("the arm is already there; nothing to move")
-        # Token-plan rows: token_schedule adds the same blend at each end of the poses.
-        pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
-        kplan = keyframe_plan(base, keyframes, split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad)
-        # Where a safety stop at each segment resumes. A unit that is the tail of the plan reuses
-        # the plan's own tokens.
-        units = [retreat_poses(kplan, s) for s in range(len(kplan.segments))]
-        is_tail = [np.array_equal(u, kplan.poses[len(kplan.poses) - len(u) :]) for u in units]
-        if any(len(u) + pad > _MAX_CHUNK_ROWS for u in units):
-            raise ValueError("a retreat is longer than one session chunk")
-        extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
-        if self._checker is not None:
-            for path in (kplan.poses, *extra.values()):
-                if contact := self._checker.first_contact(path, start=base):
-                    raise RuntimeError(
-                        f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
-                    )
-        started = time.monotonic()
-        motion_tokens = self._encoder.encode(kplan.poses)
-        unit_tokens = {key: self._encoder.encode(u) for key, u in extra.items()}
-        encode_s = time.monotonic() - started
-        if self._stop.is_set():
-            raise RuntimeError("stopped on request; nothing sent")
-        current = self._execution.get_feedback()
-        if current is None or np.abs(np.asarray(current.body_q) - base).max() > _MOVED_LIMIT:
-            raise RuntimeError("the body moved while the reference was encoded; nothing sent")
-        captured = np.asarray(state.token_state)
-        tokens = token_schedule(captured, motion_tokens)
-        hands = np.r_[state.left_hand_q, state.right_hand_q]
-        plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
-        chunks = chunk_rows(len(plan), token_still(tokens))
-
-        def retreat(token_row: int) -> NDArray[np.float64] | None:
-            route = retreat_route(kplan, max(token_row - pad, 0))
-            if route is None:
-                return None  # Already on the way home.
-            segment, offset = route
-            unit = units[segment]
-            unit_rows = (
-                motion_tokens[len(motion_tokens) - len(unit) :]
-                if is_tail[segment]
-                else unit_tokens[unit.tobytes()]
+        assert self._arm is not None
+        return self._arm.execute(
+            self._arm.prepare(
+                label, keyframes_of, allowed, require_check=require_check, report_extra=report_extra
             )
-            rows = token_schedule(captured, unit_rows)[pad + offset :]
-            return np.hstack([rows, np.tile(hands, (len(rows), 1))])
-
-        longest_chunk = max(end - start for start, end in chunks)
-        longest_retreat = max(len(u) + pad for u in units)
-        if (
-            profile["max_observation_age"] <= longest_chunk / RATE + 0.5
-            or profile["max_duration"] <= len(plan) / RATE + longest_retreat / RATE + 2.0
-        ):
-            raise RuntimeError(
-                "the execution profile's observation age and duration must cover the plan",
-            )
-        delta = deltas[np.argmax(np.linalg.norm(deltas, axis=1))]
-        allowed = allowed + np.abs(deltas).max(axis=0)
-        watch = _Watch(base=base, allowed=allowed, max_dq=self.config.max_dq, delta=delta)
-        with self._lock:
-            self._watch = watch
-
-        try:
-            task_id = self._execution.start_task()["task_id"]
-        except Exception as exc:
-            raise RuntimeError(f"execution refused the task: {exc}; nothing sent") from exc
-        try:
-            outcome = self._stream(task_id, plan, chunks, retreat, profile, watch)
-        except Exception as exc:
-            outcome = f"{type(exc).__name__}: {exc}"
-            try:
-                self._execution.cancel_task(task_id)
-            except Exception:
-                pass  # The execution module fails the session on its own faults.
-        task = self._wait_done(profile)
-        with self._lock:
-            watch.returning = True
-        if task is not None and task["handback_confirmed"]:
-            time.sleep(self.config.return_watch_seconds)
-
-        moved = np.nonzero(np.any(deltas != 0, axis=0))[0]
-        report = {
-            "task_id": task_id,
-            "motion": label,
-            "reached_fraction": round(watch.reached, 2),
-            "planned_deg": {_JOINTS[j]: round(math.degrees(base[j] + delta[j]), 1) for j in moved},
-            "reached_deg": {
-                _JOINTS[j]: round(math.degrees(watch.reached_q[j]), 1)
-                if watch.reached > 0
-                else None
-                for j in moved
-            },
-            "max_deviation_rad": {
-                # The moving joints are the motion itself, not deviations.
-                g: round(float(max([watch.deviation[j] for j in i if j not in moved] or [0.0])), 3)
-                for g, i in _GROUPS.items()
-            },
-            "stream_peak_dq": _peak(watch.stream_dq),
-            "return_peak_dq": _peak(watch.return_dq),
-            "keyframes": len(keyframes),
-            "chunks": len(chunks),
-            "encode_s": round(encode_s, 2),
-            "journal_path": self._execution.get_status()["journal_path"],
-        }
-        if report_extra is not None:
-            report.update(report_extra(base))
-        if len(moved) == 1:  # move_upper_body: the swing in degrees, as before.
-            report["reached_deg"] = round(math.degrees(watch.reached * abs(delta[moved[0]])), 1)
-            report["planned_deg"] = round(math.degrees(abs(delta[moved[0]])), 1)
-        journal = report["journal_path"]
-        if task is None or not task["handback_confirmed"]:
-            raise RuntimeError(
-                f"planner handback unconfirmed ({outcome}); check the controller. Journal: {journal}"
-            )
-        if outcome == "finished" and task["outcome"] != "finished":
-            outcome = f"session {task['outcome']}: {task['reason']}"
-        if outcome not in ("finished", "envelope"):
-            raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
-        if outcome == "envelope":
-            message = f"{label} stopped early: {watch.abort}"
-        elif watch.reached < 0.5:  # SONIC tracked less than half the planned move.
-            message = f"{label} did not follow the reference: reached {100 * watch.reached:.0f}% of the plan"
-        elif len(moved) == 1:
-            message = f"{label} reached {report['reached_deg']:.1f} deg and returned"
-        else:
-            message = f"{label} reached {100 * watch.reached:.0f}% of the planned pose and returned"
-        return SkillResult(f"{message}; control returned to SONIC's planner", metadata=report)
-
-    def _stream(
-        self,
-        task_id: str,
-        plan: NDArray[np.float64],
-        chunks: list[tuple[int, int]],
-        retreat: Callable[[int], NDArray[np.float64] | None],
-        profile: dict[str, Any],
-        watch: _Watch,
-    ) -> str:
-        startup = time.monotonic() + profile["seed_seconds"] + profile["arm_timeout"] + 1.0
-        while (task := self._task())["phase"] != "waiting_for_chunk":
-            if task["phase"] == "done" or time.monotonic() > startup:
-                return f"stream did not arm ({task['reason']})"
-            time.sleep(0.01)
-        plan_start = next_check = time.monotonic()
-        start, end = chunks[0]
-        task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
-        pending, sequence = chunks[1:], 0
-        retreat_start: float | None = None  # set once a safety stop starts the smooth way back
-        while True:
-            now = time.monotonic()
-            with self._lock:
-                if self._stop.is_set() and watch.abort is None:
-                    watch.abort = "stop requested"  # Retreats like a safety stop.
-                abort, overspeed_at = watch.abort, watch.overspeed_at
-            if abort is not None and retreat_start is None:
-                if (rows := retreat(int((now - plan_start) * RATE))) is not None:
-                    pending = []  # The way back replaces the rest of the plan.
-                    sequence += 1
-                    task = self._execution.submit_chunk(task_id, sequence, now, rows)
-                    plan, plan_start = rows, now
-                retreat_start = now
-            elif retreat_start is not None and overspeed_at > retreat_start:
-                self._execution.cancel_task(task_id)  # A joint ran away during the way back.
-                return "envelope"
-            if (now - plan_start) * RATE >= len(plan) - 2:
-                # The plan already blended back to the planner token.
-                self._execution.finish_task(task_id)
-                # Checked against the session's own outcome afterwards.
-                return "finished" if retreat_start is None else "envelope"
-            if pending and now >= plan_start + pending[0][0] / RATE:
-                start, end = pending.pop(0)
-                sequence += 1
-                task = self._execution.submit_chunk(
-                    task_id, sequence, plan_start + start / RATE, plan[start:end]
-                )
-            elif now >= next_check:
-                task, next_check = self._task(), now + 0.1
-            if task["phase"] not in ("waiting_for_chunk", "running"):
-                return f"session ended: {task['reason']}"
-            time.sleep(0.005)
-
-    def _task(self) -> dict[str, Any]:
-        task: dict[str, Any] = self._execution.get_status()["task"]
-        return task
-
-    def _wait_done(self, profile: dict[str, Any]) -> dict[str, Any] | None:
-        deadline = time.monotonic() + profile["handback_timeout"] + 1.0
-        while time.monotonic() < deadline:
-            task = self._task()
-            if task["phase"] == "done":
-                return task
-            time.sleep(0.01)
-        return None
+        )
 
 
 sonic_arm_skill_container = SonicArmSkillContainer.blueprint

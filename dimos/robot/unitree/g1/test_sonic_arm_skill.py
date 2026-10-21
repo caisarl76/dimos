@@ -26,6 +26,7 @@ import json
 import math
 from pathlib import Path
 import re
+import sys
 import threading
 import time
 from uuid import uuid4
@@ -295,7 +296,7 @@ def test_retreat_resumes_at_the_matching_point_of_the_way_back(skill, mocker):
 
 def test_one_keyframe_moves_encode_the_plan_once(skill, mocker):
     module, _ = skill
-    spy = mocker.spy(module._encoder, "encode")
+    spy = mocker.spy(module._arm._encoder, "encode")
     run(module, 20.0, follows)
     assert spy.call_count == 1  # the retreat reuses the plan's own way back
 
@@ -546,13 +547,13 @@ def test_stop_mid_motion_retreats_smoothly_and_hands_back(real_launch_skill, moc
 def test_stop_during_encoding_sends_nothing(real_launch_skill, mocker):
     module, peer = real_launch_skill
     updates = mocker.spy(module, "tool_update")
-    encode = module._encoder.encode
+    encode = module._arm._encoder.encode
 
     def stop_then_encode(poses):
         assert module.stop_arm().startswith("Stopping")
         return encode(poses)
 
-    mocker.patch.object(module._encoder, "encode", side_effect=stop_then_encode)
+    mocker.patch.object(module._arm._encoder, "encode", side_effect=stop_then_encode)
     module.move_upper_body("left_arm_forward", 20.0)
     wait_until(lambda: updates.call_count == 1)
     assert updates.call_args.args[1] == "move_upper_body failed: stopped on request; nothing sent"
@@ -697,7 +698,7 @@ def test_base_exception_in_the_motion_still_closes_the_stream(real_launch_skill,
     assert excepthook.call_args.args[0].exc_type is Interrupted
     assert updates.call_args.args[1] == "move_upper_body failed: Interrupted"
     assert stop_tool.call_count == 1 and not module._tools and module._running is None
-    assert module._watch is None
+    assert module._arm._watch is None
 
 
 def test_agent_prompt_names_only_skills_the_blueprint_has():
@@ -867,7 +868,7 @@ def test_joint_targets_need_the_path_check(real_launch_skill, mocker):
 )
 def test_joint_targets_outside_the_box_send_nothing(skill, angles):
     module, peer = skill
-    module._checker = FakeChecker()
+    module._arm._checker = FakeChecker()
     with pytest.raises(ValueError, match="must be within"):
         module.move_left_arm_joints(*angles)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
@@ -875,22 +876,22 @@ def test_joint_targets_outside_the_box_send_nothing(skill, angles):
 
 def test_unsafe_joint_target_path_is_refused_before_sending(skill):
     module, peer = skill
-    module._checker = FakeChecker("torso_link")
+    module._arm._checker = FakeChecker("torso_link")
     with pytest.raises(RuntimeError, match="torso_link; nothing sent"):
         module.move_left_arm_joints(11.0, -10.0, 0.0, 34.0)
-    assert module._checker.calls == 1
+    assert module._arm._checker.calls == 1
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
 def test_checked_joint_target_runs(skill):
     module, _ = skill
-    module._checker = FakeChecker()
+    module._arm._checker = FakeChecker()
     target = np.radians([-90.0, 11.0, 0.0, 70.0])
     result = call_with_feed(
         module, lambda: module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0), reaching(target)
     )
     assert "returned" in result.message, result
-    assert module._checker.calls == 1
+    assert module._arm._checker.calls == 1
 
 
 _MODEL = "gear_sonic/data/robot_model/model_data/g1/scene_43dof.xml"
@@ -991,7 +992,7 @@ def raised_start(module, mocker, pitch=-1.0):
 def test_gesture_from_a_raised_arm_returns_to_where_it_started(skill, mocker):
     module, peer = skill
     raised = raised_start(module, mocker)
-    encode = mocker.spy(module._encoder, "encode")
+    encode = mocker.spy(module._arm._encoder, "encode")
     result = call_with_feed(module, lambda: module.perform_gesture("beckon"), lambda t: raised)
     assert result.metadata["motion"] == "beckon" and result.metadata["keyframes"] == 5
     poses = encode.call_args_list[0].args[0]  # the plan; later calls are retreat units
@@ -1038,10 +1039,10 @@ def test_unknown_gesture_sends_nothing(skill):
 
 def test_gesture_checks_the_path_when_configured_and_runs_without(skill):
     module, _ = skill
-    module._checker = FakeChecker("torso_link")
+    module._arm._checker = FakeChecker("torso_link")
     with pytest.raises(RuntimeError, match="torso_link; nothing sent"):
         module.perform_gesture("stop_sign")
-    module._checker = None
+    module._arm._checker = None
     result = call_with_feed(
         module, lambda: module.perform_gesture("stop_sign"), reaching(GESTURES["stop_sign"][0][0])
     )
@@ -1156,3 +1157,62 @@ def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
     k, value = np.array(emitted).T
     assert np.abs(value - plan[k.astype(int), 0]).max() < 0.005
     assert np.abs(np.diff(value)).max() <= np.abs(np.diff(plan[:, 0])).max() + 1e-4  # No ripple.
+
+
+def one_joint_prepare(module, mocker=None):
+    allowed = group_margins(0.15, 0.2, 0.3)
+    delta = np.zeros(29)
+    delta[15] = -math.radians(20)
+    return module._arm.prepare(
+        "p", lambda base: [Keyframe(base + delta, 1.0)], allowed, require_check=False
+    )
+
+
+def test_prepare_sends_nothing_and_execute_runs_it(skill):
+    module, peer = skill
+    with feeding(module, follows):
+        prepared = one_joint_prepare(module)
+        assert not any(p.startswith(b"pose") for p in peer.snapshot())
+        result = module._arm.execute(prepared)
+    assert "returned" in result.message, result
+    assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_prepare_refuses_a_chunk_the_session_would_reject(skill, mocker):
+    module, peer = skill
+    mocker.patch.object(sys.modules[__name__], "FAKE_GAIN", 50.0)
+    with feeding(module, follows), pytest.raises(ValueError, match="token bound exceeded"):
+        one_joint_prepare(module)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_move_stop_move_again_with_the_real_launcher(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    submit = mocker.spy(module._execution, "submit_chunk")
+    updates = mocker.spy(module, "tool_update")
+    with feeding(module, follows):
+        module.move_upper_body("left_arm_forward", 20.0)
+        wait_until(lambda: submit.call_count == 1)
+        module.stop_arm()
+        wait_until(lambda: updates.call_count == 1)
+        assert "stop requested" in updates.call_args_list[0].args[1]
+        wait_until(lambda: module._running is None)
+        module.move_upper_body("left_arm_forward", 20.0)
+        wait_until(lambda: updates.call_count == 2)
+    second = updates.call_args_list[1].args[1]
+    assert "returned" in second and "stop requested" not in second, second
+
+
+def test_execute_rechecks_the_pose(skill, mocker):
+    module, peer = skill
+    with feeding(module, follows):
+        prepared = one_joint_prepare(module)
+        state = module._execution.get_feedback()
+        q = list(state.body_q)
+        q[3] += 0.1
+        mocker.patch.object(
+            module._execution, "get_feedback", return_value=replace(state, body_q=tuple(q))
+        )
+        with pytest.raises(RuntimeError, match="the body moved"):
+            module._arm.execute(prepared)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
