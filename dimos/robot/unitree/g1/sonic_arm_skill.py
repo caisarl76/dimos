@@ -14,19 +14,22 @@
 
 """Left-arm-forward skill on the guarded SONIC controller, through SonicExecutionModule.
 
-Encodes a min-jerk left-shoulder-pitch reference from the measured pose (sonic_arm_reference),
-streams it as a sonic78 source and hands control back to the native planner. The whole 11 s plan
-is one open-loop chunk planned from the start pose, exactly as commissioned on a G1, so the
-execution profile's max_observation_age must cover it. Resubmitting it like a policy source was
-rejected: every chunk restarts the session blend, a 2.5 Hz speed ripple. observed_at uses this
-host's monotonic clock: run on the same host as the execution module. Never starts or stops native
-control. Cancels to the planner if a joint leaves its per-group envelope or exceeds `max_dq`.
+Encodes a min-jerk keyframe reference from the measured pose (sonic_arm_reference), streams it as
+a sonic78 source and hands control back to the native planner. A plan of up to 1000 rows is one
+open-loop chunk planned from the start pose, exactly as commissioned on a G1; a longer one is split
+only inside a hold, because every chunk restarts the session blend, a 2.5 Hz speed ripple while the
+arm moves. The execution profile's max_observation_age must cover the longest chunk. A safety stop
+retreats along the plan's own way home instead of handing a raised arm to the native planner.
+observed_at uses this host's monotonic clock: run on the same host as the execution module. Never
+starts or stops native control. Cancels to the planner if a joint leaves its per-group envelope or
+exceeds `max_dq`. The motion skills run in the background and report through the tool stream;
+stop_arm retreats the same way a safety stop does.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import math
 from pathlib import Path
 import threading
@@ -45,19 +48,26 @@ from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import In
 from dimos.robot.unitree.g1.sonic_arm_reference import (
+    _SPLIT_STILL_ROWS,
     ARM_JOINTS,
     LEFT_SHOULDER_PITCH,
     LOOSE_JOINTS,
     RATE,
     ArmCollisionChecker,
+    Keyframe,
     SonicEncoder,
     group_margins,
+    keyframe_plan,
     pose_margins,
-    stroke_plan,
+    retreat_poses,
+    retreat_route,
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.spec.utils import Spec
+from dimos.utils.logging_config import setup_logger
+
+logger = setup_logger()
 
 UpperBodyMotion = Literal["left_arm_forward", "left_arm_sideways", "left_forearm_raise"]
 # Motion -> (motor-order joint, sign of a positive angle, min deg, max deg). Directions from the G1
@@ -90,6 +100,25 @@ POSES: dict[str, tuple[float, float, float, float]] = {
     "left_hand_over_head": (-2.80, 0.50, 0.00, 1.20),
     "left_hand_over_head_sideways": (0.00, 2.10, 0.00, 1.20),
 }
+GestureName = Literal["wave", "point_forward", "stop_sign", "raise_hand", "beckon"]
+_WAVE_RAISE = (-0.3, 1.3, 0.0, 0.0)
+# Left-arm gestures as absolute (shoulder pitch, roll, yaw, elbow) rad and the hold at each, s; the
+# engine adds the way back to the measured start. Wave swings the shoulder yaw, beckon the elbow.
+GESTURES: dict[str, list[tuple[tuple[float, float, float, float], float]]] = {
+    "wave": [
+        (_WAVE_RAISE, 0.0),
+        *[((-0.3, 1.3, yaw, 0.0), 0.0) for yaw in (-0.35, 0.35) * 3],
+        (_WAVE_RAISE, 0.5),
+    ],
+    "point_forward": [((-1.5, 0.25, 0.0, 1.35), 2.0)],
+    "stop_sign": [((-1.3, 0.25, 0.0, 0.0), 2.0)],
+    "raise_hand": [((-2.6, 0.45, 0.0, 1.2), 2.0)],
+    "beckon": [
+        ((-1.2, 0.3, 0.0, 0.6), 0.0),
+        *[((-1.2, 0.3, 0.0, elbow), 0.0) for elbow in (0.0, 0.6) * 2],
+    ],
+}
+GESTURE_MAX_S = 40.0  # longest plan a gesture may take, lead-in and way home included
 # move_left_arm_joints bounds, deg, inside the joint limits. Collisions inside the box are left to the
 # runtime path check (ArmCollisionChecker), which the joint-target skill requires.
 JOINT_BOUNDS = {
@@ -102,32 +131,47 @@ _LEFT_ARM_TARGET = [15, 16, 17, 18]
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _MAX_CHUNK_ROWS = 1000  # SonicTaskSession accepts chunks of at most 1000 rows (20 s).
 _CHUNK_OVERLAP = 25  # rows the first chunk runs past the split, so it never runs dry
+_HOLD_BOUNDS = (1.0, 20.0)  # seconds
+_NO_PATH_CHECK = "collision_model_path is not configured; joint targets need the path check"
 
 
-def chunk_rows(plan_rows: int, hold_start: int) -> list[tuple[int, int]]:
-    """(start, end) rows of each chunk to submit. One chunk when it fits the session's limit, as
-    commissioned; otherwise two, split at the start of the hold at full depth. The reference is still
-    there, so the session's blend restart at the second chunk cannot ripple the speed."""
-    if plan_rows <= _MAX_CHUNK_ROWS:
-        return [(0, plan_rows)]
-    chunks = [(0, hold_start + _CHUNK_OVERLAP), (hold_start, plan_rows)]
-    if any(end - start > _MAX_CHUNK_ROWS for start, end in chunks):
-        raise ValueError("plan too long for two session chunks")
+def chunk_rows(plan_rows: int, still: NDArray[np.bool_]) -> list[tuple[int, int]]:
+    """Greedy session chunks, restarting the blend only at stationary token-plan rows."""
+    chunks = []
+    start = 0
+    while plan_rows - start > _MAX_CHUNK_ROWS:
+        candidates = np.flatnonzero(still[start + 1 : start + _MAX_CHUNK_ROWS - _CHUNK_OVERLAP + 1])
+        if not len(candidates):
+            raise ValueError("plan cannot be split into session chunks")
+        split = start + 1 + int(candidates[-1])
+        chunks.append((start, split + _CHUNK_OVERLAP))
+        start = split
+    chunks.append((start, plan_rows))
     return chunks
 
 
-def retreat_row(progress: NDArray[np.float64], row: int) -> int:
-    """Where to resume after a safety stop at `row`: the first row of the way back whose progress
-    toward the target is no further than the arm's, so the rest of the plan returns it smoothly to
-    the start and blends back to the planner token. Handing back mid-pose instead lets the native
-    planner snap the arm home: in MuJoCo an overhead stop whipped the shoulder at 23 rad/s, tilted
-    the body 11.5 deg and lifted both feet. progress: [N] fraction of the planned displacement per
-    token-plan row (0 at the start pose)."""
-    hold_end = len(progress) - 1 - int(np.argmax(progress[::-1]))
-    if row > hold_end:
-        return row  # Already on the way back.
-    back = np.nonzero(progress[hold_end + 1 :] <= progress[row] + 1e-9)[0]
-    return hold_end + 1 + int(back[0]) if len(back) else row
+def token_still(tokens: NDArray[Any]) -> NDArray[np.bool_]:
+    """Rows whose next 15 tokens are all within 1e-9 of the first (including itself)."""
+    still = np.zeros(len(tokens), dtype=np.bool_)
+    for row in range(len(tokens) - _SPLIT_STILL_ROWS + 1):
+        still[row] = np.all(np.abs(tokens[row : row + _SPLIT_STILL_ROWS] - tokens[row]) <= 1e-9)
+    return still
+
+
+def gesture_keyframes(name: str, base: NDArray[np.float64]) -> list[Keyframe]:
+    """The gesture's keyframes: its left-arm targets over `base` (wrists and everything else kept)."""
+    keyframes = []
+    for arm, hold in GESTURES[name]:
+        target = base.copy()
+        target[_LEFT_ARM_TARGET] = arm
+        keyframes.append(Keyframe(target, hold))
+    return keyframes
+
+
+def _check_hold(hold_seconds: float) -> None:
+    low, high = _HOLD_BOUNDS
+    if not math.isfinite(hold_seconds) or not low <= hold_seconds <= high:
+        raise ValueError(f"hold_seconds must be within {low:g}..{high:g}")
 
 
 _JOINTS = [name.removeprefix("g1/") for name in make_humanoid_joints("g1")]
@@ -174,7 +218,7 @@ class _Watch:
     base: NDArray[np.float64]
     allowed: NDArray[np.float64]
     max_dq: float
-    delta: NDArray[np.float64]  # The planned displacement of every joint at full depth.
+    delta: NDArray[np.float64]  # The planned displacement of every joint at the deepest keyframe.
     returning: bool = False
     reached: float = 0.0  # Furthest progress along the planned displacement, as a fraction.
     reached_q: NDArray[np.float64] = field(default_factory=lambda: np.zeros(29))
@@ -194,7 +238,10 @@ class SonicArmSkillContainer(Module):
 
     def __init__(self, **kwargs: Any) -> None:
         self._lock = threading.Lock()
-        self._busy = threading.Lock()
+        # Serializes every change of the running motion: start, refusal, rebind and cleanup.
+        self._lifecycle = threading.Lock()
+        self._running: str | None = None  # The running motion's skill (and tool-stream) name.
+        self._stop = threading.Event()
         self._watch: _Watch | None = None
         self._encoder: SonicEncoder | None = None
         self._checker: ArmCollisionChecker | None = None
@@ -239,8 +286,8 @@ class SonicArmSkillContainer(Module):
                 elif dq[k] > watch.max_dq:
                     watch.abort = f"{_JOINTS[k]} speed {dq[k]:.2f} rad/s > {watch.max_dq}"
 
-    @skill(uses=[CAP_MOVEMENT])
-    def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> SkillResult:
+    @skill(uses=[CAP_MOVEMENT], lifecycle="background")
+    def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> str:
         """Move one upper-body joint out by angle_deg, hold it for 1 second, move it back, then hand control back.
 
         Motions: "left_arm_forward" swings the left arm forward (shoulder pitch),
@@ -248,28 +295,35 @@ class SonicArmSkillContainer(Module):
         "left_forearm_raise" lifts the left forearm (elbow). Min-jerk, 2 s out and 2 s back (longer
         for big angles), while SONIC keeps the robot balanced; 18-24 s in all. Requires the SONIC
         controller running in confirmed planner idle; it never starts or stops the controller. Stops
-        early and returns control to the planner if any joint strays from the plan.
+        early and returns control to the planner if any joint strays from the plan. Returns at
+        once; a tool update reports the result.
 
         Args:
             motion: One of "left_arm_forward", "left_arm_sideways", "left_forearm_raise".
             angle_deg: How far to move, in degrees: left_arm_forward 10-28, left_arm_sideways 10-40,
                 left_forearm_raise 20-60.
         """
-        if motion not in MOTIONS:
-            raise ValueError(f"motion must be one of {sorted(MOTIONS)}")
-        joint, sign, low, high = MOTIONS[motion]
-        if not low <= angle_deg <= high or not math.isfinite(angle_deg):
-            raise ValueError(f"{motion} angle_deg must be within {low:g}..{high:g}")
-        delta = np.zeros(29)
-        delta[joint] = sign * math.radians(angle_deg)
-        allowed = group_margins(
-            self.config.body_margin, self.config.arm_margin, self.config.wrist_margin
-        )
-        return self._run(motion, lambda base: delta, allowed, require_check=False)
 
-    @skill(uses=[CAP_MOVEMENT])
-    def move_left_arm_pose(self, pose: LeftArmPose) -> SkillResult:
-        """Move the left arm to a full-range pose, hold it for 1 second, bring it back, then hand control back.
+        def prepare() -> Callable[[], SkillResult]:
+            if motion not in MOTIONS:
+                raise ValueError(f"motion must be one of {sorted(MOTIONS)}")
+            joint, sign, low, high = MOTIONS[motion]
+            if not low <= angle_deg <= high or not math.isfinite(angle_deg):
+                raise ValueError(f"{motion} angle_deg must be within {low:g}..{high:g}")
+            delta = np.zeros(29)
+            delta[joint] = sign * math.radians(angle_deg)
+            allowed = group_margins(
+                self.config.body_margin, self.config.arm_margin, self.config.wrist_margin
+            )
+            return lambda: self._run(
+                motion, lambda base: [Keyframe(base + delta, 1.0)], allowed, require_check=False
+            )
+
+        return self._launch("move_upper_body", prepare)
+
+    @skill(uses=[CAP_MOVEMENT], lifecycle="background")
+    def move_left_arm_pose(self, pose: LeftArmPose, hold_seconds: float = 1.0) -> str:
+        """Move the left arm to a full-range pose, hold it for hold_seconds, bring it back, then hand control back.
 
         Poses: "left_arm_forward_horizontal" (straight arm pointing forward at shoulder height),
         "left_arm_side_horizontal" (straight arm out to the side at shoulder height),
@@ -278,25 +332,33 @@ class SonicArmSkillContainer(Module):
         (peak 0.47 rad/s): 20-40 s in all, overhead the longest. Requires the SONIC controller running
         in confirmed planner idle; it never starts or stops the controller. Stops early and returns
         control to the planner if the legs, waist or the other arm stray, or the arm strays far from
-        the plan.
+        the plan. Returns at once; a tool update reports the result.
 
         Args:
             pose: One of "left_arm_forward_horizontal", "left_arm_side_horizontal",
                 "left_hand_over_head", "left_hand_over_head_sideways".
+            hold_seconds: How long to hold the pose, 1-20 s.
         """
-        if pose not in POSES:
-            raise ValueError(f"pose must be one of {sorted(POSES)}")
-        return self._run_targets(pose, np.asarray(POSES[pose]), require_check=False)
 
-    @skill(uses=[CAP_MOVEMENT])
+        def prepare() -> Callable[[], SkillResult]:
+            if pose not in POSES:
+                raise ValueError(f"pose must be one of {sorted(POSES)}")
+            _check_hold(hold_seconds)
+            target = np.asarray(POSES[pose])
+            return lambda: self._run_targets(pose, target, hold_seconds, require_check=False)
+
+        return self._launch("move_left_arm_pose", prepare)
+
+    @skill(uses=[CAP_MOVEMENT], lifecycle="background")
     def move_left_arm_joints(
         self,
         shoulder_pitch_deg: float,
         shoulder_roll_deg: float,
         shoulder_yaw_deg: float,
         elbow_deg: float,
-    ) -> SkillResult:
-        """Move the left arm to the given joint angles, hold for 1 second, bring it back, then hand control back.
+        hold_seconds: float = 1.0,
+    ) -> str:
+        """Move the left arm to the given joint angles, hold for hold_seconds, bring it back, then hand control back.
 
         Angles are absolute, in degrees. Hanging rest is about pitch 11, roll 11, yaw 0, elbow 34.
         Shoulder pitch: negative raises the arm forward (-90 forward horizontal, -160 overhead).
@@ -304,61 +366,164 @@ class SonicArmSkillContainer(Module):
         the upper arm. Elbow: 82 is straight, 0 is bent 90 degrees, negative bends further. The
         planned path is checked against the robot's body first and refused if the arm would come
         near it. Slow (peak 0.47 rad/s), up to about 40 s. Prefer move_left_arm_pose for the
-        named poses.
+        named poses. Returns at once; a tool update reports the result.
 
         Args:
             shoulder_pitch_deg: -165 to 45.
             shoulder_roll_deg: -10 to 120.
             shoulder_yaw_deg: -90 to 90.
             elbow_deg: -30 to 82.
+            hold_seconds: How long to hold the pose, 1-20 s.
         """
         values = (shoulder_pitch_deg, shoulder_roll_deg, shoulder_yaw_deg, elbow_deg)
-        for (joint, (low, high)), value in zip(JOINT_BOUNDS.items(), values, strict=True):
-            if not math.isfinite(value) or not low <= value <= high:
-                raise ValueError(f"{joint} must be within {low:g}..{high:g} deg")
-        target = np.radians(np.asarray(values, np.float64))
-        label = "joints(" + ", ".join(f"{v:g}" for v in values) + ")"
-        return self._run_targets(label, target, require_check=True)
+
+        def prepare() -> Callable[[], SkillResult]:
+            if self._checker is None:
+                raise RuntimeError(_NO_PATH_CHECK)
+            for (joint, (low, high)), value in zip(JOINT_BOUNDS.items(), values, strict=True):
+                if not math.isfinite(value) or not low <= value <= high:
+                    raise ValueError(f"{joint} must be within {low:g}..{high:g} deg")
+            _check_hold(hold_seconds)
+            target = np.radians(np.asarray(values, np.float64))
+            label = "joints(" + ", ".join(f"{v:g}" for v in values) + ")"
+            return lambda: self._run_targets(label, target, hold_seconds, require_check=True)
+
+        return self._launch("move_left_arm_joints", prepare)
+
+    @skill(uses=[CAP_MOVEMENT], lifecycle="background")
+    def perform_gesture(self, name: GestureName) -> str:
+        """Perform a left-arm gesture, then bring the arm back and hand control back.
+
+        Gestures: "wave" (raises the hand and swings it side to side three times, about 30 s),
+        "point_forward" (arm out in front, about 16 s), "stop_sign" (raised forward palm out, about 15 s),
+        "raise_hand" (arm up, about 25 s) and "beckon" (forearm curls in and out twice, about 21 s).
+        Slow (peak 0.47 rad/s). Requires the SONIC controller running in confirmed planner idle; it
+        never starts or stops the controller. Stops early and returns control to the planner if the
+        legs, waist or the other arm stray, or the arm strays far from the plan. Returns at once; a
+        tool update reports the result.
+
+        Args:
+            name: One of "wave", "point_forward", "stop_sign", "raise_hand", "beckon".
+        """
+
+        def prepare() -> Callable[[], SkillResult]:
+            if name not in GESTURES:
+                raise ValueError(f"name must be one of {sorted(GESTURES)}")
+
+            def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+                keyframes = gesture_keyframes(name, base)
+                seconds = len(keyframe_plan(base, keyframes).poses) / RATE
+                if seconds > GESTURE_MAX_S:
+                    raise ValueError(
+                        f"{name} would take {seconds:.0f} s, more than {GESTURE_MAX_S:g} s; nothing sent"
+                    )
+                return keyframes
+
+            allowed = pose_margins(
+                self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
+            )
+            return lambda: self._run(name, keyframes_of, allowed, require_check=False)
+
+        return self._launch("perform_gesture", prepare)
+
+    @skill
+    def stop_arm(self) -> str:
+        """Stop the running arm motion: the arm returns smoothly to where it started, then control goes back to SONIC's planner.
+
+        The stopped motion's tool update reports how far it got.
+        """
+        with self._lifecycle:
+            if self._running is None:
+                return "No arm motion is running."
+            self._stop.set()
+        return "Stopping: the arm returns smoothly to its start pose; a tool update reports the result."
+
+    def _launch(self, tool: str, prepare: Callable[[], Callable[[], SkillResult]]) -> str:
+        """Start a motion in the background; its result is the tool stream's final update.
+
+        Checks for a running motion before validating, and never closes or releases what it holds:
+        a same-tool retry through MCP has already taken over the capability hold, and start_tool
+        rebinds the live stream to it, so the running motion's stream stop releases it.
+        """
+        with self._lifecycle:
+            if self._running == tool:
+                self.start_tool(tool)
+                return (
+                    f"{tool} is already running; its result will follow as a tool update. "
+                    "Call stop_arm to stop it."
+                )
+            if self._running is not None:
+                raise RuntimeError("an arm move is already running")
+            work = prepare()
+            self.start_tool(tool)
+            self._running = tool
+            self._stop.clear()
+            threading.Thread(
+                target=self._finish, args=(tool, work), name=f"arm-{tool}", daemon=True
+            ).start()
+        return f"{tool} started; a tool update reports the result. Call stop_arm to stop early."
+
+    def _finish(self, tool: str, work: Callable[[], SkillResult]) -> None:
+        started = time.monotonic()
+        try:
+            result = work()
+            elapsed_ms = (time.monotonic() - started) * 1000.0
+            text = replace(result, duration_ms=elapsed_ms).agent_encode()[0]["text"]
+        except Exception as exc:
+            text = f"{tool} failed: {exc}"
+        except BaseException as exc:
+            text = f"{tool} failed: {type(exc).__name__}"
+            raise  # After the cleanup below, so the motion never stays held.
+        finally:
+            logger.info("Arm skill result", tool=tool, result=text)
+            # One critical section: a call arriving now either rebinds a stream that still has
+            # this update to come, or finds nothing running and opens a fresh one.
+            with self._lifecycle:
+                try:
+                    self.tool_update(tool, text)
+                finally:
+                    self.stop_tool(tool)
+                    self._running = None
+                    with self._lock:
+                        self._watch = None
 
     def _run_targets(
-        self, label: str, target: NDArray[np.float64], *, require_check: bool
+        self,
+        label: str,
+        target: NDArray[np.float64],
+        hold_seconds: float,
+        *,
+        require_check: bool,
     ) -> SkillResult:
-        def delta_of(base: NDArray[np.float64]) -> NDArray[np.float64]:
-            delta = np.zeros(29)
-            delta[_LEFT_ARM_TARGET] = target - base[_LEFT_ARM_TARGET]
-            return delta
+        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+            goal = base.copy()
+            goal[_LEFT_ARM_TARGET] = target
+            return [Keyframe(goal, hold_seconds)]
 
         allowed = pose_margins(
             self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
         )
-        return self._run(label, delta_of, allowed, require_check=require_check)
+        return self._run(label, keyframes_of, allowed, require_check=require_check)
 
     def _run(
         self,
         label: str,
-        delta_of: Callable[[NDArray[np.float64]], NDArray[np.float64]],
+        keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]],
         allowed: NDArray[np.float64],
         *,
         require_check: bool,
+        report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
     ) -> SkillResult:
         if require_check and self._checker is None:
-            raise RuntimeError(
-                "collision_model_path is not configured; joint targets need the path check",
-            )
-        if not self._busy.acquire(blocking=False):
-            raise RuntimeError("an arm move is already running")
-        try:
-            return self._move(label, delta_of, allowed)
-        finally:
-            with self._lock:
-                self._watch = None
-            self._busy.release()
+            raise RuntimeError(_NO_PATH_CHECK)
+        return self._move(label, keyframes_of, allowed, report_extra)
 
     def _move(
         self,
         label: str,
-        delta_of: Callable[[NDArray[np.float64]], NDArray[np.float64]],
+        keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]],
         allowed: NDArray[np.float64],
+        report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
     ) -> SkillResult:
         assert self._encoder is not None
         status = self._execution.get_status()
@@ -369,36 +534,67 @@ class SonicArmSkillContainer(Module):
         if state is None or state.token_state is None:
             raise RuntimeError("no fresh controller feedback; nothing sent")
         base = np.asarray(state.body_q, np.float64)
-        delta = delta_of(base)
-        if not np.abs(delta).max() > math.radians(1):
+        keyframes = keyframes_of(base)
+        targets = np.asarray([k.target for k in keyframes], np.float64).reshape(-1, 29)
+        deltas = targets - base
+        if not np.abs(deltas).max() > math.radians(1):
             raise ValueError("the arm is already there; nothing to move")
-        poses = stroke_plan(base, delta)
-        # First row at full depth, in token-plan rows (token_schedule prepends a 2 s blend).
-        if self._checker is not None and (contact := self._checker.first_contact(poses)):
-            raise RuntimeError(
-                f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
-            )
+        # Token-plan rows: token_schedule adds the same blend at each end of the poses.
+        pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+        kplan = keyframe_plan(base, keyframes, split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad)
+        # Where a safety stop at each segment resumes. A unit that is the tail of the plan reuses
+        # the plan's own tokens.
+        units = [retreat_poses(kplan, s) for s in range(len(kplan.segments))]
+        is_tail = [np.array_equal(u, kplan.poses[len(kplan.poses) - len(u) :]) for u in units]
+        if any(len(u) + pad > _MAX_CHUNK_ROWS for u in units):
+            raise ValueError("a retreat is longer than one session chunk")
+        extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
+        if self._checker is not None:
+            for path in (kplan.poses, *extra.values()):
+                if contact := self._checker.first_contact(path, start=base):
+                    raise RuntimeError(
+                        f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
+                    )
         started = time.monotonic()
-        motion_tokens = self._encoder.encode(poses)
+        motion_tokens = self._encoder.encode(kplan.poses)
+        unit_tokens = {key: self._encoder.encode(u) for key, u in extra.items()}
         encode_s = time.monotonic() - started
+        if self._stop.is_set():
+            raise RuntimeError("stopped on request; nothing sent")
         current = self._execution.get_feedback()
         if current is None or np.abs(np.asarray(current.body_q) - base).max() > _MOVED_LIMIT:
             raise RuntimeError("the body moved while the reference was encoded; nothing sent")
-        tokens = token_schedule(np.asarray(state.token_state), motion_tokens)
+        captured = np.asarray(state.token_state)
+        tokens = token_schedule(captured, motion_tokens)
         hands = np.r_[state.left_hand_q, state.right_hand_q]
         plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
-        # Token-plan rows: token_schedule adds the same blend at each end of the poses.
-        pad = (len(plan) - len(poses)) // 2
-        hold_start = pad + int(np.argmax(np.abs(poses - base).sum(axis=1)))
-        progress = np.r_[np.zeros(pad), (poses - base) @ delta / (delta @ delta), np.zeros(pad)]
+        chunks = chunk_rows(len(plan), token_still(tokens))
+
+        def retreat(token_row: int) -> NDArray[np.float64] | None:
+            route = retreat_route(kplan, max(token_row - pad, 0))
+            if route is None:
+                return None  # Already on the way home.
+            segment, offset = route
+            unit = units[segment]
+            unit_rows = (
+                motion_tokens[len(motion_tokens) - len(unit) :]
+                if is_tail[segment]
+                else unit_tokens[unit.tobytes()]
+            )
+            rows = token_schedule(captured, unit_rows)[pad + offset :]
+            return np.hstack([rows, np.tile(hands, (len(rows), 1))])
+
+        longest_chunk = max(end - start for start, end in chunks)
+        longest_retreat = max(len(u) + pad for u in units)
         if (
-            profile["max_observation_age"] <= len(plan) / RATE + 0.5
-            or profile["max_duration"] <= len(plan) / RATE + 5.0
+            profile["max_observation_age"] <= longest_chunk / RATE + 0.5
+            or profile["max_duration"] <= len(plan) / RATE + longest_retreat / RATE + 2.0
         ):
             raise RuntimeError(
                 "the execution profile's observation age and duration must cover the plan",
             )
-        allowed = allowed + np.abs(delta)
+        delta = deltas[np.argmax(np.linalg.norm(deltas, axis=1))]
+        allowed = allowed + np.abs(deltas).max(axis=0)
         watch = _Watch(base=base, allowed=allowed, max_dq=self.config.max_dq, delta=delta)
         with self._lock:
             self._watch = watch
@@ -408,9 +604,7 @@ class SonicArmSkillContainer(Module):
         except Exception as exc:
             raise RuntimeError(f"execution refused the task: {exc}; nothing sent") from exc
         try:
-            outcome = self._stream(
-                task_id, plan, chunk_rows(len(plan), hold_start), progress, profile, watch
-            )
+            outcome = self._stream(task_id, plan, chunks, retreat, profile, watch)
         except Exception as exc:
             outcome = f"{type(exc).__name__}: {exc}"
             try:
@@ -423,7 +617,7 @@ class SonicArmSkillContainer(Module):
         if task is not None and task["handback_confirmed"]:
             time.sleep(self.config.return_watch_seconds)
 
-        moved = np.nonzero(delta)[0]
+        moved = np.nonzero(np.any(deltas != 0, axis=0))[0]
         report = {
             "task_id": task_id,
             "motion": label,
@@ -442,9 +636,13 @@ class SonicArmSkillContainer(Module):
             },
             "stream_peak_dq": _peak(watch.stream_dq),
             "return_peak_dq": _peak(watch.return_dq),
+            "keyframes": len(keyframes),
+            "chunks": len(chunks),
             "encode_s": round(encode_s, 2),
             "journal_path": self._execution.get_status()["journal_path"],
         }
+        if report_extra is not None:
+            report.update(report_extra(base))
         if len(moved) == 1:  # move_upper_body: the swing in degrees, as before.
             report["reached_deg"] = round(math.degrees(watch.reached * abs(delta[moved[0]])), 1)
             report["planned_deg"] = round(math.degrees(abs(delta[moved[0]])), 1)
@@ -472,7 +670,7 @@ class SonicArmSkillContainer(Module):
         task_id: str,
         plan: NDArray[np.float64],
         chunks: list[tuple[int, int]],
-        progress: NDArray[np.float64],
+        retreat: Callable[[int], NDArray[np.float64] | None],
         profile: dict[str, Any],
         watch: _Watch,
     ) -> str:
@@ -489,15 +687,15 @@ class SonicArmSkillContainer(Module):
         while True:
             now = time.monotonic()
             with self._lock:
+                if self._stop.is_set() and watch.abort is None:
+                    watch.abort = "stop requested"  # Retreats like a safety stop.
                 abort, overspeed_at = watch.abort, watch.overspeed_at
             if abort is not None and retreat_start is None:
-                row = int((now - plan_start) * RATE)
-                back = retreat_row(progress, row)
-                pending = []  # The way back replaces the rest of the plan.
-                if back > row:
+                if (rows := retreat(int((now - plan_start) * RATE))) is not None:
+                    pending = []  # The way back replaces the rest of the plan.
                     sequence += 1
-                    task = self._execution.submit_chunk(task_id, sequence, now, plan[back:])
-                    plan_start = now - back / RATE  # plan rows keep their timing from here on
+                    task = self._execution.submit_chunk(task_id, sequence, now, rows)
+                    plan, plan_start = rows, now
                 retreat_start = now
             elif retreat_start is not None and overspeed_at > retreat_start:
                 self._execution.cancel_task(task_id)  # A joint ran away during the way back.

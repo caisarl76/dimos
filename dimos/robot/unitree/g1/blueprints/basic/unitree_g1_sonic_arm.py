@@ -20,7 +20,11 @@ does either. Run it on the robot PC, beside the controller, with the SONIC v1.1 
     dimos run unitree-g1-sonic-arm \\
         --sonicarmskillcontainer.encoder-path=<deploy>/policy/sonic_v1_1/model_encoder.onnx
     dimos mcp call move_upper_body --arg motion=left_arm_forward --arg angle_deg=20
-    dimos mcp call --timeout 60 move_left_arm_pose --arg pose=left_hand_over_head
+    dimos mcp call move_left_arm_pose --arg pose=left_hand_over_head
+    dimos mcp call stop_arm
+
+The motion skills return at once ("started"); their result arrives as a tool update, which
+`dimos mcp call` does not print. It is also logged: follow it with `dimos log -f`.
 
 move_left_arm_joints also needs the gear_sonic MuJoCo model for its path check:
 --sonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
@@ -86,15 +90,16 @@ unitree_g1_sonic_arm = autoconnect(
         reference_bind="tcp://127.0.0.1:5556",
         feedback_endpoint="tcp://127.0.0.1:5557",
         journal_dir=STATE_DIR / "sonic-arm",
-        # The skills stream each plan as one open-loop chunk: up to 15.4 s for move_upper_body,
-        # 31 s for the slowest full-range pose (overhead at 0.47 rad/s).
+        # The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 15.4 s
+        # for move_upper_body, 31 s for the slowest full-range pose (overhead at 0.47 rad/s) and
+        # up to 20 s more for a held pose. max_duration also covers a retreat after a late stop.
         profile=SonicModelProfile(
             name="g1-sonic-arm",
             source_fps=50,
             right_hand_order="native",
             handback_policy="native_planner",
             max_observation_age=35.0,
-            max_duration=45.0,
+            max_duration=75.0,
         ),
     ),
     SonicArmSkillContainer.blueprint(),

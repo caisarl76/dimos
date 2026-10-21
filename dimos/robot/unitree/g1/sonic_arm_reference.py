@@ -22,7 +22,10 @@ body pose, so the reference holds the robot where it is. Commissioned on a G1 on
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 import hashlib
+import math
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +69,9 @@ LEFT_SHOULDER_PITCH = 15  # Motor order; negative moves the hand forward.
 ENCODER_SHA256 = "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae"  # SONIC v1.1
 RATE = 50
 PEAK_SPEED = 0.47  # rad/s: the commissioned 0.5 rad stroke over 2 s; bigger moves take longer.
+ENCODER_LOOKAHEAD_ROWS = 45
+_SPLIT_STILL_ROWS = 15
+_SPLIT_POSE_ROWS = _SPLIT_STILL_ROWS + ENCODER_LOOKAHEAD_ROWS + 2
 ARM_JOINTS = [15, 16, 18, 22, 23, 25]  # shoulder pitch and roll, elbows
 LEFT_ARM = list(range(15, 22))
 RIGHT_ARM = list(range(22, 29))
@@ -147,20 +153,123 @@ def stroke_plan(
     [N,29] at 50 Hz. Each stroke lasts at least move_s and long enough that the largest joint's
     min-jerk peak speed (1.875 * delta / T) stays at or below peak_speed.
     """
-    delta = np.asarray(delta, np.float64)
-    move_s = max(move_s, 1.875 * float(np.abs(delta).max()) / peak_speed)
-    lead, move, hold = (round(s * RATE) for s in (lead_s, move_s, hold_s))
-    profile = min_jerk(move)[:, None]
-    offset = np.vstack(
-        [
-            np.zeros((lead, 29)),
-            profile * delta,
-            np.tile(delta, (hold, 1)),
-            profile[::-1] * delta,
-            np.zeros((lead, 29)),
-        ]
-    )
-    return np.asarray(np.asarray(base, np.float64) + offset, np.float64)
+    base = np.asarray(base, np.float64)
+    return keyframe_plan(
+        base,
+        [Keyframe(base + np.asarray(delta, np.float64), hold_s)],
+        lead_s=lead_s,
+        move_s=move_s,
+        peak_speed=peak_speed,
+    ).poses
+
+
+@dataclass(frozen=True)
+class Keyframe:
+    target: NDArray[np.float64]
+    hold_s: float = 0.0
+
+
+@dataclass(frozen=True)
+class Segment:
+    start: int
+    end: int
+    src: int
+    dst: int
+
+
+@dataclass(frozen=True)
+class KeyframePlan:
+    base: NDArray[np.float64]
+    targets: NDArray[np.float64]
+    poses: NDArray[np.float64]
+    segments: list[Segment]
+    still: NDArray[np.bool_]
+    move_s: float = 2.0
+    peak_speed: float = PEAK_SPEED
+
+
+def _segment_poses(
+    src: NDArray[np.float64], dst: NDArray[np.float64], move_s: float, peak_speed: float
+) -> NDArray[np.float64]:
+    duration = max(move_s, 1.875 * float(np.abs(dst - src).max()) / peak_speed)
+    rows = math.ceil(duration * RATE) + 1
+    # Use the same arithmetic in either direction so a return exactly mirrors the outward path.
+    reverse = tuple(src) > tuple(dst)
+    a, b = (dst, src) if reverse else (src, dst)
+    poses = a + min_jerk(rows)[:, None] * (b - a)
+    poses[0], poses[-1] = a, b
+    return poses[::-1] if reverse else poses
+
+
+def keyframe_plan(
+    base: NDArray[Any],
+    keyframes: Sequence[Keyframe],
+    *,
+    lead_s: float = 1.0,
+    move_s: float = 2.0,
+    peak_speed: float = PEAK_SPEED,
+    split_every: int | None = None,
+) -> KeyframePlan:
+    """Min-jerk moves through absolute targets and back, with holds long enough for token splits."""
+    base = np.asarray(base, np.float64)
+    targets = np.asarray([keyframe.target for keyframe in keyframes], np.float64).reshape(-1, 29)
+    lead = np.tile(base, (round(lead_s * RATE), 1))
+    parts = [lead]
+    segments: list[Segment] = []
+    row = len(lead)
+    last_still = max(0, row - _SPLIT_POSE_ROWS + 1)
+    src = base
+    for k, dst in enumerate([*targets, base]):
+        move = _segment_poses(src, dst, move_s, peak_speed)
+        if split_every is not None and len(move) > split_every:
+            raise ValueError("segment longer than a session chunk")
+        if k:
+            hold = round(keyframes[k - 1].hold_s * RATE)
+            # Arrival and departure also repeat the target; the window needs both neighbours.
+            if hold + 2 >= _SPLIT_POSE_ROWS:
+                last_still = row + hold - _SPLIT_POSE_ROWS + 2
+            tail = len(lead) if k == len(targets) else 0  # the lead-out stays in the last chunk
+            if split_every is not None and row + hold + len(move) + tail - last_still > split_every:
+                hold = max(hold, _SPLIT_POSE_ROWS)
+                last_still = row + hold - _SPLIT_POSE_ROWS + 2
+            parts.append(np.tile(src, (hold, 1)))
+            row += hold
+        parts.append(move)
+        segments.append(Segment(row, row + len(move), k - 1, k if k < len(targets) else -1))
+        row += len(move)
+        src = dst
+    parts.append(lead)
+    poses = np.vstack(parts)
+    still = np.zeros(len(poses), dtype=np.bool_)
+    if len(poses) >= _SPLIT_POSE_ROWS:
+        unchanged = np.all(poses[1:] == poses[:-1], axis=1)
+        windows = np.lib.stride_tricks.sliding_window_view(unchanged, _SPLIT_POSE_ROWS - 1)
+        still[1 : len(windows) + 1] = windows.all(axis=1)
+    return KeyframePlan(base, targets, poses, segments, still, move_s, peak_speed)
+
+
+def retreat_poses(plan: KeyframePlan, segment: int) -> NDArray[np.float64]:
+    """Reverse the active outward segment, go directly home, and keep the plan's lead-out."""
+    seg = plan.segments[segment]
+    if seg.dst == -1:
+        return plan.poses[seg.start :]
+    parts = [plan.poses[seg.start : seg.end][::-1]]
+    if seg.src >= 0:
+        parts.append(_segment_poses(plan.targets[seg.src], plan.base, plan.move_s, plan.peak_speed))
+    parts.append(plan.poses[plan.segments[-1].end :])
+    return np.vstack(parts)
+
+
+def retreat_route(plan: KeyframePlan, row: int) -> tuple[int, int] | None:
+    """Retreat unit and offset for a pose row; None when the plan is already returning home."""
+    if row >= plan.segments[-1].start:
+        return None
+    for s, seg in enumerate(plan.segments):
+        if row < seg.start:
+            return s, 0 if seg.dst == -1 else seg.end - seg.start
+        if row < seg.end:
+            return s, seg.end - 1 - row
+    return None
 
 
 def arm_poses(
@@ -265,12 +374,14 @@ class ArmCollisionChecker:
                     near[(arm, other)] = min(float(c.dist), near.get((arm, other), np.inf))
         return near
 
-    def first_contact(self, poses: NDArray[Any], every: int = 5) -> str | None:
-        """Name of the first body the planned left arm comes near, or None. poses: [N,29] motor order."""
+    def first_contact(
+        self, poses: NDArray[Any], every: int = 5, start: NDArray[Any] | None = None
+    ) -> str | None:
+        """First body near the arm, or None. Tolerate contacts from start (default poses[0])."""
         poses = np.asarray(poses)
-        start = self._near(poses[0])
+        baseline = self._near(poses[0] if start is None else start)
         for q in poses[::every]:
             for (arm, other), dist in self._near(q).items():
-                if (arm, other) not in start or dist < start[(arm, other)] - self._closer:
+                if (arm, other) not in baseline or dist < baseline[(arm, other)] - self._closer:
                     return str(self._body[other])
         return None
