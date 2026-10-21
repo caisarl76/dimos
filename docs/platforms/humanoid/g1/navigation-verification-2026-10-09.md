@@ -711,3 +711,37 @@ Session 2026-10-20-5, with the option on:
 - `source_pause` was refused at begin by the pc2 execution ("fresh navigation
   readiness required") with the peer ready and the link round trip at most 26 ms;
   the next case's begin succeeded.
+
+### Walk-off goal and the source_pause refusal, 2026-10-21
+
+Two-host simulation with the synthetic goal 30 deg left of the heading: the
+first relayed command walked (vx 0.2, wz 0.2), with no in-place turn. Turn and
+stop settle times in the simulation have been 2.2-4.2 s against the 3 s gate
+since the 0.20 rad facing lead (trial9). With the old 20 deg initial-rotation
+tolerance restored for an A/B, every case passed (left turn 2.99 s), so the
+occasional settle miss is not from the planner change. The simulation harness
+now reads peer replies on a thread: a reply buffered behind a log line had timed
+out a call, and the late reply aborted cleanup and orphaned the simulator.
+
+Sessions 2026-10-21-1..5 (commit `a22ce3a7b`, `--ignore-rear-occupancy`):
+
+- `goal_1m_left30` passed: the goal was 31 deg left of the heading. The planner
+  went straight to path following, so the robot walked off at once (first command
+  vx 0.2) instead of turning in place, and turned about 55 deg while walking. It
+  was within 0.3 m 8.1 s after the goal was sent: final error 0.26 m,
+  cross-track 0.29 m, no latch or feedback gaps.
+- The goal pre-checks refused 12 earlier attempts in sessions 2-3: an unknown
+  robot cell after short walks (7), the robot cell occupied (1), and one
+  occupied cell ahead within 0.5 m (4). With self points filtered, the cell
+  under the robot becomes known only after walking about 0.5 m onto ground seen
+  from farther away; a curve just before the goal reliably does this.
+- `source_pause` passed in sessions 3 and 5. `idle` and `operator_stop` passed.
+  `forward_020` covered 8 cm (the day's first walk) and more later;
+  `curve_left_020` 44-47 cm, `curve_right_020` 30 cm for about 60 deg of turn.
+
+The `source_pause` begin refused on 2026-10-20 was a link-quality event. pc2's
+graph log for that run records 146 relay round trips over the 100 ms readiness
+limit, a burst roughly every 250 ms from 07:22:20 to 07:22:22.3 UTC, ending at
+the refused begin (07:22:22.5). Other graph runs logged 0-23 such events and no
+refusals. The execution refused correctly; the workstation's own records did not
+show it because they measure only the workstation side.
