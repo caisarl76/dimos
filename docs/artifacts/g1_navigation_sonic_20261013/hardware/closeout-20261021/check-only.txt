@@ -1,0 +1,5 @@
+{"ready": true, "blocking": []}
+Clocks pinned.
+{"report": "/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/checks/20261021-134652/readiness.json", "blocking": [], "tolerated": []}
+Passive check complete; nothing was started.
+check exit=0
