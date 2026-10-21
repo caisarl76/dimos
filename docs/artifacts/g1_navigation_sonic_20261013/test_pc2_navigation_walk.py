@@ -238,3 +238,41 @@ def test_rear_occupancy_is_ignored_only_when_opted_in() -> None:
     assert "within 0.5 m" in walk.goal_admissible(
         {**clear, "occupied_within_0.5m": 3}, ignore_rear=True
     )
+
+
+def test_obstacle_cases_need_a_passed_goal_and_carry_their_event() -> None:
+    for name, event in (
+        ("goal_detour", "placed"),
+        ("goal_obstacle_appears", "drop"),
+        ("goal_teleop_cancel", "teleop"),
+    ):
+        case = walk.CASES[name]
+        assert (case.kind, case.event, case.requires) == ("goal", event, ("goal_1m",))
+        assert case.distance == 2.0
+    assert walk.CASES["goal_1m"].distance == walk.GOAL_M and walk.CASES["goal_1m"].event == ""
+    (gx, gy), _ = walk.goal_pose(0.0, 0.0, 0.0, 0.0, distance=2.0)
+    assert (gx, gy) == pytest.approx((2.0, 0.0))
+
+
+def test_placed_obstacle_must_be_seen_and_the_goal_cell_free() -> None:
+    clear = {"robot_cell": 0, "occupied_within_0.5m": 0}
+    seen = {**clear, "values": [0, 0, 100, 100, 0, 0]}  # probes, then the goal cell
+    assert walk.goal_admissible(seen, obstacle=True) is None
+    assert "not seen" in walk.goal_admissible(
+        {**clear, "values": [0, 0, 0, 0, 0, 0]}, obstacle=True
+    )
+    assert "goal cell" in walk.goal_admissible(
+        {**clear, "values": [0, 100, 0, 0, 0, -1]}, obstacle=True
+    )
+    # Without the obstacle flag an occupied probe still refuses, as before.
+    assert "ahead" in walk.goal_admissible(seen)
+
+
+def test_track_clearance_is_the_nearest_occupied_cell() -> None:
+    import numpy as np
+
+    grid = np.zeros((40, 40), dtype=np.int8)
+    grid[20, 30] = 100  # cell centre (1.525, 1.025) for origin (0, 0), 0.05 m
+    track = [(0.0, 1.025), (1.0, 1.025)]
+    assert walk.track_clearance(track, grid, (0.0, 0.0), 0.05) == pytest.approx(0.525)
+    assert walk.track_clearance(track, np.zeros((4, 4), dtype=np.int8), (0.0, 0.0), 0.05) is None
