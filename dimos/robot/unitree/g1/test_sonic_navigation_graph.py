@@ -213,6 +213,13 @@ def test_safety_configuration_is_enforced() -> None:
     turn_floor = {**PEER_KWARGS, ReplanningAStarPlanner.name: {"min_angular_velocity": 0.2}}
     with pytest.raises(ValueError, match="min_angular_velocity"):
         check(unitree_g1_sonic_navigation_peer, "peer", turn_floor)
+    # The pc2 execution rejects walking above 0.2 m/s, so an uncapped follower never moves.
+    fast = {
+        **PEER_KWARGS,
+        ReplanningAStarPlanner.name: {"min_angular_velocity": 0.0, "nerf_speed": 1.0},
+    }
+    with pytest.raises(ValueError, match="nerf_speed"):
+        check(unitree_g1_sonic_navigation_peer, "peer", fast)
     claimed = {
         **PEER_KWARGS,
         SonicNavigationPeerModule.name: {
