@@ -299,3 +299,21 @@ def test_begin_retries_once_after_a_transient_readiness_lapse() -> None:
     calls = []
     reply, retried = walk.begin_with_retry(lambda: calls.append(1) or other, naps.append)
     assert reply == other and retried is None and len(calls) == 1
+
+
+def test_startup_scan_turns_left_right_and_back_after_the_operator_stop() -> None:
+    case = walk.CASES["startup_scan"]
+    assert (case.kind, case.requires) == ("scan", ("operator_stop",))
+    assert walk.SCAN_LEGS_DEG == (60.0, -60.0, 0.0) and case.wz == 0.2
+
+
+def test_unknown_by_bearing_reports_bands_around_the_robot() -> None:
+    import numpy as np
+
+    grid = np.zeros((100, 100), dtype=np.int8)  # 5 m square, origin (-2.5, -2.5)
+    grid[:, :50] = -1  # unknown for x < 0: behind a robot at the origin facing +x
+    out = walk.unknown_by_bearing(grid, (-2.5, -2.5), 0.05, (0.0, 0.0, 0.0))
+    near = out["0.5-1.0 m"]
+    assert len(near) == 12  # 30 deg bins from -180
+    assert near[0] == 100 and near[6] == 0  # behind unknown, ahead known
+    assert out["total"]["1.0-2.0 m"] == pytest.approx(50, abs=3)

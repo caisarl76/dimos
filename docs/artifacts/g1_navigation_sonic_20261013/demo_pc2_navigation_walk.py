@@ -87,6 +87,12 @@ class Case:
     event: str = ""
 
 
+# Startup scan (startup-blind-spot.md): the head frame and cables hide fixed wedges of
+# the scan; turning the whole robot in place sweeps them over the surroundings.
+SCAN_LEGS_DEG = (60.0, -60.0, 0.0)  # headings relative to the start, in order
+SCAN_TOLERANCE_DEG = 5.0
+SCAN_LEG_TIMEOUT_S = 75.0  # the robot turns in place at about 2-3 deg/s
+
 CASES = {
     "idle": Case("idle", seconds=3.0),
     "operator_stop": Case("operator_stop", requires=("idle",)),
@@ -118,6 +124,7 @@ CASES = {
     ),
     # Obstacle cases, after the simulation ones (two-host-sim/obstacles-4). The box must
     # be tall and wide enough to show in the costmap: about 40 cm tall, 40-60 cm wide.
+    "startup_scan": Case("scan", wz=0.20, seconds=SCAN_LEG_TIMEOUT_S, requires=("operator_stop",)),
     "goal_detour": Case("goal", seconds=60.0, requires=("goal_1m",), distance=2.0, event="placed"),
     "goal_obstacle_appears": Case(
         "goal", seconds=60.0, requires=("goal_1m",), distance=2.0, event="drop"
@@ -218,6 +225,31 @@ def goal_admissible(
     if near:
         return f"occupied cells within 0.5 m ({near})"
     return None
+
+
+def unknown_by_bearing(
+    grid: Any, origin: tuple[float, float], resolution: float, pose: tuple[float, float, float]
+) -> dict[str, Any]:
+    """Unknown cell share (%) by 30-degree bearing from the heading (from -180), per band."""
+    cells = np.asarray(grid)
+    rows, cols = np.indices(cells.shape)
+    x, y, h = pose
+    cx = origin[0] + (cols + 0.5) * resolution - x
+    cy = origin[1] + (rows + 0.5) * resolution - y
+    distance = np.hypot(cx, cy)
+    bearing = np.degrees(np.remainder(np.arctan2(cy, cx) - h + math.pi, 2 * math.pi) - math.pi)
+    out: dict[str, Any] = {"total": {}}
+    for near, far in ((0.5, 1.0), (1.0, 2.0)):
+        band = (distance >= near) & (distance < far)
+        name = f"{near}-{far} m"
+        out[name] = [
+            round(100 * float((cells[mask] < 0).mean()))
+            if (mask := band & (bearing >= b) & (bearing < b + 30)).any()
+            else None
+            for b in range(-180, 180, 30)
+        ]
+        out["total"][name] = round(100 * float((cells[band] < 0).mean()))
+    return out
 
 
 def occupied_ahead(
@@ -519,7 +551,7 @@ def run_session(args: Any) -> None:
         raise RuntimeError("no recent odometry")
 
     def costmap_record(
-        name: str, bearing: float = 0.0, probes: list[float] | None = None
+        name: str, bearing: float = 0.0, probes: list[float] | None = None, suffix: str = ""
     ) -> dict[str, Any]:
         """Read-only: no begin, no motion. Cells along `bearing` plus the peer summary."""
         x, y, h, _ = latest_odom()
@@ -529,7 +561,7 @@ def run_session(args: Any) -> None:
         ]
         reply = peer.call("costmap", points=ahead)
         summary = reply["costmap"]
-        snapshot = out / f"costmap-{len(results['cases']) + 1:02d}.npz"
+        snapshot = out / f"costmap-{len(results['cases']) + 1:02d}{suffix}.npz"
         saved = peer.call("snapshot", path=str(snapshot)).get("saved")
         record = {"name": name, "started_unix": time.time(), "ahead_points": ahead, **reply}
         record["snapshot"] = saved and snapshot.name
@@ -689,6 +721,91 @@ def run_session(args: Any) -> None:
         record["passed"] = bool(ok) and record["observation"]["confirmed"]
         return record
 
+    def coverage(snapshot: str | None) -> dict[str, Any] | None:
+        if not snapshot:
+            return None
+        with np.load(out / snapshot) as snap:
+            x, y, _, h = (float(v) for v in snap["robot"])
+            return unknown_by_bearing(
+                snap["grid"],
+                (float(snap["origin"][0]), float(snap["origin"][1])),
+                float(snap["resolution"]),
+                (x, y, h),
+            )
+
+    def scan_record(name: str, case: Case) -> dict[str, Any]:
+        """Turn in place through SCAN_LEGS_DEG, closed on LIO yaw, then compare the map."""
+        record = costmap_record(name)
+        record["coverage_before"] = coverage(record.get("snapshot"))
+        record["passed"] = record["measured_ok"] = False
+        mark = agent.call("mark")["monotonic"]
+        record["begin"], record["begin_refused_first"] = begin_with_retry(
+            lambda: agent.call("begin"), time.sleep
+        )
+        if (
+            "error" in record["begin"]
+            or wait(lambda: status()["navigation"]["phase"] == "active", 1.5) is None
+        ):
+            tele(0.0, 0.0)
+            record["error"] = "begin refused or no active phase; no motion was commanded"
+            return record
+        tele(0.0, 0.0)
+        time.sleep(1.0)
+        heading = latest_odom()[2]
+        legs = []
+        for target_deg in SCAN_LEGS_DEG:
+            target = heading + math.radians(target_deg)
+            yaw0 = latest_odom()[2]
+            sign = 1.0 if math.remainder(target - yaw0, 2 * math.pi) > 0 else -1.0
+            leg_start = tele(0.0, sign * case.wz)
+            reached = None
+            while time.monotonic() - leg_start < case.seconds:
+                error = math.remainder(target - latest_odom()[2], 2 * math.pi)
+                if sign * error <= math.radians(SCAN_TOLERANCE_DEG):
+                    reached = time.monotonic() - leg_start
+                    break
+                time.sleep(0.05)
+            tele(0.0, 0.0)
+            time.sleep(1.5)  # the peer ramps the turn down; let the heading settle
+            turned = math.degrees(math.remainder(latest_odom()[2] - yaw0, 2 * math.pi))
+            legs.append(
+                {
+                    "target_deg": target_deg,
+                    "reached_s": reached,
+                    "turned_deg": turned,
+                    "rate_dps": abs(turned) / reached if reached else None,
+                }
+            )
+            print(json.dumps(legs[-1]))
+            if reached is None:
+                break
+        record["legs"] = legs
+        record["settle_s"] = settled()
+        record["end"] = agent.call("end")
+        record["handback_s"] = wait(lambda: status()["navigation"]["pose_ready"], 6.0)
+        record["native"] = native_summary(agent.call("since", monotonic=mark)["rows"])
+        after = costmap_record(name, suffix="-after")
+        record["snapshot_after"] = after.get("snapshot")
+        record["coverage_after"] = coverage(after.get("snapshot"))
+        print(
+            json.dumps(
+                {
+                    "unknown_before": (record["coverage_before"] or {}).get("total"),
+                    "unknown_after": (record["coverage_after"] or {}).get("total"),
+                }
+            )
+        )
+        record["observation"] = observe("Did the robot turn left, right and back in place?")
+        ok = (
+            len(legs) == len(SCAN_LEGS_DEG)
+            and all(leg["reached_s"] is not None for leg in legs)
+            and not record["native"]["latched"]
+            and record["settle_s"] is not None
+        )
+        record["measured_ok"] = bool(ok)
+        record["passed"] = bool(ok) and record["observation"]["confirmed"]
+        return record
+
     def tele(vx: float, wz: float) -> float:
         peer.call("tele", vx=vx, wz=wz)
         return time.monotonic()
@@ -815,6 +932,8 @@ def run_session(args: Any) -> None:
                 record = costmap_record(name)
             elif CASES[name].kind == "goal":
                 record = goal_record(name, CASES[name])
+            elif CASES[name].kind == "scan":
+                record = scan_record(name, CASES[name])
             else:
                 record = run_case(name, CASES[name])
             results["cases"].append(record)
