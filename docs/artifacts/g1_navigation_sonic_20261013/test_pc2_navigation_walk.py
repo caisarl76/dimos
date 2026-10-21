@@ -282,3 +282,20 @@ def test_track_clearance_is_the_nearest_occupied_cell_ahead() -> None:
     track = [(0.0, 0.5), (1.5, 0.5)]
     assert walk.track_clearance(track, cells) == pytest.approx(math.hypot(0.025, 0.475))
     assert walk.track_clearance(track, np.zeros((0, 2))) is None
+
+
+def test_begin_retries_once_after_a_transient_readiness_lapse() -> None:
+    lapse = {"op": "begin", "error": "ValueError: fresh navigation readiness required"}
+    ok = {"op": "begin", "result": {"phase": "rearming"}}
+    replies = iter([lapse, ok])
+    naps: list[float] = []
+    reply, retried = walk.begin_with_retry(lambda: next(replies), naps.append)
+    assert reply == ok and retried == lapse and naps == [walk.BEGIN_RETRY_S]
+    # Other refusals are real states, not lapses: no retry.
+    other = {
+        "op": "begin",
+        "error": "RuntimeError: navigation or unresolved cancellation is active",
+    }
+    calls = []
+    reply, retried = walk.begin_with_retry(lambda: calls.append(1) or other, naps.append)
+    assert reply == other and retried is None and len(calls) == 1
