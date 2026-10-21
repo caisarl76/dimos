@@ -1,0 +1,82 @@
+{
+  "started_unix": 1792561615.6703355,
+  "observation_seconds": 8.0,
+  "creates_writers_or_command_sockets": false,
+  "clocks": {
+    "pinned": true,
+    "checked": 9,
+    "issues": []
+  },
+  "sonic_processes": [],
+  "ports_in_use": [],
+  "streams": {
+    "lidar_raw": {
+      "samples": 79,
+      "rate_hz": 9.972734112784277,
+      "max_receipt_gap_s": 0.16840076600010434,
+      "max_source_stall_s": 0.16840076600010434,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792561615.8013408,
+      "last_source_stamp": 1792561623.6262867,
+      "budget_s": 0.35,
+      "ready": true
+    },
+    "imu_raw": {
+      "samples": 1602,
+      "rate_hz": 200.51545788606612,
+      "max_receipt_gap_s": 0.08610926400024255,
+      "max_source_stall_s": 0.08610926400024255,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792561615.8088298,
+      "last_source_stamp": 1792561623.813217,
+      "budget_s": 0.2,
+      "ready": true
+    },
+    "lowstate": {
+      "samples": 8337,
+      "rate_hz": 1045.1128787686189,
+      "max_receipt_gap_s": 0.08794804999979533,
+      "max_source_stall_s": 0.08794804999979533,
+      "rollbacks": 0,
+      "duplicates": 336,
+      "first_source_stamp": 2675.1730000000002,
+      "last_source_stamp": 2683.176,
+      "budget_s": 0.2,
+      "ready": true
+    }
+  },
+  "lowstate": {
+    "samples": 401,
+    "joints": 29,
+    "finite": true,
+    "tick_advancing": true,
+    "ready": true
+  },
+  "lowcmd_traffic_samples": 0,
+  "command_writers_discovered": [
+    {
+      "topic": "rt/arm_sdk",
+      "participant": "011007c4-3f92-740b-84af-ea4b000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "0110e348-fc3e-3bd8-fb4f-e7c5000001c1"
+    }
+  ],
+  "conversion_errors": 0,
+  "extrinsic_commissioned": true,
+  "host_load": {
+    "loadavg": [
+      "0.46",
+      "0.52",
+      "0.61"
+    ],
+    "cpus": 8,
+    "mem_available_kb": 13227684,
+    "gpu_load_permille": 0
+  },
+  "blocking": [],
+  "ready": true
+}

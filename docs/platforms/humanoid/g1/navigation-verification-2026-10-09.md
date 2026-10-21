@@ -8,7 +8,74 @@ the production DimOS `move()` method using a task-initialized Unitree client.
 No mode setter, stand-up request, controller release, or G1 locomotion-module
 startup has been issued. No planner goal has been submitted.
 
-## Result so far
+That paragraph and the sections after the final verdict are the chronological
+record. The final verdict for navigation through SONIC comes first.
+
+## Final verdict, 2026-10-21
+
+**Scope.** DimOS navigation through one guarded SONIC controller (plan Task 11).
+The workstation peer runs the sensor receiver, PointLIO, the ray-traced voxel
+map, the height costmap, the replanning A* planner and MovementManager. A private
+link carries its commands to the pc2 relay and execution owner, which drive the
+guarded native SONIC controller. The stock Unitree locomotion route in the early
+sections (2026-10-09 to 10-12) is a separate path and stays unverified.
+
+| Layer | Verdict | Evidence |
+|---|---|---|
+| Software | **Pass, one gate open** | 812 tests across `dimos/robot/unitree/g1`, `dimos/navigation` and the task artifacts; mypy clean (73 files). The exact legacy FK regression (Task 3) stays blocked: no authentic fixture exists ([fk-resolution.md](/docs/artifacts/g1_navigation_sonic_20261013/fk-resolution.md)). |
+| Simulation | **Pass** | The two-host MuJoCo matrix (85 cases): sensor and map freezes, link delay and hold, cancel, the native and publisher watchdogs, seeded-pose handback, peer and publisher restarts, and synthetic goals straight ahead and 30 deg off the heading. The 3 s settle gate is marginal since the 0.20 rad facing lead: settling takes 2.2-4.2 s and most runs miss it once. |
+| Hardware | **Pass for the cases below** | pc2 sessions 2026-10-15 to 10-21, with the robot on the floor and a slack support cable from a crane. |
+
+Hardware cases (distances and angles are LIO base odometry, not tape-measured):
+
+| Case | Result |
+|---|---|
+| `idle`, native operator stop | Passed in every session day; handback to IDLE unlatched |
+| `forward_020` (0.2 m/s, 2 s) | 8-30 cm per run, under 3 cm sideways |
+| `turn_left_020`, `turn_right_020` (0.2 rad/s, 2 s) | 7-23 deg per run |
+| `curve_left_020`, `curve_right_020` (4 s) | Left 44-48 cm, right 30-41 cm, about 60 deg of turn |
+| `cancel` | IDLE 0.051 s after the cancel |
+| `source_pause` | Passed (2026-10-19, 10-21-3, 10-21-5) |
+| `goal_1m` | Reached within 0.3 m twice: 17.0 s (2026-10-19-11) and 8.6 s (2026-10-20-5) |
+| `goal_1m_left30` | Reached in 8.1 s (2026-10-21-5); walked off at once, no turn in place |
+
+The plan's first steps of +0.10 m/s and ±0.10 rad/s were replaced by 0.20 m/s and
+0.20 rad/s by operator decision: 0.10 m/s for 1 s did not step and 0.10 rad/s
+turned 1.6 deg.
+
+**Simulation only.** The seeded-pose handback route, the publisher and native
+watchdogs, and peer loss. Navigation-to-IDLE handback was measured on the robot
+in every case.
+
+**Not verified on the robot.** Tape-measured distances and angles, obstacle
+avoidance and replanning, teleop preemption of a goal, and routes longer than
+1 m.
+
+**Known limitations.**
+
+- In-place turns are slow on the robot: 2-3 deg/s for 11.5 deg/s commanded,
+  against about 14 deg/s while walking a curve. The SONIC peer therefore walks off
+  below 45 deg of heading error (`6a179cf38`).
+- Repeated same-direction turns shrink on the robot (foot friction, per the
+  operator) but not in simulation.
+- Right curves cover about 30% less distance than left ones, in both the robot
+  and simulation: a native SONIC characteristic.
+- With self points filtered, the cell under the robot is known only after about
+  0.5 m of walking, so goals need a curve or a longer walk first.
+- `--ignore-rear-occupancy` exempts the support crane behind the robot from the
+  goal pre-check. It is opt-in, for supported experiments only.
+- Odometry is session-local: there is no saved map or relocalization.
+- Wi-Fi round-trip bursts over 100 ms lapse readiness. Motion takes a recoverable
+  IDLE, and one `begin` was refused (2026-10-20).
+
+**Close-out, 2026-10-21 13:46 CST.** The operator shut the robot down. No
+task process ran on either host. `launch.sh --check-only` reported ready with
+nothing blocking. The 1,232 environment fingerprints, shared controllers, task
+controller binary, models, 71 original GR00T native source files and 87 task
+native source files all matched
+([closeout-20261021](/docs/artifacts/g1_navigation_sonic_20261013/hardware/closeout-20261021/closeout.json)).
+
+## Early results, 2026-10-09 to 2026-10-12
 
 **Resumed on 2026-10-12.** Initial work was limited to sensors. After another
 power cycle, the user confirmed standing Run mode, a clear area, an operator
@@ -197,7 +264,10 @@ Collected remote evidence is saved locally in
 sensor capture logs/summaries, discovery and sensor destination responses,
 latest GET-only controller telemetry, and the runtime integrity result.
 
-## Remaining hardware verification
+## Remaining hardware verification (stock route, as of 2026-10-12)
+
+This list is for the stock Unitree locomotion route. Navigation through SONIC is
+covered by the final verdict at the top.
 
 1. Calibrate and check the G1 body/sensor frames, actual footprint, initial-safe
    radius, and physical floor/obstacle clearance. The present map's origin is
