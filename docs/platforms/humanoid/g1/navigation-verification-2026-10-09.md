@@ -72,9 +72,12 @@ than 2 m, and obstacles beyond a single box.
 - Odometry is session-local: there is no saved map or relocalization.
 - Wi-Fi round-trip bursts over 100 ms lapse readiness. Motion takes a recoverable
   IDLE, and one `begin` was refused (2026-10-20).
-- In open space the voronoi A* gives an isolated obstacle a very wide berth: a
-  9.5 m simulated path to a goal 2 m away, and a 6.3 m robot track for the 2 m
-  `goal_detour`. Walls make its paths sensible (about 1.1x the straight line).
+- In open space the A* gives an isolated obstacle a very wide berth: a 9.5 m
+  simulated path to a goal 2 m away. It ranks paths by summed cell cost before
+  length, and the cost falls off over 1.5 m from every obstacle. In the lab and in
+  a corridor its paths are sensible: the 2 m `goal_detour` planned 3.27 m and the
+  robot walked about 3.3 m (1.6x); corridor paths are about 1.1x. An offline study
+  (below) found a shorter falloff helps only in open space.
 - A goal is sometimes refused by the pc2 relay from its own state ("rejected or
   admission closed", twice on the robot); the retry after the cancel works. The
   cause is not identified yet: the relay now logs a reason, from attempt 11.
@@ -876,3 +879,24 @@ the retry after the cancel worked. Every refusal now names its reason: the peer 
 relay log it and the execution's error says "(peer refused)", "(request changed)"
 or "(phase ...)" (`8e91e3220`). The relay and execution part reaches pc2 with
 attempt 11.
+
+### Planner detours in open space, 2026-10-21
+
+The replanning A* minimises summed cell cost first and path length only on ties, and
+its gradient spreads cost 1.5 m from every inflated obstacle (`gradient_distance` in
+`make_navigation_map`). Offline, with the planner's own map and search code
+(robot width 0.6 m x 1.1):
+
+| Map, goal | Falloff 1.5 m (current) | 1.0 m | 0.75 m | 0.5 m |
+|---|---|---|---|---|
+| Session 2026-10-21-6 lab costmap, box about 1.2 m ahead, goal 2 m (voronoi) | 3.27 m, 0.36 m clear | 3.27 m | 3.27 m | 3.69 m, 0.48 m clear |
+| Same, gradient strategy | 2.81 m | 3.32 m | 3.61 m | 3.66 m |
+| Open space, 0.6 m box 1.0 m ahead, goal 2 m | 7.84 m | 5.95 m | 4.94 m | 3.97 m |
+| Open space, 0.6 m box 1.8 m ahead, goal 3.5 m | 7.47 m, 1.43 m clear | 5.62 m | 4.94 m | 4.41 m, 0.80 m clear |
+
+In the lab the current setting already gives a modest detour and a shorter falloff
+makes the path longer, so the setting is unchanged. A shorter falloff (about 0.5 m)
+would halve open-space detours while keeping more than 0.7 m from the box; it is a
+candidate if the robot is to work in open halls. Earlier this report gave the robot
+track of `goal_detour` as 6.3 m: that window included 37 s of standing, where LIO
+jitter adds length; sampled once a second the walk was 3.33 m.
