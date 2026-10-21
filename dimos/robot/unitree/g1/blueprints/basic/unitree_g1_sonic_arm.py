@@ -20,6 +20,10 @@ does either. Run it on the robot PC, beside the controller, with the SONIC v1.1 
     dimos run unitree-g1-sonic-arm \\
         --sonicarmskillcontainer.encoder-path=<deploy>/policy/sonic_v1_1/model_encoder.onnx
     dimos mcp call move_upper_body --arg motion=left_arm_forward --arg angle_deg=20
+    dimos mcp call --timeout 60 move_left_arm_pose --arg pose=left_hand_over_head
+
+move_left_arm_joints also needs the gear_sonic MuJoCo model for its path check:
+--sonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
     dimos mcp call observe
 
 The head camera is the G1's D435i colour stream, read through V4L2 (no depth).
@@ -82,13 +86,15 @@ unitree_g1_sonic_arm = autoconnect(
         reference_bind="tcp://127.0.0.1:5556",
         feedback_endpoint="tcp://127.0.0.1:5557",
         journal_dir=STATE_DIR / "sonic-arm",
-        # The skill streams its plan (11 s, up to 15.4 s for big angles) as one open-loop chunk.
+        # The skills stream each plan as one open-loop chunk: up to 15.4 s for move_upper_body,
+        # 31 s for the slowest full-range pose (overhead at 0.47 rad/s).
         profile=SonicModelProfile(
             name="g1-sonic-arm",
             source_fps=50,
             right_hand_order="native",
             handback_policy="native_planner",
-            max_observation_age=17.0,
+            max_observation_age=35.0,
+            max_duration=45.0,
         ),
     ),
     SonicArmSkillContainer.blueprint(),

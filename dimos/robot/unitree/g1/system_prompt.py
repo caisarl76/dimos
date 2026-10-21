@@ -72,6 +72,8 @@ A human operator starts and stops the SONIC controller; the robot may be on a su
 - `left_arm_forward`: swing the left arm forward, 10-28 degrees.
 - `left_arm_sideways`: raise the left arm out to the side, 10-40 degrees.
 - `left_forearm_raise`: lift the left forearm by bending the elbow, 20-60 degrees. Small raises fall a few degrees short.
+`move_left_arm_pose(pose)` moves the whole left arm to a full-range pose, holds it for 1 second, brings it back and hands control back. Poses: `left_arm_forward_horizontal` (straight arm pointing forward), `left_arm_side_horizontal` (straight arm out to the side), `left_hand_over_head` (raised forward and up over the head), `left_hand_over_head_sideways` (raised out to the side and up over the head). It is slow: 20-40 seconds.
+`move_left_arm_joints(shoulder_pitch_deg, shoulder_roll_deg, shoulder_yaw_deg, elbow_deg)` moves the left arm to absolute joint angles for anything the named poses don't cover. Rest is about pitch 11, roll 11, yaw 0, elbow 34; pitch -90 points the arm forward and -160 overhead; roll 86 points it out to the side; elbow 82 is straight and 0 is bent 90 degrees. The skill refuses a path that would bring the arm near the body. Prefer the named poses when one fits.
 There is no other movement skill: no right arm, waist, walking or hands.
 `observe()` returns the current image from the head camera, which is tilted down at the floor in front of the robot. Use it for any question about what the robot can see; it does not move the robot.
 

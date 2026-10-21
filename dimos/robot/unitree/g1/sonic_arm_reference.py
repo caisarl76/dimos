@@ -67,6 +67,35 @@ ENCODER_SHA256 = "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365b
 RATE = 50
 PEAK_SPEED = 0.47  # rad/s: the commissioned 0.5 rad stroke over 2 s; bigger moves take longer.
 ARM_JOINTS = [15, 16, 18, 22, 23, 25]  # shoulder pitch and roll, elbows
+LEFT_ARM = list(range(15, 22))
+RIGHT_ARM = list(range(22, 29))
+MOTOR_NAMES = (
+    [
+        f"{side}_{joint}"
+        for side, joints in (
+            ("left", ("hip_pitch", "hip_roll", "hip_yaw", "knee", "ankle_pitch", "ankle_roll")),
+            ("right", ("hip_pitch", "hip_roll", "hip_yaw", "knee", "ankle_pitch", "ankle_roll")),
+        )
+        for joint in joints
+    ]
+    + ["waist_yaw", "waist_roll", "waist_pitch"]
+    + [
+        f"{side}_{joint}"
+        for side in ("left", "right")
+        for joint in (
+            "shoulder_pitch",
+            "shoulder_roll",
+            "shoulder_yaw",
+            "elbow",
+            "wrist_roll",
+            "wrist_pitch",
+            "wrist_yaw",
+        )
+    ]
+)
+_LEFT_ARM_LINKS = ("left_shoulder_yaw", "left_elbow", "left_wrist")
+# The left shoulder links next to the torso, absent hands, and the floor.
+_IGNORED = ("left_shoulder_pitch", "left_shoulder_roll", "left_hand", "right_hand", "world")
 # Wrists and shoulder yaws: SONIC's decoder moves these by itself, at low torque, when an arm moves.
 LOOSE_JOINTS = [17, 19, 20, 21, 24, 26, 27, 28]
 
@@ -104,6 +133,36 @@ def min_jerk(n: int) -> NDArray[np.float64]:
     return np.asarray(10 * s**3 - 15 * s**4 + 6 * s**5, np.float64)
 
 
+def stroke_plan(
+    base: NDArray[Any],
+    delta: NDArray[Any],
+    *,
+    lead_s: float = 1.0,
+    move_s: float = 2.0,
+    hold_s: float = 1.0,
+    peak_speed: float = PEAK_SPEED,
+) -> NDArray[np.float64]:
+    """Base pose, lead-in, move every joint by delta[29] together, hold, move back, lead-out.
+
+    [N,29] at 50 Hz. Each stroke lasts at least move_s and long enough that the largest joint's
+    min-jerk peak speed (1.875 * delta / T) stays at or below peak_speed.
+    """
+    delta = np.asarray(delta, np.float64)
+    move_s = max(move_s, 1.875 * float(np.abs(delta).max()) / peak_speed)
+    lead, move, hold = (round(s * RATE) for s in (lead_s, move_s, hold_s))
+    profile = min_jerk(move)[:, None]
+    offset = np.vstack(
+        [
+            np.zeros((lead, 29)),
+            profile * delta,
+            np.tile(delta, (hold, 1)),
+            profile[::-1] * delta,
+            np.zeros((lead, 29)),
+        ]
+    )
+    return np.asarray(np.asarray(base, np.float64) + offset, np.float64)
+
+
 def arm_poses(
     base: NDArray[Any],
     joint: int,
@@ -114,20 +173,12 @@ def arm_poses(
     hold_s: float = 1.0,
     peak_speed: float = PEAK_SPEED,
 ) -> NDArray[np.float64]:
-    """Base pose, lead-in, move by delta, hold, move back, lead-out. [N,29] at 50 Hz.
-
-    Each stroke lasts at least move_s and long enough that the min-jerk peak speed
-    (1.875 * delta / T) stays at or below peak_speed.
-    """
-    move_s = max(move_s, 1.875 * abs(delta) / peak_speed)
-    lead, move, hold = (round(s * RATE) for s in (lead_s, move_s, hold_s))
-    profile = min_jerk(move)
-    offset = np.r_[
-        np.zeros(lead), delta * profile, np.full(hold, delta), delta * profile[::-1], np.zeros(lead)
-    ]
-    poses = np.tile(np.asarray(base, np.float64), (len(offset), 1))
-    poses[:, joint] += offset
-    return poses
+    """stroke_plan for one joint moved by delta."""
+    vector = np.zeros(29)
+    vector[joint] = delta
+    return stroke_plan(
+        base, vector, lead_s=lead_s, move_s=move_s, hold_s=hold_s, peak_speed=peak_speed
+    )
 
 
 def blend(a: NDArray[Any], b: NDArray[Any], seconds: float) -> NDArray[np.float64]:
@@ -164,3 +215,62 @@ def group_margins(body: float, arm: float, wrist: float) -> NDArray[np.float64]:
     margins[ARM_JOINTS] = arm
     margins[LOOSE_JOINTS] = wrist
     return margins
+
+
+def pose_margins(body: float, moving_arm: float, other_arm: float) -> NDArray[np.float64]:
+    """Envelope for full-range left-arm poses: legs and waist `body`, every left-arm joint
+    `moving_arm` (SONIC coordinates the whole arm: in MuJoCo it added -0.31 rad of shoulder pitch to
+    a side raise), every right-arm joint `other_arm`."""
+    margins = np.full(29, body)
+    margins[LEFT_ARM] = moving_arm
+    margins[RIGHT_ARM] = other_arm
+    return margins
+
+
+class ArmCollisionChecker:
+    """Kinematic check that a planned left-arm path keeps clear of the body.
+
+    Uses the G1 SONIC MuJoCo model (gear_sonic scene_43dof.xml). Every geom gets `margin` of extra
+    reach and MuJoCo adds the two, so a contact means the left upper arm, elbow or wrist links come
+    within 2 * margin of the torso, pelvis, legs or right arm. The Dex3 hand geoms are ignored (no
+    hands are installed). Pairs already that close at the start pose (the robot's idle left wrist
+    rests about 2 cm from the hip) are allowed unless the path brings them `closer` nearer.
+    """
+
+    def __init__(self, scene: Path, margin: float = 0.01, closer: float = 0.005) -> None:
+        import mujoco
+
+        self._mujoco = mujoco
+        self._m = mujoco.MjModel.from_xml_path(str(scene))
+        self._m.geom_margin[:] = margin
+        self._d = mujoco.MjData(self._m)
+        self._closer = closer
+        body = [self._m.body(self._m.geom_bodyid[g]).name for g in range(self._m.ngeom)]
+        self._body = body
+        self._arm = {g for g in range(self._m.ngeom) if body[g].startswith(_LEFT_ARM_LINKS)}
+        self._qadr = [self._m.jnt_qposadr[self._m.joint(n + "_joint").id] for n in MOTOR_NAMES]
+
+    def _near(self, q: NDArray[Any]) -> dict[tuple[int, int], float]:
+        """Arm-to-body geom pairs within the margin at pose q, with their distances."""
+        self._mujoco.mj_resetData(self._m, self._d)  # type: ignore[attr-defined]
+        self._d.qpos[2] = 0.79
+        self._d.qpos[self._qadr] = q
+        self._mujoco.mj_forward(self._m, self._d)
+        near: dict[tuple[int, int], float] = {}
+        for c in self._d.contact[: self._d.ncon]:
+            a, b = int(c.geom1), int(c.geom2)
+            if (a in self._arm) != (b in self._arm):
+                arm, other = (a, b) if a in self._arm else (b, a)
+                if not self._body[other].startswith(_IGNORED):
+                    near[(arm, other)] = min(float(c.dist), near.get((arm, other), np.inf))
+        return near
+
+    def first_contact(self, poses: NDArray[Any], every: int = 5) -> str | None:
+        """Name of the first body the planned left arm comes near, or None. poses: [N,29] motor order."""
+        poses = np.asarray(poses)
+        start = self._near(poses[0])
+        for q in poses[::every]:
+            for (arm, other), dist in self._near(q).items():
+                if (arm, other) not in start or dist < start[(arm, other)] - self._closer:
+                    return str(self._body[other])
+        return None

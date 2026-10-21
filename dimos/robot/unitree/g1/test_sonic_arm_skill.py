@@ -20,6 +20,7 @@ thread plays body telemetry into the skill's watch. The plan is shortened to abo
 
 from dataclasses import replace
 from functools import partial
+from pathlib import Path
 import re
 import threading
 import time
@@ -30,12 +31,13 @@ import pytest
 
 from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.core.transport_factory import make_transport
-from dimos.robot.unitree.g1 import sonic_arm_skill
+from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     arm_poses,
     group_margins,
     min_jerk,
+    stroke_plan,
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import SonicArmSkillContainer
@@ -49,6 +51,7 @@ from dimos.robot.unitree.g1.test_sonic_execution_module import (
 from dimos.robot.unitree.g1.test_sonic_session import feedback, pose_values
 
 PEER_TOKEN = 0.125  # ScriptedPeer token_state
+FAKE_GAIN = 0.25  # Fake token value 0 per rad of summed joint offset; keeps big poses in the bound.
 
 
 @pytest.fixture
@@ -78,9 +81,7 @@ class FakeEncoder:
 
     def encode(self, poses):
         tokens = np.full((len(poses), 64), PEER_TOKEN)
-        tokens[:, 0] += (poses - poses[0]).sum(
-            axis=1
-        )  # The planned offset of whichever joint moves.
+        tokens[:, 0] += FAKE_GAIN * (poses - poses[0]).sum(axis=1)  # The planned offsets.
         return tokens
 
 
@@ -89,8 +90,8 @@ def skill(execution, mocker):
     mocker.patch.object(sonic_arm_skill, "SonicEncoder", FakeEncoder)
     mocker.patch.object(
         sonic_arm_skill,
-        "arm_poses",
-        partial(arm_poses, lead_s=0.1, move_s=0.3, hold_s=0.1, peak_speed=100.0),
+        "stroke_plan",
+        partial(stroke_plan, lead_s=0.1, move_s=0.3, hold_s=0.1, peak_speed=100.0),
     )
     mocker.patch.object(sonic_arm_skill, "token_schedule", partial(token_schedule, blend_s=0.2))
     module = SonicArmSkillContainer(encoder_path="unused.onnx", return_watch_seconds=0.0)
@@ -163,7 +164,7 @@ def test_swing_streams_one_chunk_and_hands_back(skill):
         p[-3:-1] == b"\0\0" for p in packets if p.startswith(b"command")
     )  # Never start/stop.
     streamed = tokens(packets)[:, 0]
-    assert streamed.min() == pytest.approx(PEER_TOKEN - np.radians(20), abs=0.01)  # Full depth.
+    assert streamed.min() == pytest.approx(PEER_TOKEN - FAKE_GAIN * np.radians(20), abs=0.01)
     assert np.abs(np.diff(streamed)).max() <= 0.05 + 1e-6
     assert streamed[-1] == pytest.approx(PEER_TOKEN, abs=1e-3)  # Blended back before handback.
 
@@ -338,7 +339,7 @@ def test_other_motions_move_their_own_joint_with_its_widened_envelope(skill, mot
         18.9, abs=0.1
     )
     streamed = tokens(peer.snapshot())[:, 0]
-    assert streamed.max() - streamed.min() == pytest.approx(np.radians(22), abs=0.01)
+    assert streamed.max() - streamed.min() == pytest.approx(FAKE_GAIN * np.radians(22), abs=0.01)
 
 
 def test_unknown_motion_sends_nothing(skill):
@@ -393,3 +394,241 @@ def test_shoulder_yaw_shares_the_loose_envelope(skill, joint, passes):
         assert (
             result.error_code == "ENVELOPE" and sonic_arm_skill._JOINTS[joint] in result.message
         ), result
+
+
+class FakeChecker:
+    def __init__(self, contact=None):
+        self.contact, self.calls = contact, 0
+
+    def first_contact(self, poses):
+        self.calls += 1
+        return self.contact
+
+
+def reaching(target, fraction=0.8, extra=None):
+    """Telemetry that moves the left arm to `fraction` of an absolute target mid-run."""
+
+    def body_q(t):
+        q = np.zeros(29)
+        if 0.5 < t < 0.9:
+            q[15:19] = fraction * np.asarray(target)
+        for joint, value in (extra or {}).items():
+            q[joint] = value if t > 0.4 else 0.0
+        return q
+
+    return body_q
+
+
+def call_with_feed(module, call, body_q):
+    stopped = threading.Event()
+
+    def feed():
+        start = time.monotonic()
+        while not stopped.is_set():
+            state = module._execution.get_feedback()
+            if state is not None:
+                q = tuple(float(v) for v in body_q(time.monotonic() - start))
+                module.handle_feedback(replace(state, body_q=q))
+            time.sleep(0.01)
+
+    feeder = threading.Thread(target=feed, daemon=True)
+    feeder.start()
+    try:
+        return call()
+    finally:
+        stopped.set()
+        feeder.join(2)
+
+
+def test_full_range_pose_moves_every_left_arm_joint_together(skill):
+    module, peer = skill
+    target = sonic_arm_skill.POSES["left_hand_over_head"]
+    result = call_with_feed(
+        module, lambda: module.move_left_arm_pose("left_hand_over_head"), reaching(target)
+    )
+    assert result.success, result
+    assert result.metadata["reached_fraction"] == pytest.approx(0.8, abs=0.01)
+    assert result.metadata["planned_deg"]["left_shoulder_pitch"] == pytest.approx(
+        np.degrees(-2.8), abs=0.1
+    )
+    streamed = tokens(peer.snapshot())[:, 0]  # FakeEncoder: summed offsets of the moved joints
+    assert streamed.min() - PEER_TOKEN == pytest.approx(FAKE_GAIN * sum(target), abs=0.02)
+
+
+def test_pose_envelope_lets_the_arm_and_other_arm_coordinate(skill):
+    module, _ = skill
+    target = sonic_arm_skill.POSES["left_arm_side_horizontal"]
+    # SONIC adds shoulder pitch (0.35 off plan) and moves the right arm (0.30): both allowed.
+    result = call_with_feed(
+        module,
+        lambda: module.move_left_arm_pose("left_arm_side_horizontal"),
+        reaching(target, extra={15: -0.35, 23: 0.30}),
+    )
+    assert result.success, result
+
+
+def test_pose_envelope_still_guards_the_legs(skill):
+    module, _ = skill
+    target = sonic_arm_skill.POSES["left_arm_side_horizontal"]
+    result = call_with_feed(
+        module,
+        lambda: module.move_left_arm_pose("left_arm_side_horizontal"),
+        reaching(target, extra={3: 0.2}),
+    )
+    assert result.error_code == "ENVELOPE" and "left_knee" in result.message, result
+
+
+def test_joint_targets_need_the_path_check(skill):
+    module, peer = skill
+    assert module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0).error_code == "NOT_READY"
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+@pytest.mark.parametrize(
+    "angles", [(-170.0, 11.0, 0.0, 70.0), (-90.0, -20.0, 0.0, 70.0), (-90.0, 11.0, 0.0, 90.0)]
+)
+def test_joint_targets_outside_the_box_send_nothing(skill, angles):
+    module, peer = skill
+    module._checker = FakeChecker()
+    assert module.move_left_arm_joints(*angles).error_code == "INVALID_ANGLE"
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_unsafe_joint_target_path_is_refused_before_sending(skill):
+    module, peer = skill
+    module._checker = FakeChecker("torso_link")
+    result = module.move_left_arm_joints(11.0, -10.0, 0.0, 34.0)
+    assert result.error_code == "UNSAFE_PATH" and "torso_link" in result.message, result
+    assert module._checker.calls == 1
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_checked_joint_target_runs(skill):
+    module, _ = skill
+    module._checker = FakeChecker()
+    target = np.radians([-90.0, 11.0, 0.0, 70.0])
+    result = call_with_feed(
+        module, lambda: module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0), reaching(target)
+    )
+    assert result.success, result
+    assert module._checker.calls == 1
+
+
+_MODEL = "gear_sonic/data/robot_model/model_data/g1/scene_43dof.xml"
+SCENE = next(
+    (
+        root / _MODEL
+        for root in (
+            Path.home() / "work/GR00T-WholeBodyControl-hand-tracking-watchdog",
+            Path.home() / "GR00T-WholeBodyControl",  # the G1 PC2
+        )
+        if (root / _MODEL).exists()
+    ),
+    Path("/nonexistent"),
+)
+
+
+@pytest.mark.skipif(not SCENE.exists(), reason="gear_sonic G1 MuJoCo model not on this host")
+def test_real_collision_model_clears_the_poses_and_catches_the_torso():
+    checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
+    legs_waist = [-0.312, 0, 0, 0.669, -0.363, 0, -0.312, 0, 0, 0.669, -0.363, 0, 0, 0, 0]
+    rest = np.array([*legs_waist, 0.2, 0.2, 0, 0.6, 0, 0, 0, 0.2, -0.2, 0, 0.6, 0, 0, 0])
+    for pose, target in sonic_arm_skill.POSES.items():
+        delta = np.zeros(29)
+        delta[15:19] = np.asarray(target) - rest[15:19]
+        assert checker.first_contact(stroke_plan(rest, delta)) is None, pose
+    inward = np.zeros(29)
+    inward[16] = -0.7  # shoulder roll into the torso
+    assert checker.first_contact(stroke_plan(rest, inward)) == "torso_link"
+
+
+@pytest.mark.skipif(not SCENE.exists(), reason="gear_sonic G1 MuJoCo model not on this host")
+def test_robot_idle_pose_near_the_hip_does_not_block_moves_away():
+    """The G1's idle left wrist rests about 2 cm from the hip (pc2 log 2026-10-19 16:22)."""
+    checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
+    legs_waist = [-0.312, 0.044, 0, 0.669, -0.363, 0, -0.312, 0, 0, 0.669, -0.363, 0, 0, 0, 0]
+    left_arm = [-0.02, 0.284, -0.651, 0.984, -0.152, -0.06, 0.011]
+    idle = np.array([*legs_waist, *left_arm, 0.2, -0.2, 0, 0.6, 0, 0, 0])
+    assert checker.first_contact(idle[None]) is None  # Already near at the start: allowed.
+    for pose, target in sonic_arm_skill.POSES.items():
+        delta = np.zeros(29)
+        delta[15:19] = np.asarray(target) - idle[15:19]
+        assert checker.first_contact(stroke_plan(idle, delta)) is None, pose
+    inward = np.zeros(29)
+    inward[16] = -0.25  # Closing in on the hip is still refused.
+    assert checker.first_contact(stroke_plan(idle, inward)) == "left_hip_roll_link"
+
+
+def test_long_plans_split_into_two_chunks_at_the_hold():
+    assert sonic_arm_skill.chunk_rows(800, 400) == [(0, 800)]  # As commissioned: one chunk.
+    chunks = sonic_arm_skill.chunk_rows(1545, 705)
+    assert chunks == [(0, 730), (705, 1545)]
+    assert all(end - start <= 1000 for start, end in chunks)
+    with pytest.raises(ValueError):
+        sonic_arm_skill.chunk_rows(2500, 200)
+
+
+def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
+    """The slowest pose (overhead at 0.47 rad/s, 31 s) through the real session on a simulated clock."""
+    packets: list[bytes] = []
+    profile = SonicModelProfile(
+        name="arm",
+        source_fps=50,
+        right_hand_order="native",
+        handback_policy="native_planner",
+        max_observation_age=35.0,
+        max_duration=45.0,
+    )
+    session = SonicTaskSession("task", profile, send=packets.append, journal=lambda event: None)
+    seed = feedback(10.0)
+    rest = np.zeros(29)
+    delta = np.zeros(29)
+    delta[15:19] = np.asarray(sonic_arm_skill.POSES["left_hand_over_head"]) - [0.2, 0.2, 0.0, 0.6]
+    poses = stroke_plan(rest, delta)
+    motion = np.full((len(poses), 64), 0.125)
+    motion[:, 0] += FAKE_GAIN * (poses - poses[0]).sum(axis=1)
+    tokens = token_schedule(np.asarray(seed.token_state), motion)
+    plan = np.hstack(
+        [tokens, np.tile(np.r_[seed.left_hand_q, seed.right_hand_q], (len(tokens), 1))]
+    )
+    hold_start = 100 + int(np.argmax(np.abs(poses - rest).sum(axis=1)))
+    chunks = sonic_arm_skill.chunk_rows(len(plan), hold_start)
+    assert len(plan) > 1000 and len(chunks) == 2
+    session.start(seed, now=10.0)
+    now, index, plan_start, emitted, sent = 10.0, 100, None, [], 0
+    while session.status.phase != SessionPhase.HANDBACK:
+        now, index = round(now + 0.02, 2), index + 1
+        planner = session.status.phase == SessionPhase.SEEDING
+        session.observe(
+            feedback(
+                now,
+                index,
+                planner=planner,
+                epoch=7 if planner else 8,
+                accepted=session.status.last_frame_index,
+            ),
+            now=now,
+        )
+        if session.status.phase in (SessionPhase.WAITING, SessionPhase.RUNNING):
+            plan_start = plan_start or now
+            k = round((now - plan_start) * 50)
+            if sent < len(chunks) and k >= chunks[sent][0]:
+                start, end = chunks[sent]
+                session.submit_chunk(
+                    task_id="task",
+                    sequence=sent,
+                    observed_at=plan_start + start / 50,
+                    actions=plan[start:end],
+                    now=now,
+                )
+                sent += 1
+            elif k >= len(plan) - 2:
+                session.finish(now=now)
+        before = len(packets)
+        session.tick(now=now)
+        if plan_start is not None and len(packets) > before:
+            emitted.append((round((now - plan_start) * 50), pose_values(packets[-1])[0]))
+    assert session.status.outcome == "finished" and session.status.last_chunk_sequence == 1
+    k, value = np.array(emitted).T
+    assert np.abs(value - plan[k.astype(int), 0]).max() < 0.005
+    assert np.abs(np.diff(value)).max() <= np.abs(np.diff(plan[:, 0])).max() + 1e-4  # No ripple.
