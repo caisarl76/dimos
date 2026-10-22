@@ -22,9 +22,10 @@ body pose, so the reference holds the robot where it is. Commissioned on a G1 on
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import hashlib
+import itertools
 import math
 from pathlib import Path
 from typing import Any
@@ -128,7 +129,26 @@ HEAD_CAMERA_SIZE = (640, 480)
 HEAD_CAMERA_K = (606.62, 607.12, 325.54, 245.35)  # fx, fy, cx, cy
 HEAD_CAMERA_XYZ = (0.0576235, 0.01753, 0.41987)  # torso_link -> camera_link
 HEAD_CAMERA_QUAT_XYZW = (0.0, 0.40355, 0.0, 0.91496)
-OBJECT_RANGE_M = 2.0  # point_at_object aims at this distance along the pixel's ray
+# Forearm pointing: the elbow-to-wrist line, extended, passes through the pixel ray's floor point.
+AIM_RANGE_M = (0.5, 4.0)  # clamp on the ray length to the aim point; a level ray uses the far end
+FOREARM_PREF = np.radians([-45.0, 25.0, 0.0, 30.0])  # pitch, roll, yaw, elbow: a natural point
+FOREARM_WEIGHTS = np.array([1.0, 1.0, 0.7, 0.7])
+# Natural-pose acceptance, torso frame: hand ahead, forearm forward, moderate bend, modest roll,
+# every arm joint off its JOINT_BOUNDS limit.
+FOREARM_WRIST_MIN_X = 0.10  # m
+FOREARM_MIN_X = 0.2  # x of the forearm's unit vector
+ELBOW_STRAIGHT = 1.43  # rad
+ELBOW_BEND_DEG = (5.0, 70.0)  # from straight
+FOREARM_ROLL_MAX_DEG = 60.0
+FOREARM_LIMIT_MARGIN_DEG = 5.0
+# Search: a coarse grid (pitch, roll, yaw, elbow steps, deg; roll from 10 deg), seeds within 8 deg
+# ranked by FOREARM_PREF distance, the first 40 refined by a compass search from 4 to 0.05 deg.
+_FOREARM_GRID_STEPS_DEG = (10.0, 10.0, 15.0, 15.0)
+_FOREARM_GRID_MIN_ROLL_DEG = 10.0
+_FOREARM_SEED_DEG = 8.0
+_FOREARM_SEEDS = 40
+_FOREARM_STEP_DEG = (4.0, 0.05)
+_COMPASS_4D = np.vstack([np.eye(4), -np.eye(4)])
 
 
 class SonicEncoder:
@@ -374,12 +394,6 @@ def pixel_ray(u: float, v: float) -> NDArray[np.float64]:
     return np.asarray(ray / np.linalg.norm(ray), np.float64)
 
 
-def aim_from_pixel(u: float, v: float, shoulder: NDArray[Any]) -> tuple[float, float]:
-    """(azimuth, elevation) deg from `shoulder` to the point OBJECT_RANGE_M along pixel (u, v)'s ray."""
-    x, y, z = np.asarray(HEAD_CAMERA_XYZ) + OBJECT_RANGE_M * pixel_ray(u, v) - shoulder
-    return math.degrees(math.atan2(y, x)), math.degrees(math.atan2(z, math.hypot(x, y)))
-
-
 class ArmCollisionChecker:
     """Kinematic check that a planned left-arm path keeps clear of the body.
 
@@ -433,11 +447,37 @@ class ArmCollisionChecker:
         return None
 
 
+def _refine_forearm(
+    kin: ArmKinematics, base: NDArray[np.float64], seed: NDArray[Any], point: NDArray[Any]
+) -> tuple[NDArray[np.float64], float]:
+    """Compass search from seed [4] to the smallest forearm error at point: (q4, error deg)."""
+    pose = base.copy()
+
+    def cost(q4: NDArray[np.float64]) -> float:
+        pose[15:19] = q4
+        return kin.forearm_error(pose, point)
+
+    low, high = kin.arm_bounds[:, 0], kin.arm_bounds[:, 1]
+    best = np.asarray(seed, np.float64)
+    best_cost, step = cost(best), math.radians(_FOREARM_STEP_DEG[0])
+    while step > math.radians(_FOREARM_STEP_DEG[1]):
+        moves = [np.clip(best + step * d, low, high) for d in _COMPASS_4D]
+        costs = [cost(x) for x in moves]
+        k = int(np.argmin(costs))
+        if costs[k] < best_cost:
+            best, best_cost = moves[k], costs[k]
+        else:
+            step /= 2
+    return best, best_cost
+
+
 class ArmKinematics:
-    """Left-arm forward kinematics on scene_43dof.xml, and pointing IK for a near-straight arm.
+    """Left-arm forward kinematics on scene_43dof.xml, and pointing IK for a near-straight arm
+    (`solve`) or a bent arm aiming its forearm (`solve_forearm`).
 
     Directions are in the torso_link frame, from the left_shoulder_pitch_link origin to the
-    left_wrist_yaw_link origin. Same model and qpos layout as ArmCollisionChecker.
+    left_wrist_yaw_link origin; the forearm runs from the left_elbow_link origin to the wrist.
+    Same model and qpos layout as ArmCollisionChecker.
     Not thread-safe: every call reuses the instance's one MjData; the skill uses it only from its
     single motion thread.
     """
@@ -450,11 +490,44 @@ class ArmKinematics:
         self._d = mujoco.MjData(self._m)
         self._d.qpos[2] = 0.79
         self._qadr = [self._m.jnt_qposadr[self._m.joint(n + "_joint").id] for n in MOTOR_NAMES]
-        self._torso, self._shoulder, self._wrist = (
+        self._torso, self._shoulder, self._elbow, self._wrist = (
             self._m.body(name).id
-            for name in ("torso_link", "left_shoulder_pitch_link", "left_wrist_yaw_link")
+            for name in (
+                "torso_link",
+                "left_shoulder_pitch_link",
+                "left_elbow_link",
+                "left_wrist_yaw_link",
+            )
         )
+        self._ankles = [self._m.body(f"{s}_ankle_roll_link").id for s in ("left", "right")]
         self._bounds = np.radians([JOINT_BOUNDS["shoulder_pitch"], JOINT_BOUNDS["shoulder_roll"]])
+        self.arm_bounds = np.radians(
+            [JOINT_BOUNDS[n] for n in ("shoulder_pitch", "shoulder_roll", "shoulder_yaw", "elbow")]
+        )
+        self.sole_offset = self._sole_offset()
+        low, high = self.arm_bounds.T.copy()
+        low[1] = math.radians(_FOREARM_GRID_MIN_ROLL_DEG)  # the grid only; refinement may go lower
+        steps = np.radians(_FOREARM_GRID_STEPS_DEG)
+        self._forearm_grid = np.array(
+            list(itertools.product(*map(np.arange, low, high + 1e-9, steps)))
+        )
+
+    def _sole_offset(self) -> float:
+        """Height of an ankle-roll origin above the lowest point of its foot's collision geometry,
+        at the zero pose (the geoms' bounding boxes; exact for the G1's box soles)."""
+        d = self._mujoco.MjData(self._m)
+        self._mujoco.mj_kinematics(self._m, d)  # type: ignore[attr-defined]
+        offset = 0.0
+        for ankle in self._ankles:
+            for g in np.flatnonzero(self._m.geom_bodyid == ankle):
+                if self._m.geom_contype[g] or self._m.geom_conaffinity[g]:
+                    rot = d.geom_xmat[g].reshape(3, 3)
+                    center, half = self._m.geom_aabb[g, :3], self._m.geom_aabb[g, 3:]
+                    lowest = (d.geom_xpos[g] + rot @ center)[2] - np.abs(rot[2]) @ half
+                    offset = max(offset, float(d.xpos[ankle][2] - lowest))
+        if offset == 0.0:
+            raise ValueError("no foot collision geometry below the ankle-roll links")
+        return offset
 
     def _frame(self, q: NDArray[Any]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Shoulder origin and shoulder-to-wrist vector at pose q, torso frame."""
@@ -466,9 +539,6 @@ class ArmKinematics:
             to_torso @ (shoulder - self._d.xpos[self._torso]),
             to_torso @ (self._d.xpos[self._wrist] - shoulder),
         )
-
-    def shoulder(self, q: NDArray[Any]) -> NDArray[np.float64]:
-        return self._frame(q)[0]
 
     def direction(self, q: NDArray[Any]) -> tuple[float, float]:
         """(azimuth, elevation) of the arm at pose q, deg."""
@@ -513,3 +583,133 @@ class ArmKinematics:
                 f"{elevation_deg:g} deg: its closest pose is {off:.0f} deg away, more than 3 deg off"
             )
         return np.array([best[0], best[1], 0.0, POINT_ELBOW])
+
+    def forearm_points(self, q: NDArray[Any]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Elbow and wrist origins at pose q, torso frame."""
+        self._d.qpos[self._qadr] = q
+        self._mujoco.mj_kinematics(self._m, self._d)  # type: ignore[attr-defined]
+        to_torso = self._d.xmat[self._torso].reshape(3, 3).T
+        origin = self._d.xpos[self._torso]
+        return (
+            to_torso @ (self._d.xpos[self._elbow] - origin),
+            to_torso @ (self._d.xpos[self._wrist] - origin),
+        )
+
+    def aim_point(self, q: NDArray[Any], u: float, v: float) -> tuple[NDArray[np.float64], float]:
+        """Where pixel (u, v)'s ray meets the floor at measured pose q: (point in the torso frame,
+        ray length from the camera in m), the length clamped to AIM_RANGE_M.
+
+        The floor is level in the model's world (pelvis upright), at the lower ankle-roll origin
+        minus the sole offset.
+        """
+        self._d.qpos[self._qadr] = q
+        self._mujoco.mj_kinematics(self._m, self._d)  # type: ignore[attr-defined]
+        up = self._d.xmat[self._torso].reshape(3, 3)[2]  # world z row: torso frame -> world height
+        floor = min(self._d.xpos[a][2] for a in self._ankles) - self.sole_offset
+        camera = np.array(HEAD_CAMERA_XYZ)
+        ray = pixel_ray(u, v)
+        height = self._d.xpos[self._torso][2] + up @ camera - floor
+        drop = -float(up @ ray)
+        length = height / drop if drop > 1e-6 else AIM_RANGE_M[1]
+        length = min(max(length, AIM_RANGE_M[0]), AIM_RANGE_M[1])
+        return camera + length * ray, length
+
+    def forearm_error(self, q: NDArray[Any], point: NDArray[Any]) -> float:
+        """Angle between the forearm (elbow to wrist) and the wrist-to-point line at pose q, deg."""
+        elbow, wrist = self.forearm_points(q)
+        forearm, to_point = wrist - elbow, np.asarray(point) - wrist
+        cos = forearm @ to_point / (np.linalg.norm(forearm) * np.linalg.norm(to_point))
+        return math.degrees(math.acos(min(1.0, max(-1.0, float(cos)))))
+
+    def natural_pose(self, q: NDArray[Any]) -> str | None:
+        """None when pose q reads as pointing, else the name of the first failed check."""
+        elbow, wrist = self.forearm_points(q)
+        q4 = np.asarray(q, np.float64)[15:19]
+        bend = math.degrees(ELBOW_STRAIGHT - q4[3])
+        margin = math.radians(FOREARM_LIMIT_MARGIN_DEG)
+        if wrist[0] < FOREARM_WRIST_MIN_X:
+            return "wrist_behind"
+        if (wrist - elbow)[0] / np.linalg.norm(wrist - elbow) < FOREARM_MIN_X:
+            return "forearm_backward"
+        if not ELBOW_BEND_DEG[0] <= bend <= ELBOW_BEND_DEG[1]:
+            return "elbow_bend"
+        if math.degrees(q4[1]) > FOREARM_ROLL_MAX_DEG:
+            return "shoulder_roll"
+        if np.any(q4 < self.arm_bounds[:, 0] + margin) or np.any(
+            q4 > self.arm_bounds[:, 1] - margin
+        ):
+            return "joint_limit"
+        return None
+
+    def solve_forearm(
+        self,
+        q: NDArray[Any],
+        point: NDArray[Any],
+        path_clear: Callable[[NDArray[np.float64]], str | None],
+    ) -> NDArray[np.float64]:
+        """Shoulder pitch, roll, yaw and elbow [4] that aim the forearm at point (torso frame)
+        within 3 deg, in a natural pose whose path path_clear(full pose) passes.
+
+        The rest of q stays as given. Coarse grid -> the 40 seeds within 8 deg nearest
+        FOREARM_PREF -> refined -> kept when within 3 deg and natural -> re-ranked by FOREARM_PREF
+        distance -> path-checked in that order; the first clear one wins. The best posture among
+        the searched candidates, not a global optimum.
+        """
+        base = np.asarray(q, np.float64).copy()
+        point = np.asarray(point, np.float64)
+        where = "({:.2f}, {:.2f}, {:.2f}) m".format(*point)
+        # Grid FK, recomputed per call since it depends on the rest of q (about 0.3 s for 27k poses).
+        self.forearm_points(base)
+        to_torso = self._d.xmat[self._torso].reshape(3, 3).T.copy()
+        origin = self._d.xpos[self._torso].copy()
+        arm = self._qadr[15:19]
+        elbows = np.empty((len(self._forearm_grid), 3))
+        wrists = np.empty_like(elbows)
+        for i, q4 in enumerate(self._forearm_grid):
+            self._d.qpos[arm] = q4
+            self._mujoco.mj_kinematics(self._m, self._d)  # type: ignore[attr-defined]
+            elbows[i], wrists[i] = self._d.xpos[self._elbow], self._d.xpos[self._wrist]
+        elbows, wrists = (elbows - origin) @ to_torso.T, (wrists - origin) @ to_torso.T
+        forearm = wrists - elbows
+        to_point = point - wrists
+        cos = np.sum(forearm * to_point, axis=1) / (
+            np.linalg.norm(forearm, axis=1) * np.linalg.norm(to_point, axis=1)
+        )
+        error = np.degrees(np.arccos(np.clip(cos, -1.0, 1.0)))
+        seeds = self._forearm_grid[error < _FOREARM_SEED_DEG]
+        seeds = seeds[np.argsort(_pref_distance(seeds), kind="stable")][:_FOREARM_SEEDS]
+        close = False
+        accepted: list[tuple[float, NDArray[np.float64]]] = []
+        for seed in seeds:
+            q4, off = _refine_forearm(self, base, seed, point)
+            if off > _POINT_TOLERANCE_DEG:
+                continue
+            close = True
+            pose = base.copy()
+            pose[15:19] = q4
+            if self.natural_pose(pose) is None:
+                accepted.append((float(_pref_distance(q4)), pose))
+        if not close:
+            raise ValueError(f"the left forearm cannot point within 3 deg at {where}")
+        if not accepted:
+            raise ValueError(
+                f"the left forearm cannot aim at {where}: no natural pose points there"
+            )
+        accepted.sort(key=lambda c: c[0])
+        blocked = None
+        for _, pose in accepted:
+            body = path_clear(pose)
+            if body is None:
+                return pose[15:19].copy()
+            blocked = blocked or body
+        raise ValueError(
+            f"the left forearm cannot aim at {where}: every pose that points there comes near "
+            f"the {blocked}"
+        )
+
+
+def _pref_distance(q4: NDArray[Any]) -> NDArray[np.float64]:
+    """Weighted distance of [..., 4] arm poses from FOREARM_PREF, rad."""
+    return np.asarray(
+        np.linalg.norm((np.asarray(q4) - FOREARM_PREF) * FOREARM_WEIGHTS, axis=-1), np.float64
+    )

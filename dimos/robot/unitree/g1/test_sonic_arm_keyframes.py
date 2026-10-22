@@ -23,8 +23,13 @@ from typing import get_args
 import numpy as np
 import pytest
 
+from dimos.robot.unitree.g1 import sonic_arm_reference
 from dimos.robot.unitree.g1.sonic_arm_reference import (
+    AIM_RANGE_M,
+    FOREARM_PREF,
+    FOREARM_WEIGHTS,
     HEAD_CAMERA_XYZ,
+    MOTOR_NAMES,
     PEAK_SPEED,
     POINT_AZIMUTH_DEG,
     POINT_ELEVATION_DEG,
@@ -33,7 +38,6 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     ArmKinematics,
     Keyframe,
     SonicEncoder,
-    aim_from_pixel,
     keyframe_plan,
     pixel_ray,
     retreat_poses,
@@ -333,12 +337,6 @@ def test_solve_is_fast(kinematics):
 
 
 @needs_scene
-def test_shoulder_sits_left_of_and_above_the_torso_origin(kinematics):
-    x, y, z = kinematics.shoulder(ROBOT_IDLE)
-    assert abs(x) < 0.05 and 0.05 < y < 0.15 and 0.15 < z < 0.3
-
-
-@needs_scene
 @pytest.mark.parametrize("az,el", [(0, 0), (15, -30), (30, -45), (45, -30), (60, 0), (80, 30)])
 def test_common_directions_solve_and_clear_the_body(kinematics, az, el):
     solved = ROBOT_IDLE.copy()
@@ -381,10 +379,136 @@ def test_pixel_left_and_up_turn_left_and_up():
     assert pixel_ray(325.54, 50.0)[2] > c[2]  # above centre -> higher
 
 
-def test_aim_from_pixel_points_the_shoulder_at_the_object_2m_out():
-    shoulder = np.array([0.0, 0.15, 0.24])
-    az, el = aim_from_pixel(325.54, 245.35, shoulder)
-    p = np.array(HEAD_CAMERA_XYZ) + 2.0 * pixel_ray(325.54, 245.35) - shoulder
-    assert (az, el) == pytest.approx(
-        (np.degrees(np.arctan2(p[1], p[0])), np.degrees(np.arctan2(p[2], np.hypot(p[0], p[1]))))
+FOREARM_US = [0, 106, 213, 320, 426, 533, 639]
+FOREARM_VS = [0, 80, 160, 240, 320, 400, 479]
+SOLE_OFFSET_M = (
+    0.035  # scene_43dof foot collision box: 5 mm half-height, centred 30 mm below the ankle
+)
+
+
+def with_arm(base, q4):
+    pose = np.asarray(base, np.float64).copy()
+    pose[15:19] = q4
+    return pose
+
+
+def floor_check(q):
+    """(torso origin, torso rotation, floor height) in the MuJoCo world, computed independently."""
+    import mujoco  # optional dependency, as in sonic_arm_reference
+
+    m = mujoco.MjModel.from_xml_path(str(SCENE))
+    d = mujoco.MjData(m)
+    d.qpos[2] = 0.79
+    d.qpos[[m.jnt_qposadr[m.joint(n + "_joint").id] for n in MOTOR_NAMES]] = q
+    mujoco.mj_kinematics(m, d)
+    ankles = [d.xpos[m.body(f"{side}_ankle_roll_link").id][2] for side in ("left", "right")]
+    torso = m.body("torso_link").id
+    return d.xpos[torso].copy(), d.xmat[torso].reshape(3, 3).copy(), min(ankles) - SOLE_OFFSET_M
+
+
+def path_clear_from(checker, base):
+    return lambda pose: checker.first_contact(stroke_plan(base, pose - base), start=base)
+
+
+@needs_scene
+def test_forearm_covers_the_whole_image(kinematics):
+    clear = path_clear_from(ArmCollisionChecker(SCENE), ROBOT_IDLE)
+    rows, times = [], []
+    for v in FOREARM_VS:
+        for u in FOREARM_US:
+            point, t = kinematics.aim_point(ROBOT_IDLE, u, v)
+            assert AIM_RANGE_M[0] <= t <= AIM_RANGE_M[1]
+            started = time.monotonic()
+            q4 = kinematics.solve_forearm(ROBOT_IDLE, point, clear)
+            times.append(time.monotonic() - started)
+            pose = with_arm(ROBOT_IDLE, q4)
+            error = kinematics.forearm_error(pose, point)
+            rows.append((u, v, t, error, times[-1]))
+            assert error <= 3.0, (u, v)
+            assert kinematics.natural_pose(pose) is None, (u, v)
+    for u, v, t, error, took in rows:
+        print(f"u {u:3d} v {v:3d} ray {t:.2f} m error {error:.2f} deg solve {took:.2f} s")
+    print(f"worst error {max(r[3] for r in rows):.2f} deg, slowest {max(times):.2f} s")
+    assert float(np.median(times)) < 1.0
+
+
+@needs_scene
+def test_aim_point_ray_length_matches_the_camera_height(kinematics):
+    origin, rotation, floor = floor_check(ROBOT_IDLE)
+    for (u, v), length in [
+        ((320, 240), 1.68),
+        ((320, 479), 1.32),
+        ((0, 0), 3.18),
+        ((639, 0), 3.18),
+    ]:
+        point, t = kinematics.aim_point(ROBOT_IDLE, u, v)
+        assert t == pytest.approx(length, abs=0.05), (u, v)
+        np.testing.assert_allclose(point, np.array(HEAD_CAMERA_XYZ) + t * pixel_ray(u, v))
+        assert (origin + rotation @ point)[2] == pytest.approx(floor, abs=1e-3)
+
+
+@needs_scene
+def test_aim_point_follows_the_measured_waist(kinematics):
+    bent = ROBOT_IDLE.copy()
+    bent[14] += 0.1  # waist pitch
+    _, idle_t = kinematics.aim_point(ROBOT_IDLE, 320, 240)
+    point, t = kinematics.aim_point(bent, 320, 240)
+    assert abs(t - idle_t) > 0.02
+    origin, rotation, floor = floor_check(bent)
+    assert (origin + rotation @ point)[2] == pytest.approx(floor, abs=1e-3)
+
+
+@needs_scene
+@pytest.mark.parametrize("ray", [[1.0, 0.0, 0.0], [0.8, 0.0, 0.6]])
+def test_aim_point_clamps_a_level_ray(kinematics, monkeypatch, ray):
+    monkeypatch.setattr(sonic_arm_reference, "pixel_ray", lambda u, v: np.array(ray))
+    point, t = kinematics.aim_point(ROBOT_IDLE, 320, 240)
+    assert t == AIM_RANGE_M[1]
+    assert np.all(np.isfinite(point))
+
+
+@needs_scene
+def test_refined_candidates_are_rescored_before_the_path_check(kinematics, monkeypatch):
+    point, _ = kinematics.aim_point(ROBOT_IDLE, 320, 240)
+    near_pref = FOREARM_PREF.copy()
+    far_pref = np.radians([-15.0, 50.0, 0.0, 30.0])
+    for q4 in (near_pref, far_pref):
+        assert kinematics.natural_pose(with_arm(ROBOT_IDLE, q4)) is None
+    weighted = [
+        np.linalg.norm((q4 - FOREARM_PREF) * FOREARM_WEIGHTS) for q4 in (near_pref, far_pref)
+    ]
+    assert weighted[0] < weighted[1]
+    refined = iter([(far_pref, 0.5), (near_pref, 0.5)])
+    monkeypatch.setattr(
+        sonic_arm_reference,
+        "_refine_forearm",
+        lambda kin, base, seed, aim: next(refined, (seed, 90.0)),
     )
+    checked = []
+    q4 = kinematics.solve_forearm(ROBOT_IDLE, point, lambda pose: checked.append(pose) or None)
+    np.testing.assert_allclose(q4, near_pref)
+    np.testing.assert_allclose(checked[0][15:19], near_pref)
+
+
+@needs_scene
+def test_unreachable_point_is_refused(kinematics):
+    with pytest.raises(ValueError, match="cannot point within 3 deg|no natural pose points there"):
+        kinematics.solve_forearm(ROBOT_IDLE, np.array([-1.0, 0.1, 0.0]), lambda pose: None)
+
+
+@needs_scene
+def test_all_blocked_is_refused_with_the_body(kinematics):
+    point, _ = kinematics.aim_point(ROBOT_IDLE, 320, 240)
+    with pytest.raises(ValueError, match="every pose that points there comes near the torso_link"):
+        kinematics.solve_forearm(ROBOT_IDLE, point, lambda pose: "torso_link")
+
+
+@needs_scene
+def test_natural_pose_names_the_first_failed_check(kinematics):
+    assert kinematics.natural_pose(with_arm(ROBOT_IDLE, FOREARM_PREF)) is None
+    straight = with_arm(ROBOT_IDLE, np.radians([-45.0, 25.0, 0.0, 80.0]))
+    assert kinematics.natural_pose(straight) in ("elbow_bend", "joint_limit")
+    wide = with_arm(ROBOT_IDLE, np.radians([-45.0, 70.0, 0.0, 30.0]))
+    assert kinematics.natural_pose(wide) == "shoulder_roll"
+    back = with_arm(ROBOT_IDLE, np.radians([30.0, 25.0, 0.0, 30.0]))
+    assert kinematics.natural_pose(back) == "wrist_behind"
