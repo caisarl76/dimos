@@ -394,6 +394,28 @@ impl VoxelMap {
         self.voxels.clear();
     }
 
+    /// Remove every voxel whose center lies in `bounds`, keeping support counts
+    /// and the viz in sync. Returns how many were removed.
+    pub fn clear_region(&mut self, bounds: &LocalBounds, voxel_size: f32) -> usize {
+        let inside: Vec<VoxelKey> = self
+            .voxels
+            .iter()
+            .map(|(k, _)| k)
+            .filter(|&k| {
+                let (x, y, z) = voxel_center(k, voxel_size);
+                bounds.contains(x, y, z)
+            })
+            .collect();
+        for &key in &inside {
+            if let Some(v) = self.voxels.remove(&key) {
+                if v.health > 0 {
+                    self.health_crossed(key, false);
+                }
+            }
+        }
+        inside.len()
+    }
+
     #[cfg(test)]
     fn health(&self, key: VoxelKey) -> Option<VoxelHealth> {
         self.voxels.get(&key).map(|c| c.health)

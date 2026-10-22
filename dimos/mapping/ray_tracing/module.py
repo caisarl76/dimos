@@ -97,6 +97,9 @@ class RayTracingVoxelMap(NativeModule, mapping.GlobalPointcloud):
     # An externally loaded map cloud, placed by the latest tf world_frame ->
     # cloud frame_id. Only the first cloud seeds the map.
     loaded_map: In[PointCloud2]
+    # Remove the voxels inside this cylinder, in world_frame and encoded like
+    # region_bounds: position is the center, orientation holds radius, z_min, z_max.
+    clear_region: In[PoseStamped]
     tf: In[TFMessage]
     global_map: Out[PointCloud2]
     local_map: Out[PointCloud2]

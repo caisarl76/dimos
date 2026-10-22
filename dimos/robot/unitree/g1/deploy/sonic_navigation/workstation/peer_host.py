@@ -43,6 +43,7 @@ from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParse
 from dimos.core.coordination.module_coordinator import ModuleCoordinator
 from dimos.core.coordination.worker_manager_python import WorkerManagerPython
 from dimos.msgs.geometry_msgs.Pose import Pose
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.geometry_msgs.Twist import Twist
@@ -67,6 +68,12 @@ from dimos.robot.unitree.g1.sonic_navigation_sensor_module import SonicNavigatio
 
 NATIVE_NAMES = ("pointlio_native", "voxel_ray_tracing")
 SYNTHETIC_CELLS, SYNTHETIC_RESOLUTION = 200, 0.05  # a 10 m square around the robot
+# Operator map refresh (sessions 2026-10-22-2..6): voxels the operator's body left in
+# the near field, which the MID360 cannot re-observe to clear, are removed above the
+# mapped floor around the robot; live scans rebuild whatever is still visible.
+REFRESH_RADIUS_M = 2.5
+REFRESH_FLOOR_MARGIN_M = 0.12  # one and a half 0.08 m voxels: both floor layers stay
+REFRESH_HEADROOM_M = 1.5  # above the base: past the sensor and anything mapped near it
 
 
 def truth_sensor_pose(row: dict[str, Any], mount: Transform) -> Transform:
@@ -150,6 +157,29 @@ def save_snapshot(path: str, cloud: PointCloud2, grid: OccupancyGrid, odom: Odom
         resolution=grid.resolution,
         robot=[odom.position.x, odom.position.y, odom.position.z, odom.yaw],
     )
+
+
+def refresh_region(points: Any, x: float, y: float, base_z: float) -> dict[str, float] | None:
+    """The cylinder an operator refresh clears around base (x, y, base_z), or None.
+
+    The floor is the most populated 0.04 m height bin of the mapped points within the
+    radius and below the knees; without one the refresh refuses rather than guess.
+    """
+    near = np.hypot(points[:, 0] - x, points[:, 1] - y) <= REFRESH_RADIUS_M
+    low = points[near & (points[:, 2] < base_z - 0.4), 2]
+    if len(low) == 0:
+        return None
+    counts, edges = np.histogram(low, bins=np.arange(low.min(), low.max() + 0.08, 0.04))
+    peak = int(np.argmax(counts))
+    floor = float(np.median(low[(low >= edges[peak]) & (low < edges[peak + 1])]))
+    return {
+        "cx": x,
+        "cy": y,
+        "radius": REFRESH_RADIUS_M,
+        "floor": floor,
+        "z_min": floor + REFRESH_FLOOR_MARGIN_M,
+        "z_max": base_z + REFRESH_HEADROOM_M,
+    }
 
 
 def costmap_summary(
@@ -316,6 +346,7 @@ def main() -> None:
             }:
                 subscriptions.append(transport.subscribe(partial(receive, name)))
         teleop = coordinator.transports[("tele_cmd_vel", Twist)]
+        clear_region = coordinator.transports[("clear_region", PoseStamped)]
         costmap_out = coordinator.transports[("global_costmap", OccupancyGrid)]
         stop = threading.Event()
         synthetic = threading.Event()
@@ -421,6 +452,28 @@ def main() -> None:
                     save_snapshot(command["path"], cloud, grid, odom)
                     saved = command["path"]
                 reply(op=op, saved=saved)
+            elif op == "refresh_map":
+                # Operator-commanded, once the area is confirmed clear: drop what the map
+                # holds above the floor around the robot (RayTracingVoxelMap.clear_region).
+                with lock:
+                    cloud, odom = latest.get("global_map"), latest.get("odometry")
+                region = None
+                if cloud is not None and odom is not None:
+                    p = odom.position
+                    region = refresh_region(cloud.points_f32(), p.x, p.y, p.z)
+                if region is not None:
+                    clear_region.broadcast(
+                        None,
+                        PoseStamped(
+                            position=Vector3(region["cx"], region["cy"], 0.0),
+                            orientation=Quaternion(
+                                region["radius"], region["z_min"], region["z_max"], 0.0
+                            ),
+                            frame_id="odom",
+                            ts=time.time(),
+                        ),
+                    )
+                reply(op=op, region=region)
             elif op == "synthetic_costmap":
                 synthetic.set()
                 threading.Thread(target=publish_synthetic, daemon=True).start()

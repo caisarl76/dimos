@@ -1978,3 +1978,41 @@ fn regions_group_chunks_by_center_and_never_split_a_chunk() {
     // A grid finer than a chunk widens to the chunk.
     assert_eq!(region_of((5, -1, 0), 0.5, 1.0), (5, -1));
 }
+
+#[test]
+fn clear_region_removes_only_voxels_inside_the_cylinder_band() {
+    let voxel_size = 1.0;
+    let mut map = VoxelMap::default();
+    // A floor row at z=0 and a post on it at x=2, plus a post outside the radius.
+    for x in 0..5 {
+        map.set_health((x, 0, 0), 1);
+    }
+    for z in 1..4 {
+        map.set_health((2, 0, z), 1);
+        map.set_health((9, 0, z), 1);
+    }
+    let cylinder = Cylinder {
+        cx: 2.5,
+        cy: 0.5,
+        radius: 3.0,
+        z_min: 1.0,
+        z_max: 3.0,
+    };
+
+    let removed = map.clear_region(&cylinder.bounds(), voxel_size);
+
+    // Centers at z 1.5 and 2.5 fall in the band; 3.5 is above it.
+    assert_eq!(removed, 2);
+    assert!(!map.voxels.contains_key(&(2, 0, 1)));
+    assert!(!map.voxels.contains_key(&(2, 0, 2)));
+    assert!(map.voxels.contains_key(&(2, 0, 3)), "above the band is kept");
+    for x in 0..5 {
+        assert!(map.voxels.contains_key(&(x, 0, 0)), "floor below the band is kept");
+    }
+    for z in 1..4 {
+        assert!(map.voxels.contains_key(&(9, 0, z)), "outside the radius is kept");
+    }
+    // The floor voxel under the post lost the post as a healthy neighbor.
+    assert_eq!(map.voxels.support(&(2, 0, 0)), Some(2));
+    assert_eq!(map.voxels.support(&(2, 0, 3)), Some(0));
+}

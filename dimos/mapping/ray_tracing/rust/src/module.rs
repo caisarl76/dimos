@@ -41,6 +41,8 @@ enum Job {
     /// A loaded map placed in the world and split into tiles, or None when
     /// it could not be placed.
     SeedPrepared(Option<SeedPartition>),
+    /// Remove the voxels inside a cylinder, given like region_bounds.
+    ClearRegion(PoseStamped),
 }
 
 /// Messages the handlers can queue ahead of the worker before they wait.
@@ -59,6 +61,11 @@ pub struct RayTracingVoxelMap {
     // An externally loaded map cloud. Only the first one seeds the map.
     #[input(decode = PointCloud2::decode, handler = on_loaded_map)]
     loaded_map: Input<PointCloud2>,
+
+    // Remove the voxels inside this cylinder, in world_frame and encoded like
+    // region_bounds. For an operator refresh: live rays rebuild what is visible.
+    #[input(decode = PoseStamped::decode, handler = on_clear_region)]
+    clear_region: Input<PoseStamped>,
 
     #[tf]
     tf: Tf,
@@ -142,6 +149,10 @@ impl RayTracingVoxelMap {
 
     async fn on_loaded_map(&mut self, msg: PointCloud2) {
         self.enqueue(Job::LoadedMap(msg)).await;
+    }
+
+    async fn on_clear_region(&mut self, msg: PoseStamped) {
+        self.enqueue(Job::ClearRegion(msg)).await;
     }
 
     async fn enqueue(&self, job: Job) {
@@ -356,6 +367,28 @@ impl Worker {
                     );
                 }
                 state.seed.placed(partition);
+            }
+            Job::ClearRegion(msg) => {
+                if msg.header.frame_id != self.config.world_frame {
+                    warn!(
+                        frame = %msg.header.frame_id,
+                        world_frame = %self.config.world_frame,
+                        "Ignored a clear_region outside world_frame.",
+                    );
+                    return;
+                }
+                let region = pose_to_bounds(&msg);
+                let mapper = &mut state.mapper;
+                let removed = tokio::task::block_in_place(|| mapper.clear_region(&region));
+                info!(
+                    removed,
+                    cx = region.cx,
+                    cy = region.cy,
+                    radius = region.radius,
+                    z_min = region.z_min,
+                    z_max = region.z_max,
+                    "Cleared a map region."
+                );
             }
         }
     }
@@ -685,6 +718,19 @@ fn bounds_to_pose(c: &Cylinder, frame_id: &str, stamp: Time) -> PoseStamped {
     }
 }
 
+/// The cylinder a bounds message carries, the inverse of `bounds_to_pose`.
+fn pose_to_bounds(msg: &PoseStamped) -> Cylinder {
+    let p = &msg.pose.position;
+    let o = &msg.pose.orientation;
+    Cylinder {
+        cx: p.x as f32,
+        cy: p.y as f32,
+        radius: o.x as f32,
+        z_min: o.y as f32,
+        z_max: o.z as f32,
+    }
+}
+
 async fn publish_bounds(out: &Output<PoseStamped>, msg: &PoseStamped) {
     if let Err(e) = out.publish(msg).await {
         error_throttled!(
@@ -804,6 +850,22 @@ mod tests {
             viz_emit_every: 0,
             viz_sweep_cells: 0,
         }
+    }
+
+    #[test]
+    fn clear_region_decodes_the_bounds_encoding() {
+        let c = Cylinder {
+            cx: 1.5,
+            cy: -2.0,
+            radius: 2.5,
+            z_min: -1.1,
+            z_max: 0.3,
+        };
+        let back = pose_to_bounds(&bounds_to_pose(&c, "odom", Time::default()));
+        assert_eq!(
+            (back.cx, back.cy, back.radius, back.z_min, back.z_max),
+            (c.cx, c.cy, c.radius, c.z_min, c.z_max)
+        );
     }
 
     /// Build a map whose listed voxels are healthy, through the public API.
