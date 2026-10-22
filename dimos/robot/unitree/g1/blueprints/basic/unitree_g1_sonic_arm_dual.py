@@ -17,7 +17,7 @@
 Runbook. Each G1's PC2 runs its guarded SONIC launcher, which binds telemetry on 127.0.0.1:5557
 and reads references from 127.0.0.1:5556. Use each PC2's ssh alias (today: 222 `pc2_222`, 223
 `pc2`). The camera publisher on 222 (/home/unitree/gumin/d435_color_publisher.py) binds
-0.0.0.0:5556: it must not run during a dual session.
+0.0.0.0:5556: it must not run during a dual session (check: `ssh pc2_222 pgrep -af d435_color_publisher`).
 
 1. Start each controller and confirm planner idle, BEFORE the tunnels (the idle helper binds
    127.0.0.1:5556; with a tunnel already holding it, it fails "Address already in use"):
@@ -52,7 +52,7 @@ and reads references from 127.0.0.1:5556. Use each PC2's ssh alias (today: 222 `
 
 4. Readiness check (`dimos shell` needs a TTY; this does not):
 
-       python -c "from dimos.porcelain.dimos import Dimos; app = Dimos.connect(); print(app.g1_222.get_status()); print(app.g1_223.get_status()); app.stop()"
+       PYTHONPATH=<this checkout> <its venv>/bin/python -c "from dimos.porcelain.dimos import Dimos; app = Dimos.connect(); print(app.g1_222.get_status()); print(app.g1_223.get_status()); app.stop()"
 
    Look at `ready`, `subscriptions_ready`, `feedback_fresh`, `feedback_age_s`. A skill saying
    "SONIC is not in confirmed planner idle" while the planner is idle usually means a tunnel
