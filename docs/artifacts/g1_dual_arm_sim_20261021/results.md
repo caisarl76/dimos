@@ -108,9 +108,17 @@ the two robots at 10 % and 50 % of each joint's own stroke:
 - **Main stroke:** in every run and command, the two robots stay within 3–52 ms at 10 % and 50 %.
 - **Reported gap:** the 0.22–0.44 s `start_skew_s` comes from secondary joints.
 - **Since the Tier-1 merge:** the pose's elbow also lags by about 0.21 s at 50 % of its travel, on both stand-ins
-  (run04 and run05 agree). The cause is not yet understood. It is within the 0.5 s target.
-- **Follow-up:** replace `start_skew_s` with a progress-based onset (e.g. 10 % of the planned displacement) and
-  explain the elbow lag.
+  (run04 and run05 agree). This is the policy's tracking, not the reference:
+  - both robots measured the same base (pitch −1.5°, roll 17.0°, yaw −40.3°, elbow 54.7°);
+  - so both planned identical deltas (13.0°, 68.9°, 40.3°, 14.1°);
+  - the chunks were sent 1 ms apart;
+  - the measured elbow excursion is 20–21° against the planned 14°, an overshooting, non-monotonic path whose
+    50 % crossing moves with small differences in tracking.
+
+  Every joint in a keyframe segment shares one min-jerk profile (Tier-1 engine), so the reference cannot
+  stagger joints.
+- **Follow-up:** replace `start_skew_s` with a progress-based onset (e.g. 10 % of the planned displacement),
+  so that the reported number reflects the main stroke.
 
 ## Not covered (hardware, next)
 
