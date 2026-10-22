@@ -138,9 +138,9 @@ _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _MAX_CHUNK_ROWS = 1000  # SonicTaskSession accepts chunks of at most 1000 rows (20 s).
 _CHUNK_OVERLAP = 25  # rows the first chunk runs past the split, so it never runs dry
 _HOLD_BOUNDS = (1.0, 20.0)  # seconds
-# rad: a planned joint this far from its pose at the chunk-0 send has started moving; above sensor
-# noise and idle drift.
-_ONSET_RAD = 0.03
+# Fraction of the planned displacement, measured from the pose at the chunk-0 send, that marks the
+# stroke's start. Projected on the plan so secondary-joint drift in the token blend does not count.
+_ONSET_PROGRESS = 0.10
 _NO_PATH_CHECK = "collision_model_path is not configured; joint targets need the path check"
 _NO_ARM_MODEL = "collision_model_path is not configured; point_at needs the arm model"
 _FRAME_TIMEOUT_S = 5.0
@@ -355,7 +355,6 @@ class _Watch:
     allowed: NDArray[np.float64]
     max_dq: float
     delta: NDArray[np.float64]  # The planned displacement of every joint at the deepest keyframe.
-    moving: NDArray[np.bool_]  # The joints any keyframe moves.
     returning: bool = False
     reached: float = 0.0  # Furthest progress along the planned displacement, as a fraction.
     reached_q: NDArray[np.float64] = field(default_factory=lambda: np.zeros(29))
@@ -368,8 +367,8 @@ class _Watch:
     plan_start: float | None = None  # monotonic time of the first chunk's row 0
     hold_q: list[NDArray[np.float64]] = field(default_factory=list)  # body_q inside the hold
     # Start timing, all on the execution host's monotonic clock: just before and just after the
-    # chunk-0 submit_chunk call, and the receipt time of the first sample that moved a planned joint
-    # _ONSET_RAD from onset_q, the latest sample received before the send.
+    # chunk-0 submit_chunk call, and the receipt time of the first sample whose progress along delta,
+    # measured from onset_q (the latest sample received before the send), reached _ONSET_PROGRESS.
     send_at: float | None = None
     ack_at: float | None = None
     onset_q: NDArray[np.float64] | None = None
@@ -454,7 +453,8 @@ class SonicArm:
             elif watch.onset_q is not None and (
                 watch.moved_at is None or received < watch.moved_at
             ):
-                if (np.abs(body - watch.onset_q)[watch.moving] >= _ONSET_RAD).any():
+                moved = (body - watch.onset_q) @ watch.delta / (watch.delta @ watch.delta)
+                if moved >= _ONSET_PROGRESS:
                     watch.moved_at = received
             progress = float(q @ watch.delta / (watch.delta @ watch.delta))
             if progress > watch.reached:
@@ -588,7 +588,6 @@ class SonicArm:
                 allowed=allowed,
                 max_dq=self.config.max_dq,
                 delta=delta,
-                moving=np.any(deltas != 0, axis=0),
                 hold_rows=hold if hold[0] <= hold[1] else None,
             ),
             keyframes=len(keyframes),

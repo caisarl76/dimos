@@ -71,7 +71,7 @@ def step(s):
 
 
 def ramp(s):
-    """Out from 0.3 s, back from 0.7 s, both over 0.3 s: onset depends on the stroke."""
+    """Out from 0.3 s, back from 0.7 s, both over 0.3 s: 10% progress at 0.33 s for any stroke."""
     return float(np.clip(min((s - 0.3) / 0.3, (1.0 - s) / 0.3), 0.0, 1.0))
 
 
@@ -276,9 +276,7 @@ def test_onset_uses_receipt_time_not_handler_time():
     arm = SonicArm("222", SonicArmSkillConfig(encoder_path="unused.onnx"), None, None, None)
     delta = np.zeros(29)
     delta[15] = -0.3
-    watch = _Watch(
-        base=np.zeros(29), allowed=np.ones(29), max_dq=3.0, delta=delta, moving=delta != 0
-    )
+    watch = _Watch(base=np.zeros(29), allowed=np.ones(29), max_dq=3.0, delta=delta)
     arm._watch = watch
 
     def sample(received, joint15):
@@ -290,10 +288,21 @@ def test_onset_uses_receipt_time_not_handler_time():
     watch.send_at = 10.0
     arm.handle_feedback(sample(9.98, -0.1))  # Received before the send, handled after it.
     assert watch.moved_at is None
-    arm.handle_feedback(sample(10.01, -0.01))  # Under the onset threshold.
+    arm.handle_feedback(sample(10.01, -0.029))  # Under 10% of the stroke.
     assert watch.moved_at is None
     arm.handle_feedback(sample(10.02, -0.1))
     assert watch.moved_at == 10.02
+
+
+def test_onset_ignores_secondary_joint_drift_in_the_blend(arms):
+    """On 222 the shoulder roll drifts 0.05 rad in the token blend; both strokes start at 0.3 s."""
+
+    def drift(s):
+        return {16: 0.05 if s > 0.05 else 0.0}
+
+    with feeding(arms, shape=ramp, extra=(drift, None)):
+        result = run_arms([pose(arm) for arm in arms])
+    assert result.metadata["start_skew_s"] < 0.1, result.metadata
 
 
 def test_both_envelope_on_one_retreats_both(arms, dual_executions):
