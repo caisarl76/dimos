@@ -69,7 +69,7 @@ class AbsoluteEncoder(FakeEncoder):
 
     def encode(self, poses):
         tokens = np.full((len(poses), 64), PEER_TOKEN)
-        tokens[:, 0] += FAKE_GAIN * poses.sum(axis=1)
+        tokens[:, 0] += FAKE_GAIN / 2 * poses.sum(axis=1)
         return tokens
 
 
@@ -189,7 +189,9 @@ def test_peer_stop_during_wave_retreats_continuously(inline, stop_s, mocker):
     encoder = AbsoluteEncoder(None)
     units = [retreat_poses(plan, k) for k in range(len(plan.segments))]
     row = max(np.abs(np.diff(encoder.encode(p)[:, 0])).max() for p in (plan.poses, *units))
-    row *= 1.1  # A blend with the stream already in flight adds a few percent.
+    # Emits come every 20-30 ms on a 5 ms poll and the session samples the chunk by wall clock,
+    # so a packet's step is up to ~1.5 row steps.
+    row *= 1.5
     submit = mocker.spy(module._execution_223, "submit_chunk")
 
     def knee(s):
