@@ -1,0 +1,101 @@
+{
+  "started_unix": 1792633657.4327037,
+  "observation_seconds": 8.0,
+  "creates_writers_or_command_sockets": false,
+  "clocks": {
+    "pinned": false,
+    "checked": 9,
+    "issues": [
+      "cpu0 min=729600 max=1984000",
+      "cpu1 min=729600 max=1984000",
+      "cpu2 min=729600 max=1984000",
+      "cpu3 min=729600 max=1984000",
+      "cpu4 min=729600 max=1984000",
+      "cpu5 min=729600 max=1984000",
+      "cpu6 min=729600 max=1984000",
+      "cpu7 min=729600 max=1984000",
+      "gpu min=306000000 max=918000000"
+    ]
+  },
+  "sonic_processes": [],
+  "ports_in_use": [],
+  "streams": {
+    "lidar_raw": {
+      "samples": 78,
+      "rate_hz": 9.907870356307226,
+      "max_receipt_gap_s": 0.28647425700000895,
+      "max_source_stall_s": 0.28647425700000895,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792633657.8638082,
+      "last_source_stamp": 1792633665.5884113,
+      "budget_s": 0.35,
+      "ready": true
+    },
+    "imu_raw": {
+      "samples": 1568,
+      "rate_hz": 200.00567898703517,
+      "max_receipt_gap_s": 0.2941068639997866,
+      "max_source_stall_s": 0.2941068639997866,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792633657.9203007,
+      "last_source_stamp": 1792633665.7560136,
+      "budget_s": 0.2,
+      "ready": false
+    },
+    "lowstate": {
+      "samples": 7903,
+      "rate_hz": 975.2074193891918,
+      "max_receipt_gap_s": 0.27955105099999855,
+      "max_source_stall_s": 0.2795516910000515,
+      "rollbacks": 0,
+      "duplicates": 320,
+      "first_source_stamp": 2531.509,
+      "last_source_stamp": 2539.442,
+      "budget_s": 0.2,
+      "ready": false
+    }
+  },
+  "lowstate": {
+    "samples": 387,
+    "joints": 29,
+    "finite": true,
+    "tick_advancing": true,
+    "ready": true
+  },
+  "lowcmd_traffic_samples": 7884,
+  "command_writers_discovered": [
+    {
+      "topic": "rt/arm_sdk",
+      "participant": "01109609-fdf4-c721-491f-66e5000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "01101d77-d2ab-1e92-91e7-32af000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "01103ebe-dae2-5875-be9b-e282000001c1"
+    }
+  ],
+  "conversion_errors": 0,
+  "extrinsic_commissioned": true,
+  "host_load": {
+    "loadavg": [
+      "1.54",
+      "1.43",
+      "0.95"
+    ],
+    "cpus": 8,
+    "mem_available_kb": 12546824,
+    "gpu_load_permille": 0
+  },
+  "blocking": [
+    "clocks_not_pinned",
+    "stream_unready:imu_raw",
+    "stream_unready:lowstate",
+    "active_motor_commands"
+  ],
+  "ready": false
+}

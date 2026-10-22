@@ -11,9 +11,9 @@ hosts:
 Verification history, robot sessions and simulation evidence are in
 [docs/artifacts/g1_navigation_sonic_20261013](/docs/artifacts/g1_navigation_sonic_20261013/)
 and the [verification report](/docs/platforms/humanoid/g1/navigation-verification-2026-10-09.md).
-Provisioning attempts 1-10 are recorded in
+Provisioning attempts 1-12 are recorded in
 [pc2-provision/summary.json](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json);
-attempt 11 was interrupted on 2026-10-21 when pc2 went offline.
+attempt 12 (2026-10-22, commit `7320a98e1`) is the installed one.
 
 ## Layout
 

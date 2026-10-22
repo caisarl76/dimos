@@ -386,8 +386,8 @@
       },
       "superseded": "walk agent gained the goal op for goal_1m (823f852cf)"
     },
-    "final": {
-      "task_dir": "sonic-navigation-20261013",
+    "attempt10": {
+      "task_dir": "sonic-navigation-20261013.attempt10-no-refusal-reasons",
       "started": "2026-10-19 16:47 CST",
       "finished": "16:52 CST",
       "precondition": "no SONIC process, no container; attempt-9 image 58beb689 removed",
@@ -408,7 +408,8 @@
       "image": {
         "id": "sha256:6ce8de18f3ce17ba5db67261bd6a19c276271c73e6d79db8531c008bb001c134",
         "arch": "arm64",
-        "size_gb": 6.66
+        "size_gb": 6.66,
+        "removed": true
       },
       "dimos_source_commit": "823f852cf (payload manifest 3bb4b3b49)",
       "check_only": {
@@ -438,10 +439,79 @@
             "0.88"
           ]
         }
+      },
+      "superseded": "refusal reasons and the 0.20 m clearance line (8e91e3220)"
+    },
+    "attempt11": {
+      "task_dir": "sonic-navigation-20261013.attempt11-old-source",
+      "started": "2026-10-21 17:41 CST",
+      "finished": "17:46 CST",
+      "precondition": "no SONIC process, no container; attempt-10 image 6ce8de18 removed",
+      "native_tests": 42,
+      "native_failed": [
+        "FK.TestFKAndGlobalVelocities"
+      ],
+      "controller_sha256": "dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9",
+      "smoke": {
+        "smoke": "passed",
+        "modules": [
+          "sonicexecutionmodule",
+          "sonicnavigationrelaymodule",
+          "sonicnavigationsensorsender"
+        ],
+        "planner_packet_bytes": 1339
+      },
+      "image": {
+        "id": "sha256:f89ad80f06ae62f17987d275e6788361c72b1b7329c601fd2513c221901dc3b3",
+        "arch": "arm64",
+        "size_gb": 6.68,
+        "removed": true
+      },
+      "dimos_source_commit": "00a4238d2 (payload manifest 6eee3a33a)",
+      "check_only": {},
+      "superseded": "provisioned, then pc2 went offline before a check; its source predates the relay control_busy resend (679400178), the agent skills and graph-agentic (8502f54a6, 8097877e0) and the deploy move (7320a98e1)"
+    },
+    "final": {
+      "task_dir": "sonic-navigation-20261013",
+      "attempt": 12,
+      "started": "2026-10-22 09:37 CST",
+      "finished": "09:47 CST",
+      "precondition": "pc2 booted 09:06; no SONIC process, no container; attempt-11 image f89ad80f removed",
+      "native_tests": 42,
+      "native_failed": [
+        "FK.TestFKAndGlobalVelocities"
+      ],
+      "controller_sha256": "dc59a4abc4c603a7c3ebf89aafd162911605dcf8b7091c23226339a10d6da3b9",
+      "smoke": {
+        "smoke": "passed",
+        "modules": [
+          "sonicexecutionmodule",
+          "sonicnavigationrelaymodule",
+          "sonicnavigationsensorsender"
+        ],
+        "planner_packet_bytes": 1339
+      },
+      "image": {
+        "id": "sha256:ca6e61b0a094f50bb11901c29bb3434e3f37c0b2ccbf2806fad166ab89db0fe6",
+        "arch": "arm64",
+        "size_gb": 6.68
+      },
+      "dimos_source_commit": "7320a98e1",
+      "check_only": {
+        "20261022-094734": {
+          "report": "sonic-navigation-20261013/checks/check-only-20261022-094734.json",
+          "blocking": [
+            "clocks_not_pinned",
+            "stream_unready:imu_raw",
+            "stream_unready:lowstate",
+            "active_motor_commands"
+          ],
+          "finding": "robot-side, not the install: jetson_clocks not yet run after boot; 7,884 rt/lowcmd samples in 8 s from two writers (attempt 10's passing check saw writers but 0 samples), so another controller was commanding the motors; one simultaneous ~0.29 s receipt gap on all three streams"
+        }
       }
     }
   },
-  "integrity": "attempts 3-10: 1,232 fingerprints, 71 original native source files and both shared controller binaries unchanged before and after; attempts 1-2 stopped at the smoke check and were rechecked unchanged",
+  "integrity": "attempts 3-12: 1,232 fingerprints, 71 original native source files and both shared controller binaries unchanged before and after; attempts 1-2 stopped at the smoke check and were rechecked unchanged",
   "concurrent_robot_use": "The manipulation session ran its own guarded SONIC controller (native runs from 08:53:00 and 08:54:17, hold-reference tests 08:54:50-08:56:01 CST). Attempt 2 (08:49:41-08:54:56) and the final run (from 08:56:22, controller PID 13636 still running at its start) overlapped with that activity. No navigation controller, container or command was started. Attempt 4 started with no SONIC controller running, before or after.",
   "check_only": {
     "launch_check_only_20261015_121108": {
