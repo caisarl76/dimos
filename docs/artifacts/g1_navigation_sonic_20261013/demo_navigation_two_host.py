@@ -67,6 +67,9 @@ from dimos.robot.unitree.g1.sonic_navigation_skills import SonicNavigationSkills
 from dimos.robot.unitree.g1.sonic_reference import encode_command
 
 HERE = Path(__file__).resolve().parent
+PEER_HOST = (
+    HERE.parents[2] / "dimos/robot/unitree/g1/deploy/sonic_navigation/workstation/peer_host.py"
+)
 PORTS = {
     "reference": 18556,  # execution binds
     "reference_proxy": 18559,  # native connects here
@@ -197,7 +200,9 @@ class FaultProxy:
 
 
 def open_router(port: int) -> Any:
-    from demo_navigation_two_host_peer import open_router as peer_router
+    from dimos.robot.unitree.g1.deploy.sonic_navigation.workstation.peer_host import (
+        open_router as peer_router,
+    )
 
     return peer_router(f"tcp/127.0.0.1:{port}")
 
@@ -217,7 +222,7 @@ class PeerHost:
                 "--kill-child",
                 sys.executable,
                 "-u",
-                str(HERE / "demo_navigation_two_host_peer.py"),
+                str(PEER_HOST),
                 "--output",
                 str(output),
                 "--router",
@@ -233,6 +238,8 @@ class PeerHost:
             stdout=subprocess.PIPE,
             stderr=log,
             text=True,
+            # The peer host loads the simulation audit hook from this directory.
+            env={**os.environ, "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH', '')}"},
         )
         self._start_reader(log)
         self.ready = self.read(120.0)
@@ -476,16 +483,16 @@ def run_two_host(args: Any) -> None:
         "peer_native_sha256": {name: sha(path) for name, path in natives.items()},
         "replay_sha256": sha(replay),
         "harness_sha256": {
-            name: sha(HERE / name)
-            for name in (
-                "demo_navigation_sim.py",
-                "demo_navigation_two_host.py",
-                "demo_navigation_two_host_peer.py",
-                "demo_navigation_dds_finder.py",
-                "demo_navigation_audit.py",
-                "demo_analyze_navigation.py",
-                "demo_navigation_sim_worker.py",
-                "demo_navigation_timing.py",
+            path.name: sha(path)
+            for path in (
+                HERE / "demo_navigation_sim.py",
+                HERE / "demo_navigation_two_host.py",
+                PEER_HOST,
+                HERE / "demo_navigation_dds_finder.py",
+                HERE / "demo_navigation_audit.py",
+                HERE / "demo_analyze_navigation.py",
+                HERE / "demo_navigation_sim_worker.py",
+                HERE / "demo_navigation_timing.py",
             )
         },
         "dds_shim_sha256": {str(p.relative_to(HERE)): sha(p) for p in shim_files},

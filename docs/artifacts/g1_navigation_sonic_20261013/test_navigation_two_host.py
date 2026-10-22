@@ -188,7 +188,8 @@ def test_snapshot_keeps_points_near_the_robot_with_grid_and_pose(tmp_path):
     from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
 
     spec = importlib.util.spec_from_file_location(
-        "two_host_peer", HERE / "demo_navigation_two_host_peer.py"
+        "two_host_peer",
+        HERE.parents[2] / "dimos/robot/unitree/g1/deploy/sonic_navigation/workstation/peer_host.py",
     )
     peer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(peer)
@@ -220,7 +221,8 @@ def test_costmap_summary_splits_near_occupancy_behind_the_robot():
     from dimos.msgs.nav_msgs.Odometry import Odometry
 
     spec = importlib.util.spec_from_file_location(
-        "two_host_peer", HERE / "demo_navigation_two_host_peer.py"
+        "two_host_peer",
+        HERE.parents[2] / "dimos/robot/unitree/g1/deploy/sonic_navigation/workstation/peer_host.py",
     )
     peer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(peer)
@@ -265,7 +267,8 @@ def test_peer_call_skips_a_late_reply_to_an_earlier_timed_out_call(monkeypatch):
 
 def load_peer_host():
     spec = importlib.util.spec_from_file_location(
-        "two_host_peer", HERE / "demo_navigation_two_host_peer.py"
+        "two_host_peer",
+        HERE.parents[2] / "dimos/robot/unitree/g1/deploy/sonic_navigation/workstation/peer_host.py",
     )
     peer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(peer)

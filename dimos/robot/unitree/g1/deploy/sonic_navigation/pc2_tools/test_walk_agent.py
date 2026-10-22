@@ -17,7 +17,7 @@
 import math
 from types import SimpleNamespace
 
-from docs.artifacts.g1_navigation_sonic_20261013 import demo_pc2_walk_agent as agent
+from dimos.robot.unitree.g1.deploy.sonic_navigation.pc2_tools import walk_agent as agent
 
 
 class FakeExecution:

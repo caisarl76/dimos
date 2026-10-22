@@ -80,6 +80,7 @@ def floor_plane(cloud: Array, up: Array, mount: Transform) -> dict[str, Any]:
     mode = edges[np.argmax(counts)] + 0.01
     inliers = points[below & (np.abs(heights - mode) < 0.03)]
     normal = up
+    centroid = inliers.mean(axis=0)
     for tolerance in (None, 0.01):  # fit, then refit on points within 1 cm of the plane
         if tolerance is not None:
             inliers = inliers[np.abs((inliers - centroid) @ normal) < tolerance]
@@ -118,11 +119,12 @@ def evaluate(
     roll, pitch = tilt_components(mid360_up, up)
     if floor["found"]:
         floor["roll_deg"], floor["pitch_deg"] = tilt_components(np.array(floor["normal_torso"]), up)
-    result = {
+    gravity_deg = angle_deg(mid360_up, up)
+    result: dict[str, Any] = {
         "static": pelvis_gyro_rms < MAX_GYRO_RMS,
         "pelvis_gyro_rms": pelvis_gyro_rms,
         "gravity": {
-            "angle_deg": angle_deg(mid360_up, up),
+            "angle_deg": gravity_deg,
             "roll_deg": roll,
             "pitch_deg": pitch,
             "pelvis_up_torso": up.tolist(),
@@ -138,7 +140,7 @@ def evaluate(
     }
     result["passed"] = bool(
         result["static"]
-        and result["gravity"]["angle_deg"] <= MAX_TILT_DEG
+        and gravity_deg <= MAX_TILT_DEG
         and floor["found"]
         and floor["tilt_deg"] <= MAX_TILT_DEG
     )

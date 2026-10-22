@@ -18,12 +18,13 @@ Runs in its own process (and monotonic time namespace) with a private zenoh
 router. stdin carries JSON control lines; stdout carries JSON replies only.
 Teleop enters through MovementManager's existing tele_cmd_vel input. The torso
 -> MID360 mount is the nominal URDF value: a stand-in in simulation, and on the
-robot (demo_pc2_navigation_walk.py) only after the operator accepted it that day.
+robot (walk_harness.py) only after the operator accepted it that day.
 """
 
 from __future__ import annotations
 
 import argparse
+from functools import partial
 import hashlib
 import json
 import math
@@ -32,7 +33,7 @@ from pathlib import Path
 import sys
 import threading
 import time
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import psutil
@@ -40,6 +41,7 @@ import zenoh
 
 from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
 from dimos.core.coordination.module_coordinator import ModuleCoordinator
+from dimos.core.coordination.worker_manager_python import WorkerManagerPython
 from dimos.msgs.geometry_msgs.Pose import Pose
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Transform import Transform
@@ -113,7 +115,7 @@ def synthetic_grid(x: float, y: float, obstacles: list[list[float]], ts: float) 
 
 if os.environ.get("SONIC_TWO_HOST_OUTPUT"):
     # Workers re-import this entry module: audit link control calls (behavior unchanged).
-    import demo_navigation_audit
+    import demo_navigation_audit  # type: ignore[import-not-found]  # docs/artifacts, simulation
 
     demo_navigation_audit.install()
 
@@ -312,7 +314,7 @@ def main() -> None:
                 ("path", NavPath),
                 ("global_map", PointCloud2),
             }:
-                subscriptions.append(transport.subscribe(lambda m, n=name: receive(n, m)))
+                subscriptions.append(transport.subscribe(partial(receive, name)))
         teleop = coordinator.transports[("tele_cmd_vel", Twist)]
         costmap_out = coordinator.transports[("global_costmap", OccupancyGrid)]
         stop = threading.Event()
@@ -383,7 +385,7 @@ def main() -> None:
                 tele[0] = None
                 reply(op=op)
             elif op == "pids":
-                manager = coordinator._managers["python"]
+                manager = cast("WorkerManagerPython", coordinator._managers["python"])
                 natives = {}
                 for child in psutil.Process().children(recursive=True):
                     try:
