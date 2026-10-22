@@ -189,10 +189,20 @@ def test_peer_stop_during_wave_retreats_continuously(inline, stop_s, mocker):
     encoder = AbsoluteEncoder(None)
     units = [retreat_poses(plan, k) for k in range(len(plan.segments))]
     row = max(np.abs(np.diff(encoder.encode(p)[:, 0])).max() for p in (plan.poses, *units))
-    # Emits come every 20-30 ms on a 5 ms poll and the session samples the chunk by wall clock,
-    # so a packet's step is up to ~1.5 row steps.
-    row *= 1.5
     submit = mocker.spy(module._execution_223, "submit_chunk")
+    # The session samples the chunk on its tick clock, so a packet moves at most one row step per
+    # 1/RATE of that clock since the previous packet. Emits are 20-30 ms apart, but 50 ms and more
+    # on a loaded host, so the step is bounded per elapsed tick time, not per packet.
+    sent = []  # Per robot: the tick time and bytes of every pose packet sent.
+    for execution, _ in executions:
+        sent.append(poses := [])
+
+        def record(packet, execution=execution, send=execution._send, poses=poses):
+            if packet.startswith(b"pose"):
+                poses.append((execution._session._now, packet))
+            send(packet)
+
+        mocker.patch.object(execution, "_send", record)
 
     def knee(s):
         return {3: 0.2 if s > stop_s else 0.0}
@@ -209,7 +219,10 @@ def test_peer_stop_during_wave_retreats_continuously(inline, stop_s, mocker):
         )
         streamed = tokens(peer.snapshot())[:, 0]
         assert streamed[-1] == pytest.approx(PEER_TOKEN, abs=1e-3)
-        assert np.abs(np.diff(streamed)).max() <= row
+    for poses in sent:
+        ticks = np.diff([t for t, _ in poses]) * RATE
+        rows = np.abs(np.diff(tokens([p for _, p in poses])[:, 0])) / ticks / row
+        assert rows.max() <= 1.25, rows.max()  # A skipped reverse segment steps over 2 rows.
     for arm in module._arms():
         assert task(arm)["handback_confirmed"], task(arm)
 
