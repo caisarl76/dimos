@@ -74,13 +74,16 @@ def stream_progress(
         "last_source_stamp": rows[-1][1] if rows else None,
         "budget_s": budget,
     }
+    gap, stall = result["max_receipt_gap_s"], result["max_source_stall_s"]
     result["ready"] = (
         len(rows) >= 2
         and rollbacks == 0
         and (repeats_ok or duplicates == 0)
         and rows[-1][1] > rows[0][1]
-        and result["max_receipt_gap_s"] < budget
-        and result["max_source_stall_s"] < budget
+        and gap is not None
+        and gap < budget
+        and stall is not None
+        and stall < budget
     )
     return result
 

@@ -22,11 +22,11 @@ import subprocess
 
 import pytest
 
-LAUNCH = Path(__file__).with_name("pc2-package") / "launch.sh"
+LAUNCH = Path(__file__).with_name("launch.sh")
 DOCKER = """#!/usr/bin/env bash
 echo "docker $*" >> "$STUB_LOG"
 if [[ "$1 $2" == "container inspect" ]]; then [[ "${STUB_CONTAINER:-0}" == 1 ]]; exit; fi
-if [[ "$*" == *demo_pc2_navigation_readiness.py* ]]; then
+if [[ "$*" == *readiness_probe.py* ]]; then
     out=$(printf '%s\\n' "$@" | sed -n 's/^type=bind,source=\\(.*\\),target=\\/verification$/\\1/p')
     printf '{"blocking": %s}\\n' "$STUB_BLOCKING" > "$out/readiness.json"
 fi
@@ -204,7 +204,7 @@ def test_start_sends_the_operator_start_only_to_this_tasks_idle_controller(host)
     (task / "provision").mkdir()
     (task / "provision/controller.sha256").write_text(f"abc123  {ours}\n")
     fake_process(root, 4343, ours)
-    started = "demo_pc2_operator_start.py --start-idle-planner"
+    started = "operator_start.py --start-idle-planner"
     for refused in (
         {"STUB_SONIC_PIDS": ""},  # no controller to start
         {"STUB_SONIC_PIDS": "4343", "STUB_HASH": "abc123", "STUB_CONTAINER": "1"},  # graph up

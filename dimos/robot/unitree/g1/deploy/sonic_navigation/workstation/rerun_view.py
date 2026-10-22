@@ -20,7 +20,7 @@ Start it beside a walk-harness session and open the URL it prints. A bare
 http://localhost:9878 loads an unconnected viewer: rerun only passes the data
 server to the page through `?url=`.
 
-    python docs/artifacts/g1_navigation_sonic_20261013/demo_peer_rerun_view.py
+    python -m dimos.robot.unitree.g1.deploy.sonic_navigation.workstation.rerun_view
 """
 
 import argparse
@@ -37,7 +37,7 @@ from dimos.robot.unitree.g1.g1_rerun import g1_costmap
 from dimos.visualization.rerun.bridge import RerunBridgeModule
 from dimos.visualization.rerun.constants import RERUN_GRPC_PORT, RERUN_WEB_VIEWER_PORT
 
-ROUTER = "tcp/127.0.0.1:17211"  # demo_pc2_navigation_walk.py peer router
+ROUTER = "tcp/127.0.0.1:17211"  # walk_harness.py peer router
 TOPICS = ["global_costmap", "navigation_costmap", "global_map", "path", "odometry", "tf"]
 # odom is the boot base_link (pelvis); the floor sits about one pelvis height below it.
 FLOOR_Z = -0.74

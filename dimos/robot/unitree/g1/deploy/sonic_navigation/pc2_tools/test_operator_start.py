@@ -22,8 +22,8 @@ import msgpack
 import pytest
 import zmq
 
+from dimos.robot.unitree.g1.deploy.sonic_navigation.pc2_tools import operator_start as start
 from dimos.robot.unitree.g1.sonic_reference import encode_command
-from docs.artifacts.g1_navigation_sonic_20261013 import demo_pc2_operator_start as start
 
 
 def free_endpoint() -> str:

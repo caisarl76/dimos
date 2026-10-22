@@ -14,7 +14,7 @@
 
 """pc2 side of the supervised walk harness, attached to the running graph container.
 
-Run with `docker exec -i <graph container> python .../demo_pc2_walk_agent.py`. It joins
+Run with `docker exec -i <graph container> python /opt/sonic-navigation/package/walk_agent.py`. It joins
 the graph's private zenoh router as a client and reaches the one execution owner by RPC.
 It calls only begin/end navigation, one set_navigation_goal per goal case, and read-only
 status; velocity commands enter through the workstation peer. JSON lines: commands on

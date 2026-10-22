@@ -33,7 +33,7 @@ import tempfile
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parents[3]
+ROOT = HERE.parents[6]
 INPUTS = HERE / "inputs"
 PORT_DIR = "gear_sonic_deploy/src/g1/g1_deploy_onnx_ref"
 SHARED_CONTROLLERS = {
@@ -138,12 +138,8 @@ def main() -> None:
             target = out / "package" / path.relative_to(HERE / "package")
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
-    for name in (
-        "demo_pc2_navigation_readiness.py",
-        "demo_pc2_walk_agent.py",
-        "demo_pc2_operator_start.py",
-    ):
-        shutil.copy2(HERE.parent / name, out / "package")
+    for name in ("readiness_probe.py", "walk_agent.py", "operator_start.py"):
+        shutil.copy2(HERE.parent / "pc2_tools" / name, out / "package")
 
     files = {str(p.relative_to(out)): sha(p) for p in sorted(out.rglob("*")) if p.is_file()}
     (out / "manifest.sha256").write_text(sums(files))

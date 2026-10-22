@@ -22,7 +22,8 @@ It starts the validated workstation peer graph (the Task 9 peer host with the re
 pc2 endpoints) and attaches the pc2 agent to the graph container. The operator picks
 each bounded named case; a case unlocks only after its prerequisites passed in this
 session. Teleop enters through MovementManager's tele_cmd_vel; the harness never
-raises a speed, retries a refused begin or changes controller ownership. Every case
+raises a speed or changes controller ownership, and retries a refused begin only once,
+after a readiness lapse. Every case
 records the commanded twist, the native guard state, the peer's LIO base odometry
 and the operator's own observation.
 """
@@ -53,7 +54,7 @@ from dimos.robot.unitree.g1.sonic_navigation_link import SonicNavigationLink
 HERE = Path(__file__).resolve().parent
 PC2 = "pc2"
 CONTAINER = "dimos-g1-sonic-navigation-graph-20261013"
-AGENT = "/opt/sonic-navigation/package/demo_pc2_walk_agent.py"
+AGENT = "/opt/sonic-navigation/package/walk_agent.py"
 ENDPOINTS = {
     "router": "tcp/127.0.0.1:17211",
     "link_bind": "tcp://192.168.0.62:17103",
@@ -366,6 +367,7 @@ class JsonLines:
         *,
         stdout_log: Path | None = None,
     ) -> None:
+        self._name = Path(command[0]).name
         self.process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env
         )
@@ -391,10 +393,10 @@ class JsonLines:
         try:
             reply = self._replies.get(timeout=timeout)
         except queue.Empty:
-            raise TimeoutError(f"{self.process.args[0]} reply") from None
+            raise TimeoutError(f"{self._name} reply") from None
         if reply is None:
             self._replies.put(None)
-            raise RuntimeError(f"{self.process.args[0]} exited")
+            raise RuntimeError(f"{self._name} exited")
         return reply
 
     def call(self, op: str, timeout: float = 10.0, **fields: Any) -> dict[str, Any]:
@@ -452,7 +454,7 @@ def sha(path: Path) -> str:
 
 def peer_command(out: Path) -> list[str]:
     endpoints = (f"--{k.replace('_', '-')}={v}" for k, v in ENDPOINTS.items())
-    script = HERE / "demo_navigation_two_host_peer.py"
+    script = HERE / "peer_host.py"
     return [sys.executable, "-u", str(script), "--output", str(out), *endpoints]
 
 
@@ -470,7 +472,7 @@ def run_session(args: Any) -> None:
     prior = prior_passed(args.prior_session, args.operator_ready)
     out = args.output
     out.mkdir(parents=True, exist_ok=False)
-    root = HERE.parents[2]
+    root = HERE.parents[6]
     results: dict[str, Any] = {
         "operator_ready": args.operator_ready,
         "ignore_rear_occupancy": args.ignore_rear_occupancy,
@@ -481,9 +483,9 @@ def run_session(args: Any) -> None:
         "harness_sha256": {
             p.name: sha(p)
             for p in (
-                HERE / "demo_pc2_navigation_walk.py",
-                HERE / "demo_pc2_walk_agent.py",
-                HERE / "demo_navigation_two_host_peer.py",
+                HERE / "walk_harness.py",
+                HERE.parent / "pc2_tools/walk_agent.py",
+                HERE / "peer_host.py",
             )
         },
         "dimos_commit": subprocess.run(

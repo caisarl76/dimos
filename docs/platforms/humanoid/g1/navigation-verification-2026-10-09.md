@@ -9,7 +9,12 @@ No mode setter, stand-up request, controller release, or G1 locomotion-module
 startup has been issued. No planner goal has been submitted.
 
 That paragraph and the sections after the final verdict are the chronological
-record. The final verdict for navigation through SONIC comes first.
+record. The final verdict for navigation through SONIC comes first. The deployment
+tooling those sections name (`pc2-package/`, `demo_pc2_*.py`,
+`demo_navigation_two_host_peer.py`, `demo_peer_rerun_view.py`) moved on 2026-10-22 to
+[dimos/robot/unitree/g1/deploy/sonic_navigation](/dimos/robot/unitree/g1/deploy/sonic_navigation/README.md),
+without the `demo_` prefixes; evidence and the simulation harness stay in the
+artifacts directory.
 
 ## Final verdict, 2026-10-21 (updated in the evening)
 

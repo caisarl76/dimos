@@ -20,8 +20,8 @@ from scipy.spatial.transform import Rotation
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
+from dimos.robot.unitree.g1.deploy.sonic_navigation.pc2_tools import extrinsic_check as check
 from dimos.robot.unitree.g1.g1_tf_publisher import torso_to_mid360
-from docs.artifacts.g1_navigation_sonic_20261013 import demo_pc2_extrinsic_check as check
 
 WAIST = np.array([0.02, -0.01, 0.03])
 WORLD_BASE = Rotation.from_euler("xyz", [0.01, 0.05, 0.4])  # leaning, arbitrary heading

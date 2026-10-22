@@ -18,7 +18,7 @@ import ast
 import inspect
 from pathlib import Path
 
-from docs.artifacts.g1_navigation_sonic_20261013 import demo_pc2_navigation_readiness as probe
+from dimos.robot.unitree.g1.deploy.sonic_navigation.pc2_tools import readiness_probe as probe
 
 
 def write(path: Path, text: str) -> None:

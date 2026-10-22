@@ -68,7 +68,7 @@ check_only() {  # $1: blocking issues tolerated (space separated)
         --security-opt no-new-privileges --cpus 2 --memory 2g \
         --mount "type=bind,source=$out,target=/verification" \
         --env XDG_STATE_HOME=/verification/state --env XDG_CACHE_HOME=/tmp/cache \
-        "$image" python /opt/sonic-navigation/package/demo_pc2_navigation_readiness.py \
+        "$image" python /opt/sonic-navigation/package/readiness_probe.py \
         --config /opt/sonic-navigation/package/config/probe.json \
         --output /verification/readiness.json || true
     if clocks_pinned; then echo 'Clocks pinned.'; fi
@@ -142,7 +142,7 @@ case "$3" in
         echo "Sending the operator start to controller PID $pid; the robot can move."
         exec docker run --rm --init --network host --user 1000:1000 --cap-drop ALL \
             --security-opt no-new-privileges --cpus 1 --memory 1g "$image" \
-            python /opt/sonic-navigation/package/demo_pc2_operator_start.py --start-idle-planner
+            python /opt/sonic-navigation/package/operator_start.py --start-idle-planner
         ;;
     graph | graph-agentic)
         verify_package

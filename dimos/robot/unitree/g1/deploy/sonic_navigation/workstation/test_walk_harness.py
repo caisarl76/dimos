@@ -20,7 +20,7 @@ import math
 
 import pytest
 
-from docs.artifacts.g1_navigation_sonic_20261013 import demo_pc2_navigation_walk as walk
+from dimos.robot.unitree.g1.deploy.sonic_navigation.workstation import walk_harness as walk
 
 
 def passed(*names: str) -> list[dict]:
