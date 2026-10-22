@@ -2005,12 +2005,21 @@ fn clear_region_removes_only_voxels_inside_the_cylinder_band() {
     assert_eq!(removed, 2);
     assert!(!map.voxels.contains_key(&(2, 0, 1)));
     assert!(!map.voxels.contains_key(&(2, 0, 2)));
-    assert!(map.voxels.contains_key(&(2, 0, 3)), "above the band is kept");
+    assert!(
+        map.voxels.contains_key(&(2, 0, 3)),
+        "above the band is kept"
+    );
     for x in 0..5 {
-        assert!(map.voxels.contains_key(&(x, 0, 0)), "floor below the band is kept");
+        assert!(
+            map.voxels.contains_key(&(x, 0, 0)),
+            "floor below the band is kept"
+        );
     }
     for z in 1..4 {
-        assert!(map.voxels.contains_key(&(9, 0, z)), "outside the radius is kept");
+        assert!(
+            map.voxels.contains_key(&(9, 0, z)),
+            "outside the radius is kept"
+        );
     }
     // The floor voxel under the post lost the post as a healthy neighbor.
     assert_eq!(map.voxels.support(&(2, 0, 0)), Some(2));
