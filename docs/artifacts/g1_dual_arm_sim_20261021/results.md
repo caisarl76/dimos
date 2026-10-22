@@ -55,6 +55,25 @@ Stand-in totals over each whole run (both runs):
   `unitree-g1-sonic-arm-agentic` has the same line, reported to that session. The driver's
   `dimos run --daemon` hung on a captured stdout pipe; it now writes to `dimos_run.log`.
 
+## run03: merged code (Tier-1 aa798e221 + dual), in-repo stand-in, 2026-10-22
+
+Branch at `221f07512`, run as `STANDIN=repo` (`python -m dimos.robot.unitree.g1.sonic_sim_peer`).
+**The stand-ins ran at only 0.66–0.68× real time** (mean tick 30 ms, against 20 ms in run01/run02). The
+host's load average was 13–14 from unrelated jobs: an ASPIRE G1 sim, two `cap_harness` agents and three
+`flora_eval` captioners. Behaviour holds; timing does not.
+
+| Check | run03 |
+|---|---|
+| `move_left_arm_pose(both, …)` | start 0.272 s / submit 0.002 s; 92 % / 92 %, returned |
+| `perform_gesture(both, wave)` | start 0.269 s / submit 0.002 s; 98 % / 99 %, returned |
+| `move_upper_body(223, …)` | 223 reached 16.7°; 222 never armed (0.022 rad drift) |
+| wave + `stop_arm` 6 s after both armed | both "stopped early: stop requested", returned; peak 1.00 / 1.08 rad/s, tilt ≤ 1.27°, 8 contacts (local npz) |
+| agent "both robots wave" | start 0.378 s; 98 % / 98 % |
+| 223 killed, then `both` | "223: SONIC is not in confirmed planner idle; nothing sent; nothing sent to any robot"; 222 moved 0.014 rad |
+
+The start skews of 0.27–0.38 s are not comparable with run01/run02, because each stand-in lagged real time
+by a different, varying amount. Rerun on an idle host before reading them as sync evidence.
+
 ## Not covered (hardware, next)
 
 This doesn't cover the real guarded controllers, the SSH tunnels, a dropped tunnel (which still
