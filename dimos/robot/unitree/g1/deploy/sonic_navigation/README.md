@@ -74,6 +74,14 @@ PYTHONPATH=$PWD .venv/bin/python dimos/robot/unitree/g1/deploy/sonic_navigation/
   container. A case is offered once its prerequisites passed today.
 - `--ignore-rear-occupancy` leaves the support crane behind the robot out of the goal
   pre-check. It is for supported experiments only.
+- The MID360 cannot see the floor within about 1 m of the robot, so whatever passes
+  through there (the operator setting up a box) stays in the map. The goal cases ask
+  the operator to confirm the area clear and to stand at least 1 m to the side of the
+  path, then refresh the map: everything 0.12 m above the mapped floor within 2.5 m
+  is cleared, and live scans rebuild what is still visible within 2 s. The
+  `refresh_map` case does the same on its own. A real object nearer than about 0.7 m
+  is not seen again after a refresh.
+- A goal case ends after 3 s when the planner found no path to the goal.
 
 Viewer, in another terminal, once the harness shows its menu:
 
