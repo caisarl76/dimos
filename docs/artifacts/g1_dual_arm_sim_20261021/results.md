@@ -74,6 +74,44 @@ host's load average was 13–14 from unrelated jobs: an ASPIRE G1 sim, two `cap_
 The start skews of 0.27–0.38 s are not comparable with run01/run02, because each stand-in lagged real time
 by a different, varying amount. Rerun on an idle host before reading them as sync evidence.
 
+## run04 / run05: merged code (Tier-1 aa798e221 + forearm 0d664204e), host lightly loaded
+
+Branch at `48fdfeabd`. run04 used the in-repo stand-in (`STANDIN=repo`), run05 the frozen snapshot.
+Both stand-ins ran at 0.95–0.96× real time (host load ~3.4, from an unrelated ASPIRE sim), so the timing
+is usable. All six checks passed in both runs, with no reference expiry.
+
+| Check | run04 | run05 |
+|---|---|---|
+| `move_left_arm_pose(both, …)` | start 0.223 s / submit 0.001 s; 91 % / 92 % | start 0.224 s / submit 0.001 s |
+| `perform_gesture(both, wave)` | start 0.264 s; 98 % / 99 % | start 0.225 s |
+| agent "both robots wave" | start 0.334 s | start 0.443 s |
+| `move_upper_body(223, …)` | 222 never armed | 222 never armed |
+| wave + `stop_arm` | both "stopped early: stop requested"; peak 0.88 / 0.87 rad/s, tilt ≤ 1.31° (local npz) | both stopped early, returned |
+| 223 killed, then `both` | nothing sent to any robot | nothing sent to any robot |
+
+### What `start_skew_s` measures
+
+`start_skew_s` is the first time any planned joint moves 0.03 rad from its pose at send, per robot. That catches
+whichever joint drifts first, often a small secondary joint. Measured from the local npz, the gap between
+the two robots at 10 % and 50 % of each joint's own stroke:
+
+| run, command | `start_skew_s` | shoulder roll (main stroke) 10 % / 50 % | shoulder yaw 10 % / 50 % | elbow 10 % / 50 % |
+|---|---|---|---|---|
+| run01 pose | 0.000 | 0.003 / 0.017 | 0.023 / 0.017 | 0.003 / 0.017 |
+| run02 pose | 0.017 | 0.011 / 0.009 | 0.011 / 0.009 | 0.011 / 0.011 |
+| run04 pose | 0.223 | 0.009 / 0.011 | 0.232 / 0.050 | 0.211 / 0.211 |
+| run05 pose | 0.224 | 0.006 / 0.013 | 0.212 / 0.027 | 0.193 / 0.213 |
+| run02 wave | 0.249 | 0.029 / 0.029 | 0.031 / 0.009 | 0.029 / 0.029 |
+| run04 wave | 0.264 | 0.029 / 0.027 | 0.030 / 0.032 | 0.050 / 0.007 |
+| run05 agent wave | 0.443 | 0.016 / 0.032 | 0.014 / 0.050 | 0.027 / 0.032 |
+
+- **Main stroke:** in every run and command, the two robots stay within 3–52 ms at 10 % and 50 %.
+- **Reported gap:** the 0.22–0.44 s `start_skew_s` comes from secondary joints.
+- **Since the Tier-1 merge:** the pose's elbow also lags by about 0.21 s at 50 % of its travel, on both stand-ins
+  (run04 and run05 agree). The cause is not yet understood. It is within the 0.5 s target.
+- **Follow-up:** replace `start_skew_s` with a progress-based onset (e.g. 10 % of the planned displacement) and
+  explain the elbow lag.
+
 ## Not covered (hardware, next)
 
 This doesn't cover the real guarded controllers, the SSH tunnels, a dropped tunnel (which still
