@@ -17,18 +17,25 @@
 import math
 import os
 from pathlib import Path
+import time
 from typing import get_args
 
 import numpy as np
 import pytest
 
 from dimos.robot.unitree.g1.sonic_arm_reference import (
+    HEAD_CAMERA_XYZ,
     PEAK_SPEED,
+    POINT_AZIMUTH_DEG,
+    POINT_ELEVATION_DEG,
     RATE,
     ArmCollisionChecker,
+    ArmKinematics,
     Keyframe,
     SonicEncoder,
+    aim_from_pixel,
     keyframe_plan,
+    pixel_ray,
     retreat_poses,
     retreat_route,
     stroke_plan,
@@ -219,6 +226,18 @@ def test_a_split_pause_gives_still_tokens_for_the_session_blend():
         assert still[row]
 
 
+@needs_encoder
+def test_encoder_anchor_defaults_to_identity_and_is_used() -> None:
+    encoder = SonicEncoder(ENCODER)
+    target = BASE.copy()
+    target[[15, 16, 17, 18]] = -0.5, 0.3, 0, 0.6
+    poses = keyframe_plan(BASE, [Keyframe(target, 0.2)]).poses[:40]
+    default = encoder.encode(poses)
+    assert default.tobytes() == encoder.encode(poses, np.array([1.0, 0, 0, 1, 0, 0])).tobytes()
+    tilted = np.array([math.cos(0.1), 0, 0, 1, -math.sin(0.1), 0])  # 0.1 rad pitch
+    assert not np.allclose(default, encoder.encode(poses, tilted))
+
+
 def test_token_still_compares_all_fifteen_rows_to_the_first_with_absolute_tolerance():
     tokens = np.ones((40, 64))
     tokens[15:30] += 0.5e-9
@@ -274,3 +293,98 @@ def test_each_gesture_and_its_retreats_clear_the_body(name):
     assert checker.first_contact(plan.poses, start=ROBOT_IDLE) is None
     for s in range(len(plan.segments)):
         assert checker.first_contact(retreat_poses(plan, s), start=ROBOT_IDLE) is None, s
+
+
+def angle_between(a, b):
+    """Great-circle angle between two (azimuth, elevation) directions, deg."""
+    (az1, el1), (az2, el2) = np.radians(a), np.radians(b)
+    cos = np.sin(el1) * np.sin(el2) + np.cos(el1) * np.cos(el2) * np.cos(az1 - az2)
+    return math.degrees(math.acos(min(1.0, max(-1.0, cos))))
+
+
+@pytest.fixture(scope="module")
+def kinematics():
+    return ArmKinematics(SCENE)
+
+
+@needs_scene
+# The brief's -30 and 100 are dropped: with yaw 0 the shoulder bounds cannot reach -30, or 100 high.
+# Body contact is the path check's business, not the IK's.
+@pytest.mark.parametrize("az", [0.0, 45.0, 80.0])
+@pytest.mark.parametrize("el", [-70.0, -30.0, 0.0, 40.0, 70.0])
+def test_solved_arm_points_where_asked(kinematics, az, el):
+    q = ROBOT_IDLE.copy()
+    q[[15, 16, 17, 18]] = kinematics.solve(ROBOT_IDLE, az, el)
+    assert q[17] == 0.0 and q[18] == 1.35
+    assert angle_between(kinematics.direction(q), (az, el)) <= 3.0
+
+
+@needs_scene
+def test_solve_refuses_a_direction_the_arm_cannot_reach(kinematics):
+    with pytest.raises(ValueError, match="more than 3 deg off"):
+        kinematics.solve(ROBOT_IDLE, -150.0, 0.0)  # behind the robot, across the torso
+
+
+@needs_scene
+def test_solve_is_fast(kinematics):
+    started = time.monotonic()
+    kinematics.solve(ROBOT_IDLE, 45.0, -30.0)
+    assert time.monotonic() - started < 0.5
+
+
+@needs_scene
+def test_shoulder_sits_left_of_and_above_the_torso_origin(kinematics):
+    x, y, z = kinematics.shoulder(ROBOT_IDLE)
+    assert abs(x) < 0.05 and 0.05 < y < 0.15 and 0.15 < z < 0.3
+
+
+@needs_scene
+@pytest.mark.parametrize("az,el", [(0, 0), (15, -30), (30, -45), (45, -30), (60, 0), (80, 30)])
+def test_common_directions_solve_and_clear_the_body(kinematics, az, el):
+    solved = ROBOT_IDLE.copy()
+    solved[[15, 16, 17, 18]] = kinematics.solve(ROBOT_IDLE, az, el)
+    assert angle_between(kinematics.direction(solved), (az, el)) <= 3.0
+    plan = stroke_plan(ROBOT_IDLE, solved - ROBOT_IDLE)
+    assert ArmCollisionChecker(SCENE).first_contact(plan, start=ROBOT_IDLE) is None
+
+
+@needs_scene
+def test_cone_grid_is_solved_or_refused_for_a_stated_reason(kinematics):
+    """Every direction in the coarse bound clears the body, is out of reach, or meets the body."""
+    checker = ArmCollisionChecker(SCENE)
+    outcomes = {"clear": 0, "out_of_reach": 0, "contact": 0}
+    for az in np.linspace(*POINT_AZIMUTH_DEG, 7):
+        for el in np.linspace(*POINT_ELEVATION_DEG, 7):
+            solved = ROBOT_IDLE.copy()
+            try:
+                solved[[15, 16, 17, 18]] = kinematics.solve(ROBOT_IDLE, az, el)
+            except ValueError as exc:
+                assert "more than 3 deg off" in str(exc)
+                outcomes["out_of_reach"] += 1
+                continue
+            assert angle_between(kinematics.direction(solved), (az, el)) <= 3.0
+            plan = stroke_plan(ROBOT_IDLE, solved - ROBOT_IDLE)
+            contact = checker.first_contact(plan, start=ROBOT_IDLE)
+            outcomes["clear" if contact is None else "contact"] += 1
+    print(outcomes)
+    assert outcomes["clear"] > outcomes["out_of_reach"] + outcomes["contact"]
+
+
+def test_image_centre_looks_down_the_camera_axis():
+    ray = pixel_ray(325.54, 245.35)
+    np.testing.assert_allclose(ray, [np.cos(0.8306), 0.0, -np.sin(0.8306)], atol=2e-3)  # 47.6 deg
+
+
+def test_pixel_left_and_up_turn_left_and_up():
+    c = pixel_ray(325.54, 245.35)
+    assert pixel_ray(100.0, 245.35)[1] > c[1]  # left of centre -> +y (robot's left)
+    assert pixel_ray(325.54, 50.0)[2] > c[2]  # above centre -> higher
+
+
+def test_aim_from_pixel_points_the_shoulder_at_the_object_2m_out():
+    shoulder = np.array([0.0, 0.15, 0.24])
+    az, el = aim_from_pixel(325.54, 245.35, shoulder)
+    p = np.array(HEAD_CAMERA_XYZ) + 2.0 * pixel_ray(325.54, 245.35) - shoulder
+    assert (az, el) == pytest.approx(
+        (np.degrees(np.arctan2(p[1], p[0])), np.degrees(np.arctan2(p[2], np.hypot(p[0], p[1]))))
+    )

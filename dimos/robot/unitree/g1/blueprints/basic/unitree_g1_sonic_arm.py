@@ -26,6 +26,10 @@ does either. Run it on the robot PC, beside the controller, with the SONIC v1.1 
 The motion skills return at once ("started"); their result arrives as a tool update, which
 `dimos mcp call` does not print. It is also logged: follow it with `dimos log -f`.
 
+Operator rule: call stop_arm and wait for its tool update before `dimos stop` or stopping the
+controller. Shutdown also retreats a running motion first, but only best-effort: the execution
+module may stop at the same time and hand the raised arm to the native planner.
+
 move_left_arm_joints also needs the gear_sonic MuJoCo model for its path check:
 --sonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
     dimos mcp call observe
@@ -43,6 +47,12 @@ from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.msgs.sensor_msgs.CameraInfo import CameraInfo
+from dimos.robot.unitree.g1.sonic_arm_reference import (
+    HEAD_CAMERA_K,
+    HEAD_CAMERA_QUAT_XYZW,
+    HEAD_CAMERA_SIZE,
+    HEAD_CAMERA_XYZ,
+)
 from dimos.robot.unitree.g1.sonic_arm_skill import SonicArmSkillContainer
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
@@ -50,19 +60,19 @@ from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 # The D435i colour interface (USB interface 3) on the G1 PC2's internal head-camera port; by-path
 # stays fixed across reboots, unlike /dev/videoN, and by-id names collide with the depth interface.
 HEAD_CAMERA_DEVICE = "/dev/v4l/by-path/platform-3610000.usb-usb-0:3:1.3-video-index0"
-# Factory colour intrinsics at 640x480 (librealsense), distortion all zero.
-_FX, _FY, _CX, _CY = 606.62, 607.12, 325.54, 245.35
+_FX, _FY, _CX, _CY = HEAD_CAMERA_K
+_WIDTH, _HEIGHT = HEAD_CAMERA_SIZE
 
 
 def _head_camera() -> Webcam:
     return Webcam(
         camera_index=HEAD_CAMERA_DEVICE,
-        width=640,
-        height=480,
+        width=_WIDTH,
+        height=_HEIGHT,
         fps=15,
         camera_info=CameraInfo(
-            height=480,
-            width=640,
+            height=_HEIGHT,
+            width=_WIDTH,
             distortion_model="plumb_bob",
             D=[0.0] * 5,
             K=[_FX, 0.0, _CX, 0.0, _FY, _CY, 0.0, 0.0, 1.0],
@@ -73,13 +83,25 @@ def _head_camera() -> Webcam:
     )
 
 
+# The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 15.4 s for
+# move_upper_body, 31 s for the slowest full-range pose (overhead at 0.47 rad/s) and up to 20 s more
+# for a held pose. max_duration also covers a retreat after a late stop.
+SONIC_ARM_PROFILE = SonicModelProfile(
+    name="g1-sonic-arm",
+    source_fps=50,
+    right_hand_order="native",
+    handback_policy="native_planner",
+    max_observation_age=35.0,
+    max_duration=75.0,
+)
+
+
 unitree_g1_sonic_arm = autoconnect(
     CameraModule.blueprint(
         hardware=_head_camera,
-        # URDF d435_joint on torso_link: pitched 0.83 rad down, looking at the floor ahead.
         transform=Transform(
-            translation=Vector3(0.0576235, 0.01753, 0.41987),
-            rotation=Quaternion(0.0, 0.40355, 0.0, 0.91496),
+            translation=Vector3(*HEAD_CAMERA_XYZ),
+            rotation=Quaternion(*HEAD_CAMERA_QUAT_XYZW),
             frame_id="torso_link",
             child_frame_id="camera_link",
         ),
@@ -90,17 +112,7 @@ unitree_g1_sonic_arm = autoconnect(
         reference_bind="tcp://127.0.0.1:5556",
         feedback_endpoint="tcp://127.0.0.1:5557",
         journal_dir=STATE_DIR / "sonic-arm",
-        # The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 15.4 s
-        # for move_upper_body, 31 s for the slowest full-range pose (overhead at 0.47 rad/s) and
-        # up to 20 s more for a held pose. max_duration also covers a retreat after a late stop.
-        profile=SonicModelProfile(
-            name="g1-sonic-arm",
-            source_fps=50,
-            right_hand_order="native",
-            handback_policy="native_planner",
-            max_observation_age=35.0,
-            max_duration=75.0,
-        ),
+        profile=SONIC_ARM_PROFILE,
     ),
     SonicArmSkillContainer.blueprint(),
     McpServer.blueprint(),

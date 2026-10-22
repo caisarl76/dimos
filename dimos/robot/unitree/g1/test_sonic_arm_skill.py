@@ -38,12 +38,18 @@ from dimos.agents.capabilities import CapabilityRegistry
 from dimos.agents.mcp import mcp_server
 from dimos.agents.mcp.tool_stream import NOTIFICATIONS_MESSAGE_METHOD, TOOL_STREAM_STOPPED_METHOD
 from dimos.agents.skills.observe_skill import ObserveSkill
+from dimos.core.coordination.blueprint_config.sources import validate_global_values
 from dimos.core.transport_factory import make_transport
+from dimos.msgs.sensor_msgs.Image import Image
 from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill
+from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_agentic import (
+    unitree_g1_sonic_arm_agentic,
+)
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     RATE,
     Keyframe,
+    aim_from_pixel,
     arm_poses,
     group_margins,
     keyframe_plan,
@@ -52,7 +58,7 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     stroke_plan,
     token_schedule,
 )
-from dimos.robot.unitree.g1.sonic_arm_skill import GESTURES, SonicArmSkillContainer
+from dimos.robot.unitree.g1.sonic_arm_skill import GESTURES, SonicArmSkillContainer, query_boxes
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
@@ -449,6 +455,20 @@ def test_one_chunk_streams_the_plan_without_speed_ripple():
     assert value.min() == pytest.approx(0.125 - 0.5, abs=0.005)
 
 
+def test_observation_age_must_cover_the_longest_retreat(skill, mocker):
+    module, peer = skill
+    # Tiny chunks: only the retreat (21 rows + the 10-row blend = 0.62 s) is longer than 0.5 s.
+    mocker.patch.object(
+        sonic_arm_skill, "chunk_rows", lambda n, still: [(i, min(i + 5, n)) for i in range(0, n, 5)]
+    )
+    status = module._execution.get_status()
+    short = status | {"profile": status["profile"] | {"max_observation_age": 1.0}}
+    mocker.patch.object(module._execution, "get_status", return_value=short)
+    with pytest.raises(RuntimeError, match="must cover the plan"):
+        module.move_upper_body("left_arm_forward", 20.0)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
 def test_profile_too_short_for_the_plan_sends_nothing(skill, mocker):
     module, peer = skill
     status = module._execution.get_status()
@@ -559,6 +579,86 @@ def test_stop_during_encoding_sends_nothing(real_launch_skill, mocker):
     assert updates.call_args.args[1] == "move_upper_body failed: stopped on request; nothing sent"
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
     assert module._execution.get_status()["task"] is None
+
+
+def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
+    real_launch_skill, mocker
+):
+    module, _ = real_launch_skill
+    submit = mocker.spy(module._execution, "submit_chunk")
+    updates = mocker.spy(module, "tool_update")
+    with feeding(module, follows):
+        module.move_upper_body("left_arm_forward", 20.0)
+        wait_until(lambda: submit.call_count == 1)  # The stream is armed.
+        time.sleep(0.4)  # Mid-motion, past the lead-in blend.
+        module.stop()
+        # stop() returned only after the retreat and the motion's own final update.
+        assert module._arm.stop.is_set()
+        assert [c.args[1] for c in submit.call_args_list] == [0, 1]
+        assert updates.call_count == 1
+    assert "stopped early: stop requested" in json.loads(updates.call_args.args[1])["message"]
+    assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
+    module, _ = skill
+    real = module._execution.submit_chunk
+
+    def submit(task_id, sequence, observed_at, actions):
+        task = real(task_id, sequence, observed_at, actions)
+        if sequence == 0:
+            time.sleep(0.05)  # A few rows into the fixture's 10-row lead-in blend.
+            module._arm.stop.set()
+        return task
+
+    spy = mocker.patch.object(module._execution, "submit_chunk", side_effect=submit)
+    result = run(module, 20.0, follows)
+    assert "stopped early: stop requested" in result.message, result
+    first, rows = spy.call_args_list[0].args[3], spy.call_args_list[1].args[3]
+    row = len(rows) - 2  # The blend rows sent so far, reversed, then the planner token.
+    assert 0 <= row < 10
+    assert np.array_equal(rows[:-1], first[row::-1])
+    assert np.array_equal(rows[-1], first[-1])  # The captured planner token (and hands).
+    assert rows[-1][0] == pytest.approx(PEER_TOKEN)
+    assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_stop_during_arming_sends_no_chunk(real_launch_skill, mocker):
+    module, peer = real_launch_skill
+    submit = mocker.spy(module._execution, "submit_chunk")
+    updates = mocker.spy(module, "tool_update")
+    real = module._execution.start_task
+
+    def start_then_stop():
+        task = real()
+        assert module.stop_arm().startswith("Stopping")  # While the stream arms.
+        return task
+
+    mocker.patch.object(module._execution, "start_task", side_effect=start_then_stop)
+    with feeding(module, follows):
+        module.move_upper_body("left_arm_forward", 20.0)
+        wait_until(lambda: updates.call_count == 1)
+    assert updates.call_args.args[1] == "move_upper_body failed: stopped on request; nothing sent"
+    assert submit.call_count == 0
+    # Only the session's own arming packets, holding the planner token: no motion was sent.
+    assert np.allclose(tokens(peer.snapshot())[:, 0], PEER_TOKEN)
+    assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_thread_start_failure_leaves_nothing_running(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    real_start = threading.Thread.start
+
+    def start(thread):
+        if thread.name.startswith("arm-"):
+            raise RuntimeError("can't start new thread")
+        real_start(thread)
+
+    mocker.patch.object(threading.Thread, "start", start)
+    with pytest.raises(RuntimeError, match="can't start new thread"):
+        module.move_upper_body("left_arm_forward", 20.0)
+    assert module._running is None and not module._tools
+    assert module.stop_arm() == "No arm motion is running."
 
 
 def test_second_stop_during_the_retreat_changes_nothing(real_launch_skill, mocker):
@@ -1157,6 +1257,249 @@ def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
     k, value = np.array(emitted).T
     assert np.abs(value - plan[k.astype(int), 0]).max() < 0.005
     assert np.abs(np.diff(value)).max() <= np.abs(np.diff(plan[:, 0])).max() + 1e-4  # No ripple.
+
+
+class FakeKinematics:
+    """solve returns a fixed reachable pose, or raises what the real solve raises."""
+
+    POSE = (-1.2, 0.5, 0.0, 1.35)
+
+    def __init__(self, reachable=True):
+        self.reachable, self.bases = reachable, []
+
+    def solve(self, q, azimuth_deg, elevation_deg):
+        self.bases.append(np.array(q))
+        if not self.reachable:
+            raise ValueError(f"({azimuth_deg:g}, {elevation_deg:g}) is more than 3 deg off")
+        return np.array(self.POSE)
+
+    def direction(self, q):
+        assert np.allclose(q[15:19], self.POSE)
+        return (31.04, -19.96)
+
+    def shoulder(self, q):
+        return np.array([0.0, 0.15, 0.24])
+
+
+@pytest.mark.parametrize("az,el", [(-40.0, 0.0), (0.0, 80.0), (120.0, 0.0), (math.nan, 0.0)])
+def test_point_at_outside_the_cone_sends_nothing(skill, az, el):
+    module, peer = skill
+    with pytest.raises(ValueError, match="cone"):
+        module.point_at(az, el)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_point_at_needs_the_arm_model(real_launch_skill, mocker):
+    module, peer = real_launch_skill
+    start_tool = mocker.spy(module, "start_tool")
+    with pytest.raises(RuntimeError, match="collision_model_path is not configured"):
+        module.point_at(30.0, -20.0)
+    assert start_tool.call_count == 0 and module._running is None
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+@pytest.mark.parametrize("hold", [0.5, 21.0])
+def test_point_at_hold_outside_1_to_20_sends_nothing(skill, hold):
+    module, peer = skill
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics()
+    with pytest.raises(ValueError, match="hold_seconds"):
+        module.point_at(30.0, -20.0, hold)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_unreachable_direction_sends_nothing(skill):
+    module, peer = skill
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics(reachable=False)
+    with pytest.raises(ValueError, match="more than 3 deg off"):
+        module.point_at(30.0, -20.0)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+    assert module._execution.get_status()["task"] is None
+
+
+def test_point_at_solves_from_the_measured_base_and_reports_the_direction(skill, mocker):
+    module, _ = skill
+    raised = raised_start(module, mocker, pitch=-0.3)
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics()
+    result = call_with_feed(
+        module, lambda: module.point_at(30.0, -20.0), reaching(FakeKinematics.POSE)
+    )
+    assert "returned" in result.message, result
+    assert np.array_equal(module._kinematics.bases[0], raised)  # The real start, not a rest pose.
+    assert module._arm._checker.calls == 1
+    assert result.metadata["requested_direction_deg"] == [30.0, -20.0]
+    assert result.metadata["achieved_direction_deg"] == [31.0, -20.0]
+    assert result.metadata["planned_deg"]["left_elbow"] == pytest.approx(
+        math.degrees(1.35), abs=0.1
+    )
+
+
+@needs_scene
+def test_point_at_with_the_real_arm_model(skill):
+    module, _ = skill
+    module._arm._checker = FakeChecker()
+    module._kinematics = sonic_arm_reference.ArmKinematics(SCENE)
+    target = module._kinematics.solve(np.zeros(29), 45.0, -30.0)
+    result = call_with_feed(module, lambda: module.point_at(45.0, -30.0), reaching(target))
+    assert "returned" in result.message, result
+    az, el = result.metadata["achieved_direction_deg"]
+    assert abs(az - 45.0) < 3.0 and abs(el + 30.0) < 3.0
+
+
+@needs_scene
+def test_point_at_near_the_body_is_refused_by_the_path_check(skill, mocker):
+    module, peer = skill
+    real = module._execution.get_feedback
+    mocker.patch.object(
+        module._execution,
+        "get_feedback",
+        lambda: replace(real(), body_q=tuple(float(v) for v in ROBOT_IDLE)),
+    )
+    module._arm._checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
+    module._kinematics = sonic_arm_reference.ArmKinematics(SCENE)
+    with pytest.raises(RuntimeError, match="comes within 2 cm of the torso_link; nothing sent"):
+        module.point_at(0.0, -60.0)  # low and straight ahead: the upper arm meets the torso
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_prompt_states_the_point_at_bound():
+    (az_low, az_high), (el_low, el_high) = (
+        sonic_arm_reference.POINT_AZIMUTH_DEG,
+        sonic_arm_reference.POINT_ELEVATION_DEG,
+    )
+    assert f"azimuth {az_low:g} to {az_high:g}" in G1_SONIC_ARM_SYSTEM_PROMPT
+    assert f"elevation {el_low:g} to {el_high:g}" in G1_SONIC_ARM_SYSTEM_PROMPT
+    assert "may be refused" in G1_SONIC_ARM_SYSTEM_PROMPT
+
+
+IMAGE_640x480 = Image.from_numpy(np.zeros((480, 640, 3), np.uint8))
+
+
+class FakeVl:
+    """query_json answers with a fixed payload, or raises it if it is an exception."""
+
+    def __init__(self, payload):
+        self.payload, self.prompts = payload, []
+
+    def query_json(self, image, prompt):
+        self.prompts.append(prompt)
+        if isinstance(self.payload, Exception):
+            raise self.payload
+        return self.payload
+
+
+def seeing(module, mocker, payload, shoulder=None):
+    """The skill with a fake vision model, arm model and head-camera frame."""
+    mocker.patch.object(module.config, "vl_model", "fake-vl")
+    module._vl = FakeVl(payload)
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics()
+    if shoulder is not None:
+        mocker.patch.object(module._kinematics, "shoulder", lambda q: np.asarray(shoulder))
+    mocker.patch.object(module.color_image, "get_next", return_value=IMAGE_640x480)
+
+
+def test_point_at_object_with_no_match_says_so_and_sends_nothing(skill, mocker):
+    module, peer = skill
+    seeing(module, mocker, [])
+    with pytest.raises(RuntimeError, match="found no 'red box' in the camera image; nothing sent"):
+        module.point_at_object("red box")
+    assert "red box" in module._vl.prompts[0]
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_point_at_object_vision_failure_is_not_reported_as_not_found(skill, mocker):
+    module, peer = skill
+    seeing(module, mocker, ConnectionError("gateway down"))
+    with pytest.raises(
+        RuntimeError, match="vision model fake-vl failed: gateway down; nothing sent"
+    ):
+        module.point_at_object("red box")
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_point_at_object_reply_that_is_not_a_list_is_a_vision_failure(skill, mocker):
+    module, peer = skill
+    seeing(module, mocker, {"boxes": [["box", 1, 1, 9, 9]]})
+    with pytest.raises(
+        RuntimeError,
+        match="vision model fake-vl failed: vision model reply is not a list of boxes; nothing sent",
+    ):
+        module.point_at_object("red box")
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+    with pytest.raises(ValueError, match="not a list of boxes"):
+        query_boxes(FakeVl("[]"), IMAGE_640x480, "box")  # A string, not a parsed list.
+    assert query_boxes(FakeVl([]), IMAGE_640x480, "box") == []
+
+
+def test_point_at_object_without_a_camera_frame_sends_nothing(skill, mocker):
+    module, peer = skill
+    seeing(module, mocker, [["box", 1, 1, 2, 2]])
+    mocker.patch.object(module.color_image, "get_next", side_effect=Exception("timeout"))
+    with pytest.raises(RuntimeError, match="no camera frame.*; nothing sent"):
+        module.point_at_object("red box")
+    assert module._vl.prompts == []
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_normalized_boxes_convert_before_bounds_checks():
+    vl = FakeVl([["box", 700, 600, 900, 900]])
+    ((label, x1, y1, x2, y2),) = query_boxes(vl, IMAGE_640x480, "box", "normalized_1000")
+    assert label == "box" and (x1, y1, x2, y2) == pytest.approx((448, 288, 576, 432))
+    # Read as pixels it lies off the image: zero area after clipping.
+    assert query_boxes(vl, IMAGE_640x480, "box", "pixels") == []
+
+
+def test_malformed_boxes_are_dropped_and_partial_ones_clipped():
+    vl = FakeVl(
+        [["a", 1, 2, 3], "junk", ["b", "x", 0, 9, 9], ["c", 9, 9, 1, 1], ["d", -5, 10, 700, 20]]
+    )
+    assert query_boxes(vl, IMAGE_640x480, "box") == [("d", 0.0, 10.0, 640.0, 20.0)]
+
+
+def test_point_at_object_points_at_the_largest_box(skill, mocker):
+    module, _ = skill
+    seeing(module, mocker, [["small", 300, 200, 320, 220], ["big box", 100.4, 300, 260, 420]])
+    result = call_with_feed(
+        module, lambda: module.point_at_object("box"), reaching(FakeKinematics.POSE)
+    )
+    assert "returned" in result.message, result
+    assert result.metadata["label"] == "big box"
+    assert result.metadata["box_px"] == [100, 300, 260, 420]
+    az, el = aim_from_pixel(180.2, 360.0, np.array([0.0, 0.15, 0.24]))
+    assert result.metadata["direction_deg"] == pytest.approx([az, el], abs=0.06)
+    assert result.metadata["requested_direction_deg"] == result.metadata["direction_deg"]
+    assert result.metadata["achieved_direction_deg"] == [31.0, -20.0]
+
+
+def test_point_at_object_outside_the_cone_sends_nothing(skill, mocker):
+    module, peer = skill
+    seeing(module, mocker, [["box", 300, 200, 340, 240]], shoulder=[0.0, 0.0, 10.0])
+    with pytest.raises(RuntimeError, match=r"azimuth -?\d+\.\d, elevation -8\d\.\d deg.*cone"):
+        module.point_at_object("box")
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_point_at_object_without_a_model_is_disabled(skill):
+    module, _ = skill
+    with pytest.raises(RuntimeError, match="disabled: no vl_model configured"):
+        module.point_at_object("red box")
+
+
+@pytest.mark.parametrize(
+    ("description", "hold", "error"),
+    [("", 2.0, "description"), ("box", 0.5, "hold_seconds")],
+)
+def test_point_at_object_rejects_bad_arguments_before_looking(
+    skill, mocker, description, hold, error
+):
+    module, _ = skill
+    seeing(module, mocker, [])
+    with pytest.raises(ValueError, match=error):
+        module.point_at_object(description, hold)
+    assert module._vl.prompts == []
+
+
+def test_agentic_blueprint_global_config_is_valid():
+    validate_global_values(unitree_g1_sonic_arm_agentic.global_config_overrides)
 
 
 def one_joint_prepare(module, mocker=None):

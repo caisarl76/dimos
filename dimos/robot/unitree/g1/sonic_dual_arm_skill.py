@@ -85,6 +85,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
 
     @rpc
     def stop(self) -> None:
+        self._retreat_before_stop()
         super().stop()
 
     @rpc

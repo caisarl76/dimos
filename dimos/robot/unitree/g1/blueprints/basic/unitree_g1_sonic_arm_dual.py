@@ -52,24 +52,20 @@ returns to the planner pose at once. Keep both robots on stands.
 
 The motion skills return at once; the result arrives as a tool update (also logged: `dimos log -f`).
 Only one motion runs at a time across both robots; stop_arm stops it.
+
+Operator rule: call stop_arm and wait for its tool update before `dimos stop` or stopping either
+controller. Shutdown also retreats a running motion first, but only best-effort: the execution
+modules may stop at the same time and hand the raised arms to the native planner.
 """
 
 from dimos.agents.mcp.mcp_server import McpServer
 from dimos.constants import STATE_DIR
 from dimos.core.coordination.blueprints import autoconnect
+from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import SONIC_ARM_PROFILE
 from dimos.robot.unitree.g1.sonic_dual_arm_skill import DualSonicArmSkillContainer
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
-from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 
-# Same profile as unitree-g1-sonic-arm.
-_PROFILE = SonicModelProfile(
-    name="g1-sonic-arm",
-    source_fps=50,
-    right_hand_order="native",
-    handback_policy="native_planner",
-    max_observation_age=35.0,
-    max_duration=75.0,
-)
+_PROFILE = SONIC_ARM_PROFILE  # The single-robot blueprint's, so the two never drift apart.
 
 
 unitree_g1_sonic_arm_dual = autoconnect(

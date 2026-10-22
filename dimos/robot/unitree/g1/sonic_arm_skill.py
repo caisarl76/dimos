@@ -49,15 +49,24 @@ from dimos.control.components import make_humanoid_joints
 from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import In
+from dimos.models.vl.base import VlModel
+from dimos.models.vl.openai import OpenAIVlModel
+from dimos.msgs.sensor_msgs.Image import Image
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     _SPLIT_STILL_ROWS,
     ARM_JOINTS,
+    HEAD_CAMERA_SIZE,
+    JOINT_BOUNDS,
     LEFT_SHOULDER_PITCH,
     LOOSE_JOINTS,
+    POINT_AZIMUTH_DEG,
+    POINT_ELEVATION_DEG,
     RATE,
     ArmCollisionChecker,
+    ArmKinematics,
     Keyframe,
     SonicEncoder,
+    aim_from_pixel,
     group_margins,
     keyframe_plan,
     pose_margins,
@@ -115,21 +124,15 @@ GESTURES: dict[str, list[tuple[tuple[float, float, float, float], float]]] = {
     ],
     "point_forward": [((-1.5, 0.25, 0.0, 1.35), 2.0)],
     "stop_sign": [((-1.3, 0.25, 0.0, 0.0), 2.0)],
-    "raise_hand": [((-2.6, 0.45, 0.0, 1.2), 2.0)],
+    # Roll 0.6, not 0.45: in the MuJoCo stand-in 0.45 tripped the 0.15 knee envelope during the
+    # hold every time (0.6: 0.12 rad).
+    "raise_hand": [((-2.6, 0.6, 0.0, 1.2), 2.0)],
     "beckon": [
         ((-1.2, 0.3, 0.0, 0.6), 0.0),
         *[((-1.2, 0.3, 0.0, elbow), 0.0) for elbow in (0.0, 0.6) * 2],
     ],
 }
 GESTURE_MAX_S = 40.0  # longest plan a gesture may take, lead-in and way home included
-# move_left_arm_joints bounds, deg, inside the joint limits. Collisions inside the box are left to the
-# runtime path check (ArmCollisionChecker), which the joint-target skill requires.
-JOINT_BOUNDS = {
-    "shoulder_pitch": (-165.0, 45.0),
-    "shoulder_roll": (-10.0, 120.0),
-    "shoulder_yaw": (-90.0, 90.0),
-    "elbow": (-30.0, 82.0),
-}
 _LEFT_ARM_TARGET = [15, 16, 17, 18]
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _MAX_CHUNK_ROWS = 1000  # SonicTaskSession accepts chunks of at most 1000 rows (20 s).
@@ -139,6 +142,47 @@ _HOLD_BOUNDS = (1.0, 20.0)  # seconds
 # noise and idle drift.
 _ONSET_RAD = 0.03
 _NO_PATH_CHECK = "collision_model_path is not configured; joint targets need the path check"
+_NO_ARM_MODEL = "collision_model_path is not configured; point_at needs the arm model"
+_FRAME_TIMEOUT_S = 5.0
+# How long Module.stop() waits for a running motion to retreat and hand back: the longest retreat
+# is one session chunk (20 s), then _wait_done (handback_timeout 2 s + 1 s) and at most 5 s of
+# return_watch_seconds; it also covers a stop that lands during encoding (wave: ~14 s on pc2).
+_STOP_JOIN_S = 30.0
+BOX_PROMPT = """Find every `{query}` in this image.
+
+Reply with only JSON, no other text: a list of boxes, one per match,
+[["label", x1, y1, x2, y2], ...]
+where (x1, y1) is the box's top-left corner and (x2, y2) its bottom-right corner.
+If there is no match, reply [].
+"""
+BoxScale = Literal["pixels", "normalized_1000"]
+
+
+def query_boxes(
+    vl: VlModel, image: Image, query: str, box_scale: BoxScale = "pixels"
+) -> list[tuple[str, float, float, float, float]]:
+    """(label, x1, y1, x2, y2) pixel boxes the vision model finds for `query`; model errors propagate,
+    and a reply that is not a JSON list raises ValueError.
+
+    Coordinates are scaled to pixels first ("normalized_1000": 0-1000 on each axis), then clipped
+    to the image; malformed entries and boxes with no area left are dropped.
+    """
+    raw = vl.query_json(image, BOX_PROMPT.format(query=query))
+    if not isinstance(raw, list):
+        raise ValueError("vision model reply is not a list of boxes")
+    w, h = image.width, image.height
+    sx, sy = (w / 1000, h / 1000) if box_scale == "normalized_1000" else (1.0, 1.0)
+    boxes = []
+    for entry in raw:
+        try:
+            label, x1, y1, x2, y2 = entry
+            x1, x2 = (min(max(float(x) * sx, 0.0), w) for x in (x1, x2))
+            y1, y2 = (min(max(float(y) * sy, 0.0), h) for y in (y1, y2))
+        except (TypeError, ValueError):
+            continue
+        if x2 > x1 and y2 > y1:  # Also drops NaN and inverted corners.
+            boxes.append((str(label), x1, y1, x2, y2))
+    return boxes
 
 
 def chunk_rows(plan_rows: int, still: NDArray[np.bool_]) -> list[tuple[int, int]]:
@@ -292,8 +336,13 @@ class SonicArmSkillConfig(ModuleConfig):
     # (SONIC coordinates the whole arm), every right-arm joint this far from its start, rad.
     pose_arm_margin: float = Field(default=0.45, gt=0, le=0.6)
     other_arm_margin: float = Field(default=0.35, gt=0, le=0.5)
-    # gear_sonic scene_43dof.xml for the runtime path check; move_left_arm_joints needs it.
+    # gear_sonic scene_43dof.xml for the runtime path check and point_at's kinematics;
+    # move_left_arm_joints and point_at need it.
     collision_model_path: Path | None = None
+    # OpenAI-compatible vision model for point_at_object (OPENAI_BASE_URL / OPENAI_API_KEY from the
+    # environment); None disables the skill. vl_box_scale is the model's box coordinate convention.
+    vl_model: str | None = None
+    vl_box_scale: BoxScale = "pixels"
 
 
 @dataclass
@@ -482,7 +531,9 @@ class SonicArm:
             return np.hstack([rows, np.tile(hands, (len(rows), 1))])
 
         def retreat(token_row: int) -> NDArray[np.float64] | None:
-            route = retreat_route(kplan, max(token_row - pad, 0))
+            if token_row < pad:  # Still in the lead-in blend: play it backwards to the planner.
+                return np.vstack([plan[token_row::-1], plan[-1]])
+            route = retreat_route(kplan, token_row - pad)
             if route is None:
                 return None  # Already on the way home.
             return retreat_rows(*route)
@@ -490,7 +541,7 @@ class SonicArm:
         longest_chunk = max(end - start for start, end in chunks)
         longest_retreat = max(len(u) + pad for u in units)
         if (
-            profile["max_observation_age"] <= longest_chunk / RATE + 0.5
+            profile["max_observation_age"] <= max(longest_chunk, longest_retreat) / RATE + 0.5
             or profile["max_duration"] <= len(plan) / RATE + longest_retreat / RATE + 2.0
         ):
             raise RuntimeError(
@@ -624,6 +675,8 @@ class SonicArm:
             )
         if outcome == "finished" and task["outcome"] != "finished":
             outcome = f"session {task['outcome']}: {task['reason']}"
+        if outcome == "stopped":
+            raise RuntimeError("stopped on request; nothing sent")
         if outcome not in ("finished", "envelope"):
             raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
         if outcome == "envelope":
@@ -656,15 +709,22 @@ class SonicArm:
                     barrier.abort()  # The peers give up at once, not at their barrier timeout.
                     if task["phase"] != "done":
                         self._cancel(task_id)  # Nothing sent: the session hands back as usual.
+                if called_off and self.stop.is_set():
+                    return "stopped"
                 reason = "the joint start was called off" if called_off else task["reason"]
                 return f"stream did not arm ({reason})"
             time.sleep(0.01)
+        if self.stop.is_set():  # stop_arm while arming: hand back before any chunk.
+            if barrier is not None:
+                barrier.abort()  # Every peer calls its start off too: no robot gets a chunk.
+            self._execution.finish_task(task_id)
+            return "stopped"
         if barrier is not None:
             try:  # Released together; inside the session's first-chunk timeout.
                 barrier.wait(timeout=profile["first_chunk_timeout"] / 2)
             except threading.BrokenBarrierError:
                 self._cancel(task_id)
-                return "another robot did not arm"
+                return "stopped" if self.stop.is_set() else "another robot did not arm"
         plan_start = next_check = watch.send_at = time.monotonic()
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
@@ -814,7 +874,22 @@ class ArmLauncher:
         self._lifecycle = threading.Lock()
         self._running: str | None = None  # The running motion's skill (and tool-stream) name.
         self._launched: Sequence[SonicArm] = ()  # The running motion's arms.
+        self._motion: threading.Thread | None = None  # The running motion's thread.
         super().__init__(*args, **kwargs)
+
+    def _retreat_before_stop(self) -> None:
+        """For the host's Module.stop(): stop a running motion and wait for its retreat.
+
+        Best-effort, so the native planner never takes over a raised arm; the coordinator may stop
+        the execution workers concurrently.
+        """
+        with self._lifecycle:
+            motion = self._motion if self._running is not None else None
+            if motion is not None:
+                for arm in self._launched:
+                    arm.stop.set()
+        if motion is not None:
+            motion.join(timeout=_STOP_JOIN_S)
 
     def _request_stop(self) -> str:
         with self._lifecycle:
@@ -852,9 +927,16 @@ class ArmLauncher:
             for arm in selected:
                 arm.reset()
             self._launched = selected
-            threading.Thread(
+            self._motion = threading.Thread(
                 target=self._finish, args=(tool, work, selected), name=f"arm-{tool}", daemon=True
-            ).start()
+            )
+            try:
+                self._motion.start()
+            except BaseException:
+                self.stop_tool(tool)
+                self._running = None
+                self._launched = ()
+                raise
         return f"{tool} started; a tool update reports the result. Call stop_arm to stop early."
 
     def _finish(self, tool: str, work: Callable[[], SkillResult], arms: Sequence[SonicArm]) -> None:
@@ -887,10 +969,13 @@ class SonicArmSkillContainer(ArmLauncher, Module):
 
     config: SonicArmSkillConfig
     feedback: In[SonicFeedback]
+    color_image: In[Image]
     _execution: SonicArmExecutionSpec
 
     def __init__(self, **kwargs: Any) -> None:
         self._arm: SonicArm | None = None
+        self._kinematics: ArmKinematics | None = None
+        self._vl: VlModel | None = None
         super().__init__(**kwargs)
 
     def _arms(self) -> Sequence[SonicArm]:
@@ -902,11 +987,15 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         checker = None
         if self.config.collision_model_path is not None:
             checker = ArmCollisionChecker(self.config.collision_model_path)
+            self._kinematics = ArmKinematics(self.config.collision_model_path)
+        if self.config.vl_model is not None:
+            self._vl = OpenAIVlModel(model_name=self.config.vl_model)
         self._arm = SonicArm("g1", self.config, self._execution, encoder, checker)
         super().start()
 
     @rpc
     def stop(self) -> None:
+        self._retreat_before_stop()
         super().stop()
 
     @rpc
@@ -1022,6 +1111,69 @@ class SonicArmSkillContainer(ArmLauncher, Module):
 
         return self._launch("perform_gesture", prepare)
 
+    @skill(uses=[CAP_MOVEMENT], lifecycle="background")
+    def point_at(self, azimuth_deg: float, elevation_deg: float, hold_seconds: float = 2.0) -> str:
+        """Point the straight left arm in a direction, hold for hold_seconds, bring it back, then hand control back.
+
+        Directions are relative to the torso: azimuth 0 = straight ahead, positive = the robot's
+        left; elevation 0 = horizontal, positive = up. Requests must lie within azimuth -35 to 110
+        and elevation -75 to 75 degrees. Pointing low and close to straight ahead, or far to the
+        right, may be refused when the arm would pass near the body or cannot reach; the refusal
+        says why, and nothing moves. The arm is aimed from the shoulder within 3 degrees. Slow
+        (peak 0.47 rad/s), 10-30 s plus the hold. Returns at once; a tool update reports the result
+        with the achieved direction.
+
+        Args:
+            azimuth_deg: -35 to 110; positive is to the robot's left.
+            elevation_deg: -75 to 75; positive is up.
+            hold_seconds: How long to hold the pointing pose, 1-20 s.
+        """
+
+        def prepare() -> Callable[[], SkillResult]:
+            for name, value, (low, high) in (
+                ("azimuth_deg", azimuth_deg, POINT_AZIMUTH_DEG),
+                ("elevation_deg", elevation_deg, POINT_ELEVATION_DEG),
+            ):
+                if not math.isfinite(value) or not low <= value <= high:
+                    raise ValueError(
+                        f"{name} must be within {low:g}..{high:g}: outside the pointing cone"
+                    )
+            _check_hold(hold_seconds)
+            if self._arm is None or self._arm._checker is None or self._kinematics is None:
+                raise RuntimeError(_NO_ARM_MODEL)
+            label = f"point_at({azimuth_deg:g}, {elevation_deg:g})"
+            return lambda: self._point(label, azimuth_deg, elevation_deg, hold_seconds, {})
+
+        return self._launch("point_at", prepare)
+
+    @skill(uses=[CAP_MOVEMENT], lifecycle="background")
+    def point_at_object(self, description: str, hold_seconds: float = 2.0) -> str:
+        """Point the straight left arm at an object the head camera sees, hold for hold_seconds, bring it back, then hand control back.
+
+        A vision model finds the description in the current head-camera image, and the arm points
+        at the largest match, taken as 2 m away along its camera ray. The head camera looks at the
+        floor about 0.3-2 m ahead; objects above about waist height may be out of view. If nothing
+        matches or the vision model fails, nothing moves. Pointing can still be refused near the
+        body, as for point_at. Returns at once; a tool update reports the result with the object's
+        box and direction.
+
+        Args:
+            description: What to point at, e.g. "red box".
+            hold_seconds: How long to hold the pointing pose, 1-20 s.
+        """
+
+        def prepare() -> Callable[[], SkillResult]:
+            if self._vl is None:
+                raise RuntimeError("point_at_object is disabled: no vl_model configured")
+            if self._arm is None or self._arm._checker is None or self._kinematics is None:
+                raise RuntimeError(_NO_ARM_MODEL)
+            _check_hold(hold_seconds)
+            if not description.strip():
+                raise ValueError("description must not be empty")
+            return lambda: self._point_at_object(description, hold_seconds)
+
+        return self._launch("point_at_object", prepare)
+
     @skill
     def stop_arm(self) -> str:
         """Stop the running arm motion: the arm returns smoothly to where it started, then control goes back to SONIC's planner.
@@ -1029,6 +1181,84 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         The stopped motion's tool update reports how far it got.
         """
         return self._request_stop()
+
+    def _point_at_object(self, description: str, hold_seconds: float) -> SkillResult:
+        """Find the object, aim at it, then run point_at's path. Runs on the motion thread: the
+        vision call can take seconds, and a stop_arm meanwhile is honoured after encoding."""
+        assert self._vl is not None and self._kinematics is not None
+        try:
+            image = self.color_image.get_next(timeout=_FRAME_TIMEOUT_S)
+        except Exception as exc:
+            raise RuntimeError(
+                f"no camera frame within {_FRAME_TIMEOUT_S:g} s; nothing sent"
+            ) from exc
+        if (image.width, image.height) != HEAD_CAMERA_SIZE:
+            raise RuntimeError(
+                f"camera frame is {image.width}x{image.height}, not the calibrated "
+                f"{HEAD_CAMERA_SIZE[0]}x{HEAD_CAMERA_SIZE[1]}; nothing sent"
+            )
+        try:
+            boxes = query_boxes(self._vl, image, description, self.config.vl_box_scale)
+        except Exception as exc:
+            raise RuntimeError(
+                f"vision model {self.config.vl_model} failed: {exc}; nothing sent"
+            ) from exc
+        if not boxes:
+            raise RuntimeError(f"found no '{description}' in the camera image; nothing sent")
+        label, x1, y1, x2, y2 = max(boxes, key=lambda b: (b[3] - b[1]) * (b[4] - b[2]))
+        # The shoulder sits on torso_link, so any pose gives its origin.
+        shoulder = self._kinematics.shoulder(np.zeros(29))
+        azimuth, elevation = (
+            round(v, 1) for v in aim_from_pixel((x1 + x2) / 2, (y1 + y2) / 2, shoulder)
+        )
+        (az_low, az_high), (el_low, el_high) = POINT_AZIMUTH_DEG, POINT_ELEVATION_DEG
+        if not (az_low <= azimuth <= az_high and el_low <= elevation <= el_high):
+            raise RuntimeError(
+                f"the {description} is at azimuth {azimuth:.1f}, elevation {elevation:.1f} deg, "
+                "outside the pointing cone; nothing sent"
+            )
+        extra = {
+            "label": label,
+            "box_px": [round(v) for v in (x1, y1, x2, y2)],
+            "direction_deg": [azimuth, elevation],
+        }
+        return self._point(
+            f"point_at_object('{description}')", azimuth, elevation, hold_seconds, extra
+        )
+
+    def _point(
+        self,
+        label: str,
+        azimuth_deg: float,
+        elevation_deg: float,
+        hold_seconds: float,
+        extra: dict[str, Any],
+    ) -> SkillResult:
+        """point_at's motion: solve the arm from the measured pose, run it, report the directions."""
+        kinematics = self._kinematics
+        assert kinematics is not None
+        solved: list[NDArray[np.float64]] = []
+
+        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+            # Solved from the measured pose, so the waist and wrists are the robot's own.
+            goal = base.copy()
+            goal[_LEFT_ARM_TARGET] = kinematics.solve(base, azimuth_deg, elevation_deg)
+            solved.append(goal)
+            return [Keyframe(goal, hold_seconds)]
+
+        def report_extra(base: NDArray[np.float64]) -> dict[str, Any]:
+            return {
+                **extra,
+                "requested_direction_deg": [azimuth_deg, elevation_deg],
+                "achieved_direction_deg": [round(v, 1) for v in kinematics.direction(solved[-1])],
+            }
+
+        allowed = pose_margins(
+            self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
+        )
+        return self._run(
+            label, keyframes_of, allowed, require_check=True, report_extra=report_extra
+        )
 
     def _run_move(self, move: ArmMove) -> SkillResult:
         return self._run(

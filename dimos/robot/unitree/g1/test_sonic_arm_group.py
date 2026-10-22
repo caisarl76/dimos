@@ -401,3 +401,29 @@ def test_one_job_is_the_single_arm_path(arms, dual_executions, mocker):
     assert no_pose(dual_executions[1][1])
     with pytest.raises(ValueError, match="the arm is already there"):  # Raised as it is.
         run_arms([swing(arms[0], degrees=0.0)])
+
+
+@pytest.mark.parametrize("late", [0, 1])
+def test_both_stop_while_one_arms_sends_no_chunk_to_either(arms, dual_executions, mocker, late):
+    """A stop while the late arm arms, the other already armed and waiting: no robot gets a chunk."""
+    early = arms[1 - late]
+    real = arms[late]._execution.start_task
+    submits = [mocker.spy(arm._execution, "submit_chunk") for arm in arms]
+
+    def start_then_stop():
+        wait_until(lambda: (t := task(early)) is not None and t["phase"] == "waiting_for_chunk")
+        started = real()
+        for arm in arms:  # What stop_arm does to a joint start's arms.
+            arm.stop.set()
+        return started
+
+    mocker.patch.object(arms[late]._execution, "start_task", side_effect=start_then_stop)
+    with feeding(arms), pytest.raises(RuntimeError) as raised:
+        run_arms([swing(arm) for arm in arms])
+    assert str(raised.value) == (
+        "222: stopped on request; nothing sent; 223: stopped on request; nothing sent"
+    )
+    assert [s.call_count for s in submits] == [0, 0]
+    assert all(planner_token_only(peer) for peer in peers(dual_executions))
+    for arm in arms:
+        assert task(arm)["handback_confirmed"], task(arm)

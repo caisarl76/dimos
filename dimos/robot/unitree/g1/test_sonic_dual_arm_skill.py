@@ -304,6 +304,26 @@ def test_refusal_never_releases_the_running_motion(real_launch_skill, mocker):
     assert stop_tool.call_count == 1
 
 
+def test_module_stop_mid_motion_retreats_both_and_waits_for_the_update(real_launch_skill, mocker):
+    module, executions = real_launch_skill
+    submits = [mocker.spy(execution, "submit_chunk") for execution, _ in executions]
+    updates = mocker.spy(module, "tool_update")
+    with feeding(module._arms()):
+        module.move_upper_body("both", "left_arm_forward", 20.0)
+        wait_until(lambda: all(s.call_count == 1 for s in submits))  # Both streams armed.
+        time.sleep(0.4)  # Mid-motion, past the lead-in blend.
+        module.stop()
+        # stop() returned only after both retreats and the motion's own final update.
+        assert all(arm.stop.is_set() for arm in module._arms())
+        assert [[c.args[1] for c in s.call_args_list] for s in submits] == [[0, 1], [0, 1]]
+        assert updates.call_count == 1
+    first, second = json.loads(updates.call_args.args[1])["message"].split("; 223: ")
+    assert "stopped early" in first and "stop requested" in first, first
+    assert "stopped early" in second and "stop requested" in second, second
+    for arm in module._arms():
+        assert task(arm)["handback_confirmed"], task(arm)
+
+
 def test_dual_blueprints_set_only_known_global_config_fields() -> None:
     for bp in (unitree_g1_sonic_arm_dual, unitree_g1_sonic_arm_dual_agentic):
         assert set(bp.global_config_overrides) <= set(GlobalConfig.model_fields)
