@@ -144,19 +144,27 @@ def test_dual_prompt_names_only_dual_skills():
     assert named and named <= skills, named - skills
 
 
-def test_single_robot_command_ignores_the_other_robot(inline):
+@pytest.mark.parametrize("robot", ["222", 222])  # `dimos mcp call --arg robot=222` sends an int.
+def test_single_robot_command_ignores_the_other_robot(inline, robot):
     module, executions = inline
     peer = executions[1][1]
     peer.pause_feedback.set()
     try:
         wait_until(lambda: module._execution_223.get_feedback() is None)
         with feeding(module._arms()):
-            result = module.move_upper_body("222", "left_arm_forward", 20.0)
+            result = module.move_upper_body(robot, "left_arm_forward", 20.0)
     finally:
         peer.pause_feedback.clear()
     assert result.message.startswith("left_arm_forward reached"), result
     assert "returned" in result.message and "223" not in result.metadata
     assert no_pose(peer)
+
+
+def test_unknown_robot_refuses_before_sending(inline):
+    module, executions = inline
+    with pytest.raises(ValueError, match=re.escape("robot must be one of ['222', '223', 'both']")):
+        module.move_upper_body(224, "left_arm_forward", 20.0)
+    assert all(no_pose(peer) for _, peer in executions)
 
 
 def test_gesture_both_through_the_container(inline):

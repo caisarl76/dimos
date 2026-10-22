@@ -213,11 +213,12 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
 
     def _select(self, robot: str) -> list[SonicArm]:
         """The arms a command targets; an unknown robot selects all, and validation refuses it."""
-        if robot in self._by_robot:
-            return [self._by_robot[robot]]
+        if str(robot) in self._by_robot:
+            return [self._by_robot[str(robot)]]
         return list(self._arms())
 
     def _launch_move(self, tool: str, robot: str, make_move: Callable[[], ArmMove]) -> str:
+        robot = str(robot)  # `dimos mcp call --arg robot=223` sends the integer 223.
         selected = self._select(robot)
 
         def prepare() -> Callable[[], SkillResult]:
