@@ -85,7 +85,7 @@ than 2 m, and obstacles beyond a single box.
   (below) found a shorter falloff helps only in open space.
 - A goal is sometimes refused by the pc2 relay from its own state ("rejected or
   admission closed", twice on the robot); the retry after the cancel works. The
-  cause is not identified yet: the relay now logs a reason, from attempt 11.
+  cause is not identified yet: the relay now logs a reason, from attempt 12.
 - MovementManager cancels a running goal on any teleop message; the goal does not
   resume when teleop stops.
 
@@ -97,10 +97,15 @@ native source files all matched
 ([closeout-20261021](/docs/artifacts/g1_navigation_sonic_20261013/hardware/closeout-20261021/closeout.json)).
 Sessions 2026-10-21-6 and -8 ran after it, for the obstacle cases.
 
-**pc2 state, 2026-10-21 evening.** Re-provisioning (attempt 11, `00a4238d2`, the
-merged code with refusal reasons) was interrupted when pc2 went offline. Attempt
-10 is kept as `.attempt10-no-refusal-reasons`, but its image was removed, so pc2
-has no runnable stack until attempt 11 completes.
+**pc2 state, 2026-10-22.** Attempt 11 (`00a4238d2`) finished provisioning on
+2026-10-21 but pc2 went offline before a check, and its source predates the relay
+resend, the agent skills and the deploy move; it is kept as `.attempt11-old-source`.
+Attempt 12 (`7320a98e1`, the moved deploy layout) is installed: native tests 41/42
+(the FK fixture test, as before), smoke check passed, fingerprints, original source
+and shared controllers unchanged. Its first `--check-only`, right after boot, blocked
+on unpinned clocks and on live `rt/lowcmd` traffic (7,884 samples in 8 s from two
+writers) with no SONIC process on pc2: another controller was commanding the motors
+([summary](/docs/artifacts/g1_navigation_sonic_20261013/pc2-package/pc2-provision/summary.json)).
 
 ## Early results, 2026-10-09 to 2026-10-12
 
@@ -883,7 +888,7 @@ In both sessions one goal was refused at pc2 before the workstation peer saw it,
 the retry after the cancel worked. Every refusal now names its reason: the peer and
 relay log it and the execution's error says "(peer refused)", "(request changed)"
 or "(phase ...)" (`8e91e3220`). The relay and execution part reaches pc2 with
-attempt 11.
+attempt 12.
 
 ### Planner detours in open space, 2026-10-21
 
