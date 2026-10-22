@@ -427,3 +427,29 @@ def test_both_stop_while_one_arms_sends_no_chunk_to_either(arms, dual_executions
     assert all(planner_token_only(peer) for peer in peers(dual_executions))
     for arm in arms:
         assert task(arm)["handback_confirmed"], task(arm)
+
+
+def test_each_arm_samples_its_own_hold_until_a_peer_abort(arms, mocker):
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+    )
+
+    def stamped(s):  # The feeder's time since this arm's own chunk 0, in the left wrist pitch.
+        return {20: 0.01 * s}
+
+    def knee(s):  # 222 leaves its envelope mid-hold.
+        return {20: 0.01 * s, 3: 0.2 if s > 1.6 else 0.0}
+
+    with feeding(arms, extra=(knee, stamped)):
+        result = run_arms([swing(arm, hold=2.0) for arm in arms])
+    assert "stopped early: 222: left_knee" in result.message, result
+    for arm in arms:
+        watch = arm._watch
+        assert watch is not None and watch.hold_rows is not None
+        assert watch.plan_start == watch.send_at
+        times = [(q[20] - watch.base[20]) / 0.01 for q in watch.hold_q]
+        assert result.metadata[arm.name]["hold_samples"] == len(times) > 0, arm.name
+        assert watch.hold_rows[0] / 50 - 0.03 <= min(times), arm.name
+        assert max(times) <= 1.6 + 0.1, arm.name  # Neither collects after the abort.

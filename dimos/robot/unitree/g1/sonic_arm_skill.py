@@ -66,12 +66,12 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     ArmKinematics,
     Keyframe,
     SonicEncoder,
-    aim_from_pixel,
     group_margins,
     keyframe_plan,
     pose_margins,
     retreat_poses,
     retreat_route,
+    stroke_plan,
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
@@ -224,6 +224,10 @@ def _check_hold(hold_seconds: float) -> None:
         raise ValueError(f"hold_seconds must be within {low:g}..{high:g}")
 
 
+# Extra report fields from the start pose and the body_q samples held at the deepest keyframe.
+ReportExtra = Callable[[NDArray[np.float64], NDArray[np.float64] | None], dict[str, Any]]
+
+
 class ArmMove(NamedTuple):
     """What a skill asks of an arm: SonicArm.prepare's label, keyframes, envelope and check mode."""
 
@@ -360,6 +364,9 @@ class _Watch:
     return_dq: tuple[float, int] = (0.0, -1)
     abort: str | None = None
     overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
+    hold_rows: tuple[int, int] | None = None  # token-plan rows of the deepest keyframe's hold
+    plan_start: float | None = None  # monotonic time of the first chunk's row 0
+    hold_q: list[NDArray[np.float64]] = field(default_factory=list)  # body_q inside the hold
     # Start timing, all on the execution host's monotonic clock: just before and just after the
     # chunk-0 submit_chunk call, and the receipt time of the first sample that moved a planned joint
     # _ONSET_RAD from onset_q, the latest sample received before the send.
@@ -393,7 +400,7 @@ class _Prepared:
     watch: _Watch
     keyframes: int
     encode_s: float
-    report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None
+    report_extra: ReportExtra | None
 
 
 class SonicArm:
@@ -463,6 +470,16 @@ class SonicArm:
                     watch.abort = f"{_JOINTS[j]} left its envelope ({q[j]:+.3f} rad)"
                 elif dq[k] > watch.max_dq:
                     watch.abort = f"{_JOINTS[k]} speed {dq[k]:.2f} rad/s > {watch.max_dq}"
+            # After the envelope check, so the sample that trips it is not collected. A peer's
+            # abort reaches watch.abort through _stream, and stops collection on this arm too.
+            if (
+                watch.abort is None
+                and not self.stop.is_set()
+                and watch.plan_start is not None
+                and watch.hold_rows is not None
+                and watch.hold_rows[0] <= (received - watch.plan_start) * RATE <= watch.hold_rows[1]
+            ):
+                watch.hold_q.append(body)
 
     def prepare(
         self,
@@ -471,7 +488,7 @@ class SonicArm:
         allowed: NDArray[np.float64],
         *,
         require_check: bool,
-        report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
+        report_extra: ReportExtra | None = None,
     ) -> _Prepared:
         """Plan, check and encode a move. Raises with nothing sent."""
         if require_check and self._checker is None:
@@ -547,7 +564,10 @@ class SonicArm:
             raise RuntimeError(
                 "the execution profile's observation age and duration must cover the plan",
             )
-        delta = deltas[np.argmax(np.linalg.norm(deltas, axis=1))]
+        deepest = int(np.argmax(np.linalg.norm(deltas, axis=1)))
+        delta = deltas[deepest]
+        seg, nxt = kplan.segments[deepest], kplan.segments[deepest + 1]
+        hold = (pad + seg.end - 1 + 25, pad + nxt.start - 25)
         allowed = allowed + np.abs(deltas).max(axis=0)
         token_bound = profile["token_bound"]
         for start, end in chunks:  # What the session would reject is refused with nothing sent.
@@ -569,6 +589,7 @@ class SonicArm:
                 max_dq=self.config.max_dq,
                 delta=delta,
                 moving=np.any(deltas != 0, axis=0),
+                hold_rows=hold if hold[0] <= hold[1] else None,
             ),
             keyframes=len(keyframes),
             encode_s=encode_s,
@@ -663,8 +684,12 @@ class SonicArm:
             "encode_s": round(prepared.encode_s, 2),
             "journal_path": self._execution.get_status()["journal_path"],
         }
+        with self._lock:
+            samples = list(watch.hold_q)
+        hold_q = np.asarray(samples) if samples else None
+        report["hold_samples"] = len(samples)
         if prepared.report_extra is not None:
-            report.update(prepared.report_extra(base))
+            report.update(prepared.report_extra(base, hold_q))
         if len(moved) == 1:  # move_upper_body: the swing in degrees, as before.
             report["reached_deg"] = round(math.degrees(watch.reached * abs(delta[moved[0]])), 1)
             report["planned_deg"] = round(math.degrees(abs(delta[moved[0]])), 1)
@@ -725,7 +750,9 @@ class SonicArm:
             except threading.BrokenBarrierError:
                 self._cancel(task_id)
                 return "stopped" if self.stop.is_set() else "another robot did not arm"
-        plan_start = next_check = watch.send_at = time.monotonic()
+        plan_start = next_check = time.monotonic()
+        with self._lock:  # Once, here: past any joint-start barrier, never on a retreat.
+            watch.send_at = watch.plan_start = plan_start
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
         watch.ack_at = time.monotonic()
@@ -1148,14 +1175,16 @@ class SonicArmSkillContainer(ArmLauncher, Module):
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
     def point_at_object(self, description: str, hold_seconds: float = 2.0) -> str:
-        """Point the straight left arm at an object the head camera sees, hold for hold_seconds, bring it back, then hand control back.
+        """Point the left forearm at an object the head camera sees, hold for hold_seconds, bring it back, then hand control back.
 
-        A vision model finds the description in the current head-camera image, and the arm points
-        at the largest match, taken as 2 m away along its camera ray. The head camera looks at the
-        floor about 0.3-2 m ahead; objects above about waist height may be out of view. If nothing
-        matches or the vision model fails, nothing moves. Pointing can still be refused near the
-        body, as for point_at. Returns at once; a tool update reports the result with the object's
-        box and direction.
+        A vision model finds the description in the current head-camera image, and the forearm
+        points at the floor under the largest match's centre, almost anywhere the head camera sees; low
+        and to the right, near the hip, it may refuse. The head
+        camera looks at the floor about 0.3-2 m ahead; objects above about waist height may be out
+        of view, and objects on a table may be aimed slightly behind themselves. If nothing matches
+        or the vision model fails, nothing moves. Refused, with the reason, if no natural pose
+        points there or every such pose comes near the body. Returns at once; a tool update reports
+        the result with the object's box and the planned and measured aim errors.
 
         Args:
             description: What to point at, e.g. "red box".
@@ -1183,8 +1212,9 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         return self._request_stop()
 
     def _point_at_object(self, description: str, hold_seconds: float) -> SkillResult:
-        """Find the object, aim at it, then run point_at's path. Runs on the motion thread: the
-        vision call can take seconds, and a stop_arm meanwhile is honoured after encoding."""
+        """Find the object, then aim the forearm at it. Runs on the motion thread: the vision
+        call and the forearm solve can take seconds, and a stop_arm meanwhile is honoured after
+        encoding."""
         assert self._vl is not None and self._kinematics is not None
         try:
             image = self.color_image.get_next(timeout=_FRAME_TIMEOUT_S)
@@ -1206,24 +1236,62 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         if not boxes:
             raise RuntimeError(f"found no '{description}' in the camera image; nothing sent")
         label, x1, y1, x2, y2 = max(boxes, key=lambda b: (b[3] - b[1]) * (b[4] - b[2]))
-        # The shoulder sits on torso_link, so any pose gives its origin.
-        shoulder = self._kinematics.shoulder(np.zeros(29))
-        azimuth, elevation = (
-            round(v, 1) for v in aim_from_pixel((x1 + x2) / 2, (y1 + y2) / 2, shoulder)
+        extra = {"label": label, "box_px": [round(v) for v in (x1, y1, x2, y2)]}
+        return self._point_forearm(
+            f"point_at_object('{description}')", (x1 + x2) / 2, (y1 + y2) / 2, hold_seconds, extra
         )
-        (az_low, az_high), (el_low, el_high) = POINT_AZIMUTH_DEG, POINT_ELEVATION_DEG
-        if not (az_low <= azimuth <= az_high and el_low <= elevation <= el_high):
-            raise RuntimeError(
-                f"the {description} is at azimuth {azimuth:.1f}, elevation {elevation:.1f} deg, "
-                "outside the pointing cone; nothing sent"
+
+    def _point_forearm(
+        self, label: str, u: float, v: float, hold_seconds: float, extra: dict[str, Any]
+    ) -> SkillResult:
+        """point_at_object's motion: aim the forearm at pixel (u, v)'s floor point from the
+        measured pose, run it, report the planned and held aim errors."""
+        assert self._arm is not None
+        kinematics, checker = self._kinematics, self._arm._checker
+        assert kinematics is not None and checker is not None
+        solved: list[tuple[NDArray[np.float64], float, NDArray[np.float64]]] = []
+
+        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+            point, distance = kinematics.aim_point(base, u, v)
+            q4 = kinematics.solve_forearm(
+                base,
+                point,
+                lambda pose: checker.first_contact(stroke_plan(base, pose - base), start=base),
             )
-        extra = {
-            "label": label,
-            "box_px": [round(v) for v in (x1, y1, x2, y2)],
-            "direction_deg": [azimuth, elevation],
-        }
-        return self._point(
-            f"point_at_object('{description}')", azimuth, elevation, hold_seconds, extra
+            goal = base.copy()
+            goal[_LEFT_ARM_TARGET] = q4
+            solved.append((point, distance, goal))
+            return [Keyframe(goal, hold_seconds)]
+
+        def report_extra(
+            base: NDArray[np.float64], hold_q: NDArray[np.float64] | None
+        ) -> dict[str, Any]:
+            point, distance, goal = solved[-1]
+            planned = round(kinematics.forearm_error(goal, point), 2)
+            wrist_x = round(float(kinematics.forearm_points(goal)[1][0]), 3)
+            measured = (
+                None
+                if hold_q is None
+                else round(
+                    float(np.median([kinematics.forearm_error(q, point) for q in hold_q])), 2
+                )
+            )
+            return {
+                "mode": "forearm",
+                **extra,
+                "aim_point_m": [round(float(c), 3) for c in point],
+                "aim_distance_m": round(float(distance), 2),
+                "pose_deg": [round(math.degrees(a), 1) for a in goal[_LEFT_ARM_TARGET]],
+                "planned_aim_error_deg": planned,
+                "planned_wrist_x_m": wrist_x,
+                "measured_aim_error_deg": measured,
+            }
+
+        allowed = pose_margins(
+            self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
+        )
+        return self._run(
+            label, keyframes_of, allowed, require_check=True, report_extra=report_extra
         )
 
     def _point(
@@ -1246,7 +1314,9 @@ class SonicArmSkillContainer(ArmLauncher, Module):
             solved.append(goal)
             return [Keyframe(goal, hold_seconds)]
 
-        def report_extra(base: NDArray[np.float64]) -> dict[str, Any]:
+        def report_extra(
+            base: NDArray[np.float64], hold_q: NDArray[np.float64] | None
+        ) -> dict[str, Any]:
             return {
                 **extra,
                 "requested_direction_deg": [azimuth_deg, elevation_deg],
@@ -1272,7 +1342,7 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         allowed: NDArray[np.float64],
         *,
         require_check: bool,
-        report_extra: Callable[[NDArray[np.float64]], dict[str, Any]] | None = None,
+        report_extra: ReportExtra | None = None,
     ) -> SkillResult:
         assert self._arm is not None
         return self._arm.execute(

@@ -49,7 +49,6 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     RATE,
     Keyframe,
-    aim_from_pixel,
     arm_poses,
     group_margins,
     keyframe_plan,
@@ -1154,7 +1153,7 @@ def test_report_extra_is_merged_into_the_metadata(skill):
     allowed = pose_margins(0.15, 0.45, 0.35)
     seen = []
 
-    def extra(base):
+    def extra(base, hold_q):
         seen.append(base.copy())
         return {"direction": "left"}
 
@@ -1171,6 +1170,88 @@ def test_report_extra_is_merged_into_the_metadata(skill):
     )
     assert result.metadata["direction"] == "left" and result.metadata["motion"] == "probe"
     assert len(seen) == 1 and seen[0].shape == (29,)
+
+
+def _stamped(t):
+    """Telemetry that carries its own feeder time (in 0.1 s units) in the moving elbow joint."""
+    q = np.zeros(29)
+    q[15] = 0.1 * t
+    return q
+
+
+def _hold_run(module, mocker, body_q, report_extra):
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+    )
+    submit = mocker.spy(module._execution, "submit_chunk")
+    t0 = time.monotonic()
+    result = call_with_feed(
+        module,
+        lambda: module._run(
+            "probe",
+            lambda base: [Keyframe(base + 0.3 * np.eye(29)[15], 2.0)],
+            pose_margins(0.15, 0.45, 0.35),
+            require_check=False,
+            report_extra=report_extra,
+        ),
+        body_q,
+    )
+    return result, t0, submit.call_args_list[0].args[2]
+
+
+def test_hold_samples_come_only_from_the_hold_window(skill, mocker):
+    module, _ = skill
+    seen = []
+    result, t0, plan_start = _hold_run(
+        module, mocker, _stamped, lambda base, hold_q: seen.append(hold_q) or {}
+    )
+    first, last = module._arm._watch.hold_rows
+    times = [t0 + 10 * q[15] for q in seen[0]]
+    assert result.metadata["hold_samples"] == len(times) > 0
+    assert plan_start + first / 50 - 0.03 <= min(times)
+    assert max(times) <= plan_start + last / 50 + 0.03
+
+
+def test_no_hold_samples_after_a_stop(skill, mocker):
+    module, _ = skill
+    seen = []
+
+    def knee(t):
+        q = _stamped(t)
+        q[3] = 0.2 if t > 0.2 else 0.0
+        return q
+
+    result, _, _ = _hold_run(module, mocker, knee, lambda base, hold_q: seen.append(hold_q) or {})
+    assert "stopped early" in result.message, result
+    assert result.metadata["hold_samples"] == 0 and seen == [None]
+
+
+def test_samples_stop_at_a_mid_hold_stop(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+    )
+    updates = mocker.spy(module, "tool_update")
+    t0 = []
+
+    def stamped(t):
+        t0 or t0.append(time.monotonic() - t)  # feeder start, in wall time
+        return _stamped(t)
+
+    with feeding(module, stamped):
+        module.move_left_arm_pose("left_arm_side_horizontal", hold_seconds=2.0)
+        wait_until(lambda: module._arm._watch is not None)
+        watch = module._arm._watch  # The motion clears it when done.
+        wait_until(lambda: len(watch.hold_q) >= 5)
+        stopped = time.monotonic()
+        module.stop_arm()
+        wait_until(lambda: updates.call_count == 1)
+    arrivals = [t0[0] + 10 * q[15] for q in watch.hold_q]
+    assert len(arrivals) >= 5 and max(arrivals) <= stopped
 
 
 def test_long_plans_split_into_two_chunks_at_the_hold():
@@ -1260,12 +1341,40 @@ def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
 
 
 class FakeKinematics:
-    """solve returns a fixed reachable pose, or raises what the real solve raises."""
+    """solve and solve_forearm return a fixed reachable pose, or raise what the real ones raise.
+
+    forearm_error reads 100 * the left wrist pitch (motor 20) of the pose, so telemetry sets it.
+    """
 
     POSE = (-1.2, 0.5, 0.0, 1.35)
+    AIM = np.array([1.2, 0.1, -0.9])
 
     def __init__(self, reachable=True):
-        self.reachable, self.bases = reachable, []
+        self.reachable, self.bases, self.pixels, self.errors = reachable, [], [], []
+
+    def aim_point(self, q, u, v):
+        self.bases.append(np.array(q))
+        self.pixels.append((u, v))
+        return self.AIM.copy(), 1.68
+
+    def solve_forearm(self, q, point, path_clear):
+        assert np.array_equal(point, self.AIM)
+        if not self.reachable:
+            raise ValueError(
+                "the left forearm cannot aim at (1.20, 0.10, -0.90) m: no natural pose"
+            )
+        pose = np.array(q, np.float64)
+        pose[15:19] = self.POSE
+        assert path_clear(pose) is None
+        return np.array(self.POSE)
+
+    def forearm_points(self, q):
+        return np.zeros(3), np.array([0.12345, 0.2, -0.1])
+
+    def forearm_error(self, q, point):
+        assert np.array_equal(point, self.AIM)
+        self.errors.append(100 * float(q[20]))
+        return self.errors[-1]
 
     def solve(self, q, azimuth_deg, elevation_deg):
         self.bases.append(np.array(q))
@@ -1276,9 +1385,6 @@ class FakeKinematics:
     def direction(self, q):
         assert np.allclose(q[15:19], self.POSE)
         return (31.04, -19.96)
-
-    def shoulder(self, q):
-        return np.array([0.0, 0.15, 0.24])
 
 
 @pytest.mark.parametrize("az,el", [(-40.0, 0.0), (0.0, 80.0), (120.0, 0.0), (math.nan, 0.0)])
@@ -1387,13 +1493,11 @@ class FakeVl:
         return self.payload
 
 
-def seeing(module, mocker, payload, shoulder=None):
+def seeing(module, mocker, payload, kinematics=None):
     """The skill with a fake vision model, arm model and head-camera frame."""
     mocker.patch.object(module.config, "vl_model", "fake-vl")
     module._vl = FakeVl(payload)
-    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics()
-    if shoulder is not None:
-        mocker.patch.object(module._kinematics, "shoulder", lambda q: np.asarray(shoulder))
+    module._arm._checker, module._kinematics = FakeChecker(), kinematics or FakeKinematics()
     mocker.patch.object(module.color_image, "get_next", return_value=IMAGE_640x480)
 
 
@@ -1455,27 +1559,119 @@ def test_malformed_boxes_are_dropped_and_partial_ones_clipped():
     assert query_boxes(vl, IMAGE_640x480, "box") == [("d", 0.0, 10.0, 640.0, 20.0)]
 
 
-def test_point_at_object_points_at_the_largest_box(skill, mocker):
+def test_point_at_object_aims_the_forearm_at_the_largest_box(skill, mocker):
     module, _ = skill
+    raised = raised_start(module, mocker, pitch=-0.3)
     seeing(module, mocker, [["small", 300, 200, 320, 220], ["big box", 100.4, 300, 260, 420]])
     result = call_with_feed(
         module, lambda: module.point_at_object("box"), reaching(FakeKinematics.POSE)
     )
     assert "returned" in result.message, result
-    assert result.metadata["label"] == "big box"
-    assert result.metadata["box_px"] == [100, 300, 260, 420]
-    az, el = aim_from_pixel(180.2, 360.0, np.array([0.0, 0.15, 0.24]))
-    assert result.metadata["direction_deg"] == pytest.approx([az, el], abs=0.06)
-    assert result.metadata["requested_direction_deg"] == result.metadata["direction_deg"]
-    assert result.metadata["achieved_direction_deg"] == [31.0, -20.0]
+    kin = module._kinematics
+    assert kin.pixels == [(pytest.approx(180.2), 360.0)]
+    assert np.array_equal(kin.bases[0], raised)  # The measured start, not a rest pose.
+    assert module._arm._checker.calls == 2  # The solver's path check, then the plan's own.
+    meta = result.metadata
+    assert meta["mode"] == "forearm" and meta["label"] == "big box"
+    assert meta["box_px"] == [100, 300, 260, 420]
+    assert meta["aim_point_m"] == [1.2, 0.1, -0.9] and meta["aim_distance_m"] == 1.68
+    assert meta["pose_deg"] == [-68.8, 28.6, 0.0, 77.3]
+    assert meta["planned_aim_error_deg"] == 0.0
+    assert meta["planned_wrist_x_m"] == 0.123
+    assert meta["measured_aim_error_deg"] is None  # The fast plan's hold is too short to sample.
+    assert "direction_deg" not in meta and "requested_direction_deg" not in meta
 
 
-def test_point_at_object_outside_the_cone_sends_nothing(skill, mocker):
+def test_point_at_object_refusal_from_the_solver_sends_nothing(skill, mocker):
     module, peer = skill
-    seeing(module, mocker, [["box", 300, 200, 340, 240]], shoulder=[0.0, 0.0, 10.0])
-    with pytest.raises(RuntimeError, match=r"azimuth -?\d+\.\d, elevation -8\d\.\d deg.*cone"):
+    seeing(module, mocker, [["box", 300, 200, 340, 240]], FakeKinematics(reachable=False))
+    with pytest.raises(ValueError, match="no natural pose"):
         module.point_at_object("box")
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
+    assert module._execution.get_status()["task"] is None
+
+
+def test_point_at_object_reports_measured_error_from_hold_samples(skill, mocker):
+    module, _ = skill
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+    )
+    seeing(module, mocker, [["box", 300, 200, 340, 240]])
+
+    def body_q(t):  # Every fourth 10 ms tick an outlier: 20 deg; otherwise 1 deg.
+        q = np.zeros(29)
+        q[15:19] = 0.8 * np.asarray(FakeKinematics.POSE)
+        q[20] = 0.2 if int(t * 100) % 4 == 0 else 0.01
+        return q
+
+    result = call_with_feed(module, lambda: module.point_at_object("box", 2.0), body_q)
+    meta = result.metadata
+    planned, *samples = module._kinematics.errors  # The planned pose's error comes first.
+    assert planned == 0.0
+    assert meta["hold_samples"] == len(samples) > 10
+    assert 20.0 in samples and 1.0 in samples
+    assert meta["planned_aim_error_deg"] == 0.0
+    assert meta["measured_aim_error_deg"] == 1.0  # The median, not the mean.
+
+
+def at_idle(module, mocker):
+    """The measured pose is the robot's idle, with the real arm model and path check."""
+    real = module._execution.get_feedback
+    mocker.patch.object(
+        module._execution,
+        "get_feedback",
+        lambda: replace(real(), body_q=tuple(float(v) for v in ROBOT_IDLE)),
+    )
+    module._arm._checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
+    module._kinematics = sonic_arm_reference.ArmKinematics(SCENE)
+
+
+def idle_reaching(module, u, v):
+    """Telemetry at the robot's idle with the left arm 80% of the way to the solved pose."""
+    kin, checker = module._kinematics, module._arm._checker
+    point, _ = kin.aim_point(ROBOT_IDLE, u, v)
+    q4 = kin.solve_forearm(
+        ROBOT_IDLE,
+        point,
+        lambda pose: checker.first_contact(
+            stroke_plan(ROBOT_IDLE, pose - ROBOT_IDLE), start=ROBOT_IDLE
+        ),
+    )
+    q = ROBOT_IDLE.copy()
+    q[15:19] += 0.8 * (q4 - ROBOT_IDLE[15:19])
+    return lambda t: q
+
+
+@needs_scene
+def test_point_at_object_aims_the_forearm_at_the_floor_point(skill, mocker):
+    module, peer = skill
+    seeing(module, mocker, [["box", 300, 220, 340, 260]])
+    at_idle(module, mocker)
+    result = call_with_feed(
+        module, lambda: module.point_at_object("box"), idle_reaching(module, 320, 240)
+    )
+    assert "returned" in result.message, result
+    meta = result.metadata
+    print(meta)
+    assert meta["mode"] == "forearm"
+    assert meta["planned_aim_error_deg"] <= 3.0
+    assert meta["aim_distance_m"] == pytest.approx(1.68, abs=0.05)
+    assert len(meta["aim_point_m"]) == 3 and len(meta["pose_deg"]) == 4
+    assert any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+@needs_scene
+def test_point_at_object_right_edge_is_pointable(skill, mocker):
+    module, _ = skill
+    seeing(module, mocker, [["box", 600, 220, 640, 260]])  # Outside the old straight-arm cone.
+    at_idle(module, mocker)
+    result = call_with_feed(
+        module, lambda: module.point_at_object("box"), idle_reaching(module, 620, 240)
+    )
+    assert "returned" in result.message, result
+    assert result.metadata["planned_aim_error_deg"] <= 3.0
 
 
 def test_point_at_object_without_a_model_is_disabled(skill):
