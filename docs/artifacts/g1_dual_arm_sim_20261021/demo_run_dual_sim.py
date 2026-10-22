@@ -28,6 +28,7 @@ ENCODER = (
     "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/policy/sonic_v1_1/model_encoder.onnx"
 )
 SCENE = "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic/data/robot_model/model_data/g1/scene_43dof.xml"
+MODEL_DIR = "/home/jihun/.cache/huggingface/hub/models--nvidia--GEAR-SONIC/snapshots/9c0ff22b4ffec27c5392e8e284eb2f2df7a5b4e2"
 GENON = Path("/home/jihun/work/dimos_dev/.env.genon")
 PORTS = {"222": (15556, 15557), "223": (16556, 16557)}
 LEFT_ARM = slice(15, 19)
@@ -117,11 +118,18 @@ def call(tool: str, **args) -> dict:
 
 
 def standin(name: str, out: Path) -> subprocess.Popen:
+    """STANDIN=repo runs the in-repo dimos.robot.unitree.g1.sonic_sim_peer; otherwise standin/."""
     reference, feedback = PORTS[name]
+    repo = os.environ.get("STANDIN") == "repo"
+    program = (
+        ["-m", "dimos.robot.unitree.g1.sonic_sim_peer", "--model-dir", MODEL_DIR, "--scene", SCENE]
+        if repo
+        else ["sonic_sim_peer.py"]
+    )
     return subprocess.Popen(
         [
             PYTHON,
-            "sonic_sim_peer.py",
+            *program,
             "--name",
             f"g1_{name}",
             "--feedback",
@@ -131,7 +139,8 @@ def standin(name: str, out: Path) -> subprocess.Popen:
             "--log",
             str(out / f"sim_{name}.npz"),
         ],
-        cwd=HERE / "standin",
+        cwd=ROOT if repo else HERE / "standin",
+        env=env() if repo else None,
         stdout=open(out / f"standin_{name}.log", "w"),
         stderr=subprocess.STDOUT,
     )
@@ -162,7 +171,10 @@ def summary(npz: Path) -> dict:
 def main() -> None:
     out = Path(sys.argv[1]).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    if "def startup_on_floor" not in (HERE / "standin/sonic_sim_peer.py").read_text():
+    if (
+        os.environ.get("STANDIN") != "repo"
+        and "def startup_on_floor" not in (HERE / "standin/sonic_sim_peer.py").read_text()
+    ):
         raise SystemExit("standin/sonic_sim_peer.py is not the full simulator")
     if "No running DimOS instance" not in dimos("status", check=False):
         raise SystemExit("another DimOS instance is running; not touching it")
