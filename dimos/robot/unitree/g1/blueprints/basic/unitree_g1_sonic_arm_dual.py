@@ -14,17 +14,29 @@
 
 """Two G1s' left-arm skills from one workstation, over independently launched SONIC controllers.
 
-Runbook. Each G1 (222 on pc2_222, 223 on pc2_223) runs its guarded SONIC launcher, which binds
-telemetry on 127.0.0.1:5557 and reads references from 127.0.0.1:5556. Before `dimos run`:
+Runbook. Each G1's PC2 runs its guarded SONIC launcher, which binds telemetry on 127.0.0.1:5557
+and reads references from 127.0.0.1:5556. Use each PC2's ssh alias (today: 222 `pc2_222`, 223
+`pc2`). The camera publisher on 222 (/home/unitree/gumin/d435_color_publisher.py) binds
+0.0.0.0:5556: it must not run during a dual session.
 
-1. Start the controller on each PC2 and confirm planner idle.
+1. Start each controller and confirm planner idle, BEFORE the tunnels (the idle helper binds
+   127.0.0.1:5556; with a tunnel already holding it, it fails "Address already in use"):
+
+       223: cd ~/dimos-sonic-guard-pc2-223-20261014 && bash launch-guarded.sh --run
+            (checks the Jetson clocks itself)
+       222: sudo jetson_clocks
+            cd ~/dimos-sonic-guard-20261014 && bash launch-guarded.sh --run
+            (no clock check, hence jetson_clocks; not executable, hence bash; Dex3 hands initialise)
+       both, then: /home/unitree/dimos/.venv/bin/python start-idle-planner.py --start-idle-planner
+            and expect "Planner confirmed".
+
 2. Open the tunnels, one per robot (-R carries the PC2's reference port to this process, -L its
-   telemetry here). ExitOnForwardFailure makes ssh exit if the PC2's 5556 is still held (e.g. by
-   start-idle-planner.py) instead of silently running without the reference forward. ServerAlive* drops a dead link within
+   telemetry here). ExitOnForwardFailure makes ssh exit if the PC2's 5556 is still held instead
+   of silently running without the reference forward. ServerAlive* drops a dead link within
    ~10 s, so the robot's reference lease expires and DimOS sees stale feedback:
 
        ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:15556 -L 15557:127.0.0.1:5557 pc2_222
-       ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:16556 -L 16557:127.0.0.1:5557 pc2_223
+       ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:16556 -L 16557:127.0.0.1:5557 pc2
 
 3. Run, with the SONIC v1.1 encoder and the gear_sonic MuJoCo model for the path check:
 
@@ -32,17 +44,25 @@ telemetry on 127.0.0.1:5557 and reads references from 127.0.0.1:5556. Before `di
            --dualsonicarmskillcontainer.max-dq=2.0 \\
            --dualsonicarmskillcontainer.encoder-path=<deploy>/policy/sonic_v1_1/model_encoder.onnx \\
            --dualsonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
-       dimos mcp call move_upper_body --arg robot=both --arg motion=left_arm_forward --arg angle_deg=20
-       dimos mcp call perform_gesture --arg robot=222 --arg name=wave
+       dimos mcp call move_upper_body --json-args '{"robot": "both", "motion": "left_arm_forward", "angle_deg": 20}'
+       dimos mcp call perform_gesture --json-args '{"robot": "222", "name": "wave"}'
 
    max-dq 2.0 rad/s is the validated value (sim acceptance); the config default is 3.0.
+   (`--arg robot=223` also works: the container takes the integers 222/223 as the strings.)
 
-If a skill says "SONIC is not in confirmed planner idle" while the planner is idle, check the
-execution status from `dimos shell` (e.g. `app.g1_222.get_status()`: `subscriptions_ready`,
-`feedback_fresh`, `feedback_age_s`, `ready`); usually a tunnel forward is missing.
+4. Readiness check (`dimos shell` needs a TTY; this does not):
+
+       python -c "from dimos.porcelain.dimos import Dimos; app = Dimos.connect(); print(app.g1_222.get_status()); print(app.g1_223.get_status()); app.stop()"
+
+   Look at `ready`, `subscriptions_ready`, `feedback_fresh`, `feedback_age_s`. A skill saying
+   "SONIC is not in confirmed planner idle" while the planner is idle usually means a tunnel
+   forward is missing. (`app.stop()` only closes this client.)
 
 To restart one robot's controller: `dimos stop`, stop that robot's tunnel, then repeat the bring-up
 order (planner idle on the PC2, tunnel, `dimos run`).
+
+Shutdown order: stop_arm (if a motion runs; wait for its tool update) -> `dimos stop` -> tunnels
+-> controllers.
 
 A `both` command plans each robot in turn: expect ~20 s before motion starts and a wave of ~60 s
 from "started" to the result.
@@ -53,8 +73,7 @@ returns to the planner pose at once. Keep both robots on stands.
 The motion skills return at once; the result arrives as a tool update (also logged: `dimos log -f`).
 Only one motion runs at a time across both robots; stop_arm stops it.
 
-Operator rule: call stop_arm and wait for its tool update before `dimos stop` or stopping either
-controller. Shutdown also retreats a running motion first, but only best-effort: the execution
+Why stop_arm first: shutdown also retreats a running motion, but only best-effort: the execution
 modules may stop at the same time and hand the raised arms to the native planner.
 """
 
