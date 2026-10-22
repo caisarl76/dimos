@@ -317,3 +317,25 @@ def test_unknown_by_bearing_reports_bands_around_the_robot() -> None:
     assert len(near) == 12  # 30 deg bins from -180
     assert near[0] == 100 and near[6] == 0  # behind unknown, ahead known
     assert out["total"]["1.0-2.0 m"] == pytest.approx(50, abs=3)
+
+
+def test_a_goal_counts_as_planned_only_on_a_non_empty_path_after_it(tmp_path) -> None:
+    # Session 2026-10-22-5: the goal's own start clears the path (empty), then the
+    # planner either sends a plan or, finding none, clears it again and gives up.
+    telemetry = tmp_path / "peer-telemetry.jsonl"
+    rows = [
+        {"peer_monotonic": 5.0, "path_poses": 12},  # an earlier goal's plan
+        {"peer_monotonic": 10.0, "path_poses": 0},
+        {"peer_monotonic": 10.1, "path_poses": 0},
+        {"peer_monotonic": 10.2, "odom": [0.0, 0.0, 0.0, 0.0]},
+    ]
+    telemetry.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert walk.planned_since(telemetry, 9.9) is False
+    with telemetry.open("a") as stream:
+        stream.write(json.dumps({"peer_monotonic": 10.3, "path_poses": 9}) + "\n")
+    assert walk.planned_since(telemetry, 9.9) is True
+
+
+def test_the_map_refresh_is_a_case_available_from_the_start() -> None:
+    assert walk.CASES["refresh_map"].kind == "refresh"
+    assert walk.blocked("refresh_map", []) is None

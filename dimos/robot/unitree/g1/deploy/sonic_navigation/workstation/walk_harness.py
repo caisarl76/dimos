@@ -72,6 +72,10 @@ PAUSE_IDLE_S = 0.6
 STOP_WAIT_S = 30.0
 GOAL_M = 1.0
 GOAL_TOLERANCE_M = 0.3
+# After a map refresh, live scans rebuild what is visible (10 Hz) before the pre-check.
+REFRESH_SETTLE_S = 2.0
+# The planner plans within 0.2 s or gives up for good (session 2026-10-22-5).
+PLAN_WAIT_S = 3.0
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,9 @@ CASES = {
     "source_pause": Case("source_pause", vx=0.10, seconds=0.5, requires=("forward_020",)),
     # Read-only: the live costmap around the robot, before any physical goal is designed.
     "costmap_check": Case("costmap"),
+    # Clear the map above the floor around the robot, once the operator stepped away.
+    # The goal cases do this themselves after the clearance confirmation.
+    "refresh_map": Case("refresh"),
     # One short physical goal (plan Task 11), only after the robot has walked both curves
     # so the near field is observed; no cell is ever cleared to admit it.
     "goal_1m": Case("goal", seconds=20.0, requires=("curve_left_020", "curve_right_020")),
@@ -226,6 +233,16 @@ def goal_admissible(
     if near:
         return f"occupied cells within 0.5 m ({near})"
     return None
+
+
+def planned_since(telemetry: Path, since: float) -> bool:
+    """Whether the peer published a non-empty path after `since` (peer monotonic)."""
+    with telemetry.open() as stream:
+        for line in stream:
+            row = json.loads(line)
+            if row.get("path_poses") and row["peer_monotonic"] > since:
+                return True
+    return False
 
 
 def unknown_by_bearing(
@@ -582,22 +599,25 @@ def run_session(args: Any) -> None:
             )
         return record
 
+    def refresh_record(name: str) -> dict[str, Any]:
+        """Clear the map above the floor around the robot, then let live scans rebuild
+        what is still visible. Only once the operator confirmed the area clear."""
+        reply = peer.call("refresh_map")
+        time.sleep(REFRESH_SETTLE_S)
+        record = {"name": name, "started_unix": time.time(), **reply}
+        record["passed"] = record["measured_ok"] = reply.get("region") is not None
+        print(json.dumps({"refresh": reply.get("region")}))
+        return record
+
     def goal_record(name: str, case: Case) -> dict[str, Any]:
-        """Pre-checks, then one goal `case.distance` along the case bearing through
-        set_navigation_goal, with the case's mid-goal event; cancel after."""
+        """Clearance confirmation, a map refresh and pre-checks, then one goal
+        `case.distance` along the case bearing through set_navigation_goal, with the
+        case's mid-goal event; cancel after."""
         if case.event == "placed":
             input(
                 "Place a box (about 40 cm tall, 40-60 cm wide) about 1.2 m ahead, across "
-                "the straight path, then press Enter. "
+                "the straight path, step away, then press Enter. "
             )
-        probes = [*OBSTACLE_PROBES, case.distance] if case.event == "placed" else None
-        record = costmap_record(name, case.bearing, probes)
-        record["passed"] = record["measured_ok"] = False
-        reason = goal_admissible(
-            record.get("costmap"),
-            ignore_rear=args.ignore_rear_occupancy,
-            obstacle=case.event == "placed",
-        )
         clear = {
             "placed": f"Apart from the box, is the area {case.distance:.0f} m ahead clear?",
             "drop": f"Is the area {case.distance:.0f} m ahead clear, with a box in hand to "
@@ -607,8 +627,27 @@ def run_session(args: Any) -> None:
             f"Is the area {case.distance:.0f} m ahead, {math.degrees(case.bearing):.0f} deg "
             "left, physically clear?",
         )
-        if reason is None and input(f"{clear} [y/n] ").strip().lower() != "y":
-            reason = "operator did not confirm clearance"
+        # The operator's body stays in the map where the MID360 cannot re-observe it
+        # (sessions 2026-10-22-2..6): once they stand aside, refresh, then pre-check.
+        confirmed = (
+            input(f"{clear} Are you at least 1 m to the side of its path? [y/n] ").strip().lower()
+            == "y"
+        )
+        refresh = refresh_record(name) if confirmed else None
+        probes = [*OBSTACLE_PROBES, case.distance] if case.event == "placed" else None
+        record = costmap_record(name, case.bearing, probes)
+        record["refresh"] = refresh
+        record["passed"] = record["measured_ok"] = False
+        if refresh is None:
+            reason: str | None = "operator did not confirm clearance"
+        elif refresh.get("region") is None:
+            reason = "map refresh found no mapped floor"
+        else:
+            reason = goal_admissible(
+                record.get("costmap"),
+                ignore_rear=args.ignore_rear_occupancy,
+                obstacle=case.event == "placed",
+            )
         if reason is not None:
             record["error"] = f"goal refused before begin: {reason}"
             record["begin"] = {"error": record["error"]}
@@ -642,6 +681,13 @@ def run_session(args: Any) -> None:
             if math.dist(position, goal) < GOAL_TOLERANCE_M:
                 reached = now - goal_started
                 break
+            if "planned" not in events and now - goal_started >= PLAN_WAIT_S:
+                if not planned_since(out / "peer-telemetry.jsonl", goal_started):
+                    events["no_plan"] = now - goal_started
+                    record["error"] = "the planner found no path to the goal"
+                    print("The planner found no path to the goal; ending the case.")
+                    break
+                events["planned"] = now - goal_started
             walked = math.dist(position, (x, y))
             if case.event == "drop" and "drop" not in events and walked >= 0.5:
                 events["drop"] = now - goal_started
@@ -932,6 +978,11 @@ def run_session(args: Any) -> None:
                 continue
             if CASES[name].kind == "costmap":
                 record = costmap_record(name)
+            elif CASES[name].kind == "refresh":
+                if input("Is the area around the robot clear of people? [y/n] ").strip() != "y":
+                    print("refresh_map: not run")
+                    continue
+                record = refresh_record(name)
             elif CASES[name].kind == "goal":
                 record = goal_record(name, CASES[name])
             elif CASES[name].kind == "scan":

@@ -234,6 +234,12 @@ impl Mapper {
             .install(|| global_normal_fits(&self.map, self.config.voxel_size))
     }
 
+    /// Remove the voxels whose centers lie in the cylinder. Returns the count.
+    pub fn clear_region(&mut self, region: &Cylinder) -> usize {
+        self.map
+            .clear_region(&region.bounds(), self.config.voxel_size)
+    }
+
     /// Reset to an empty map, keeping the config.
     pub fn clear(&mut self) {
         self.map.clear();
