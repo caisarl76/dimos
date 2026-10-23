@@ -254,6 +254,34 @@ def test_obstacle_cases_need_a_passed_goal_and_carry_their_event() -> None:
     assert (gx, gy) == pytest.approx((2.0, 0.0))
 
 
+def test_placed_obstacle_corridor_sees_a_box_off_the_line() -> None:
+    import numpy as np
+
+    # Session 2026-10-22-6: box cells 0.21-0.4 m left at 0.9-1.3 m ahead, refused 3x
+    # by the single probe line. Sample like peer_host.costmap_summary (0.05 m grid).
+    res, (ox, oy) = 0.05, (-5.0, -5.0)
+    x, y, h = -1.52, 0.05, -2.95
+    grid = np.zeros((200, 200), dtype=np.int8)
+    rows, cols = np.indices(grid.shape)
+    dx, dy = ox + (cols + 0.5) * res - x, oy + (rows + 0.5) * res - y
+    ahead = dx * math.cos(h) + dy * math.sin(h)
+    left = -dx * math.sin(h) + dy * math.cos(h)
+    grid[(ahead > 0.9) & (ahead < 1.3) & (left > 0.21) & (left < 0.4)] = 100
+
+    def summary(probes: list[tuple[float, float]]) -> dict[str, object]:
+        points = walk.probe_points(x, y, h, [*probes, (2.0, 0.0)])
+        values = [int(grid[int((py - oy) // res), int((px - ox) // res)]) for px, py in points]
+        return {"robot_cell": 0, "occupied_within_0.5m": 0, "values": values}
+
+    line = [(a, 0.0) for a, l in walk.OBSTACLE_PROBES if l == 0.0]
+    assert "not seen" in walk.goal_admissible(summary(line), obstacle=True)
+    assert walk.goal_admissible(summary(walk.OBSTACLE_PROBES), obstacle=True) is None
+    # A box beyond the corridor is not the placed obstacle.
+    grid[:] = 0
+    grid[(ahead > 0.9) & (ahead < 1.3) & (left > 0.45) & (left < 0.6)] = 100
+    assert "not seen" in walk.goal_admissible(summary(walk.OBSTACLE_PROBES), obstacle=True)
+
+
 def test_placed_obstacle_must_be_seen_and_the_goal_cell_free() -> None:
     clear = {"robot_cell": 0, "occupied_within_0.5m": 0}
     seen = {**clear, "values": [0, 0, 100, 100, 0, 0]}  # probes, then the goal cell
