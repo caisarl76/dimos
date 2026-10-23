@@ -81,7 +81,8 @@ PYTHONPATH=$PWD .venv/bin/python dimos/robot/unitree/g1/deploy/sonic_navigation/
   is cleared, and live scans rebuild what is still visible within 2 s. The
   `refresh_map` case does the same on its own. A real object nearer than about 0.7 m
   is not seen again after a refresh.
-- A goal case ends after 3 s when the planner found no path to the goal.
+- The planner keeps a goal with no path for 3 s, replanning every 0.5 s with the robot
+  standing, before it gives up; the goal case ends 4.5 s after the goal without a plan.
 
 Viewer, in another terminal, once the harness shows its menu:
 
