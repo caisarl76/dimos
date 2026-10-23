@@ -18,15 +18,12 @@ A fake encoder writes the planned left-shoulder-pitch offset into token value 0;
 thread plays body telemetry into the skill's watch. The plan is shortened to about 1.2 s.
 """
 
-import asyncio
 from contextlib import contextmanager
 from dataclasses import replace
 from functools import partial
 import json
 import math
-from pathlib import Path
 import re
-import sys
 import threading
 import time
 from uuid import uuid4
@@ -34,14 +31,12 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
-from dimos.agents.capabilities import CapabilityRegistry
-from dimos.agents.mcp import mcp_server
 from dimos.agents.mcp.tool_stream import NOTIFICATIONS_MESSAGE_METHOD, TOOL_STREAM_STOPPED_METHOD
 from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.core.coordination.blueprint_config.sources import validate_global_values
+from dimos.core.module import Module
 from dimos.core.transport_factory import make_transport
-from dimos.msgs.sensor_msgs.Image import Image
-from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill
+from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill, sonic_test_support
 from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_agentic import (
     unitree_g1_sonic_arm_agentic,
 )
@@ -60,15 +55,27 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
 from dimos.robot.unitree.g1.sonic_arm_skill import GESTURES, SonicArmSkillContainer, query_boxes
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
-from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
-from dimos.robot.unitree.g1.test_sonic_execution_module import (
-    execution as execution,
-    peer as peer,
+from dimos.robot.unitree.g1.sonic_test_support import (
+    FAKE_GAIN,
+    PEER_TOKEN,
+    ROBOT_IDLE,
+    SCENE,
+    FakeEncoder,
+    FakeVl,
+    IMAGE_640x480,
+    fast_keyframe_plan,
+    feedback,
+    frames,
+    gate_start,
+    needs_scene,
+    pose_values,
+    stop_in_background,
+    tokens,
+    wait_until,
 )
-from dimos.robot.unitree.g1.test_sonic_session import feedback, pose_values
+from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
 
-PEER_TOKEN = 0.125  # ScriptedPeer token_state
-FAKE_GAIN = 0.25  # Fake token value 0 per rad of summed joint offset; keeps big poses in the bound.
+LEAD_IN_ROWS = 10  # The fixture's 0.2 s token blend at 50 Hz.
 
 
 @pytest.fixture
@@ -93,30 +100,6 @@ def execution_config(peer, tmp_path):
             max_tick_gap=0.19,
         ),
     )
-
-
-class FakeEncoder:
-    def __init__(self, path):
-        pass
-
-    def encode(self, poses):
-        tokens = np.full((len(poses), 64), PEER_TOKEN)
-        tokens[:, 0] += FAKE_GAIN * (poses - poses[0]).sum(axis=1)  # The planned offsets.
-        return tokens
-
-
-def fast_keyframe_plan(base, keyframes, **kwargs):
-    """The real engine with short leads, moves and holds, so a run takes about a second."""
-    capped = [replace(k, hold_s=min(k.hold_s, 0.1)) for k in keyframes]
-    return keyframe_plan(base, capped, **kwargs, lead_s=0.1, move_s=0.3, peak_speed=100.0)
-
-
-@pytest.fixture
-def tool_transport(mocker):
-    """The transport every ToolStream publishes on, mocked as in test_tool_stream."""
-    transport = mocker.MagicMock()
-    mocker.patch("dimos.agents.mcp.tool_stream.make_transport", return_value=transport)
-    return transport
 
 
 @pytest.fixture
@@ -173,21 +156,10 @@ def run(module, angle_deg, body_q=lambda t: np.zeros(29), motion="left_arm_forwa
         return module.move_upper_body(motion, angle_deg)
 
 
-def wait_until(condition, timeout=10.0):
-    deadline = time.monotonic() + timeout
-    while not condition():
-        assert time.monotonic() < deadline, "timed out"
-        time.sleep(0.01)
-
-
 def follows(t, delta=-np.radians(20), joint=15):  # The moving joint at the plan's depth mid-run.
     q = np.zeros(29)
     q[joint] = delta if 0.5 < t < 0.9 else 0.0
     return q
-
-
-def tokens(packets):
-    return np.array([np.frombuffer(p[1284:1540], "<f4") for p in packets if p.startswith(b"pose")])
 
 
 def test_pure_reference_parts():
@@ -384,13 +356,14 @@ def test_not_ready_execution_sends_nothing(skill, mocker):
         module.move_upper_body("left_arm_forward", 20.0)
 
 
-def test_session_failure_is_not_reported_as_success(skill):
+def test_session_failure_is_not_reported_as_success(skill, mocker):
     module, peer = skill
+    submit = mocker.spy(module._execution, "submit_chunk")
 
     def drop_feedback():
-        time.sleep(0.5)
+        wait_until(lambda: submit.call_count == 1)  # The motion is streaming.
         peer.pause_feedback.set()  # The execution session fails on stale feedback...
-        time.sleep(0.3)
+        wait_until(lambda: module._arm._task()["phase"] == SessionPhase.HANDBACK)
         peer.pause_feedback.clear()  # ...and confirms the planner once feedback returns.
 
     dropper = threading.Thread(target=drop_feedback, daemon=True)
@@ -398,6 +371,7 @@ def test_session_failure_is_not_reported_as_success(skill):
     with pytest.raises(RuntimeError, match="control returned to the planner"):
         run(module, 20.0, follows)
     dropper.join(2)
+    assert not dropper.is_alive()
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "failed" and status["handback_confirmed"]
 
@@ -489,43 +463,6 @@ def test_failed_session_at_finish_is_not_reported_as_success(skill, mocker):
         run(module, 20.0, follows)
 
 
-def frames(transport, method):
-    return [c.args[0] for c in transport.publish.call_args_list if c.args[0]["method"] == method]
-
-
-def gate_start(module, mocker):
-    """Holds the motion before its execution task starts until the returned event is set."""
-    gate = threading.Event()
-    real = module._execution.start_task
-    start = mocker.patch.object(
-        module._execution, "start_task", side_effect=lambda: gate.wait(10) and real()
-    )
-    return gate, start
-
-
-@pytest.fixture
-def mcp(real_launch_skill, tool_transport, monkeypatch):
-    """McpServer's tools/call and tool-stream handlers over the arm module, with a fresh registry."""
-    module, _ = real_launch_skill
-    skills = {s.func_name: s for s in module.get_skills()}
-    registry = CapabilityRegistry()
-    monkeypatch.setattr(mcp_server.app.state, "skills_by_name", skills)
-    monkeypatch.setattr(mcp_server.app.state, "cap_registry", registry)
-    monkeypatch.setattr(mcp_server.app.state, "event_loop", None)
-    # Every stop frame reaches the server's handler, which releases the hold it carries.
-    tool_transport.publish.side_effect = mcp_server._fan_out_to_sse_queues
-    rpc_calls = {name: getattr(module, name) for name in skills}
-
-    def call(name, /, **arguments):
-        params = {"name": name, "arguments": arguments}
-        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}
-        response = asyncio.run(mcp_server.handle_request(request, list(skills.values()), rpc_calls))
-        result = response["result"]
-        return result["content"][0]["text"], result.get("isError", False)
-
-    return call, registry
-
-
 def test_motion_skill_returns_at_once_and_reports_through_the_tool_stream(
     real_launch_skill, mocker
 ):
@@ -580,41 +517,45 @@ def test_stop_during_encoding_sends_nothing(real_launch_skill, mocker):
     assert module._execution.get_status()["task"] is None
 
 
+def stop_at_row(module, mocker, row):
+    """The motion's stop retreats from token row `row`, wherever the wall clock has got to.
+
+    Returns the rows the stream asked to retreat from, and the retreat it built.
+    """
+    real_stream = module._arm._stream
+    asked: list[int] = []
+    built: list[np.ndarray | None] = []
+
+    def stream(task_id, plan, chunks, retreat, profile, watch, group=None):
+        def at_row(token_row):
+            asked.append(token_row)
+            built.append(retreat(row))
+            return built[-1]
+
+        return real_stream(task_id, plan, chunks, at_row, profile, watch, group)
+
+    mocker.patch.object(module._arm, "_stream", side_effect=stream)
+    return asked, built
+
+
 def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
     real_launch_skill, mocker
 ):
     module, _ = real_launch_skill
     submit = mocker.spy(module._execution, "submit_chunk")
     updates = mocker.spy(module, "tool_update")
+    asked, built = stop_at_row(module, mocker, LEAD_IN_ROWS + 5)  # Mid-motion, past the blend.
     with feeding(module, follows):
         module.move_upper_body("left_arm_forward", 20.0)
         wait_until(lambda: submit.call_count == 1)  # The stream is armed.
-        time.sleep(0.4)  # Mid-motion, past the lead-in blend.
         module.stop()
         # stop() returned only after the retreat and the motion's own final update.
         assert module._arm.stop.is_set()
         assert [c.args[1] for c in submit.call_args_list] == [0, 1]
         assert updates.call_count == 1
     assert "stopped early: stop requested" in json.loads(updates.call_args.args[1])["message"]
+    assert len(asked) == 1 and np.array_equal(submit.call_args_list[1].args[3], built[0])
     assert module._execution.get_status()["task"]["handback_confirmed"]
-
-
-def stop_in_background(module, mocker):
-    """Starts module.stop() on a thread and holds it just after its retreat step, while the
-    coordinator would still be tearing the module down; returns (stopper, release)."""
-    stopping, release = threading.Event(), threading.Event()
-    retreat = module._retreat_before_stop
-
-    def retreat_then_hold():
-        retreat()
-        stopping.set()
-        release.wait(10)
-
-    mocker.patch.object(module, "_retreat_before_stop", side_effect=retreat_then_hold)
-    stopper = threading.Thread(target=module.stop)
-    stopper.start()
-    assert stopping.wait(10)
-    return stopper, release
 
 
 def test_motion_racing_module_stop_is_refused_and_nothing_outlives_stop(real_launch_skill, mocker):
@@ -664,6 +605,34 @@ def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_en
     assert registry.snapshot() == {} and not module._tools
 
 
+def test_motion_called_during_module_stop_is_refused_and_nothing_outlives_stop(
+    real_launch_skill, mocker
+):
+    module, _ = real_launch_skill
+    in_teardown, finish_teardown = threading.Event(), threading.Event()
+    teardown = Module.stop
+
+    def gated_teardown(self):  # The base teardown, held open until the call below is answered.
+        in_teardown.set()
+        assert finish_teardown.wait(10)
+        teardown(self)
+
+    mocker.patch.object(Module, "stop", gated_teardown)
+    updates = mocker.spy(module, "tool_update")
+    stopper = threading.Thread(target=module.stop)
+    stopper.start()
+    try:
+        assert in_teardown.wait(10)
+        with pytest.raises(RuntimeError, match="shutting down; nothing started"):
+            module.move_upper_body("left_arm_forward", 20.0)
+    finally:
+        finish_teardown.set()
+        stopper.join(10)
+    assert not stopper.is_alive()
+    assert module._motion is None and module._running is None and not module._tools
+    assert updates.call_count == 0
+
+
 def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     module, _ = skill
     real = module._execution.submit_chunk
@@ -671,16 +640,17 @@ def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     def submit(task_id, sequence, observed_at, actions):
         task = real(task_id, sequence, observed_at, actions)
         if sequence == 0:
-            time.sleep(0.05)  # A few rows into the fixture's 10-row lead-in blend.
-            module._arm.stop.set()
+            module._arm.stop.set()  # Seen by the stream's next loop pass.
         return task
 
     spy = mocker.patch.object(module._execution, "submit_chunk", side_effect=submit)
+    row = 3  # A few rows into the fixture's lead-in blend.
+    asked, _ = stop_at_row(module, mocker, row)
     result = run(module, 20.0, follows)
     assert "stopped early: stop requested" in result.message, result
+    assert len(asked) == 1 and len(spy.call_args_list) == 2
     first, rows = spy.call_args_list[0].args[3], spy.call_args_list[1].args[3]
-    row = len(rows) - 2  # The blend rows sent so far, reversed, then the planner token.
-    assert 0 <= row < 10
+    assert len(rows) == row + 2  # The blend rows sent so far, reversed, then the planner token.
     assert np.array_equal(rows[:-1], first[row::-1])
     assert np.array_equal(rows[-1], first[-1])  # The captured planner token (and hands).
     assert rows[-1][0] == pytest.approx(PEER_TOKEN)
@@ -1058,56 +1028,6 @@ def test_checked_joint_target_runs(skill):
     assert module._arm._checker.calls == 1
 
 
-_MODEL = "gear_sonic/data/robot_model/model_data/g1/scene_43dof.xml"
-SCENE = next(
-    (
-        root / _MODEL
-        for root in (
-            Path.home() / "work/GR00T-WholeBodyControl-hand-tracking-watchdog",
-            Path.home() / "GR00T-WholeBodyControl",  # the G1 PC2
-        )
-        if (root / _MODEL).exists()
-    ),
-    Path("/nonexistent"),
-)
-needs_scene = pytest.mark.skipif(
-    not SCENE.exists(), reason="gear_sonic G1 MuJoCo model not on this host"
-)
-ROBOT_IDLE = np.array(
-    [
-        -0.312,
-        0.044,
-        0,
-        0.669,
-        -0.363,
-        0,
-        -0.312,
-        0,
-        0,
-        0.669,
-        -0.363,
-        0,
-        0,
-        0,
-        0,
-        -0.02,
-        0.284,
-        -0.651,
-        0.984,
-        -0.152,
-        -0.06,
-        0.011,
-        0.2,
-        -0.2,
-        0,
-        0.6,
-        0,
-        0,
-        0,
-    ]
-)
-
-
 @needs_scene
 def test_real_collision_model_clears_the_poses_and_catches_the_torso():
     checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
@@ -1335,7 +1255,7 @@ def test_long_plans_split_into_two_chunks_at_the_hold():
 
 
 def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
-    """The slowest pose (overhead at 0.47 rad/s, 31 s) through the real session on a simulated clock."""
+    """The slowest pose (overhead at 0.75 rad/s, 22 s) through the real session on a simulated clock."""
     packets: list[bytes] = []
     profile = SonicModelProfile(
         name="arm",
@@ -1540,22 +1460,6 @@ def test_prompt_states_the_point_at_bound():
     assert f"azimuth {az_low:g} to {az_high:g}" in G1_SONIC_ARM_SYSTEM_PROMPT
     assert f"elevation {el_low:g} to {el_high:g}" in G1_SONIC_ARM_SYSTEM_PROMPT
     assert "may be refused" in G1_SONIC_ARM_SYSTEM_PROMPT
-
-
-IMAGE_640x480 = Image.from_numpy(np.zeros((480, 640, 3), np.uint8))
-
-
-class FakeVl:
-    """query_json answers with a fixed payload, or raises it if it is an exception."""
-
-    def __init__(self, payload):
-        self.payload, self.prompts = payload, []
-
-    def query_json(self, image, prompt):
-        self.prompts.append(prompt)
-        if isinstance(self.payload, Exception):
-            raise self.payload
-        return self.payload
 
 
 def seeing(module, mocker, payload, kinematics=None):
@@ -1784,7 +1688,7 @@ def test_prepare_sends_nothing_and_execute_runs_it(skill):
 
 def test_prepare_refuses_a_chunk_the_session_would_reject(skill, mocker):
     module, peer = skill
-    mocker.patch.object(sys.modules[__name__], "FAKE_GAIN", 50.0)
+    mocker.patch.object(sonic_test_support, "FAKE_GAIN", 50.0)
     with feeding(module, follows), pytest.raises(ValueError, match="token bound exceeded"):
         one_joint_prepare(module)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())

@@ -19,48 +19,13 @@ import struct
 import numpy as np
 import pytest
 
-from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback, SonicReferenceGuard
 from dimos.robot.unitree.g1.sonic_session import (
     JsonlSessionJournal,
     SessionPhase,
     SonicModelProfile,
     SonicTaskSession,
 )
-
-
-def feedback(now, index=100, *, planner=True, epoch=7, accepted=41, applied=None):
-    return SonicFeedback(
-        index=index,
-        source_timestamp=None,
-        received_at=1000.0 + now,
-        received_monotonic=now,
-        body_q=(0.0,) * 29,
-        body_dq=(0.0,) * 29,
-        left_hand_q=(0.1,) * 7,
-        left_hand_dq=(0.0,) * 7,
-        right_hand_q=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7),
-        right_hand_dq=(0.0,) * 7,
-        token_state=(0.125,) * 64,
-        reference_guard=SonicReferenceGuard(
-            armed=not planner,
-            expired=False,
-            planner_selected=planner,
-            planner_confirmed=planner,
-            rearm_requires_planner=False,
-            accepted_index=accepted,
-            applied_index=accepted if applied is None else applied,
-            rejected=0,
-            epoch=epoch,
-            age_ms=0.0,
-        ),
-    )
-
-
-def pose_values(packet):
-    payload = packet[4 + 1280 :]
-    return np.concatenate(
-        [np.frombuffer(payload[:256], dtype="<f4"), np.frombuffer(payload[264:], dtype="<f4")]
-    )
+from dimos.robot.unitree.g1.sonic_test_support import feedback, pose_values
 
 
 @pytest.fixture

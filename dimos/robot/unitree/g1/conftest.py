@@ -12,33 +12,99 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Two scripted SONIC executions, one per robot, for the multi-robot arm tests."""
-
+import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 
+from dimos.agents.capabilities import CapabilityRegistry
+from dimos.agents.mcp import mcp_server
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
-from dimos.robot.unitree.g1.test_sonic_execution_module import ScriptedPeer
+from dimos.robot.unitree.g1.sonic_test_support import ARM_PROFILE, ScriptedPeer
 from dimos.utils.testing.waiting import wait_until
 
-# test_sonic_arm_skill's execution profile: an observation age covering the plan, and a tick gap
-# that tolerates the ~170 ms event-loop stalls of everything sharing one process.
-ARM_PROFILE = SonicModelProfile(
-    name="scripted-peer",
-    source_fps=50,
-    right_hand_order="native",
-    handback_policy="native_planner",
-    seed_seconds=0.06,
-    blend_seconds=0.04,
-    first_chunk_timeout=1.0,
-    handback_timeout=0.4,
-    max_observation_age=6.0,
-    max_tick_gap=0.19,
-)
+
+@pytest.fixture
+def peer():
+    peer = ScriptedPeer()
+    peer.thread.start()
+    try:
+        assert peer.ready.wait(5)
+        assert peer.error is None
+        yield peer
+    finally:
+        peer.stopping.set()
+        peer.connected.set()
+        peer.thread.join(timeout=3)
+        assert not peer.thread.is_alive()
+        assert peer.error is None
+
+
+@pytest.fixture
+def execution_config(peer, tmp_path):
+    return dict(
+        reference_bind="tcp://127.0.0.1:*",
+        feedback_endpoint=peer.feedback_endpoint,
+        journal_dir=tmp_path,
+        profile=SonicModelProfile(
+            name="scripted-peer",
+            source_fps=50,
+            right_hand_order="native",
+            handback_policy="native_planner",
+            seed_seconds=0.06,
+            blend_seconds=0.04,
+            first_chunk_timeout=1.0,
+            handback_timeout=0.4,
+        ),
+    )
+
+
+@pytest.fixture
+def execution(peer, execution_config):
+    module = SonicExecutionModule(**execution_config)
+    try:
+        module.start()
+        peer.reference_endpoint = module.get_status()["reference_endpoint"]
+        peer.connected.set()
+        wait_until(lambda: module.get_status()["ready"], timeout=3)
+        yield module, peer
+    finally:
+        module.stop()
+
+
+@pytest.fixture
+def tool_transport(mocker):
+    """The transport every ToolStream publishes on, mocked as in test_tool_stream."""
+    transport = mocker.MagicMock()
+    mocker.patch("dimos.agents.mcp.tool_stream.make_transport", return_value=transport)
+    return transport
+
+
+@pytest.fixture
+def mcp(real_launch_skill, tool_transport, monkeypatch):
+    """McpServer's tools/call and tool-stream handlers over the requesting test module's arm
+    module (its real_launch_skill fixture), with a fresh registry."""
+    module, _ = real_launch_skill
+    skills = {s.func_name: s for s in module.get_skills()}
+    registry = CapabilityRegistry()
+    monkeypatch.setattr(mcp_server.app.state, "skills_by_name", skills)
+    monkeypatch.setattr(mcp_server.app.state, "cap_registry", registry)
+    monkeypatch.setattr(mcp_server.app.state, "event_loop", None)
+    # Every stop frame reaches the server's handler, which releases the hold it carries.
+    tool_transport.publish.side_effect = mcp_server._fan_out_to_sse_queues
+    rpc_calls = {name: getattr(module, name) for name in skills}
+
+    def call(name, /, **arguments):
+        params = {"name": name, "arguments": arguments}
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}
+        response = asyncio.run(mcp_server.handle_request(request, list(skills.values()), rpc_calls))
+        result = response["result"]
+        return result["content"][0]["text"], result.get("isError", False)
+
+    return call, registry
 
 
 @contextmanager
@@ -71,7 +137,7 @@ def scripted_execution(journal_dir: Path) -> Iterator[tuple[SonicExecutionModule
 
 @pytest.fixture
 def dual_executions(tmp_path):
-    """Robot 222's and robot 223's (execution, peer)."""
+    """Robot 222's and robot 223's (execution, peer), for the multi-robot arm tests."""
     with (
         scripted_execution(tmp_path / "222") as first,
         scripted_execution(tmp_path / "223") as second,

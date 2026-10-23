@@ -17,149 +17,14 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
-import threading
 import time
 
-import msgpack
 import numpy as np
 import pytest
 import zmq
 
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
-from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 from dimos.utils.testing.waiting import wait_until
-
-
-class ScriptedPeer:
-    def __init__(self):
-        self.ready = threading.Event()
-        self.connected = threading.Event()
-        self.stopping = threading.Event()
-        self.pause_feedback = threading.Event()
-        self.drop_pose_subscription = threading.Event()
-        self.lock = threading.Lock()
-        self.packets = []
-        self.error = None
-        self.feedback_endpoint = None
-        self.reference_endpoint = None
-        self.thread = threading.Thread(target=self.run, daemon=True)
-
-    def run(self):
-        try:
-            with zmq.Context() as ctx, ctx.socket(zmq.PUB) as pub, ctx.socket(zmq.SUB) as sub:
-                pub.setsockopt(zmq.LINGER, 0)
-                sub.setsockopt(zmq.LINGER, 0)
-                sub.setsockopt(zmq.SUBSCRIBE, b"command")
-                sub.setsockopt(zmq.SUBSCRIBE, b"pose")
-                port = pub.bind_to_random_port("tcp://127.0.0.1")
-                self.feedback_endpoint = f"tcp://127.0.0.1:{port}"
-                self.ready.set()
-                if not self.connected.wait(5) or self.stopping.is_set():
-                    return
-                sub.connect(self.reference_endpoint)
-                planner, epoch, accepted, index, next_feedback = True, 1, -1, 0, 0.0
-                while not self.stopping.is_set():
-                    if self.drop_pose_subscription.is_set():
-                        sub.setsockopt(zmq.UNSUBSCRIBE, b"pose")
-                        self.drop_pose_subscription.clear()
-                    if sub.poll(3):
-                        packet = sub.recv()
-                        with self.lock:
-                            self.packets.append(packet)
-                        if packet.startswith(b"command"):
-                            selected = bool(packet[-1])
-                            if planner and not selected:
-                                epoch += 1
-                            planner = selected
-                        elif not planner:
-                            accepted = int(np.frombuffer(packet[1540:1548], dtype="<i8")[0])
-                    now = time.monotonic()
-                    if now >= next_feedback and not self.pause_feedback.is_set():
-                        index += 1
-                        pub.send(
-                            b"g1_debug"
-                            + msgpack.packb(
-                                {
-                                    "index": index,
-                                    "ros_timestamp": 0.0,
-                                    "body_q": [0.0] * 29,
-                                    "body_dq": [0.0] * 29,
-                                    "left_hand_q": [0.1] * 7,
-                                    "left_hand_dq": [0.0] * 7,
-                                    "right_hand_q": [0.2] * 7,
-                                    "right_hand_dq": [0.0] * 7,
-                                    "token_state": [0.125] * 64,
-                                    "reference_guard": {
-                                        "armed": not planner,
-                                        "expired": False,
-                                        "planner_selected": planner,
-                                        "planner_confirmed": planner,
-                                        "rearm_requires_planner": False,
-                                        "accepted_index": accepted,
-                                        "applied_index": accepted,
-                                        "rejected": 0,
-                                        "epoch": epoch,
-                                        "age_ms": 0.0,
-                                    },
-                                }
-                            )
-                        )
-                        next_feedback = now + 0.01
-        except Exception as exc:
-            self.error = exc
-            self.ready.set()
-
-    def snapshot(self):
-        with self.lock:
-            return list(self.packets)
-
-
-@pytest.fixture
-def peer():
-    peer = ScriptedPeer()
-    peer.thread.start()
-    try:
-        assert peer.ready.wait(5)
-        assert peer.error is None
-        yield peer
-    finally:
-        peer.stopping.set()
-        peer.connected.set()
-        peer.thread.join(timeout=3)
-        assert not peer.thread.is_alive()
-        assert peer.error is None
-
-
-@pytest.fixture
-def execution_config(peer, tmp_path):
-    return dict(
-        reference_bind="tcp://127.0.0.1:*",
-        feedback_endpoint=peer.feedback_endpoint,
-        journal_dir=tmp_path,
-        profile=SonicModelProfile(
-            name="scripted-peer",
-            source_fps=50,
-            right_hand_order="native",
-            handback_policy="native_planner",
-            seed_seconds=0.06,
-            blend_seconds=0.04,
-            first_chunk_timeout=1.0,
-            handback_timeout=0.4,
-        ),
-    )
-
-
-@pytest.fixture
-def execution(peer, execution_config):
-    module = SonicExecutionModule(**execution_config)
-    try:
-        module.start()
-        peer.reference_endpoint = module.get_status()["reference_endpoint"]
-        peer.connected.set()
-        wait_until(lambda: module.get_status()["ready"], timeout=3)
-        yield module, peer
-    finally:
-        module.stop()
 
 
 @pytest.fixture

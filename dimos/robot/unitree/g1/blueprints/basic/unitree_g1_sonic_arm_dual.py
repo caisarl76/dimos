@@ -64,8 +64,9 @@ order (planner idle on the PC2, tunnel, `dimos run`).
 Shutdown order: stop_arm (if a motion runs; wait for its tool update) -> `dimos stop` -> tunnels
 -> controllers.
 
-A `both` command plans each robot in turn: expect ~20 s before motion starts and a wave of ~60 s
-from "started" to the result.
+A `both` command plans (encodes) each robot in turn before either moves: expect about 2 s for a
+pose and about 10-16 s for a wave before motion starts, and a wave of about 40-45 s from "started"
+to the result (the skill durations are motion only).
 
 WARNING: a dropped tunnel still snaps a raised arm: the controller loses its reference and the arm
 returns to the planner pose at once. Keep both robots on stands.

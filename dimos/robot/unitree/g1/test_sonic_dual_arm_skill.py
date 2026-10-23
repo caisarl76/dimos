@@ -44,25 +44,21 @@ from dimos.robot.unitree.g1.sonic_arm_skill import gesture_keyframes
 from dimos.robot.unitree.g1.sonic_dual_arm_skill import DualSonicArmSkillContainer
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
-from dimos.robot.unitree.g1.system_prompt import G1_SONIC_DUAL_ARM_SYSTEM_PROMPT
-from dimos.robot.unitree.g1.test_sonic_arm_group import (
-    feeding,
-    no_pose,
-    task,
-)
-from dimos.robot.unitree.g1.test_sonic_arm_skill import (
+from dimos.robot.unitree.g1.sonic_test_support import (
     FAKE_GAIN,
     PEER_TOKEN,
     FakeEncoder,
     fast_keyframe_plan,
+    feeding_arms,
     frames,
     gate_start,
-    mcp as mcp,
+    no_pose,
     stop_in_background,
+    task,
     tokens,
-    tool_transport as tool_transport,
     wait_until,
 )
+from dimos.robot.unitree.g1.system_prompt import G1_SONIC_DUAL_ARM_SYSTEM_PROMPT
 
 
 class AbsoluteEncoder(FakeEncoder):
@@ -159,7 +155,7 @@ def test_single_robot_command_ignores_the_other_robot(inline, robot):
     peer.pause_feedback.set()
     try:
         wait_until(lambda: module._execution_223.get_feedback() is None)
-        with feeding(module._arms()):
+        with feeding_arms(module._arms()):
             result = module.move_upper_body(robot, "left_arm_forward", 20.0)
     finally:
         peer.pause_feedback.clear()
@@ -177,7 +173,7 @@ def test_unknown_robot_refuses_before_sending(inline):
 
 def test_gesture_both_through_the_container(inline):
     module, _ = inline
-    with feeding(module._arms()):
+    with feeding_arms(module._arms()):
         result = module.perform_gesture("both", "wave")
     assert "222: wave reached" in result.message and "; 223: wave reached" in result.message
     assert result.metadata["start_skew_s"] < 0.5, result.metadata
@@ -223,7 +219,7 @@ def test_peer_stop_during_wave_retreats_continuously(inline, stop_s, mocker):
     def knee(s):
         return {3: 0.2 if s > stop_s else 0.0}
 
-    with feeding(module._arms(), shape=zero, extra=(knee, None)):
+    with feeding_arms(module._arms(), shape=zero, extra=(knee, None)):
         result = module.perform_gesture("both", "wave")
     assert "stopped early" in result.message and "left_knee" in result.message, result
     assert "stopped early: 222: left_knee" in result.message.split("; 223: ")[1], result
@@ -320,7 +316,7 @@ def test_refusal_never_releases_the_running_motion(real_launch_skill, mocker):
     module, _ = real_launch_skill
     updates = mocker.spy(module, "tool_update")
     stop_tool = mocker.spy(module, "stop_tool")
-    with feeding(module._arms()):
+    with feeding_arms(module._arms()):
         assert "started" in module.perform_gesture("both", "wave")
         assert "already running" in module.perform_gesture("both", "wave")
         with pytest.raises(RuntimeError, match="an arm move is already running"):
@@ -339,7 +335,7 @@ def test_module_stop_mid_motion_retreats_both_and_waits_for_the_update(real_laun
     module, executions = real_launch_skill
     submits = [mocker.spy(execution, "submit_chunk") for execution, _ in executions]
     updates = mocker.spy(module, "tool_update")
-    with feeding(module._arms()):
+    with feeding_arms(module._arms()):
         module.move_upper_body("both", "left_arm_forward", 20.0)
         wait_until(lambda: all(s.call_count == 1 for s in submits))  # Both streams armed.
         time.sleep(0.4)  # Mid-motion, past the lead-in blend.

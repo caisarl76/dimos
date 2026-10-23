@@ -20,12 +20,9 @@ import pytest
 from dimos.robot.unitree.g1.sonic_delivery_observation import (
     SonicCameraDelivery,
     SonicDeliveryPairer,
-    SonicJointDelivery,
 )
-from dimos.robot.unitree.g1.sonic_observation import (
-    POLICY_JOINT_NAMES,
-    SonicDeliveryStamp,
-)
+from dimos.robot.unitree.g1.sonic_observation import POLICY_JOINT_NAMES, SonicDeliveryStamp
+from dimos.robot.unitree.g1.sonic_test_support import camera, joints
 
 
 @pytest.fixture
@@ -35,20 +32,6 @@ def pairer():
         right_hand_slot_names=POLICY_JOINT_NAMES[21:28],
         max_age=0.2,
         max_span=0.1,
-    )
-
-
-def joints(group, marker=1, received_at=10.0, source_id=None):
-    values = tuple(float(i) for i in range(29 if group == "body" else 7))
-    return SonicJointDelivery(
-        group, values, SonicDeliveryStamp(source_id or group, marker, received_at)
-    )
-
-
-def camera(marker=1, received_at=10.01, source_id="camera"):
-    return SonicCameraDelivery(
-        np.full((480, 640, 3), [10, 20, 30], np.uint8),
-        SonicDeliveryStamp(source_id, marker, received_at),
     )
 
 

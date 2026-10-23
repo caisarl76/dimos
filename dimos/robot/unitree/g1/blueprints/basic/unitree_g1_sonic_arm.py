@@ -34,7 +34,10 @@ move_left_arm_joints also needs the gear_sonic MuJoCo model for its path check:
 --sonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
     dimos mcp call observe
 
-The head camera is the G1's D435i colour stream, read through V4L2 (no depth).
+The head camera is the G1's D435i colour stream, read through V4L2 (no depth). On another USB
+topology, select its device with
+`dimos run unitree-g1-sonic-arm --cameramodule.camera-device=/dev/videoN`
+(or CAMERAMODULE__CAMERA_DEVICE=/dev/videoN).
 """
 
 from dimos.agents.mcp.mcp_server import McpServer
@@ -83,8 +86,8 @@ def _head_camera() -> Webcam:
     )
 
 
-# The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 15.4 s for
-# move_upper_body, 31 s for the slowest full-range pose (overhead at 0.47 rad/s) and up to 20 s more
+# The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 12.3 s for
+# move_upper_body, 22 s for the slowest full-range pose (overhead at 0.75 rad/s) and up to 20 s more
 # for a held pose. max_duration also covers a retreat after a late stop.
 SONIC_ARM_PROFILE = SonicModelProfile(
     name="g1-sonic-arm",

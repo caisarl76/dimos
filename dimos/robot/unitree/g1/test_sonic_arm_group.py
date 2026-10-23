@@ -18,7 +18,6 @@ One feeder per arm plays body telemetry as a function of the sample's receipt ti
 arm's chunk-0 submission (s), so both robots "move" relative to their own start.
 """
 
-from contextlib import contextmanager
 from dataclasses import replace
 from functools import partial
 import math
@@ -46,14 +45,17 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     run_arms,
 )
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
-from dimos.robot.unitree.g1.test_sonic_arm_skill import (
+from dimos.robot.unitree.g1.sonic_test_support import (
     PEER_TOKEN,
     FakeEncoder,
     fast_keyframe_plan,
+    feedback,
+    feeding_arms,
+    no_pose,
+    task,
     tokens,
     wait_until,
 )
-from dimos.robot.unitree.g1.test_sonic_session import feedback
 
 
 @pytest.fixture
@@ -103,56 +105,9 @@ def proxied(arms, dual_executions):
     return transport
 
 
-def step(s):
-    """At the plan's depth mid-run."""
-    return 1.0 if 0.5 < s < 0.9 else 0.0
-
-
 def ramp(s):
     """Out from 0.3 s, back from 0.7 s, both over 0.3 s: 10% progress at 0.33 s for any stroke."""
     return float(np.clip(min((s - 0.3) / 0.3, (1.0 - s) / 0.3), 0.0, 1.0))
-
-
-@contextmanager
-def feeding(arms, shape=step, noise=(0.0, 0.0), extra=(None, None)):
-    """One feeder per arm: base + shape(s) * planned displacement, plus extra(s) joint offsets.
-
-    Before the arm submits chunk 0 the feeder adds uniform +-noise rad to every joint.
-    """
-    stopped = threading.Event()
-
-    def feed(arm, noise, extra):
-        rng = np.random.default_rng(0)
-        while not stopped.is_set():
-            try:
-                state = arm._execution.get_feedback()
-            except TimeoutError:  # A dead execution worker's proxy.
-                state = None
-            watch = arm._watch
-            if state is not None and watch is not None:
-                q = watch.base.copy()
-                if watch.send_at is None:
-                    q += rng.uniform(-noise, noise, 29)
-                else:
-                    s = state.received_monotonic - watch.send_at
-                    q += shape(s) * watch.delta
-                    for joint, value in (extra(s) if extra else {}).items():
-                        q[joint] += value
-                arm.handle_feedback(replace(state, body_q=tuple(q)))
-            time.sleep(0.01)
-
-    feeders = [
-        threading.Thread(target=feed, args=args, daemon=True)
-        for args in zip(arms, noise, extra, strict=True)
-    ]
-    for feeder in feeders:
-        feeder.start()
-    try:
-        yield
-    finally:
-        stopped.set()
-        for feeder in feeders:
-            feeder.join(2)
 
 
 def swing(arm, degrees=20.0, hold=1.0):
@@ -185,17 +140,9 @@ def peers(dual_executions):
     return [peer for _, peer in dual_executions]
 
 
-def no_pose(peer):
-    return not any(p.startswith(b"pose") for p in peer.snapshot())
-
-
 def planner_token_only(peer):
     streamed = tokens(peer.snapshot())
     return not len(streamed) or np.allclose(streamed, PEER_TOKEN)
-
-
-def task(arm):
-    return arm._execution.get_status()["task"]
 
 
 def ends_at_the_planner_smoothly(peer):
@@ -206,7 +153,7 @@ def ends_at_the_planner_smoothly(peer):
 
 
 def test_both_start_together_and_hand_back(arms):
-    with feeding(arms):
+    with feeding_arms(arms):
         result = run_arms([swing(arm) for arm in arms])
     assert result.message.startswith("222: swing20 reached"), result
     assert "; 223: swing20 reached" in result.message, result
@@ -219,7 +166,7 @@ def test_both_start_together_and_hand_back(arms):
 
 def test_both_peer_never_arms_moves_neither(arms, dual_executions, mocker):
     mocker.patch.object(arms[1]._execution, "start_task", side_effect=RuntimeError("busy"))
-    with feeding(arms), pytest.raises(RuntimeError, match="223: execution refused the task"):
+    with feeding_arms(arms), pytest.raises(RuntimeError, match="223: execution refused the task"):
         run_arms([swing(arm) for arm in arms])
     assert all(planner_token_only(peer) for peer in peers(dual_executions))
     status = task(arms[0])
@@ -246,7 +193,7 @@ def test_both_peer_arming_times_out(arms, dual_executions, mocker):
         return status | {"phase": "arming"} if status["phase"] == "waiting_for_chunk" else status
 
     mocker.patch.object(arms[1], "_task", never_waiting)
-    with feeding(arms), pytest.raises(RuntimeError, match="223") as raised:
+    with feeding_arms(arms), pytest.raises(RuntimeError, match="223") as raised:
         run_arms([swing(arm) for arm in arms])
     assert "222: another robot did not arm" in str(raised.value)
     assert len(waits) == 1 and waits[0] < 1.0 / 2 + 0.5, waits  # first_chunk_timeout / 2
@@ -302,7 +249,7 @@ def test_both_invalid_chunk_refused_before_sending(arms, dual_executions, mocker
 
 
 def test_onset_ignores_idle_drift_and_reports_unequal_strokes(arms):
-    with feeding(arms, shape=ramp, noise=(0.01, 0.0)):
+    with feeding_arms(arms, shape=ramp, noise=(0.01, 0.0)):
         result = run_arms([swing(arms[0], 10.0), swing(arms[1], 30.0)])
     meta = result.metadata
     assert math.isfinite(meta["start_skew_s"]) and meta["start_skew_s"] < 0.3, meta
@@ -342,7 +289,7 @@ def test_onset_ignores_secondary_joint_drift_in_the_blend(arms):
     def drift(s):
         return {16: 0.05 if s > 0.05 else 0.0}
 
-    with feeding(arms, shape=ramp, extra=(drift, None)):
+    with feeding_arms(arms, shape=ramp, extra=(drift, None)):
         result = run_arms([pose(arm) for arm in arms])
     assert result.metadata["start_skew_s"] < 0.1, result.metadata
 
@@ -351,7 +298,7 @@ def test_both_envelope_on_one_retreats_both(arms, dual_executions):
     def knee(s):
         return {3: 0.2 if s > 0.4 else 0.0}
 
-    with feeding(arms, extra=(knee, None)):
+    with feeding_arms(arms, extra=(knee, None)):
         result = run_arms([swing(arm) for arm in arms])
     first, second = result.message.split("; 223: ")
     assert "stopped early" in first and "left_knee" in first, result
@@ -370,7 +317,7 @@ def test_both_stop_request_retreats_both(arms, dual_executions):
 
     stopper = threading.Thread(target=stop_mid_stream, daemon=True)
     stopper.start()
-    with feeding(arms):
+    with feeding_arms(arms):
         result = run_arms([swing(arm) for arm in arms])
     stopper.join(2)
     first, second = result.message.split("; 223: ")
@@ -392,7 +339,7 @@ def test_both_with_different_start_poses_reports_both(arms, mocker):
         return replace(state, body_q=tuple(q))
 
     mocker.patch.object(arms[0]._execution, "get_feedback", raised)
-    with feeding(arms):
+    with feeding_arms(arms):
         result = run_arms([pose(arm) for arm in arms])
     for arm in arms:
         report = result.metadata[arm.name]
@@ -410,7 +357,7 @@ def test_both_mixed_outcome_retreats_peer_and_fails_naming_both(arms, dual_execu
 
     mocker.patch.object(sonic_arm_skill, "keyframe_plan", plan)
     mocker.patch.object(arms[1], "_wait_done", return_value=None)
-    with feeding(arms), pytest.raises(RuntimeError) as raised:
+    with feeding_arms(arms), pytest.raises(RuntimeError) as raised:
         run_arms([swing(arms[0], hold=1.0), swing(arms[1], hold=0.1)])
     first, second = str(raised.value).split("; 223: ")
     assert first.startswith("222: ") and "stopped early" in first and "223" in first, first
@@ -427,7 +374,7 @@ def test_both_feedback_lost_mid_stream_retreats_the_peer(arms, dual_executions):
     dropper = threading.Thread(target=drop_223_feedback, daemon=True)
     dropper.start()
     try:
-        with feeding(arms):
+        with feeding_arms(arms):
             try:
                 result = run_arms([swing(arm, hold=3.0) for arm in arms])
                 message = result.message
@@ -445,7 +392,7 @@ def test_both_feedback_lost_mid_stream_retreats_the_peer(arms, dual_executions):
 
 def test_one_job_is_the_single_arm_path(arms, dual_executions, mocker):
     barrier = mocker.spy(threading, "Barrier")
-    with feeding(arms):
+    with feeding_arms(arms):
         result = run_arms([swing(arms[0])])
     assert result.message.startswith("swing20 reached"), result  # No name prefix.
     assert "start_skew_s" not in result.metadata and barrier.call_count == 0
@@ -469,7 +416,7 @@ def test_both_stop_while_one_arms_sends_no_chunk_to_either(arms, dual_executions
         return started
 
     mocker.patch.object(arms[late]._execution, "start_task", side_effect=start_then_stop)
-    with feeding(arms), pytest.raises(RuntimeError) as raised:
+    with feeding_arms(arms), pytest.raises(RuntimeError) as raised:
         run_arms([swing(arm) for arm in arms])
     assert str(raised.value) == (
         "222: stopped on request; nothing sent; 223: stopped on request; nothing sent"
@@ -493,7 +440,7 @@ def test_each_arm_samples_its_own_hold_until_a_peer_abort(arms, mocker):
     def knee(s):  # 222 leaves its envelope mid-hold.
         return {20: 0.01 * s, 3: 0.2 if s > 1.6 else 0.0}
 
-    with feeding(arms, extra=(knee, stamped)):
+    with feeding_arms(arms, extra=(knee, stamped)):
         result = run_arms([swing(arm, hold=2.0) for arm in arms])
     assert "stopped early: 222: left_knee" in result.message, result
     for arm in arms:
@@ -556,7 +503,7 @@ def test_both_peer_rpc_error_mid_stream_retreats_the_healthy_arm(arms, dual_exec
 
     breaker = threading.Thread(target=break_223, daemon=True)
     breaker.start()
-    with feeding(arms), pytest.raises(RuntimeError) as raised:
+    with feeding_arms(arms), pytest.raises(RuntimeError) as raised:
         run_arms([swing(arm, hold=2.0) for arm in arms])
     breaker.join(2)
     first, second = str(raised.value).split("; 223: ")
@@ -583,7 +530,7 @@ def test_both_peer_rpc_hang_mid_stream_retreats_the_healthy_arm_promptly(
     hanger = threading.Thread(target=hang_223, daemon=True)
     hanger.start()
     started = time.monotonic()
-    with feeding(arms), pytest.raises(RuntimeError) as raised:
+    with feeding_arms(arms), pytest.raises(RuntimeError) as raised:
         run_arms([swing(arm, hold=2.0) for arm in arms])
     elapsed = time.monotonic() - started
     hanger.join(2)

@@ -20,7 +20,7 @@ import pytest
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1.sonic_delivery_observation_module import SonicDeliveryObservationModule
 from dimos.robot.unitree.g1.sonic_observation import POLICY_JOINT_NAMES
-from dimos.robot.unitree.g1.test_sonic_delivery_observation import camera, joints
+from dimos.robot.unitree.g1.sonic_test_support import camera, joints
 from dimos.utils.testing.waiting import wait_until
 
 

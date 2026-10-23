@@ -58,11 +58,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
 )
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
-from dimos.robot.unitree.g1.test_sonic_arm_skill import (
-    FakeVl,
-    IMAGE_640x480,
-    tool_transport as tool_transport,
-)
+from dimos.robot.unitree.g1.sonic_test_support import FakeVl, IMAGE_640x480
 from dimos.utils.testing.waiting import wait_until
 
 MODEL_DIR = Path(os.environ.get("GEAR_SONIC_MODEL_DIR", "/nonexistent"))

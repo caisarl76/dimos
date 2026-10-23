@@ -38,11 +38,6 @@ from dimos.robot.unitree.g1.sonic_policy_client import (
     SonicPolicyInfo,
 )
 from dimos.robot.unitree.g1.sonic_service_module import SonicServiceModule
-from dimos.robot.unitree.g1.test_sonic_execution_module import (
-    execution as execution,
-    execution_config as execution_config,
-    peer as peer,
-)
 from dimos.utils.testing.waiting import wait_until
 
 KEY = "observation.images.egocentric"

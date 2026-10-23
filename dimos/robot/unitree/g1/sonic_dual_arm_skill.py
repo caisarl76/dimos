@@ -110,7 +110,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         Motions: "left_arm_forward" swings the left arm forward (shoulder pitch),
         "left_arm_sideways" raises the left arm out to the side (shoulder roll), and
         "left_forearm_raise" lifts the left forearm (elbow). Min-jerk, 2 s out and 2 s back (longer
-        for big angles), while SONIC keeps the robot balanced; 18-24 s in all. "both" moves the two
+        for big angles), while SONIC keeps the robot balanced; 11-13 s of motion. "both" moves the two
         robots together and stops both if either stops. Requires the SONIC controller running in
         confirmed planner idle; it never starts or stops the controller. Stops early and returns
         control to the planner if any joint strays from the plan. Returns at once; a tool update
@@ -134,7 +134,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         "left_arm_side_horizontal" (straight arm out to the side at shoulder height),
         "left_hand_over_head" (arm raised forward and up until the hand is over the head),
         "left_hand_over_head_sideways" (arm raised out to the side and up over the head). Slow
-        (peak 0.47 rad/s): 20-40 s in all, overhead the longest. Requires the SONIC controller
+        (peak 0.75 rad/s): 13-21 s of motion, overhead the longest. Requires the SONIC controller
         running in confirmed planner idle; it never starts or stops the controller. Stops early and
         returns control to the planner if the legs, waist or the other arm stray, or the arm
         strays far from the plan. Returns at once; a tool update reports the result.
@@ -168,7 +168,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         Shoulder roll: positive raises it out to the side (86 side horizontal). Shoulder yaw rotates
         the upper arm. Elbow: 82 is straight, 0 is bent 90 degrees, negative bends further. The
         planned path is checked against the robot's body first and refused if the arm would come
-        near it. Slow (peak 0.47 rad/s), up to about 40 s. Prefer move_left_arm_pose for the
+        near it. Slow (peak 0.75 rad/s), up to about 25 s. Prefer move_left_arm_pose for the
         named poses. Returns at once; a tool update reports the result.
 
         Args:
@@ -192,10 +192,10 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
     def perform_gesture(self, robot: Robot, name: GestureName) -> str:
         """Perform a left-arm gesture on robot 222, 223 or both, then bring the arm back and hand control back.
 
-        Gestures: "wave" (raises the hand and swings it side to side three times, about 30 s),
-        "point_forward" (arm out in front, about 16 s), "stop_sign" (raised forward palm out, about 15 s),
-        "raise_hand" (arm up, about 25 s) and "beckon" (forearm curls in and out twice, about 21 s).
-        Slow (peak 0.47 rad/s). Requires the SONIC controller running in confirmed planner idle; it
+        Gestures: "wave" (raises the hand and swings it side to side three times, about 26 s),
+        "point_forward" (arm out in front, about 15 s), "stop_sign" (raised forward palm out, about 14 s),
+        "raise_hand" (arm up, about 21 s) and "beckon" (forearm curls in and out twice, about 20 s).
+        Slow (peak 0.75 rad/s). Requires the SONIC controller running in confirmed planner idle; it
         never starts or stops the controller. Stops early and returns control to the planner if the
         legs, waist or the other arm stray, or the arm strays far from the plan. Returns at once; a
         tool update reports the result.

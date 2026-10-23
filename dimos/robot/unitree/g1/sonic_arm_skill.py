@@ -85,7 +85,7 @@ logger = setup_logger()
 UpperBodyMotion = Literal["left_arm_forward", "left_arm_sideways", "left_forearm_raise"]
 # Motion -> (motor-order joint, sign of a positive angle, min deg, max deg). Directions from the G1
 # model in the torso frame. Ranges from a MuJoCo floor sweep at 10-60 deg with the stroke slowed to
-# PEAK_SPEED, and robot runs at 10/20/28 deg:
+# PEAK_SPEED (0.47), and robot runs at 10/20/28 deg:
 # - forward: from 40 deg the legs passed their envelope and a foot partly unloaded.
 # - sideways: at 50-60 deg other arm joints and wrists reached 85-90% of their envelopes.
 # - forearm: tracked 95% to 60 deg with little side motion, but its joint friction against the soft
@@ -104,7 +104,7 @@ LeftArmPose = Literal[
     "left_hand_over_head_sideways",
 ]
 # Full-range left-arm poses: absolute shoulder pitch, roll, yaw and elbow (motor 15-18), rad. Elbow
-# +1.43 rad is straight. MuJoCo on the floor at PEAK_SPEED: all four tracked within 0.13 rad, kept 8/8
+# +1.43 rad is straight. MuJoCo on the floor at PEAK_SPEED (0.47): all four tracked within 0.13 rad, kept 8/8
 # floor contacts (7 for forward) and never touched the body. The overhead pose needs roll 0.5:
 # at 0.2 the hand crosses over the head.
 POSES: dict[str, tuple[float, float, float, float]] = {
@@ -1086,7 +1086,7 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         Motions: "left_arm_forward" swings the left arm forward (shoulder pitch),
         "left_arm_sideways" raises the left arm out to the side (shoulder roll), and
         "left_forearm_raise" lifts the left forearm (elbow). Min-jerk, 2 s out and 2 s back (longer
-        for big angles), while SONIC keeps the robot balanced; 18-24 s in all. Requires the SONIC
+        for big angles), while SONIC keeps the robot balanced; 11-13 s of motion. Requires the SONIC
         controller running in confirmed planner idle; it never starts or stops the controller. Stops
         early and returns control to the planner if any joint strays from the plan. Returns at
         once; a tool update reports the result.
@@ -1111,7 +1111,7 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         "left_arm_side_horizontal" (straight arm out to the side at shoulder height),
         "left_hand_over_head" (arm raised forward and up until the hand is over the head),
         "left_hand_over_head_sideways" (arm raised out to the side and up over the head). Slow
-        (peak 0.47 rad/s): 20-40 s in all, overhead the longest. Requires the SONIC controller running
+        (peak 0.75 rad/s): 13-21 s of motion, overhead the longest. Requires the SONIC controller running
         in confirmed planner idle; it never starts or stops the controller. Stops early and returns
         control to the planner if the legs, waist or the other arm stray, or the arm strays far from
         the plan. Returns at once; a tool update reports the result.
@@ -1144,7 +1144,7 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         Shoulder roll: positive raises it out to the side (86 side horizontal). Shoulder yaw rotates
         the upper arm. Elbow: 82 is straight, 0 is bent 90 degrees, negative bends further. The
         planned path is checked against the robot's body first and refused if the arm would come
-        near it. Slow (peak 0.47 rad/s), up to about 40 s. Prefer move_left_arm_pose for the
+        near it. Slow (peak 0.75 rad/s), up to about 25 s. Prefer move_left_arm_pose for the
         named poses. Returns at once; a tool update reports the result.
 
         Args:
@@ -1168,10 +1168,10 @@ class SonicArmSkillContainer(ArmLauncher, Module):
     def perform_gesture(self, name: GestureName) -> str:
         """Perform a left-arm gesture, then bring the arm back and hand control back.
 
-        Gestures: "wave" (raises the hand and swings it side to side three times, about 30 s),
-        "point_forward" (arm out in front, about 16 s), "stop_sign" (raised forward palm out, about 15 s),
-        "raise_hand" (arm up, about 25 s) and "beckon" (forearm curls in and out twice, about 21 s).
-        Slow (peak 0.47 rad/s). Requires the SONIC controller running in confirmed planner idle; it
+        Gestures: "wave" (raises the hand and swings it side to side three times, about 26 s),
+        "point_forward" (arm out in front, about 15 s), "stop_sign" (raised forward palm out, about 14 s),
+        "raise_hand" (arm up, about 21 s) and "beckon" (forearm curls in and out twice, about 20 s).
+        Slow (peak 0.75 rad/s). Requires the SONIC controller running in confirmed planner idle; it
         never starts or stops the controller. Stops early and returns control to the planner if the
         legs, waist or the other arm stray, or the arm strays far from the plan. Returns at once; a
         tool update reports the result.
@@ -1195,7 +1195,7 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         and elevation -75 to 75 degrees. Pointing low and close to straight ahead, or far to the
         right, may be refused when the arm would pass near the body or cannot reach; the refusal
         says why, and nothing moves. The arm is aimed from the shoulder within 3 degrees. Slow
-        (peak 0.47 rad/s), 10-30 s plus the hold. Returns at once; a tool update reports the result
+        (peak 0.75 rad/s), 10-20 s plus the hold. Returns at once; a tool update reports the result
         with the achieved direction.
 
         Args:
