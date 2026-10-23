@@ -46,7 +46,12 @@ from dimos.core.transport import (
     pZenohTransport,
 )
 from dimos.core.transport_factory import make_transport
-from dimos.spec.utils import is_spec, spec_annotation_compliance, spec_structural_compliance
+from dimos.spec.utils import (
+    get_protocol_method_signatures,
+    is_spec,
+    spec_annotation_compliance,
+    spec_structural_compliance,
+)
 from dimos.utils.generic import short_id
 from dimos.utils.logging_config import setup_logger
 from dimos.utils.safe_thread_map import safe_thread_map
@@ -1173,6 +1178,37 @@ def _resolve_single_ref(
     )
 
 
+def _check_named_provider(
+    consumer: str, module_ref: Any, instance: str, provider: type[ModuleBase]
+) -> None:
+    """A provider bound by instance name must meet the ref's spec, as a searched one must."""
+    spec = module_ref.spec
+    where = (
+        f"{consumer}.{module_ref.name} is remapped to instance {instance!r} ({provider.__name__})"
+    )
+    if is_module_type(spec):
+        if not issubclass(provider, spec):
+            raise ValueError(f"{where}, which is not a {spec.__name__}.")
+        return
+    if not spec_structural_compliance(provider, spec):
+        missing = [
+            name for name in get_protocol_method_signatures(spec) if not hasattr(provider, name)
+        ]
+        raise ValueError(
+            f"{where}, which does not meet the {spec.__name__} spec; missing: {', '.join(missing)}."
+        )
+    if not spec_annotation_compliance(provider, spec):
+        logger.warning(
+            _ref_msg(
+                consumer,
+                module_ref,
+                spec.__name__,
+                f"{instance} met the spec structurally but had annotation mismatches.\n"
+                f"Please either change the {spec.__name__} spec or the {provider.__name__} module.",
+            )
+        )
+
+
 def _connect_module_refs(
     blueprint: Blueprint,
     module_coordinator: ModuleCoordinator,
@@ -1207,12 +1243,20 @@ def _connect_module_refs(
                 continue
             named_instance = blueprint.remapping_map.get(ref_key)
             if isinstance(named_instance, str):
-                known = {a.name for a in (*blueprint.active_blueprints, *existing_atoms)}
-                if named_instance not in known:
+                provider = next(
+                    (
+                        a.module
+                        for a in (*blueprint.active_blueprints, *existing_atoms)
+                        if a.name == named_instance
+                    ),
+                    None,
+                )
+                if provider is None:
                     raise ValueError(
                         f"{bp.name}.{module_ref.name} is remapped to instance "
                         f"{named_instance!r}, but no module has that name."
                     )
+                _check_named_provider(bp.name, module_ref, named_instance, provider)
                 mod_and_mod_ref_to_proxy[ref_key] = named_instance
                 continue
             spec = mod_and_mod_ref_to_proxy.get((bp.name, module_ref.name), module_ref.spec)

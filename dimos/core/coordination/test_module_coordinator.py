@@ -1381,3 +1381,20 @@ def test_namespace_keeps_a_module_ref_to_an_outside_instance() -> None:
     inner = TwoRefConsumer.blueprint().remappings([(TwoRefConsumer, "_a", "shared")])
     remap = inner.namespace("pair").remapping_map
     assert remap[f"pair/{TwoRefConsumer.name}", "_a"] == "shared"
+
+
+class NotAValueProvider(Module):
+    @rpc
+    def get_other(self) -> str:
+        return ""
+
+
+def test_module_ref_remapped_to_instance_missing_spec_methods_raises() -> None:
+    blueprint = autoconnect(
+        ValueProvider.blueprint(instance_name="p_a", value="a"),
+        NotAValueProvider.blueprint(instance_name="p_x"),
+        TwoRefConsumer.blueprint(),
+    ).remappings([(TwoRefConsumer, "_a", "p_a"), (TwoRefConsumer, "_b", "p_x")])
+
+    with pytest.raises(ValueError, match=r"\._b .*'p_x'.*ValueProviderSpec.*missing: get_value"):
+        _build_without_rerun(blueprint)
