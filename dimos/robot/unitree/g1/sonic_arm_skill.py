@@ -709,7 +709,7 @@ class SonicArm:
             "keyframes": prepared.keyframes,
             "chunks": len(chunks),
             "encode_s": round(prepared.encode_s, 2),
-            "journal_path": self._execution.get_status()["journal_path"],
+            "journal_path": self._journal_path(),
         }
         with self._lock:
             samples = list(watch.hold_q)
@@ -826,13 +826,29 @@ class SonicArm:
         return task
 
     def _wait_done(self, profile: dict[str, Any]) -> dict[str, Any] | None:
+        """The finished task, or None if the handback is unconfirmed by the deadline.
+
+        An RPC error or timeout (a dead or wedged worker) counts as unconfirmed, so the result
+        reads as an unconfirmed handback, not a bare RPC error an agent might retry.
+        """
         deadline = time.monotonic() + profile["handback_timeout"] + 1.0
         while time.monotonic() < deadline:
-            task = self._task()
-            if task["phase"] == "done":
-                return task
+            try:
+                task = self._task()
+            except Exception as exc:
+                logger.warning("Execution status unavailable", arm=self.name, error=str(exc))
+            else:
+                if task["phase"] == "done":
+                    return task
             time.sleep(0.01)
         return None
+
+    def _journal_path(self) -> str | None:
+        try:
+            path: str | None = self._execution.get_status()["journal_path"]
+            return path
+        except Exception:
+            return "unavailable"
 
 
 def run_arms(jobs: Sequence[tuple[SonicArm, Callable[[], _Prepared]]]) -> SkillResult:

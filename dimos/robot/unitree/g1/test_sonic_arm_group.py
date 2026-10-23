@@ -589,7 +589,11 @@ def test_both_peer_rpc_hang_mid_stream_retreats_the_healthy_arm_promptly(
     hanger.join(2)
     first, second = str(raised.value).split("; 223: ")
     assert first.startswith("222: ") and "stopped early: 223: " in first, first
-    assert "timed out" in first and "timed out" in second, raised.value
+    assert "timed out" in first, raised.value
+    # The operator's cue to check 223's controller, not a bare RPC error an agent might retry.
+    assert second.startswith(
+        "planner handback unconfirmed (TimeoutError: RPC call to 'g1_223/"
+    ) and second.endswith("check the controller. Journal: unavailable"), second
     retreats = [t for sequence, t in submits if sequence > 0]
     assert retreats and retreats[0] - hung[0] < 1.5, (retreats, hung)
     assert elapsed < 15, elapsed  # Not the transport's 120 s default.
