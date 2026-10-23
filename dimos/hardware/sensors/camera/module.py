@@ -24,7 +24,7 @@ from dimos.core.global_config import global_config
 from dimos.core.module import Module, ModuleConfig
 from dimos.core.stream import Out
 from dimos.hardware.sensors.camera.spec import CameraHardware
-from dimos.hardware.sensors.camera.webcam import Webcam
+from dimos.hardware.sensors.camera.webcam import CameraDevice, Webcam
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
@@ -48,6 +48,8 @@ class CameraModuleConfig(ModuleConfig):
     frame_id: str = "camera_link"
     transform: Transform | None = Field(default_factory=default_transform)
     hardware: Callable[[], CameraHardware] | CameraHardware = Webcam
+    # Replaces only a Webcam's camera_index, keeping the blueprint's size, fps and intrinsics.
+    camera_device: CameraDevice | None = None
     frequency: float = 0.0  # Hz, 0 means no limit
 
 
@@ -67,6 +69,16 @@ class CameraModule(Module, perception.Camera):
             self.hardware = self.config.hardware()
         else:
             self.hardware = self.config.hardware
+
+        if self.config.camera_device is not None:
+            if not isinstance(self.hardware, Webcam):
+                raise ValueError(
+                    "cameramodule.camera_device needs a Webcam; this blueprint's camera is "
+                    f"{type(self.hardware).__name__}"
+                )
+            self.hardware.config = self.hardware.config.model_copy(
+                update={"camera_index": self.config.camera_device}
+            )
 
         stream = self.hardware.image_stream()
 

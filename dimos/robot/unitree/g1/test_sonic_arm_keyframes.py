@@ -52,7 +52,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     gesture_keyframes,
     token_still,
 )
-from dimos.robot.unitree.g1.test_sonic_arm_skill import ROBOT_IDLE, SCENE, needs_scene
+from dimos.robot.unitree.g1.sonic_test_support import ROBOT_IDLE, SCENE, needs_scene
 
 BASE = np.zeros(29)
 BASE[[15, 16, 18]] = 0.19, 0.19, 0.59

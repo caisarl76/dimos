@@ -34,7 +34,10 @@ move_left_arm_joints also needs the gear_sonic MuJoCo model for its path check:
 --sonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
     dimos mcp call observe
 
-The head camera is the G1's D435i colour stream, read through V4L2 (no depth).
+The head camera is the G1's D435i colour stream, read through V4L2 (no depth). On another USB
+topology, select its device with
+`dimos run unitree-g1-sonic-arm --cameramodule.camera-device=/dev/videoN`
+(or CAMERAMODULE__CAMERA_DEVICE=/dev/videoN).
 """
 
 from dimos.agents.mcp.mcp_server import McpServer
