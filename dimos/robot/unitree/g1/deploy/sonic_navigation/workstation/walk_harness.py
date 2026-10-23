@@ -75,8 +75,9 @@ GOAL_M = 1.0
 GOAL_TOLERANCE_M = 0.3
 # After a map refresh, live scans rebuild what is visible (10 Hz) before the pre-check.
 REFRESH_SETTLE_S = 2.0
-# The planner plans within 0.2 s or gives up for good (session 2026-10-22-5).
-PLAN_WAIT_S = 3.0
+# The planner plans within 0.2 s, or replans every 0.5 s for up to 3 s while no path
+# exists before it gives up (GlobalPlanner._no_path_retry_window).
+PLAN_WAIT_S = 4.5
 
 
 @dataclass(frozen=True)

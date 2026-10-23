@@ -71,6 +71,11 @@ class GlobalPlanner(Resource):
     _stuck_threshold: float = 0.4
     _max_path_deviation: float = 0.9
     _replanning_enabled: bool = True
+    # Keep a goal with no path this long, replanning, before giving up: a person or
+    # object briefly blocking the way when the goal is sent.
+    _no_path_retry_window: float = 3.0
+    _no_path_retry_period: float = 0.5
+    _no_path_since: float | None = None
 
     def __init__(
         self,
@@ -150,6 +155,8 @@ class GlobalPlanner(Resource):
             self._current_goal = goal
             self._goal_reached = False
         self._replan_limiter.reset()
+        with self._lock:
+            self._no_path_since = None
         self._plan_path()
 
     def set_safe_goal_clearance(self, clearance: float) -> None:
@@ -174,6 +181,7 @@ class GlobalPlanner(Resource):
             if not but_will_try_again:
                 self._current_goal = None
                 self._goal_reached = arrived
+                self._no_path_since = None
                 self._replan_limiter.reset()
 
         self.path.on_next(Path())
@@ -229,8 +237,15 @@ class GlobalPlanner(Resource):
             with self._lock:
                 current_goal = self._current_goal
                 current_odom = self._current_odom
+                no_path_since = self._no_path_since
 
             if not current_goal or not current_odom:
+                continue
+
+            if no_path_since is not None:
+                if time.perf_counter() - last_stuck_check >= self._no_path_retry_period:
+                    self._plan_path()
+                    last_stuck_check = time.perf_counter()
                 continue
 
             if (
@@ -347,11 +362,22 @@ class GlobalPlanner(Resource):
         path = self._find_wide_path(safe_goal, current_odom.position)
 
         if not path:
+            now = time.monotonic()
+            with self._lock:
+                if self._no_path_since is None:
+                    self._no_path_since = now
+                waited = now - self._no_path_since
+            if waited < self._no_path_retry_window:
+                logger.info("No path found to the goal yet.", waited=round(waited, 2))
+                return
             logger.warning(
                 "No path found to the goal.", x=round(safe_goal.x, 3), y=round(safe_goal.y, 3)
             )
             self.cancel_goal()
             return
+
+        with self._lock:
+            self._no_path_since = None
 
         resampled_path = smooth_resample_path(path, current_goal, 0.1)
 
