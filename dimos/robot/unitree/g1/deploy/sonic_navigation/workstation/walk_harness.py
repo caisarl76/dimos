@@ -40,6 +40,7 @@ import math
 import os
 from pathlib import Path
 import queue
+import readline  # noqa: F401  # line editing for the operator's input() answers
 import subprocess
 import sys
 import threading
