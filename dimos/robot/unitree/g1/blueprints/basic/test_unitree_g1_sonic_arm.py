@@ -32,10 +32,10 @@ def _started_head_camera(cli: list[str], environ: dict[str, str]) -> WebcamConfi
         ["--sonicarmskillcontainer.encoder-path=unused.onnx", *cli], environ=environ
     )
     module = CameraModule(**parsed.module_kwargs("cameramodule"))
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(Webcam, "image_stream", lambda self: rx.empty())
-        module.start()
     try:
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(Webcam, "image_stream", lambda self: rx.empty())
+            module.start()
         assert isinstance(module.hardware, Webcam)
         config = module.hardware.config
     finally:
