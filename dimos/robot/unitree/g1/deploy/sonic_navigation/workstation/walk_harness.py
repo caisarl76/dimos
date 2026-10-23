@@ -145,8 +145,17 @@ CASES = {
 # Base centre to the nearest box cell, about the G1 shoulder half-width (operator
 # decision 2026-10-21; session 6 passed a box at 0.247 m without contact).
 MIN_CLEARANCE_M = 0.20
-# Probes along the path for a placed obstacle: 0.6-1.8 m, then the goal cell.
-OBSTACLE_PROBES = [0.6 + 0.1 * i for i in range(13)]
+# Half-width of the corridor a placed box must reach into: the clearance plus a margin.
+# A single probe line missed a box 0.21 m left of it 3x (session 2026-10-22-6).
+CORRIDOR_HALF_M = MIN_CLEARANCE_M + 0.15
+# (ahead, left) probes for a placed obstacle: the corridor over 0.6-1.8 m on the
+# 0.05 m costmap grid; the goal cell is appended after them.
+_LATERAL_STEPS = round(CORRIDOR_HALF_M / 0.05)
+OBSTACLE_PROBES = [
+    (0.6 + 0.05 * i, 0.05 * j)
+    for i in range(25)
+    for j in range(-_LATERAL_STEPS, _LATERAL_STEPS + 1)
+]
 
 
 def goal_pose(
@@ -155,6 +164,14 @@ def goal_pose(
     """The point `distance` away along `bearing` from heading `h`, and that direction."""
     yaw = h + bearing
     return (x + distance * math.cos(yaw), y + distance * math.sin(yaw)), yaw
+
+
+def probe_points(
+    x: float, y: float, h: float, probes: list[tuple[float, float]]
+) -> list[list[float]]:
+    """World points of (ahead, left) offsets from pose (x, y, heading h)."""
+    c, s = math.cos(h), math.sin(h)
+    return [[x + a * c - l * s, y + a * s + l * c] for a, l in probes]
 
 
 def check_token(token: str) -> None:
@@ -219,7 +236,11 @@ def goal_admissible(
     values = summary.get("values", [None])
     if obstacle:
         if not any(v is not None and v >= 100 for v in values[:-1]):
-            return f"placed obstacle not seen on the path ({values[:-1]})"
+            unknown = sum(v is None or v < 0 for v in values[:-1])
+            return (
+                f"placed obstacle not seen within {CORRIDOR_HALF_M:.2f} m of the path "
+                f"({len(values) - 1} probes, {unknown} unknown)"
+            )
         if values[-1] != 0:
             return f"goal cell not known free ({values[-1]})"
     elif any(value != 0 for value in values):
@@ -570,14 +591,16 @@ def run_session(args: Any) -> None:
         raise RuntimeError("no recent odometry")
 
     def costmap_record(
-        name: str, bearing: float = 0.0, probes: list[float] | None = None, suffix: str = ""
+        name: str,
+        bearing: float = 0.0,
+        probes: list[tuple[float, float]] | None = None,
+        suffix: str = "",
     ) -> dict[str, Any]:
-        """Read-only: no begin, no motion. Cells along `bearing` plus the peer summary."""
+        """Read-only: no begin, no motion. Cells at (ahead, left) of `bearing` plus the
+        peer summary."""
         x, y, h, _ = latest_odom()
         h += bearing
-        ahead = [
-            [x + d * math.cos(h), y + d * math.sin(h)] for d in probes or (0.25, 0.5, 0.75, 1.0)
-        ]
+        ahead = probe_points(x, y, h, probes or [(d, 0.0) for d in (0.25, 0.5, 0.75, 1.0)])
         reply = peer.call("costmap", points=ahead)
         summary = reply["costmap"]
         snapshot = out / f"costmap-{len(results['cases']) + 1:02d}{suffix}.npz"
@@ -592,7 +615,10 @@ def run_session(args: Any) -> None:
                     {
                         "robot_cell": summary.get("robot_cell"),
                         "within_1.2m": {k: disk.get(k) for k in ("unknown", "free", "occupied")},
-                        "probes_ahead": summary.get("values"),
+                        "probes_ahead": values
+                        if len(values := summary.get("values") or []) <= 8
+                        else f"{sum(v is not None and v >= 100 for v in values)} of "
+                        f"{len(values)} occupied",
                         "clear_goal": summary.get("clear_goal"),
                     }
                 )
@@ -634,7 +660,7 @@ def run_session(args: Any) -> None:
             == "y"
         )
         refresh = refresh_record(name) if confirmed else None
-        probes = [*OBSTACLE_PROBES, case.distance] if case.event == "placed" else None
+        probes = [*OBSTACLE_PROBES, (case.distance, 0.0)] if case.event == "placed" else None
         record = costmap_record(name, case.bearing, probes)
         record["refresh"] = refresh
         record["passed"] = record["measured_ok"] = False
