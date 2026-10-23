@@ -28,7 +28,7 @@ sections (2026-10-09 to 10-12) is a separate path and stays unverified.
 | Layer | Verdict | Evidence |
 |---|---|---|
 | Software | **Pass, one gate open** | After merging `main` (`ba04019c1`): 781 tests across `dimos/robot/unitree/g1`, `dimos/navigation` and the task artifacts; mypy clean (72 files). The exact legacy FK regression (Task 3) stays blocked: no authentic fixture exists ([fk-resolution.md](/docs/artifacts/g1_navigation_sonic_20261013/fk-resolution.md)). |
-| Simulation | **Pass** | The two-host MuJoCo matrix (92 cases): sensor and map freezes, link delay and hold, cancel, the native and publisher watchdogs, seeded-pose handback, peer and publisher restarts, synthetic goals straight ahead and 30 deg off the heading, and closed-loop corridor obstacle cases ([obstacles-4](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/obstacles-4/results.json)). The 3 s settle gate is marginal since the 0.20 rad facing lead: settling takes 2.2-4.2 s and most runs miss it once. |
+| Simulation | **Pass** | The two-host MuJoCo matrix (92 cases): sensor and map freezes, link delay and hold, cancel, the native and publisher watchdogs, seeded-pose handback, peer and publisher restarts, synthetic goals straight ahead and 30 deg off the heading, and closed-loop corridor obstacle cases ([obstacles-4](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/obstacles-4/results.json)). Settling takes 2.2-4.2 s since the 0.20 rad facing lead; the gate is 4.5 s since `settle-gate-45`, and the matrix passed 97 of 97 at `693a86b94` ([regress-693a86b94-2](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/regress-693a86b94-2/results.json)). |
 | Hardware | **Pass for the cases below** | pc2 sessions 2026-10-15 to 10-21, with the robot on the floor and a slack support cable from a crane. |
 
 Hardware cases (distances and angles are LIO base odometry, not tape-measured):
@@ -41,7 +41,7 @@ Hardware cases (distances and angles are LIO base odometry, not tape-measured):
 | `curve_left_020`, `curve_right_020` (4 s) | Left 44-48 cm, right 30-41 cm, about 60 deg of turn |
 | `cancel` | IDLE 0.051 s after the cancel |
 | `source_pause` | Passed (2026-10-19, 10-21-3, 10-21-5) |
-| `goal_1m` | Reached within 0.3 m four times: 17.0 s (2026-10-19-11), 8.6 s (2026-10-20-5), 6.0 s (2026-10-21-6), 6.6 s (2026-10-21-8) |
+| `goal_1m` | Reached within 0.3 m six times: 17.0 s (2026-10-19-11), 8.6 s (2026-10-20-5), 6.0 s (2026-10-21-6), 6.6 s (2026-10-21-8), 6.5 s (2026-10-22-5), 7.1 s (2026-10-22-6) |
 | `goal_1m_left30` | Reached in 8.1 s (2026-10-21-5); walked off at once, no turn in place |
 | `goal_detour` (box placed 0.6-2.0 m ahead, goal 2 m) | Detoured round the box and reached the goal in 22.7 s (2026-10-21-6). The base passed 0.247 m from the nearest box cell; the operator saw no contact |
 | `goal_obstacle_appears` (box placed mid-walk, goal 2 m) | Detected, replanned and reached the goal in 30.6 s, 0.27 m from the box (2026-10-21-8) |
@@ -910,3 +910,84 @@ would halve open-space detours while keeping more than 0.7 m from the box; it is
 candidate if the robot is to work in open halls. Earlier this report gave the robot
 track of `goal_detour` as 6.3 m: that window included 37 s of standing, where LIO
 jitter adds length; sampled once a second the walk was 3.33 m.
+
+### Sessions 2026-10-22-1..7 and the map refresh
+
+Sessions 1-6 ran attempt 12 (`7320a98e1`) on pc2 with the walk harness from the deploy
+layout (`6fe3cc635`), without `--ignore-rear-occupancy`; session 7 ran `693a86b94` with
+it ([hardware](/docs/artifacts/g1_navigation_sonic_20261013/hardware/), `results.json`
+and `raw-hashes.sha256` per session).
+
+| Session | Cases |
+|---|---|
+| 1, 4 | `idle` and `operator_stop` passed |
+| 2 | `forward_020` 21 cm; `curve_left_020` 42 cm, +63 deg; `curve_right_020` 27 cm, -64 deg. `goal_1m` refused: an occupied cell 0.75 m ahead |
+| 3 | `idle` passed. `operator_stop` saw the native stop after 8.9 s but is recorded as failed: the operator's answer reached the harness as arrow-key escapes (`o\x1b[A...`), so it was not a confirmation |
+| 5 | `forward_020` 23 cm, curves 48 cm left and 39 cm right (60 deg each). `goal_1m` reached in 6.5 s. `goal_obstacle_appears`: the planner logged "No path found" 0.12 s after the goal and gave up, so the robot did not move; the retry was refused on 7 occupied cells within 0.5 m (the crane). `startup_scan` passed |
+| 6 | `startup_scan` passed; `forward_020` 25, 30 and 35 cm. `goal_1m` was refused once for an unknown robot cell, then reached in 7.1 s after one more `forward_020`. `goal_detour` refused 3 times: "placed obstacle not seen on the path" (see the corridor check below) |
+| 7 | `refresh_map` twice, then `operator_stop`. pc2 went down before the goal cases |
+
+`forward_020` drifted at most 3.3 cm sideways. The walk agent's first status call failed with
+`KeyError: 'state'` in sessions 1 and 5 (below).
+
+**Stale voxels and the map refresh.** In sessions 2-6 the operator walked in front of
+the robot to set up an obstacle, and isolated voxels 0.7-1.0 m above the floor stayed in
+the map where the body had been. They refused `goal_1m` in session 2 and blocked
+`goal_obstacle_appears` with "No path found" in session 5. The ray map clears a voxel
+only when a later ray passes through it. The MID360 sits 1.31 m up and its lowest beam is
+-52 deg, so it cannot re-observe the near field, and the robot's own body blocks rays
+close by. Nothing ever cleared those voxels. The fix (`7c7b6c85a`, `693a86b94`):
+
+- `RayTracingVoxelMap` has a `clear_region` input: a cylinder in `world_frame`, encoded
+  like `region_bounds` (radius, z_min, z_max in the orientation). The worker removes every
+  voxel whose centre lies inside it and keeps neighbour support and the viz in sync.
+- The peer host's `refresh_map` op clears within 2.5 m of the robot. It clears from
+  0.12 m above the mapped floor (the densest 4 cm height bin below the knees) up to 1.5 m
+  above the base, and it refuses when no floor is mapped. Both floor layers stay, so the
+  robot cell and its ring remain known free.
+- Each goal case now asks the operator to confirm the area clear and to stand 1 m to the
+  side of the path. It then refreshes, waits 2 s for live scans and runs the pre-check. A
+  goal case ends 3 s after the goal when no plan was published.
+- Session 7 on the robot: the floor was found at -1.275 m. The two refreshes, 15 s apart,
+  removed 10,075 and 7,667 voxels (peer log). The live scans re-mapped most of the first
+  batch within 15 s, so it was mostly visible structure, which a refresh drops briefly.
+  The goal cases that would test the refresh did not run.
+- Offline, an end-to-end test runs the real binary through the zenoh transport
+  (`test_map_refresh.py`, skipped when the binary is not built). It maps a person's column
+  1 m ahead, removes the person, and checks that the column stays until `clear_region`
+  removes it while the floor stays.
+
+**Two-host simulation at `693a86b94`.** The full matrix passed 97 of 97
+([regress-693a86b94-2](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/regress-693a86b94-2/results.json)).
+The longest settle was 2.95 s (median 1.29 s, gate 4.5 s), with 549 missed step
+deadlines, no resets and at most 0.09 s scheduler lateness. A first attempt ran while the
+host also ran tests and a 2 GB copy
+([regress-693a86b94-loaded](/docs/artifacts/g1_navigation_sonic_20261013/two-host-sim/regress-693a86b94-loaded/results.json)).
+It passed 95 of 95, then the standing robot never held 0.5 s below the 0.03 rad/s yaw
+gate after `agent_stop_walking` (1,955 missed deadlines), and the run aborted. Load on
+the workstation, not the code: run the simulation on a quiet host.
+
+**Corridor pre-check for a placed obstacle.** `goal_detour` needs the placed box on the
+path before it sends the goal. The check used one probe line, 0.6-1.8 m ahead. In session
+6's snapshots the box's nearest cells were 0.21-0.30 m left of that line, at 0.9-1.3 m
+ahead, so every probe was free. The check now probes every 0.05 m cell within
+`MIN_CLEARANCE_M` + 0.15 m (0.35 m) of the path line over 0.6-1.8 m, and the goal cell
+must still be free (`3e61de5f9`). Replayed on that session's snapshots 07-10, the box is
+seen (26-29 occupied probes). Snapshot 06, taken before the box was placed, is still
+refused. The harness prompts also have line editing now (`85a87c69d`).
+
+The forward walks of sessions 2026-10-20 to 10-22 show no heading bias in the LIO
+heading. Over 22 `forward_020` runs the pooled displacement points -1.6 deg from the
+start heading (standard error about 1.1 deg). Single runs range from -16 to +34 deg,
+widest on the shortest walks (+34 deg over 4 cm).
+
+**Walk agent attach, `KeyError: 'state'`.** `Module.__init__` serves RPC before
+`SonicExecutionModule` caches its first status snapshot. The zenoh client re-issues an
+unanswered query every 50 ms, so an agent attached to a graph that is still starting
+lands its first status call in that window. Session 6's attach saw
+`subscriptions_ready: false`, consistent with this. `get_status` now refuses there with
+"SonicExecutionModule is starting", and `get_feedback` reports no fresh feedback
+(`d9b90588e`). A unit test reproduced the original KeyError. The walk agent's attach
+status can still return the new "starting" error in that window. It is a correct refusal,
+and the walk agent does not retry it. The fix reaches the robot with the next pc2
+re-provision.
