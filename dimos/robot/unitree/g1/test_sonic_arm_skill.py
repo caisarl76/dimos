@@ -1269,7 +1269,7 @@ def test_long_plans_split_into_two_chunks_at_the_hold():
 
 
 def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
-    """The slowest pose (overhead at 0.47 rad/s, 31 s) through the real session on a simulated clock."""
+    """The slowest pose (overhead at 0.75 rad/s, 22 s) through the real session on a simulated clock."""
     packets: list[bytes] = []
     profile = SonicModelProfile(
         name="arm",

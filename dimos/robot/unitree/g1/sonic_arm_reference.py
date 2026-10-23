@@ -69,7 +69,9 @@ ISAAC_FROM_MOTOR = np.array(
 LEFT_SHOULDER_PITCH = 15  # Motor order; negative moves the hand forward.
 ENCODER_SHA256 = "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae"  # SONIC v1.1
 RATE = 50
-PEAK_SPEED = 0.47  # rad/s: the commissioned 0.5 rad stroke over 2 s; bigger moves take longer.
+# rad/s: bigger moves take longer than the 2 s minimum stroke (move_s). Commissioned at 0.47; raised to
+# 0.75 on 2026-10-23 after the MuJoCo e2e sweep (13/13 at 0.6 and 0.75; peak |dq| 1.34 rad/s, tilt <= 2.8 deg).
+PEAK_SPEED = 0.75
 ENCODER_LOOKAHEAD_ROWS = 45
 _SPLIT_STILL_ROWS = 15
 _SPLIT_POSE_ROWS = _SPLIT_STILL_ROWS + ENCODER_LOOKAHEAD_ROWS + 2

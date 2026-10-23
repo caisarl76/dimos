@@ -83,8 +83,8 @@ def _head_camera() -> Webcam:
     )
 
 
-# The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 15.4 s for
-# move_upper_body, 31 s for the slowest full-range pose (overhead at 0.47 rad/s) and up to 20 s more
+# The skills stream a plan in chunks of at most 20 s, split only inside a hold: up to 12.3 s for
+# move_upper_body, 22 s for the slowest full-range pose (overhead at 0.75 rad/s) and up to 20 s more
 # for a held pose. max_duration also covers a retreat after a late stop.
 SONIC_ARM_PROFILE = SonicModelProfile(
     name="g1-sonic-arm",

@@ -190,7 +190,7 @@ def test_split_intervals_include_the_first_still_row_after_arrival(split_every):
 
 def test_split_lengthens_short_holds_and_rejects_an_oversize_segment():
     keyframes = [kf(-2.6, 0.45, 0, 1.2, hold=1.0)]
-    plan = keyframe_plan(BASE, keyframes, split_every=900)
+    plan = keyframe_plan(BASE, keyframes, split_every=600)
     assert plan_keyframe_holds(plan) == [1.24]
     assert plan.still.any()
     assert plan_keyframe_holds(keyframe_plan(BASE, keyframes)) == [1.0]
