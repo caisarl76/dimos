@@ -28,6 +28,8 @@ import time
 import numpy as np
 import pytest
 
+from dimos.core.rpc_client import RPCClient
+from dimos.protocol.rpc.spec import DEFAULT_RPC_TIMEOUT, RPCClient as RPCTransport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     Keyframe,
@@ -43,6 +45,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     _Watch,
     run_arms,
 )
+from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.test_sonic_arm_skill import (
     PEER_TOKEN,
     FakeEncoder,
@@ -63,6 +66,41 @@ def arms(dual_executions, mocker):
         SonicArm(name, config, execution, FakeEncoder(None), None)
         for name, (execution, _) in zip(("222", "223"), dual_executions, strict=True)
     ]
+
+
+class InProcessRPC(RPCTransport):
+    """An RPC transport to an in-process module, with call_sync's own per-method timeouts. Once
+    `dead` is set nothing answers, as with a dead or wedged execution worker."""
+
+    def __init__(self, module):
+        self.rpc_timeouts = {}
+        self.default_rpc_timeout = DEFAULT_RPC_TIMEOUT
+        self.module = module
+        self.dead = threading.Event()
+
+    def call(self, name, arguments, cb):
+        args, kwargs = arguments
+
+        def serve():
+            try:
+                result = getattr(self.module, name.rsplit("/", 1)[-1])(*args, **kwargs)
+            except Exception as exc:
+                result = exc
+            if not self.dead.is_set():
+                cb(result)
+
+        if not self.dead.is_set():
+            threading.Thread(target=serve, daemon=True).start()
+        return lambda: None
+
+
+@pytest.fixture
+def proxied(arms, dual_executions):
+    """223's arm over a worker-style RPC proxy to its execution; returns the proxy's transport."""
+    transport = InProcessRPC(dual_executions[1][0])
+    proxy = RPCClient(None, SonicExecutionModule, "g1_223", rpc=transport)
+    arms[1] = SonicArm("223", arms[1].config, proxy, arms[1]._encoder, None)
+    return transport
 
 
 def step(s):
@@ -86,7 +124,11 @@ def feeding(arms, shape=step, noise=(0.0, 0.0), extra=(None, None)):
     def feed(arm, noise, extra):
         rng = np.random.default_rng(0)
         while not stopped.is_set():
-            state, watch = arm._execution.get_feedback(), arm._watch
+            try:
+                state = arm._execution.get_feedback()
+            except TimeoutError:  # A dead execution worker's proxy.
+                state = None
+            watch = arm._watch
             if state is not None and watch is not None:
                 q = watch.base.copy()
                 if watch.send_at is None:
@@ -462,3 +504,94 @@ def test_each_arm_samples_its_own_hold_until_a_peer_abort(arms, mocker):
         assert result.metadata[arm.name]["hold_samples"] == len(times) > 0, arm.name
         assert watch.hold_rows[0] / 50 - 0.03 <= min(times), arm.name
         assert max(times) <= 1.6 + 0.1, arm.name  # Neither collects after the abort.
+
+
+def real_holds(mocker):
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),
+    )
+
+
+def both_sent(arms):
+    return all(a._watch is not None and a._watch.send_at for a in arms)
+
+
+def timed_submits(arm, mocker):
+    """(sequence, monotonic time) of each submit_chunk call on arm's in-process execution."""
+    submits = []
+    real = arm._execution.submit_chunk
+
+    def submit(task_id, sequence, *args):
+        submits.append((sequence, time.monotonic()))
+        return real(task_id, sequence, *args)
+
+    mocker.patch.object(arm._execution, "submit_chunk", side_effect=submit)
+    return submits
+
+
+def test_both_peer_rpc_error_mid_stream_retreats_the_healthy_arm(arms, dual_executions, mocker):
+    """223's status RPC fails and its cancel blocks until 222's task is done: 222 still retreats."""
+    broken = threading.Event()
+    status, cancel = arms[1]._execution.get_status, arms[1]._execution.cancel_task
+
+    def failing_status():
+        if broken.is_set():
+            raise RuntimeError("execution worker lost")
+        return status()
+
+    def blocking_cancel(task_id):  # An RPC that only returns once 222 is done either way.
+        wait_until(lambda: task(arms[0])["phase"] == "done")
+        return cancel(task_id)
+
+    real_holds(mocker)
+    mocker.patch.object(arms[1]._execution, "get_status", side_effect=failing_status)
+    mocker.patch.object(arms[1]._execution, "cancel_task", side_effect=blocking_cancel)
+
+    def break_223():
+        wait_until(lambda: both_sent(arms))
+        time.sleep(0.3)
+        broken.set()
+
+    breaker = threading.Thread(target=break_223, daemon=True)
+    breaker.start()
+    with feeding(arms), pytest.raises(RuntimeError) as raised:
+        run_arms([swing(arm, hold=2.0) for arm in arms])
+    breaker.join(2)
+    first, second = str(raised.value).split("; 223: ")
+    assert first.startswith("222: ") and "stopped early: 223: " in first, first
+    assert "execution worker lost" in first and "execution worker lost" in second, raised.value
+    assert ends_at_the_planner_smoothly(dual_executions[0][1])
+    assert task(arms[0])["handback_confirmed"], task(arms[0])
+
+
+def test_both_peer_rpc_hang_mid_stream_retreats_the_healthy_arm_promptly(
+    arms, dual_executions, proxied, mocker
+):
+    """223's worker stops answering mid-stream: its bounded RPC fails and 222 retreats at once."""
+    real_holds(mocker)
+    submits = timed_submits(arms[0], mocker)
+    hung: list[float] = []
+
+    def hang_223():
+        wait_until(lambda: both_sent(arms))
+        time.sleep(0.3)
+        hung.append(time.monotonic())
+        proxied.dead.set()
+
+    hanger = threading.Thread(target=hang_223, daemon=True)
+    hanger.start()
+    started = time.monotonic()
+    with feeding(arms), pytest.raises(RuntimeError) as raised:
+        run_arms([swing(arm, hold=2.0) for arm in arms])
+    elapsed = time.monotonic() - started
+    hanger.join(2)
+    first, second = str(raised.value).split("; 223: ")
+    assert first.startswith("222: ") and "stopped early: 223: " in first, first
+    assert "timed out" in first and "timed out" in second, raised.value
+    retreats = [t for sequence, t in submits if sequence > 0]
+    assert retreats and retreats[0] - hung[0] < 1.5, (retreats, hung)
+    assert elapsed < 15, elapsed  # Not the transport's 120 s default.
+    assert ends_at_the_planner_smoothly(dual_executions[0][1])
+    assert task(arms[0])["handback_confirmed"], task(arms[0])

@@ -48,6 +48,7 @@ from dimos.agents.skill_result import SkillResult
 from dimos.control.components import make_humanoid_joints
 from dimos.core.core import rpc
 from dimos.core.module import Module, ModuleConfig
+from dimos.core.rpc_client import RPCClient
 from dimos.core.stream import In
 from dimos.models.vl.base import VlModel
 from dimos.models.vl.openai import OpenAIVlModel
@@ -329,6 +330,16 @@ class SonicArmExecutionSpec(Spec, Protocol):
     def cancel_task(self, task_id: str) -> dict[str, Any]: ...
 
 
+_EXECUTION_METHODS = (
+    "get_status",
+    "get_feedback",
+    "start_task",
+    "submit_chunk",
+    "finish_task",
+    "cancel_task",
+)
+
+
 class SonicArmSkillConfig(ModuleConfig):
     encoder_path: Path
     body_margin: float = Field(default=0.15, gt=0, le=0.3)  # legs and waist, rad
@@ -347,6 +358,12 @@ class SonicArmSkillConfig(ModuleConfig):
     # environment); None disables the skill. vl_box_scale is the model's box coordinate convention.
     vl_model: str | None = None
     vl_box_scale: BoxScale = "pixels"
+    # How long a status or feedback read from the execution worker may take, s; the task calls
+    # (start, submit with up to a 1000-row chunk, finish, cancel) get twice as long. A dead or
+    # wedged worker then fails within about a second instead of the transport's 120 s default, so
+    # a joint start's other robots retreat at once. Each is a sub-millisecond snapshot or session
+    # call on the same host; 0.5 s covers the ~170 ms event-loop stalls seen in one process.
+    execution_rpc_timeout_seconds: float = Field(default=0.5, gt=0, le=1, allow_inf_nan=False)
 
 
 @dataclass
@@ -415,6 +432,13 @@ class SonicArm:
     ) -> None:
         self.name = name
         self.config = config
+        if isinstance(execution, RPCClient):
+            # A worker's own unpickled proxy: bound its transport's waits (see the config field).
+            read = config.execution_rpc_timeout_seconds
+            for method in _EXECUTION_METHODS:
+                execution.rpc.rpc_timeouts[f"{execution.remote_name}/{method}"] = (
+                    read if method in ("get_status", "get_feedback") else 2 * read
+                )
         self._execution = execution
         self._encoder = encoder
         self._checker = checker
@@ -646,6 +670,10 @@ class SonicArm:
             outcome = self._stream(task_id, plan, chunks, prepared.retreat, profile, watch, group)
         except Exception as exc:
             outcome = f"{type(exc).__name__}: {exc}"
+            # Published before the cancel, which may block for its RPC bound: peers retreat now.
+            self._fail(watch, outcome)
+            if group is not None:
+                group.barrier.abort()  # Raised while arming: a peer at the barrier gives up now.
             self._cancel(task_id)
         if outcome != "finished":
             self._fail(watch, outcome)
