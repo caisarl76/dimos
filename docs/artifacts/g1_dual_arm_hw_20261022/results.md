@@ -50,6 +50,9 @@ A progress-based onset replaces this metric (fix in progress).
 - **raise_hand on 222:** it trips the 0.15 rad knee envelope while SONIC balances the hand-equipped arm by
   sitting into the left leg (Tier-1 analysis). The next check is one `raise_hand` on 223, to separate the
   gesture from the hands.
+- **TODO (Dex3 hand collision), not critical while trajectory speed is managed (operator, 2026-10-23):**
+  222's Dex3 hand is much bigger than the basic hand, so a trajectory that clears on 223 can collide on 222.
+  Add the Dex3 hand to 222's path check. Marked `TODO(dex3)` in `sonic_dual_arm_skill.py`.
 - **Hand collisions unchecked on 222:** `ArmCollisionChecker` ignores the hand geoms (it was built for 223
   without hands). On 222, `move_left_arm_joints`, `point_at` and forearm pointing are unchecked for the Dex3
   hand until the checker includes it.

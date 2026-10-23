@@ -75,6 +75,9 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         encoder = SonicEncoder(self.config.encoder_path)
         checker = None
         if self.config.collision_model_path is not None:
+            # TODO(dex3): the checker ignores the hand geoms (built for 223, no hands). 222's Dex3
+            # hand is much bigger, so a path that clears on 223 can hit 222's body. Not critical
+            # while trajectory speed is managed; add the Dex3 hand to the 222 check.
             checker = ArmCollisionChecker(self.config.collision_model_path)
         executions = {"222": self._execution_222, "223": self._execution_223}
         self._by_robot = {
