@@ -166,6 +166,9 @@ class SonicExecutionModule(Module):
         with self._snapshot_lock:
             result = copy.deepcopy(self._snapshot)
             state = self._feedback_snapshot
+        if not result:
+            # Module.__init__ serves RPC before this class caches its first snapshot.
+            raise RuntimeError("SonicExecutionModule is starting: no status yet")
         age = None if state is None else time.monotonic() - state.received_monotonic
         fresh = (
             result["state"] == "running"
@@ -206,7 +209,7 @@ class SonicExecutionModule(Module):
         """Return a fresh immutable sample on this host's monotonic clock."""
         with self._snapshot_lock:
             state = self._feedback_snapshot
-            running = self._snapshot["state"] == "running"
+            running = self._snapshot.get("state") == "running"
         if (
             running
             and state is not None

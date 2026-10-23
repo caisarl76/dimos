@@ -20,6 +20,7 @@ from pathlib import Path
 import struct
 import threading
 import time
+from typing import Any
 from uuid import uuid4
 
 import msgpack
@@ -401,6 +402,31 @@ def test_worker_rpc_preserves_chunks_and_terminal_results(worker_execution):
     status = module.get_status()["task"]
     assert status["outcome"] == "finished"
     assert status["handback_confirmed"] is True
+
+
+def test_rpc_served_before_the_first_snapshot_is_a_clear_refusal(execution_config, mocker):
+    # Module.__init__ serves RPC before this class caches its first snapshot; a walk
+    # agent attaching to a just-started graph landed there (KeyError: 'state',
+    # sessions 2026-10-22-1 and -5).
+    early: list[Any] = []
+    cache = SonicExecutionModule._cache
+
+    def first_cache(self: SonicExecutionModule) -> None:
+        if not early:
+            early.append(self.get_feedback())
+            with pytest.raises(RuntimeError, match="starting"):
+                self.get_status()
+            with pytest.raises(RuntimeError, match="starting"):
+                self.get_navigation_status()
+        cache(self)
+
+    mocker.patch.object(SonicExecutionModule, "_cache", first_cache)
+    module = SonicExecutionModule(**execution_config)
+    try:
+        assert early == [None]
+        assert module.get_status()["state"] == "stopped"
+    finally:
+        module.stop()
 
 
 @pytest.mark.parametrize("socket_name", ["_publisher", "_subscriber"])
