@@ -1,0 +1,10 @@
+[g1_222] standing: {'floor_contacts': 8, 'pelvis_z': 0.7874377046559918}
+[g1_222] armed epoch 1
+[g1_222] planner (handback)
+[g1_222] armed epoch 2
+[g1_222] planner (handback)
+[g1_222] armed epoch 3
+[g1_222] planner (handback)
+[g1_222] armed epoch 4
+[g1_222] planner (handback)
+[g1_222] wrote /home/jihun/work/dimos-dual-g1/docs/artifacts/g1_dual_arm_sim_20261021/run05/sim_222.npz
