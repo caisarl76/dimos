@@ -27,6 +27,7 @@ import math
 import re
 import threading
 import time
+from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
@@ -141,7 +142,10 @@ def real_launch_skill(execution, tool_transport, mocker):
 
 @contextmanager
 def feeding(module, body_q=lambda t: np.zeros(29)):
-    """A feeder plays body telemetry into the skill (t = seconds since entering)."""
+    """A feeder plays body telemetry into the skill (t = seconds since entering).
+
+    Yields a function that stops the feeder early.
+    """
     stopped = threading.Event()
 
     def feed():
@@ -153,13 +157,16 @@ def feeding(module, body_q=lambda t: np.zeros(29)):
                 module.handle_feedback(replace(state, body_q=q))
             time.sleep(0.01)
 
+    def stop():
+        stopped.set()
+        feeder.join(2)
+
     feeder = threading.Thread(target=feed, daemon=True)
     feeder.start()
     try:
-        yield
+        yield stop
     finally:
-        stopped.set()
-        feeder.join(2)
+        stop()
 
 
 def run(module, angle_deg, body_q=lambda t: np.zeros(29), motion="left_arm_forward"):
@@ -577,25 +584,44 @@ def test_stop_during_encoding_sends_nothing(real_launch_skill, mocker):
     assert module._execution.get_status()["task"] is None
 
 
-def stop_at_row(module, mocker, row):
-    """The motion's stop retreats from token row `row`, wherever the wall clock has got to.
+def stop_at_row(module, mocker, row, on_row=lambda: None):
+    """Records the stream's stop row against sonic_arm_skill's own (real) clock.
 
-    Returns the rows the stream asked to retreat from, and the retreat it built.
+    The first time the stream reads its clock at `row` token rows or more into the plan, it calls
+    `on_row` on the stream thread and sets the returned event. Production computes the retreat row
+    and the stream gets it unchanged. Each stop is recorded as (the row the stream passed to
+    retreat(), the row its clock implied there: int((now - plan_start) * RATE), the retreat built).
     """
+    last = threading.local()  # Each thread's latest reading of the module's clock.
+    stops = []
+    reached = threading.Event()
+
+    def monotonic():
+        last.now = time.monotonic()
+        start = getattr(last, "watch", None) and last.watch.plan_start  # The stream thread's.
+        if start is not None and not reached.is_set() and (last.now - start) * RATE >= row:
+            on_row()  # Seen by this very loop pass, which retreats from this reading.
+            reached.set()
+        return last.now
+
+    mocker.patch.object(
+        sonic_arm_skill, "time", SimpleNamespace(monotonic=monotonic, sleep=time.sleep)
+    )
     real_stream = module._stream
-    asked: list[int] = []
-    built: list[np.ndarray | None] = []
 
     def stream(task_id, plan, chunks, retreat, profile, watch):
-        def at_row(token_row):
-            asked.append(token_row)
-            built.append(retreat(row))
-            return built[-1]
+        last.watch = watch  # Runs on the stream thread: its clock readings watch for the row.
 
-        return real_stream(task_id, plan, chunks, at_row, profile, watch)
+        def recorded(token_row):
+            # Nothing reads the clock between the stream's stop reading and this call.
+            implied = int((last.now - watch.plan_start) * RATE)
+            stops.append((token_row, implied, retreat(token_row)))
+            return stops[-1][2]
+
+        return real_stream(task_id, plan, chunks, recorded, profile, watch)
 
     mocker.patch.object(module, "_stream", side_effect=stream)
-    return asked, built
+    return reached, stops
 
 
 def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
@@ -604,17 +630,27 @@ def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
     module, _ = real_launch_skill
     submit = mocker.spy(module._execution, "submit_chunk")
     updates = mocker.spy(module, "tool_update")
-    asked, built = stop_at_row(module, mocker, LEAD_IN_ROWS + 5)  # Mid-motion, past the blend.
-    with feeding(module, follows):
+    reached, stops = stop_at_row(module, mocker, LEAD_IN_ROWS + 5)  # Mid-motion, past the blend.
+    teardown = Module.stop
+    with feeding(module, follows) as stop_feeding:
+
+        def quiet_teardown(self):  # A feeder call into the stopping loop would wait forever.
+            stop_feeding()
+            teardown(self)
+
+        mocker.patch.object(Module, "stop", quiet_teardown)
         module.move_upper_body("left_arm_forward", 20.0)
-        wait_until(lambda: submit.call_count == 1)  # The stream is armed.
+        assert reached.wait(10)
         module.stop()
         # stop() returned only after the retreat and the motion's own final update.
         assert module._stop.is_set()
         assert [c.args[1] for c in submit.call_args_list] == [0, 1]
         assert updates.call_count == 1
     assert "stopped early: stop requested" in json.loads(updates.call_args.args[1])["message"]
-    assert len(asked) == 1 and np.array_equal(submit.call_args_list[1].args[3], built[0])
+    [(row, implied, built)] = stops
+    # The row the stream's clock implies at the stop, not one a chunk or the blend pad off.
+    assert row == implied >= LEAD_IN_ROWS + 5, stops
+    assert np.array_equal(submit.call_args_list[1].args[3], built)
     assert module._execution.get_status()["task"]["handback_confirmed"]
 
 
@@ -648,20 +684,15 @@ def test_motion_called_during_module_stop_is_refused_and_nothing_outlives_stop(
 
 def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     module, _ = skill
-    real = module._execution.submit_chunk
-
-    def submit(task_id, sequence, observed_at, actions):
-        task = real(task_id, sequence, observed_at, actions)
-        if sequence == 0:
-            module._stop.set()  # Seen by the stream's next loop pass.
-        return task
-
-    spy = mocker.patch.object(module._execution, "submit_chunk", side_effect=submit)
-    row = 3  # A few rows into the fixture's lead-in blend.
-    asked, _ = stop_at_row(module, mocker, row)
+    spy = mocker.spy(module._execution, "submit_chunk")
+    # Stopped a few rows into the fixture's lead-in blend, seen by that same loop pass.
+    _, stops = stop_at_row(module, mocker, 3, on_row=module._stop.set)
     result = run(module, 20.0, follows)
     assert "stopped early: stop requested" in result.message, result
-    assert len(asked) == 1 and len(spy.call_args_list) == 2
+    [(row, implied, _)] = stops
+    # The row the stream's clock implies at the stop, not one a chunk or the blend pad off.
+    assert row == implied and 3 <= row < LEAD_IN_ROWS, stops
+    assert len(spy.call_args_list) == 2
     first, rows = spy.call_args_list[0].args[3], spy.call_args_list[1].args[3]
     assert len(rows) == row + 2  # The blend rows sent so far, reversed, then the planner token.
     assert np.array_equal(rows[:-1], first[row::-1])

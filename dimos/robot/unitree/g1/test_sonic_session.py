@@ -473,4 +473,3 @@ def test_observed_owner_violation_cannot_be_overwritten_before_tick(rig, epoch, 
     assert session.status.phase == SessionPhase.HANDBACK
     assert sum(p.startswith(b"pose") for p in packets) == count
     assert any(event["event"] == "feedback_fault" for event in events)
-
