@@ -360,7 +360,7 @@ def test_motion_racing_module_stop_is_refused_and_nothing_outlives_stop(real_lau
     gates, starts = gate_starts(module, mocker)
     stopper, release = stop_in_background(module, mocker)
     try:
-        with pytest.raises(RuntimeError, match="the arm skills are shutting down"):
+        with pytest.raises(RuntimeError, match="the arm skill is shutting down"):
             module.perform_gesture("both", "wave")
         assert module.stop_arm() == "No arm motion is running."
     finally:
@@ -400,7 +400,7 @@ def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_en
     assert registry.snapshot() == {} and not module._tools
     assert len(frames(tool_transport, TOOL_STREAM_STOPPED_METHOD)) == 1
     text, error = call("perform_gesture", robot="223", name="wave")
-    assert error and "the arm skills are shutting down" in text, text
+    assert error and "the arm skill is shutting down" in text, text
     assert registry.snapshot() == {} and not module._tools
 
 

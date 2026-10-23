@@ -993,7 +993,7 @@ class ArmLauncher:
                     "Call stop_arm to stop it."
                 )
             if self._closing:
-                raise RuntimeError("the arm skills are shutting down")
+                raise RuntimeError("the arm skill is shutting down; nothing started")
             if self._running is not None:
                 raise RuntimeError("an arm move is already running")
             work = prepare()
