@@ -58,6 +58,7 @@ from dimos.robot.unitree.g1.test_sonic_arm_skill import (
     frames,
     gate_start,
     mcp as mcp,
+    stop_in_background,
     tokens,
     tool_transport as tool_transport,
     wait_until,
@@ -352,6 +353,55 @@ def test_module_stop_mid_motion_retreats_both_and_waits_for_the_update(real_laun
     assert "stopped early" in second and "stop requested" in second, second
     for arm in module._arms():
         assert task(arm)["handback_confirmed"], task(arm)
+
+
+def test_motion_racing_module_stop_is_refused_and_nothing_outlives_stop(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    gates, starts = gate_starts(module, mocker)
+    stopper, release = stop_in_background(module, mocker)
+    try:
+        with pytest.raises(RuntimeError, match="the arm skills are shutting down"):
+            module.perform_gesture("both", "wave")
+        assert module.stop_arm() == "No arm motion is running."
+    finally:
+        release.set()
+        stopper.join(10)
+    alive = module._motion is not None and module._motion.is_alive()
+    assert not stopper.is_alive() and not alive
+    assert all(arm.stop.is_set() for arm in module._launched)
+    assert module._running is None and not module._tools
+    for gate in gates:
+        gate.set()
+    assert [s.call_count for s in starts] == [0, 0]
+
+
+def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_ends(
+    real_launch_skill, mcp, tool_transport, mocker
+):
+    module, _ = real_launch_skill
+    call, registry = mcp
+    gates, starts = gate_starts(module, mocker)
+    assert "started" in call("perform_gesture", robot="both", name="wave")[0]
+    wait_until(lambda: all(s.call_count == 1 for s in starts))  # Both parked at their gates.
+    stopper = threading.Thread(target=module.stop)
+    stopper.start()
+    try:
+        wait_until(lambda: all(arm.stop.is_set() for arm in module._arms()))  # stop() has begun.
+        text, error = call("perform_gesture", robot="both", name="wave")
+        assert "already running" in text and not error  # Admits nothing; rebinds the hold.
+        assert registry.snapshot() == {"movement": "perform_gesture"}
+        text, _ = call("move_upper_body", robot="222", motion="left_arm_forward", angle_deg=20.0)
+        assert "held by 'perform_gesture'" in text
+    finally:
+        for gate in gates:
+            gate.set()
+        stopper.join(10)
+    assert not stopper.is_alive() and not module._motion.is_alive()
+    assert registry.snapshot() == {} and not module._tools
+    assert len(frames(tool_transport, TOOL_STREAM_STOPPED_METHOD)) == 1
+    text, error = call("perform_gesture", robot="223", name="wave")
+    assert error and "the arm skills are shutting down" in text, text
+    assert registry.snapshot() == {} and not module._tools
 
 
 def test_dual_blueprints_set_only_known_global_config_fields() -> None:

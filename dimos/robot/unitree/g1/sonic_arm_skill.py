@@ -945,15 +945,17 @@ class ArmLauncher:
         self._running: str | None = None  # The running motion's skill (and tool-stream) name.
         self._launched: Sequence[SonicArm] = ()  # The running motion's arms.
         self._motion: threading.Thread | None = None  # The running motion's thread.
+        self._closing = False  # Set once Module.stop() begins: no new motion may start.
         super().__init__(*args, **kwargs)
 
     def _retreat_before_stop(self) -> None:
         """For the host's Module.stop(): stop a running motion and wait for its retreat.
 
         Best-effort, so the native planner never takes over a raised arm; the coordinator may stop
-        the execution workers concurrently.
+        the execution workers concurrently. Closes admission first, so no motion starts after.
         """
         with self._lifecycle:
+            self._closing = True
             motion = self._motion if self._running is not None else None
             if motion is not None:
                 for arm in self._launched:
@@ -979,7 +981,8 @@ class ArmLauncher:
 
         Checks for a running motion before validating, and never closes or releases what it holds:
         a same-tool retry through MCP has already taken over the capability hold, and start_tool
-        rebinds the live stream to it, so the running motion's stream stop releases it.
+        rebinds the live stream to it, so the running motion's stream stop releases it. That holds
+        during shutdown too: refusing such a retry would let MCP release the running motion's hold.
         """
         selected = self._arms() if arms is None else arms
         with self._lifecycle:
@@ -989,6 +992,8 @@ class ArmLauncher:
                     f"{tool} is already running; its result will follow as a tool update. "
                     "Call stop_arm to stop it."
                 )
+            if self._closing:
+                raise RuntimeError("the arm skills are shutting down")
             if self._running is not None:
                 raise RuntimeError("an arm move is already running")
             work = prepare()

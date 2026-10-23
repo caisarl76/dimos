@@ -599,6 +599,71 @@ def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
     assert module._execution.get_status()["task"]["handback_confirmed"]
 
 
+def stop_in_background(module, mocker):
+    """Starts module.stop() on a thread and holds it just after its retreat step, while the
+    coordinator would still be tearing the module down; returns (stopper, release)."""
+    stopping, release = threading.Event(), threading.Event()
+    retreat = module._retreat_before_stop
+
+    def retreat_then_hold():
+        retreat()
+        stopping.set()
+        release.wait(10)
+
+    mocker.patch.object(module, "_retreat_before_stop", side_effect=retreat_then_hold)
+    stopper = threading.Thread(target=module.stop)
+    stopper.start()
+    assert stopping.wait(10)
+    return stopper, release
+
+
+def test_motion_racing_module_stop_is_refused_and_nothing_outlives_stop(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    gate, start_task = gate_start(module, mocker)
+    stopper, release = stop_in_background(module, mocker)
+    try:
+        with pytest.raises(RuntimeError, match="the arm skills are shutting down"):
+            module.move_upper_body("left_arm_forward", 20.0)
+        assert module.stop_arm() == "No arm motion is running."
+    finally:
+        release.set()
+        stopper.join(10)
+    alive = module._motion is not None and module._motion.is_alive()
+    assert not stopper.is_alive() and not alive
+    assert all(arm.stop.is_set() for arm in module._launched)
+    assert module._running is None and not module._tools
+    gate.set()
+    assert start_task.call_count == 0
+
+
+def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_ends(
+    real_launch_skill, mcp, tool_transport, mocker
+):
+    module, _ = real_launch_skill
+    call, registry = mcp
+    gate, start_task = gate_start(module, mocker)
+    assert "started" in call("move_upper_body", motion="left_arm_forward", angle_deg=20.0)[0]
+    wait_until(lambda: start_task.call_count == 1)  # Parked at the gate, past the stop checks.
+    stopper = threading.Thread(target=module.stop)
+    stopper.start()
+    try:
+        wait_until(module._arm.stop.is_set)  # stop() has begun and waits for the motion.
+        assert module.stop_arm().startswith("Stopping")
+        text, error = call("move_upper_body", motion="left_arm_forward", angle_deg=20.0)
+        assert "already running" in text and not error  # Admits nothing; rebinds the hold.
+        assert registry.snapshot() == {"movement": "move_upper_body"}
+        assert not frames(tool_transport, TOOL_STREAM_STOPPED_METHOD)
+    finally:
+        gate.set()
+        stopper.join(10)
+    assert not stopper.is_alive() and not module._motion.is_alive() and module._arm.stop.is_set()
+    assert registry.snapshot() == {} and not module._tools
+    assert len(frames(tool_transport, TOOL_STREAM_STOPPED_METHOD)) == 1
+    text, error = call("move_upper_body", motion="left_arm_forward", angle_deg=20.0)
+    assert error and "the arm skills are shutting down" in text, text
+    assert registry.snapshot() == {} and not module._tools
+
+
 def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     module, _ = skill
     real = module._execution.submit_chunk
