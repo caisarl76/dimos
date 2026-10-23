@@ -1352,3 +1352,32 @@ def test_module_ref_remapped_to_unknown_instance_name_raises() -> None:
 
     with pytest.raises(ValueError, match="nope"):
         _build_without_rerun(blueprint)
+
+
+def test_namespaced_module_ref_remapped_to_instance_name() -> None:
+    blueprint = (
+        autoconnect(
+            ValueProvider.blueprint(instance_name="p_a", value="a"),
+            ValueProvider.blueprint(instance_name="p_b", value="b"),
+            TwoRefConsumer.blueprint(),
+        )
+        .remappings([(TwoRefConsumer, "_a", "p_a"), (TwoRefConsumer, "_b", "p_b")])
+        .namespace("pair")
+    )
+    consumer_name = f"pair/{TwoRefConsumer.name}"
+    assert blueprint.remapping_map[consumer_name, "_a"] == "pair/p_a"
+    assert blueprint.remapping_map[consumer_name, "_b"] == "pair/p_b"
+
+    coordinator = _build_without_rerun(blueprint)
+    try:
+        consumer = coordinator.get_instance(TwoRefConsumer)
+        assert consumer._a.get_value() == "a"
+        assert consumer._b.get_value() == "b"
+    finally:
+        coordinator.stop()
+
+
+def test_namespace_keeps_a_module_ref_to_an_outside_instance() -> None:
+    inner = TwoRefConsumer.blueprint().remappings([(TwoRefConsumer, "_a", "shared")])
+    remap = inner.namespace("pair").remapping_map
+    assert remap[f"pair/{TwoRefConsumer.name}", "_a"] == "shared"

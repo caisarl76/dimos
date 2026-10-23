@@ -136,6 +136,13 @@ def test_dual_blueprint_wires_each_robot_to_its_own_execution():
         assert kwargs["journal_dir"].parts[-2:] == ("sonic-arm", robot)
 
 
+def test_dual_blueprint_namespaced_keeps_each_robots_execution():
+    remap = unitree_g1_sonic_arm_dual.namespace("pair").remapping_map
+    container = f"pair/{DualSonicArmSkillContainer.name}"
+    assert remap[container, "_execution_222"] == "pair/g1_222"
+    assert remap[container, "_execution_223"] == "pair/g1_223"
+
+
 def test_dual_prompt_names_only_dual_skills():
     named = set(re.findall(r"`(\w+)\(", G1_SONIC_DUAL_ARM_SYSTEM_PROMPT))
     skills = {
