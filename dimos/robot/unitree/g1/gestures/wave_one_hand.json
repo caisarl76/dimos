@@ -1,0 +1,82 @@
+{
+  "keyframes": [
+    {
+      "delta": {},
+      "t": 0.0
+    },
+    {
+      "absolute": {
+        "right_elbow": 0.171,
+        "right_shoulder_pitch": -0.386,
+        "right_shoulder_roll": -0.689,
+        "right_shoulder_yaw": 0.028,
+        "right_wrist_pitch": -0.283,
+        "right_wrist_roll": -1.03,
+        "right_wrist_yaw": -1.24
+      },
+      "t": 2.2
+    },
+    {
+      "absolute": {
+        "right_elbow": 0.204,
+        "right_shoulder_pitch": -0.407,
+        "right_shoulder_roll": -0.554,
+        "right_shoulder_yaw": -0.306,
+        "right_wrist_pitch": -0.154,
+        "right_wrist_roll": -0.61,
+        "right_wrist_yaw": -1.09
+      },
+      "t": 3.0
+    },
+    {
+      "absolute": {
+        "right_elbow": 0.153,
+        "right_shoulder_pitch": -0.429,
+        "right_shoulder_roll": -0.665,
+        "right_shoulder_yaw": -0.07,
+        "right_wrist_pitch": -0.25,
+        "right_wrist_roll": -0.977,
+        "right_wrist_yaw": -1.189
+      },
+      "t": 3.7
+    },
+    {
+      "absolute": {
+        "right_elbow": 0.251,
+        "right_shoulder_pitch": -0.406,
+        "right_shoulder_roll": -0.583,
+        "right_shoulder_yaw": -0.31,
+        "right_wrist_pitch": -0.155,
+        "right_wrist_roll": -0.669,
+        "right_wrist_yaw": -1.066
+      },
+      "t": 4.45
+    },
+    {
+      "absolute": {
+        "right_elbow": 0.066,
+        "right_shoulder_pitch": -0.396,
+        "right_shoulder_roll": -0.683,
+        "right_shoulder_yaw": -0.06,
+        "right_wrist_pitch": -0.344,
+        "right_wrist_roll": -0.929,
+        "right_wrist_yaw": -1.074
+      },
+      "t": 5.3
+    },
+    {
+      "absolute": {
+        "right_elbow": 0.187,
+        "right_shoulder_pitch": -0.366,
+        "right_shoulder_roll": -0.609,
+        "right_shoulder_yaw": -0.308,
+        "right_wrist_pitch": -0.118,
+        "right_wrist_roll": -0.626,
+        "right_wrist_yaw": -0.914
+      },
+      "t": 6.1
+    }
+  ],
+  "name": "wave_one_hand",
+  "return_s": 1.8
+}
