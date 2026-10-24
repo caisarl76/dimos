@@ -38,10 +38,12 @@ and reads references from 127.0.0.1:5556. Use each PC2's ssh alias (today: 222 `
        ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:15556 -L 15557:127.0.0.1:5557 pc2_222
        ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R 5556:127.0.0.1:16556 -L 16557:127.0.0.1:5557 pc2
 
-3. Run, with the SONIC v1.1 encoder and the gear_sonic MuJoCo model for the path check:
+3. Run, with the SONIC v1.1 encoder, the gear_sonic MuJoCo model for the path check (the
+   imported gestures and move_left_arm_joints need it) and 222's Dex3 hands declared:
 
        dimos run unitree-g1-sonic-arm-dual \\
            --dualsonicarmskillcontainer.max-dq=2.0 \\
+           --dualsonicarmskillcontainer.hands-mounted-222=true \\
            --dualsonicarmskillcontainer.encoder-path=<deploy>/policy/sonic_v1_1/model_encoder.onnx \\
            --dualsonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
        dimos mcp call move_upper_body --json-args '{"robot": "both", "motion": "left_arm_forward", "angle_deg": 20}'
@@ -57,6 +59,33 @@ and reads references from 127.0.0.1:5556. Use each PC2's ssh alias (today: 222 `
    Look at `ready`, `subscriptions_ready`, `feedback_fresh`, `feedback_age_s`. A skill saying
    "SONIC is not in confirmed planner idle" while the planner is idle usually means a tunnel
    forward is missing. (`app.stop()` only closes this client.)
+
+Dex3 hands are per robot: hands_mounted_222 and hands_mounted_223, both false by default (the
+single-robot hands_mounted is refused here). 222 has Dex3 hands; 223 runs with them disabled (its
+hand columns are still sent and ignored). Only a robot with hands_mounted_<robot> accepts the
+operator finger check and reports a hand-only motion's hand pose; every robot plans and streams
+its imported gestures' hand rows from its own measured hands. Both execution profiles limit the
+hand step per transmitted row (SONIC_ARM_PROFILE.hand_step_limit).
+
+Operator finger check (an RPC, not an agent skill), with a running blueprint and
+`app = Dimos.connect()` as in the readiness check (step 4):
+
+       app.DualSonicArmSkillContainer.check_dex3_finger_order("222")   # "started" at once
+       app.DualSonicArmSkillContainer.operator_result("222")           # None while it runs
+
+   It holds the body and moves 222's fingers to FINGER_CHECK_POSE ("LEFT index open, middle
+   closed, thumb half; RIGHT middle open, index closed, thumb rotated") for 3 s, then back;
+   stop_arm stops it. On failure the "Hand result" log line and the result's hand_base,
+   hand_target and hand_held tell the cases apart.
+
+Hardware order for the imported gestures (after the two-stand-in run):
+   1. 223: perform_gesture "support_person", then "two_hand_hearts" (arms only: 223 has no hands).
+   2. 222 at planner idle, before any hand motion: read left_hand_q/right_hand_q
+      (app.g1_222.get_feedback()) and compare slot for slot with imported_gestures.HAND_DEFAULT.
+      Zeros mean hand feedback is not wired; a permutation means the feedback order differs from
+      the command order. Either one stops the run until fixed.
+   3. 222: check_dex3_finger_order("222"), confirmed by eye against FINGER_CHECK_POSE.
+   4. 222: the remaining hand motions (wave_one_hand, v_sign, good, two_hand_hearts), then "both".
 
 To restart one robot's controller: `dimos stop`, stop that robot's tunnel, then repeat the bring-up
 order (planner idle on the PC2, tunnel, `dimos run`).

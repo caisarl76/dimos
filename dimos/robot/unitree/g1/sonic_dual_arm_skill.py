@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Left-arm skills for two G1s on the guarded SONIC controller, from one process.
+"""Arm skills for two G1s on the guarded SONIC controller, from one process.
 
 The same skills as SonicArmSkillContainer, each taking `robot` ("222", "223" or "both"). One robot
 is a single-arm move; "both" starts both arms together and retreats both if either stops (run_arms).
-One motion runs at a time across both robots.
+One motion runs at a time across both robots. Each robot plans from its own measured body and Dex3
+hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223).
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from functools import partial
-from typing import Any, Literal
+from typing import Any, Literal, Self
+
+from pydantic import model_validator
 
 from dimos.agents.annotation import skill
 from dimos.agents.capabilities import CAP_MOVEMENT
@@ -34,6 +37,7 @@ from dimos.core.stream import In
 from dimos.robot.unitree.g1.sonic_arm_reference import ArmCollisionChecker, SonicEncoder
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     _NO_PATH_CHECK,
+    FINGER_CHECK,
     ArmLauncher,
     ArmMove,
     GestureName,
@@ -42,6 +46,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     SonicArmExecutionSpec,
     SonicArmSkillConfig,
     UpperBodyMotion,
+    finger_check_move,
     gesture_move,
     left_arm_joints_move,
     left_arm_pose_move,
@@ -54,10 +59,26 @@ Robot = Literal["222", "223", "both"]
 _ROBOTS = ("222", "223")
 
 
+class DualSonicArmSkillConfig(SonicArmSkillConfig):
+    # Dex3 hands per robot (222 has them, 223 runs without): only these say a robot's hand
+    # readings mean anything. The single-robot hands_mounted would claim it for both, so it is
+    # refused here.
+    hands_mounted_222: bool = False
+    hands_mounted_223: bool = False
+
+    @model_validator(mode="after")
+    def _hands_per_robot(self) -> Self:
+        if self.hands_mounted:
+            raise ValueError(
+                "the dual container sets hands per robot: use hands_mounted_222 / hands_mounted_223"
+            )
+        return self
+
+
 class DualSonicArmSkillContainer(ArmLauncher, Module):
     """Arm skills for robots 222 and 223 over their own SONIC executions."""
 
-    config: SonicArmSkillConfig
+    config: DualSonicArmSkillConfig
     feedback_222: In[SonicFeedback]
     feedback_223: In[SonicFeedback]
     _execution_222: SonicArmExecutionSpec
@@ -65,6 +86,8 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
 
     def __init__(self, **kwargs: Any) -> None:
         self._by_robot: dict[str, SonicArm] = {}
+        # Each robot's last operator motion's final report; None while one runs (or before any).
+        self._operator_results: dict[str, str | None] = dict.fromkeys(_ROBOTS)
         super().__init__(**kwargs)
 
     def _arms(self) -> Sequence[SonicArm]:
@@ -73,15 +96,26 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
     @rpc
     def start(self) -> None:
         encoder = SonicEncoder(self.config.encoder_path)
-        checker = None
+        checker = both_checker = None
         if self.config.collision_model_path is not None:
-            # TODO(dex3): the checker ignores the hand geoms (built for 223, no hands). 222's Dex3
+            # TODO(dex3): the checkers ignore the hand geoms (built for 223, no hands). 222's Dex3
             # hand is much bigger, so a path that clears on 223 can hit 222's body. Not critical
             # while trajectory speed is managed; add the Dex3 hand to the 222 check.
             checker = ArmCollisionChecker(self.config.collision_model_path)
+            both_checker = ArmCollisionChecker(
+                self.config.collision_model_path, arms=("left", "right")
+            )
         executions = {"222": self._execution_222, "223": self._execution_223}
+        hands = {"222": self.config.hands_mounted_222, "223": self.config.hands_mounted_223}
         self._by_robot = {
-            name: SonicArm(name, self.config, execution, encoder, checker)
+            name: SonicArm(
+                name,
+                self.config.model_copy(update={"hands_mounted": hands[name]}),
+                execution,
+                encoder,
+                checker,
+                both_checker,
+            )
             for name, execution in executions.items()
         }
         super().start()
@@ -190,19 +224,24 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
     def perform_gesture(self, robot: Robot, name: GestureName) -> str:
-        """Perform a left-arm gesture on robot 222, 223 or both, then bring the arm back and hand control back.
+        """Perform a gesture on robot 222, 223 or both, then bring the arms back and hand control back.
 
-        Gestures: "wave" (raises the hand and swings it side to side three times, about 26 s),
+        Left arm only: "wave" (raises the hand and swings it side to side three times, about 26 s),
         "point_forward" (arm out in front, about 15 s), "stop_sign" (raised forward palm out, about 14 s),
         "raise_hand" (arm up, about 21 s) and "beckon" (forearm curls in and out twice, about 20 s).
-        Slow (peak 0.75 rad/s). Requires the SONIC controller running in confirmed planner idle; it
-        never starts or stops the controller. Stops early and returns control to the planner if the
-        legs, waist or the other arm stray, or the arm strays far from the plan. Returns at once; a
-        tool update reports the result.
+        Imported, either or both arms, with the Dex3 hands where noted: "wave_one_hand" (right
+        arm waves, about 16 s), "v_sign" (right arm, V with the fingers, about 18 s), "good" (right
+        arm, thumbs up, about 19-20 s), "support_person" (both arms forward, about 17 s) and
+        "two_hand_hearts" (both arms and hands form a heart, about 31 s). Each robot plans from its
+        own measured pose and hands, so with "both" an imported gesture's timing may differ a little
+        between the robots. Slow (peak 0.75 rad/s, fingers too). Requires the SONIC controller
+        running in confirmed planner idle; it never starts or stops the controller. Stops early and
+        returns control to the planner if the legs or waist stray, or an arm strays far from the
+        plan. Returns at once; a tool update reports the result.
 
         Args:
             robot: "222", "223" or "both".
-            name: One of "wave", "point_forward", "stop_sign", "raise_hand", "beckon".
+            name: One of the gesture names above.
         """
         return self._launch_move("perform_gesture", robot, lambda: gesture_move(self.config, name))
 
@@ -213,6 +252,65 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         The stopped motion's tool update reports how far each robot got.
         """
         return self._request_stop()
+
+    @rpc
+    def check_dex3_finger_order(self, robot: str) -> str:
+        """Operator only (not a skill): on robot 222 or 223, a background motion that holds the
+        measured body and moves the Dex3 hands to an asymmetric pose for 3 s, then back, through
+        that robot's guarded, hand-speed-limited session. Returns "started" at once; stop_arm
+        stops it, and operator_result(robot) reports it. The operator confirms FINGER_CHECK_POSE
+        by eye. Refused, with nothing sent, unless hands_mounted_<robot> is set.
+        """
+        robot = str(robot)
+        if robot not in _ROBOTS:
+            raise ValueError(f"robot must be one of {list(_ROBOTS)}")
+        arm = self._by_robot[robot]
+        move = finger_check_move(arm.config)
+        with self._lifecycle:
+            self._admit()
+            if not arm.config.hands_mounted:
+                raise RuntimeError(
+                    f"no hands configured on {robot} (hands_mounted_{robot} is False); nothing sent"
+                )
+            self._operator_results[robot] = None
+
+            def store(text: str) -> None:
+                self._operator_results[robot] = text
+
+            self._begin(
+                FINGER_CHECK, lambda: run_arms(self._jobs(move, [arm])), [arm], store, lambda: None
+            )
+        return "started"
+
+    @rpc
+    def operator_result(self, robot: str) -> str | None:
+        """Robot 222's or 223's last operator motion's final report, or None while it runs (or
+        before any)."""
+        robot = str(robot)
+        if robot not in _ROBOTS:
+            raise ValueError(f"robot must be one of {list(_ROBOTS)}")
+        with self._lifecycle:
+            return self._operator_results[robot]
+
+    @staticmethod
+    def _jobs(move: ArmMove, arms: Sequence[SonicArm]) -> list[tuple[SonicArm, Callable[[], Any]]]:
+        """run_arms jobs: each arm prepares `move` from its own measured pose and hands."""
+        return [
+            (
+                arm,
+                partial(
+                    arm.prepare,
+                    move.label,
+                    move.keyframes_of,
+                    move.allowed,
+                    require_check=move.require_check,
+                    move_s=move.move_s,
+                    return_min_s=move.return_min_s,
+                    arms=move.arms,
+                ),
+            )
+            for arm in arms
+        ]
 
     def _select(self, robot: str) -> list[SonicArm]:
         """The arms a command targets; an unknown robot selects all, and validation refuses it."""
@@ -228,19 +326,9 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
             if robot not in (*_ROBOTS, "both"):
                 raise ValueError(f"robot must be one of {[*_ROBOTS, 'both']}")
             move = make_move()
-            jobs = [
-                (
-                    arm,
-                    partial(
-                        arm.prepare,
-                        move.label,
-                        move.keyframes_of,
-                        move.allowed,
-                        require_check=move.require_check,
-                    ),
-                )
-                for arm in selected
-            ]
+            for arm in selected:
+                arm.require_checker(move)
+            jobs = self._jobs(move, selected)
             return lambda: run_arms(jobs)
 
         return self._launch(tool, prepare, selected)
