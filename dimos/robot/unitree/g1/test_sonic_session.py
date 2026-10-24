@@ -473,3 +473,46 @@ def test_observed_owner_violation_cannot_be_overwritten_before_tick(rig, epoch, 
     assert session.status.phase == SessionPhase.HANDBACK
     assert sum(p.startswith(b"pose") for p in packets) == count
     assert any(event["event"] == "feedback_fault" for event in events)
+
+
+def test_hand_step_limit_clamps_transmitted_hands(rig):
+    _, packets, events = rig
+    limit = 0.015
+    profile = replace(
+        rig[0].profile, hand_step_limit=limit, blend_seconds=0.001, max_observation_age=5.0
+    )
+    session = SonicTaskSession("task-1", profile, send=packets.append, journal=events.append)
+    activate(session)
+    start = pose_values(packets[-1])[64:].astype(np.float64)
+    actions = np.zeros((150, 78))
+    actions[:, 64:] = 1.0
+    submit(session, actions=actions)
+    steps = int(np.ceil(np.max(1.0 - start) / limit))
+    previous = start
+    for tick in range(1, steps + 1):
+        advance(session, 10.08 + tick * 0.02, 110 + tick)
+        hands = pose_values(packets[-1])[64:].astype(np.float64)
+        expected = previous + np.minimum(1.0 - previous, limit)
+        assert hands == pytest.approx(expected, abs=1e-6)
+        assert np.all(hands <= 1.0 + 1e-6)
+        previous = hands
+    assert previous == pytest.approx(1.0, abs=1e-6)
+
+
+def test_no_hand_step_limit_by_default(rig):
+    session, packets, _ = rig
+    assert session.profile.hand_step_limit is None
+    activate(session)
+    actions = np.zeros((20, 78))
+    actions[:, 64:] = 1.0
+    submit(session, actions=actions)
+    advance(session, 10.10)
+    advance(session, 10.12, 111)
+    advance(session, 10.14, 112)
+    assert pose_values(packets[-1])[64:] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("value", [0.0, -0.01, float("nan"), float("inf")])
+def test_profile_rejects_invalid_hand_step_limit(rig, value):
+    with pytest.raises(ValueError):
+        replace(rig[0].profile, hand_step_limit=value)

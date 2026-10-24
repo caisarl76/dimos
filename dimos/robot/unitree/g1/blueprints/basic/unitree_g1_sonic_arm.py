@@ -55,6 +55,8 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     HEAD_CAMERA_QUAT_XYZW,
     HEAD_CAMERA_SIZE,
     HEAD_CAMERA_XYZ,
+    PEAK_SPEED,
+    RATE,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import SonicArmSkillContainer
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
@@ -96,6 +98,7 @@ SONIC_ARM_PROFILE = SonicModelProfile(
     handback_policy="native_planner",
     max_observation_age=35.0,
     max_duration=75.0,
+    hand_step_limit=PEAK_SPEED / RATE,
 )
 
 
