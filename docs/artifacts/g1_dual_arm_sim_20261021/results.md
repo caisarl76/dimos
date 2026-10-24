@@ -46,7 +46,7 @@ Stand-in totals over each whole run (both runs):
   move, all of it shoulder yaw. 222 never armed (its stand-in log shows no arming), and an idle
   stand-in drifts 0.012–0.024 rad on its own after a motion. That is settling, not a reference.
 - **Wave start skew.** Wave skew is 0.25–0.33 s and is unexplained so far. Submit skew is 1 ms, so
-  it is the physical onset, not DimOS timing. The pose skew is ≤ 0.017 s. It is within the 0.5 s
+  it is the physical onset, not dimOS timing. The pose skew is ≤ 0.017 s. It is within the 0.5 s
   target, and it is the margin to watch on hardware.
 - **Encoding time.** Encoding both waves takes longer than 8 s on this workstation. A `stop_arm`
   in that window refuses before anything is sent.

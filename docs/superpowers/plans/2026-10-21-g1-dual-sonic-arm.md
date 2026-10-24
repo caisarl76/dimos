@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** One workstation DimOS process drives the SONIC arm skills of G1s 222 and 223. Each skill takes `robot` = `"222"`, `"223"` or `"both"`, and `both` starts the two motions within 0.5 s of each other.
+**Goal:** One workstation dimOS process drives the SONIC arm skills of G1s 222 and 223. Each skill takes `robot` = `"222"`, `"223"` or `"both"`, and `both` starts the two motions within 0.5 s of each other.
 
 **Architecture:** This builds on the Tier-1 arm engine (keyframe plans, background skills with `stop_arm`, `perform_gesture`). Task 1 is a small core change that lets a module ref be remapped to a named instance. Task 2 pulls the per-robot state and streaming out of `SonicArmSkillContainer` into a `SonicArm` engine. Task 3 starts several engines together: all prepared first, then a barrier in front of the first chunk, then a shared smooth retreat. Task 4 adds a dual container bound to two named `SonicExecutionModule` instances (`g1_222`, `g1_223`).
 
-**Tech Stack:** Python 3.12, DimOS modules/blueprints, ZeroMQ, numpy, pytest, MuJoCo stand-in (`sonic_sim_peer`).
+**Tech Stack:** Python 3.12, dimOS modules/blueprints, ZeroMQ, numpy, pytest, MuJoCo stand-in (`sonic_sim_peer`).
 
 **Spec:** `docs/superpowers/specs/2026-10-21-g1-dual-sonic-arm-design.md`
 **Depends on:** `docs/superpowers/plans/2026-10-21-g1-sonic-tier1-skills.md` tasks 1-4 (session dimos-dev-84). It messages this session with the commit hash once Tier-1 task 4 lands. Task 1 here does not depend on it; Tasks 2-5 start from that commit.

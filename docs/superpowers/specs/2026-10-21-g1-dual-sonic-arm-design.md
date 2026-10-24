@@ -5,7 +5,7 @@ Status: user decisions incorporated, awaiting approval, 2026-10-21.
 ## Intent
 
 Operate two Unitree G1s, pc2_222 (192.168.0.222) and pc2_223 (192.168.0.223),
-from **one DimOS process on the workstation**. The first target is
+from **one dimOS process on the workstation**. The first target is
 synchronization: one command makes both robots perform the same arm skill at
 the same time.
 
@@ -13,9 +13,9 @@ The demo: `dimos agent-send "both robots wave"`. Both robots raise the left
 forearm and swing it side to side a few times. Their motions start within
 0.5 s of each other.
 
-Today every robot runs its own DimOS process on its own PC2
+Today every robot runs its own dimOS process on its own PC2
 (`unitree-g1-sonic-arm`). That process talks to the local guarded SONIC
-controller over `127.0.0.1:5556` (reference, DimOS binds) and
+controller over `127.0.0.1:5556` (reference, dimOS binds) and
 `127.0.0.1:5557` (feedback, native binds). Nothing in the stack knows about a
 second robot.
 
@@ -59,7 +59,7 @@ second robot.
 instances, `instance_name` `g1_222` and `g1_223`, with their streams remapped
 apart. Both connect only to workstation-localhost ports:
 
-| Robot | reference_bind (DimOS binds) | feedback_endpoint |
+| Robot | reference_bind (dimOS binds) | feedback_endpoint |
 | --- | --- | --- |
 | 222 | `tcp://127.0.0.1:15556` | `tcp://127.0.0.1:15557` |
 | 223 | `tcp://127.0.0.1:16556` | `tcp://127.0.0.1:16557` |
@@ -78,10 +78,10 @@ ssh -N -R 5556:127.0.0.1:16556 -L 16557:127.0.0.1:5557 pc2_223
 ```
 
 `-R` makes the PC2's `127.0.0.1:5556` reach the workstation bind, and `-L`
-brings the native feedback publisher to the workstation. The DimOS config is
+brings the native feedback publisher to the workstation. The dimOS config is
 therefore identical in sim and on hardware: only what serves those four ports
 changes. The tunnels are started by the operator, with the commands documented
-in the blueprint docstring. DimOS does not manage them.
+in the blueprint docstring. dimOS does not manage them.
 
 **Sim (my call).** Run two copies of the real-time MuJoCo stand-in for the
 guarded native controller, `dimos.robot.unitree.g1.sonic_sim_peer` once Tier 1
@@ -98,7 +98,7 @@ The stand-in speaks the guarded controller's ZMQ protocol, sends g1_debug
 feedback, keeps the guard semantics (200 ms expiry, planner handback) and
 starts on the floor in planner idle (`startup_on_floor`). It uses no DDS, so the
 two copies cannot cross-talk and need no namespaces. Sync is a property of the
-DimOS side, so the stand-in is enough to prove it. Native-controller behaviour
+dimOS side, so the stand-in is enough to prove it. Native-controller behaviour
 is proven on hardware the next morning. Running two native-binary MuJoCo sims
 (guarded build from
 `/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/`,
@@ -112,8 +112,8 @@ stop, but it cannot cover a dropped tunnel. Keep the robots on stands.
 
 **Bring-up order (my call).** On hardware: planner idle on each robot (`start-idle-planner.py`
 on the PC2, which needs 5556 itself), then the tunnels, then `dimos run`.
-Restarting one robot means stopping DimOS and that robot's tunnel and repeating
-the order. A robot that drops out while DimOS runs just reads as not ready.
+Restarting one robot means stopping dimOS and that robot's tunnel and repeating
+the order. A robot that drops out while dimOS runs just reads as not ready.
 
 **Builds on Tier 1 (agreed with that session, 2026-10-21).** The Tier-1
 keyframe engine, background lifecycle with `stop_arm`, and `perform_gesture`
@@ -164,7 +164,7 @@ Sim (tonight):
 - `dimos agent-send "both robots wave"`: both sim arms wave, skew < 0.5 s
   (reported), both hand back to the planner.
 - `dimos agent-send "robot 223 raise your left arm forward"`: only 223 moves.
-- With one sim stopped after DimOS is up, a `both` command moves neither and
+- With one sim stopped after dimOS is up, a `both` command moves neither and
   names the missing robot.
 - Existing `test_sonic_arm_skill.py` stays green, plus one small test for the
   `both` all-or-nothing start and skew reporting (fake executions).

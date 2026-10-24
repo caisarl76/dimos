@@ -1,7 +1,7 @@
 # Two-G1 arm sync: first hardware run (2026-10-22)
 
 pc2_222 (192.168.0.222, Dex3 hands active) and pc2_223 (192.168.0.223, no hands), both on stands, driven
-from one workstation DimOS process over SSH tunnels. Branch `jihun/feat/g1-dual-sonic-arm` at `48fdfeabd`:
+from one workstation dimOS process over SSH tunnels. Branch `jihun/feat/g1-dual-sonic-arm` at `48fdfeabd`:
 Tier-1 `aa798e221` and forearm `0d664204e` merged in. Every result line is in `results.jsonl`, extracted
 from the run logs.
 
@@ -14,7 +14,7 @@ from the run logs.
   - On both: `start-idle-planner.py --start-idle-planner`, which reported "Planner confirmed".
 - Tunnels, opened after planner idle: `ssh -N -o ExitOnForwardFailure=yes … -R 5556:127.0.0.1:1x556
   -L 1x557:127.0.0.1:5557`, to `pc2_222` and to `pc2` (223's ssh alias).
-- DimOS: `unitree-g1-sonic-arm-dual` (MCP), then `unitree-g1-sonic-arm-dual-agentic` (gpt-5.6-luna via
+- dimOS: `unitree-g1-sonic-arm-dual` (MCP), then `unitree-g1-sonic-arm-dual-agentic` (gpt-5.6-luna via
   Genon), with `--dualsonicarmskillcontainer.max-dq=2.0`. The readiness check showed both robots ready, with
   feedback ages of 4–22 ms.
 
