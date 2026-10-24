@@ -18,8 +18,11 @@ Each robot has its own scripted peer; the lifecycle tests reuse test_sonic_arm_s
 tool-stream fixtures with the dual container in place of the single one.
 """
 
+from dataclasses import replace
 from functools import partial
 import json
+import os
+from pathlib import Path
 import re
 import threading
 import time
@@ -30,6 +33,7 @@ import numpy as np
 import pytest
 
 from dimos.agents.mcp.tool_stream import TOOL_STREAM_STOPPED_METHOD
+from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
 from dimos.core.global_config import GlobalConfig
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill, sonic_dual_arm_skill
@@ -39,12 +43,30 @@ from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_dual_agentic
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm_dual import (
     unitree_g1_sonic_arm_dual,
 )
-from dimos.robot.unitree.g1.sonic_arm_reference import RATE, retreat_poses, token_schedule
-from dimos.robot.unitree.g1.sonic_arm_skill import gesture_keyframes
-from dimos.robot.unitree.g1.sonic_dual_arm_skill import DualSonicArmSkillContainer
+from dimos.robot.unitree.g1.imported_gestures import HAND_DEFAULT
+from dimos.robot.unitree.g1.sonic_arm_reference import (
+    PEAK_SPEED,
+    RATE,
+    keyframe_plan,
+    retreat_hands,
+    retreat_poses,
+    token_schedule,
+)
+from dimos.robot.unitree.g1.sonic_arm_skill import (
+    FINGER_CHECK_HANDS,
+    GESTURES,
+    IMPORTED_MOVE_S,
+    gesture_keyframes,
+    gesture_plan_inputs,
+)
+from dimos.robot.unitree.g1.sonic_dual_arm_skill import (
+    DualSonicArmSkillConfig,
+    DualSonicArmSkillContainer,
+)
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_test_support import (
+    ARM_PROFILE,
     FAKE_GAIN,
     PEER_TOKEN,
     FakeEncoder,
@@ -53,6 +75,9 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     frames,
     gate_start,
     no_pose,
+    pose_values,
+    real_hold_plan,
+    scripted_peer,
     stop_in_background,
     task,
     tokens,
@@ -76,7 +101,9 @@ def real_launch_skill(dual_executions, tool_transport, mocker):
     mocker.patch.object(sonic_dual_arm_skill, "SonicEncoder", AbsoluteEncoder)
     mocker.patch.object(sonic_arm_skill, "keyframe_plan", fast_keyframe_plan)
     mocker.patch.object(sonic_arm_skill, "token_schedule", partial(token_schedule, blend_s=0.2))
-    module = DualSonicArmSkillContainer(encoder_path="unused.onnx", return_watch_seconds=0.0)
+    module = DualSonicArmSkillContainer(
+        encoder_path="unused.onnx", return_watch_seconds=0.0, hands_mounted_222=True
+    )
     (first, _), (second, _) = dual_executions
     mocker.patch.object(module, "_execution_222", first, create=True)
     mocker.patch.object(module, "_execution_223", second, create=True)
@@ -403,3 +430,400 @@ def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_en
 def test_dual_blueprints_set_only_known_global_config_fields() -> None:
     for bp in (unitree_g1_sonic_arm_dual, unitree_g1_sonic_arm_dual_agentic):
         assert set(bp.global_config_overrides) <= set(GlobalConfig.model_fields)
+
+
+# Imported gestures, per-row Dex3 hands per robot, and the operator finger check.
+
+FIST = np.r_[HAND_DEFAULT["left"], HAND_DEFAULT["right"]]  # 222's Dex3 at the deploy default
+UNWIRED = np.zeros(14)  # 223: no hands, so no hand feedback
+PAD = 10  # The fixture's 0.2 s token blend at 50 Hz.
+ENCODER = Path(os.environ.get("GEAR_SONIC_ENCODER", "/nonexistent"))
+
+
+class FakeChecker:
+    def __init__(self, contact=None):
+        self.contact, self.calls = contact, 0
+
+    def first_contact(self, poses, every=5, start=None):
+        self.calls += 1
+        return self.contact
+
+
+def hand_timed_plan(base, keyframes, **kwargs):
+    """fast_keyframe_plan's short leads, moves and holds at a 3 rad/s peak, where the fingers'
+    travel sets the segments that move them: each robot's measured hands change its timing."""
+    capped = [replace(k, hold_s=min(k.hold_s, 0.1), min_s=min(k.min_s, 0.1)) for k in keyframes]
+    fast = dict(lead_s=0.1, move_s=0.3, peak_speed=3.0)
+    fast["return_min_s"] = min(kwargs.get("return_min_s", 0.0), 0.1)
+    return keyframe_plan(base, capped, **(kwargs | fast))
+
+
+def planned(name, hands):
+    """The plan a robot at the scripted body pose and these hands builds for an imported gesture."""
+    base = np.zeros(29)
+    keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(name, base, hands)
+    return hand_timed_plan(
+        base, keyframes, base_hands=hands, move_s=move_s, return_min_s=return_min_s
+    )
+
+
+def padded(rows):
+    """Pose-row hands [N,14] -> token rows: the token schedule's blends hold the end rows."""
+    return np.vstack([np.repeat(rows[:1], PAD, 0), rows, np.repeat(rows[-1:], PAD, 0)])
+
+
+def hands_of(chunk):
+    return np.asarray(chunk)[:, 64:]
+
+
+def sent_hands(peer):
+    return np.array([pose_values(p)[64:] for p in peer.snapshot() if p.startswith(b"pose")])
+
+
+@pytest.fixture
+def hands(inline, mocker):
+    """222 reads its Dex3 fist, 223 (handless) zeros; both arms have fake path checks, and plans
+    are hand-timed."""
+    module, executions = inline
+    for (execution, peer), measured in zip(executions, (FIST, UNWIRED), strict=True):
+        peer.left_hand_q, peer.right_hand_q = list(measured[:7]), list(measured[7:])
+        wait_until(
+            lambda e=execution, m=measured: np.array_equal(
+                np.r_[e.get_feedback().left_hand_q, e.get_feedback().right_hand_q], m
+            )
+        )
+    for arm in module._arms():
+        arm._checker, arm._both_checker = FakeChecker(), FakeChecker()
+    mocker.patch.object(sonic_arm_skill, "keyframe_plan", side_effect=hand_timed_plan)
+    return module, executions
+
+
+def plan_calls():
+    """(base_hands, move_s, return_min_s) of every keyframe_plan call the skill made."""
+    return [
+        (c.kwargs["base_hands"], c.kwargs["move_s"], c.kwargs["return_min_s"])
+        for c in sonic_arm_skill.keyframe_plan.call_args_list
+    ]
+
+
+def test_both_two_hand_hearts_streams_each_robots_own_moving_hands_step_limited(hands, mocker):
+    module, executions = hands
+    submits = [mocker.spy(execution, "submit_chunk") for execution, _ in executions]
+    with feeding_arms(module._arms()):
+        result = module.perform_gesture("both", "two_hand_hearts")
+    assert "222: two_hand_hearts reached 100%" in result.message, result
+    assert "; 223: two_hand_hearts reached 100%" in result.message, result
+    assert result.metadata["start_skew_s"] is not None, result.metadata  # Recorded for both.
+    assert result.metadata["start_skew_s"] < 0.5, result.metadata
+    lengths = []
+    for (_, peer), submit, measured in zip(executions, submits, (FIST, UNWIRED), strict=True):
+        kplan = planned("two_hand_hearts", measured)
+        assert np.ptp(kplan.hands, axis=0).max() > 0.1  # The fingers move: not the measured hands.
+        [first] = [c.args[3] for c in submit.call_args_list]
+        assert np.array_equal(hands_of(first), padded(kplan.hands))  # Its own hands, row for row.
+        lengths.append(len(first))
+        steps = np.abs(np.diff(sent_hands(peer), axis=0)).max(axis=1)
+        assert steps.max() <= PEAK_SPEED / RATE + 1e-6  # The session's hand_step_limit.
+        assert steps.max() > 0.5 * PEAK_SPEED / RATE  # The hands did move on the wire.
+    # The fist's longer finger travel to the heart stretches 222's finger segments.
+    assert lengths[0] > lengths[1], lengths
+    # Each robot planned with its own measured hands and the imported timing.
+    calls = plan_calls()
+    spec = GESTURES["two_hand_hearts"]
+    assert {(m, r) for _, m, r in calls} == {(IMPORTED_MOVE_S, spec.return_min_s)}, calls
+    assert spec.return_min_s > 0.1  # Not the default way home.
+    for measured in (FIST, UNWIRED):
+        assert any(np.array_equal(h, measured) for h, _, _ in calls), measured
+    for arm in module._arms():
+        assert task(arm)["handback_confirmed"], task(arm)
+
+
+def test_both_imported_gesture_refuses_an_arm_against_arm_contact(hands):
+    module, executions = hands
+    first, second = module._arms()
+    second._both_checker = FakeChecker("left_elbow_link (other arm)")
+    with pytest.raises(
+        RuntimeError,
+        match=r"^223: the planned arm path comes within 2 cm of the left_elbow_link \(other arm\); "
+        r"nothing sent; nothing sent to any robot$",
+    ):
+        module.perform_gesture("both", "two_hand_hearts")
+    assert first._both_checker.calls >= 1 and second._both_checker.calls >= 1
+    assert first._checker.calls == second._checker.calls == 0  # Not the left-arm check.
+    assert all(no_pose(peer) for _, peer in executions)
+    assert all(task(arm) is None for arm in module._arms())
+
+
+def test_dual_start_builds_the_both_arm_checker_for_each_robot(dual_executions, mocker):
+    checker = mocker.patch.object(sonic_dual_arm_skill, "ArmCollisionChecker")
+    mocker.patch.object(sonic_dual_arm_skill, "SonicEncoder", FakeEncoder)
+    module = DualSonicArmSkillContainer(
+        encoder_path="unused.onnx", collision_model_path="scene.xml"
+    )
+    (first, _), (second, _) = dual_executions
+    mocker.patch.object(module, "_execution_222", first, create=True)
+    mocker.patch.object(module, "_execution_223", second, create=True)
+    transports = [make_transport(f"/dual-arm-test/{uuid4().hex}", SonicFeedback) for _ in range(2)]
+    for name, transport in zip(("feedback_222", "feedback_223"), transports, strict=True):
+        module.set_transport(name, transport)
+        transport.start()
+    try:
+        module.start()
+        scene = Path("scene.xml")
+        assert checker.call_args_list == [
+            mocker.call(scene),
+            mocker.call(scene, arms=("left", "right")),
+        ]
+        for arm in module._arms():
+            assert arm._both_checker is checker.return_value
+    finally:
+        module.stop()
+        for transport in transports:
+            transport.stop()
+
+
+def test_imported_gestures_without_the_both_arm_check_are_refused(real_launch_skill, mocker):
+    module, executions = real_launch_skill
+    start_tool = mocker.spy(module, "start_tool")
+    with pytest.raises(RuntimeError, match="both-arm path check"):
+        module.perform_gesture("both", "support_person")
+    assert start_tool.call_count == 0 and module._running is None
+    assert all(no_pose(peer) for _, peer in executions)
+
+
+@pytest.mark.parametrize("refusing", ["222", "223"])
+def test_a_resolved_limit_refusal_on_one_robot_starts_neither(hands, mocker, refusing):
+    module, executions = hands
+    execution = module._by_robot[refusing]._execution
+    real = execution.get_feedback
+
+    def bent():
+        state = real()
+        q = list(state.body_q)
+        q[18] = -0.8  # left elbow; support_person adds -0.5, past the -1.0472 limit
+        return replace(state, body_q=tuple(q))
+
+    mocker.patch.object(execution, "get_feedback", bent)
+    with pytest.raises(
+        RuntimeError,
+        match=rf"^{refusing}: support_person keyframes\[1\]: left_elbow = -1\.3 outside its "
+        r"limit .*; nothing sent to any robot$",
+    ):
+        module.perform_gesture("both", "support_person")
+    assert module._by_robot[refusing]._both_checker.calls == 0  # Refused before the path check.
+    assert all(no_pose(peer) for _, peer in executions)
+    assert all(task(arm) is None for arm in module._arms())
+
+
+@pytest.mark.parametrize("how", ["fault on 222", "stop on 223"])
+def test_one_robots_fault_or_stop_retreats_both_with_their_hands(hands, mocker, how):
+    module, executions = hands
+    submits = [mocker.spy(execution, "submit_chunk") for execution, _ in executions]
+    arm_223 = module._by_robot["223"]
+
+    def knee(s):  # Mid first segment on both robots, while their fingers move.
+        return {3: 0.2 if s > 0.6 else 0.0}
+
+    def stop(s):
+        if s > 0.6:
+            arm_223.stop.set()
+        return {}
+
+    extra = (knee, None) if how == "fault on 222" else (None, stop)
+    with feeding_arms(module._arms(), shape=zero, extra=extra):
+        result = module.perform_gesture("both", "two_hand_hearts")
+    first, second = result.message.split("; 223: ")
+    if how == "fault on 222":
+        assert "stopped early: left_knee" in first and "stopped early: 222: left_knee" in second
+    else:
+        assert "stopped early: 223: stop requested" in first, first
+        assert "stopped early: stop requested" in second, second
+    for (_, peer), submit, measured in zip(executions, submits, (FIST, UNWIRED), strict=True):
+        kplan = planned("two_hand_hearts", measured)
+        plan, retreat = (c.args[3] for c in submit.call_args_list)
+        moving = np.any(np.diff(hands_of(plan), axis=0) != 0, axis=1)
+        # The way back starts at a plan row where the fingers were moving, not at a jump...
+        starts = np.flatnonzero(np.all(hands_of(plan)[1:] == hands_of(retreat)[0], axis=1))
+        assert len(starts) and moving[starts].any(), starts
+        # ...and is the plan's own way home for the hands (retreat_hands), ending at the start.
+        units = [padded(retreat_hands(kplan, k)) for k in range(len(kplan.segments))]
+        assert any(
+            len(retreat) <= len(u) and np.array_equal(hands_of(retreat), u[len(u) - len(retreat) :])
+            for u in units
+        )
+        assert np.array_equal(hands_of(retreat)[-1], measured)
+        steps = np.abs(np.diff(sent_hands(peer), axis=0)).max(axis=1)
+        assert steps.max() <= PEAK_SPEED / RATE + 1e-6
+    for arm in module._arms():
+        assert task(arm)["handback_confirmed"], task(arm)
+
+
+def test_both_execution_profiles_limit_hand_steps():
+    atoms = {a.name: a for a in unitree_g1_sonic_arm_dual.blueprints}
+    for robot in ("222", "223"):
+        profile = atoms[f"g1_{robot}"].kwargs["profile"]
+        assert profile.hand_step_limit == pytest.approx(PEAK_SPEED / RATE), robot
+
+
+def test_hands_are_configured_per_robot(real_launch_skill):
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
+        [
+            "--dualsonicarmskillcontainer.encoder-path=unused.onnx",
+            "--dualsonicarmskillcontainer.hands-mounted-222=true",
+        ],
+        environ={},
+    )
+    config = DualSonicArmSkillConfig(**parsed.module_kwargs("dualsonicarmskillcontainer"))
+    assert (config.hands_mounted_222, config.hands_mounted_223) == (True, False)
+    with pytest.raises(ValueError, match="hands_mounted_222 / hands_mounted_223"):
+        DualSonicArmSkillConfig(encoder_path="unused.onnx", hands_mounted=True)
+    module, _ = real_launch_skill  # Configured with hands_mounted_222=True.
+    assert module._by_robot["222"].config.hands_mounted is True
+    assert module._by_robot["223"].config.hands_mounted is False
+    assert module.config.hands_mounted is False
+
+
+def test_finger_check_runs_on_its_robot_only_and_delivers_the_hand_diagnostics(
+    real_launch_skill, mocker
+):
+    module, executions = real_launch_skill
+    mocker.patch.object(sonic_arm_skill, "keyframe_plan", real_hold_plan)  # The real 3 s hold.
+    submit = mocker.spy(module._execution_222, "submit_chunk")
+    encode = mocker.spy(module._by_robot["222"]._encoder, "encode")
+    with feeding_arms(module._arms(), shape=zero):
+        called = time.monotonic()
+        assert module.check_dex3_finger_order(222) == "started"  # The CLI's integer robot.
+        assert time.monotonic() - called < 1.0
+        assert module.operator_result("222") is None
+        wait_until(lambda: module.operator_result("222") is not None, 30)
+    hands = hands_of(submit.call_args_list[0].args[3])
+    assert any(np.array_equal(h, FINGER_CHECK_HANDS) for h in hands)
+    poses = encode.call_args_list[0].args[0]
+    assert np.all(poses == poses[0])  # The body stays at its measured start.
+    # The scripted peer's hands never move: the hold evidence says so, with the diagnostics.
+    result = module.operator_result("222")
+    assert '"message": "check_dex3_finger_order failed: ' in result, result
+    assert "hand did not follow" in result, result
+    for key in ("hand_base", "hand_target", "hand_held"):
+        assert key in result, (key, result)
+    assert module.operator_result("223") is None and no_pose(executions[1][1])
+    assert module._running is None
+
+
+def test_finger_check_stops_through_stop_arm(real_launch_skill, mocker):
+    module, executions = real_launch_skill
+    mocker.patch.object(sonic_arm_skill, "keyframe_plan", real_hold_plan)
+    submit = mocker.spy(module._execution_222, "submit_chunk")
+    with feeding_arms(module._arms(), shape=zero):
+        assert module.check_dex3_finger_order("222") == "started"
+        wait_until(lambda: submit.call_count == 1)
+        time.sleep(0.5)
+        assert module.stop_arm().startswith("Stopping")
+        wait_until(lambda: module.operator_result("222") is not None, 30)
+    assert "stopped early: stop requested" in module.operator_result("222")
+    assert [c.args[1] for c in submit.call_args_list] == [0, 1]  # The plan, then the retreat.
+    assert task(module._by_robot["222"])["handback_confirmed"]
+    assert no_pose(executions[1][1])
+
+
+def test_finger_check_refuses_a_robot_without_hands_and_while_a_motion_runs(
+    real_launch_skill, mocker
+):
+    module, executions = real_launch_skill
+    with pytest.raises(
+        RuntimeError, match=r"no hands configured on 223 \(hands_mounted_223 is False\)"
+    ):
+        module.check_dex3_finger_order("223")
+    for robot in ("both", 224):
+        with pytest.raises(ValueError, match="robot must be one of"):
+            module.check_dex3_finger_order(robot)
+    assert module._running is None and all(no_pose(peer) for _, peer in executions)
+    gates, _ = gate_starts(module, mocker)
+    assert "started" in module.move_upper_body("both", "left_arm_forward", 20.0)
+    with pytest.raises(RuntimeError, match="an arm move is already running"):
+        module.check_dex3_finger_order("222")
+    for gate in gates:
+        gate.set()
+    wait_until(lambda: module._running is None)
+    assert module.operator_result("222") is None and module.operator_result("223") is None
+
+
+def test_finger_check_is_an_operator_rpc_not_a_skill(real_launch_skill):
+    module, _ = real_launch_skill
+    names = {s.func_name for s in module.get_skills()}
+    assert "perform_gesture" in names and "stop_arm" in names
+    assert not {"check_dex3_finger_order", "operator_result"} & names
+    for rpc in (
+        DualSonicArmSkillContainer.check_dex3_finger_order,
+        DualSonicArmSkillContainer.operator_result,
+    ):
+        assert getattr(rpc, "__rpc__", False) and not getattr(rpc, "__skill__", False)
+
+
+@pytest.fixture
+def worker_dual(dimos_cluster, tmp_path):
+    """Both execution modules and the dual container each in a worker, wired as the blueprint."""
+    profile = replace(ARM_PROFILE, max_observation_age=25.0, max_duration=60.0)
+    with scripted_peer() as first, scripted_peer() as second:
+        peers = {"222": first, "223": second}
+        executions = {}
+        container = None
+        try:
+            for robot, peer in peers.items():
+                executions[robot] = dimos_cluster.deploy(
+                    SonicExecutionModule,
+                    instance_name=f"g1_{robot}",
+                    reference_bind="tcp://127.0.0.1:*",
+                    feedback_endpoint=peer.feedback_endpoint,
+                    journal_dir=tmp_path / robot,
+                    profile=profile,
+                )
+            container = dimos_cluster.deploy(
+                DualSonicArmSkillContainer,
+                encoder_path=ENCODER,
+                hands_mounted_222=True,
+                return_watch_seconds=0.0,
+            )
+            for robot, execution in executions.items():
+                transport = make_transport(f"/dual-arm-worker-test/{uuid4().hex}", SonicFeedback)
+                execution.set_transport("feedback", transport)
+                container.set_transport(f"feedback_{robot}", transport)
+                container.set_module_ref(f"_execution_{robot}", execution)
+                execution.start()
+                peers[robot].reference_endpoint = execution.get_status()["reference_endpoint"]
+                peers[robot].connected.set()
+                wait_until(lambda e=execution: e.get_status()["ready"], timeout=3)
+            container.start()
+            yield container, executions, peers
+        finally:
+            if container is not None:
+                container.stop()
+            for execution in executions.values():
+                execution.stop()
+
+
+@pytest.mark.skipif(not ENCODER.is_file(), reason="GEAR_SONIC_ENCODER is unset or missing")
+def test_finger_check_through_the_worker_returns_at_once_and_stop_arm_retreats(worker_dual):
+    container, executions, peers = worker_dual
+    called = time.monotonic()
+    assert container.check_dex3_finger_order("222") == "started"
+    assert time.monotonic() - called < 1.0
+    assert container.operator_result("222") is None
+    # The transmitted hands reached the finger pose: the plan is in the hold. Then a few more.
+    wait_until(
+        lambda: any(
+            np.allclose(h, FINGER_CHECK_HANDS, atol=1e-3) for h in sent_hands(peers["222"])
+        ),
+        30,
+    )
+    arrived = len(sent_hands(peers["222"]))
+    wait_until(lambda: len(sent_hands(peers["222"])) >= arrived + 10, 30)
+    called = time.monotonic()
+    assert container.stop_arm().startswith("Stopping")
+    assert time.monotonic() - called < 1.0
+    wait_until(lambda: container.operator_result("222") is not None, 30)
+    result = container.operator_result("222")
+    assert "stopped early: stop requested" in result, result
+    status = executions["222"].get_status()["task"]
+    assert status["last_chunk_sequence"] == 1 and status["handback_confirmed"], status
+    assert no_pose(peers["223"]) and container.operator_result("223") is None

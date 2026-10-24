@@ -23,7 +23,7 @@ from dimos.agents.capabilities import CapabilityRegistry
 from dimos.agents.mcp import mcp_server
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
-from dimos.robot.unitree.g1.sonic_test_support import ARM_PROFILE, ScriptedPeer
+from dimos.robot.unitree.g1.sonic_test_support import ARM_PROFILE, ScriptedPeer, scripted_peer
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -110,10 +110,7 @@ def mcp(real_launch_skill, tool_transport, monkeypatch):
 @contextmanager
 def scripted_execution(journal_dir: Path) -> Iterator[tuple[SonicExecutionModule, ScriptedPeer]]:
     """A started SonicExecutionModule against its own ScriptedPeer, ready for a task."""
-    peer = ScriptedPeer()
-    peer.thread.start()
-    try:
-        assert peer.ready.wait(5) and peer.error is None
+    with scripted_peer() as peer:
         module = SonicExecutionModule(
             reference_bind="tcp://127.0.0.1:*",
             feedback_endpoint=peer.feedback_endpoint,
@@ -128,11 +125,6 @@ def scripted_execution(journal_dir: Path) -> Iterator[tuple[SonicExecutionModule
             yield module, peer
         finally:
             module.stop()
-    finally:
-        peer.stopping.set()
-        peer.connected.set()
-        peer.thread.join(timeout=3)
-        assert not peer.thread.is_alive() and peer.error is None
 
 
 @pytest.fixture

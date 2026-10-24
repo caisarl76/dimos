@@ -51,6 +51,9 @@ class ScriptedPeer:
         self.drop_pose_subscription = threading.Event()
         self.lock = threading.Lock()
         self.packets: list[bytes] = []
+        # The Dex3 readings it reports; a test may set them before the skill measures them.
+        self.left_hand_q = [0.1] * 7
+        self.right_hand_q = [0.2] * 7
         self.error: Exception | None = None
         self.feedback_endpoint: str | None = None
         self.reference_endpoint: str | None = None
@@ -97,9 +100,9 @@ class ScriptedPeer:
                                     "ros_timestamp": 0.0,
                                     "body_q": [0.0] * 29,
                                     "body_dq": [0.0] * 29,
-                                    "left_hand_q": [0.1] * 7,
+                                    "left_hand_q": self.left_hand_q,
                                     "left_hand_dq": [0.0] * 7,
-                                    "right_hand_q": [0.2] * 7,
+                                    "right_hand_q": self.right_hand_q,
                                     "right_hand_dq": [0.0] * 7,
                                     "token_state": [0.125] * 64,
                                     "reference_guard": {
@@ -125,6 +128,21 @@ class ScriptedPeer:
     def snapshot(self) -> list[bytes]:
         with self.lock:
             return list(self.packets)
+
+
+@contextmanager
+def scripted_peer() -> Iterator[ScriptedPeer]:
+    """A running ScriptedPeer; connect it by setting reference_endpoint, then connected."""
+    peer = ScriptedPeer()
+    peer.thread.start()
+    try:
+        assert peer.ready.wait(5) and peer.error is None
+        yield peer
+    finally:
+        peer.stopping.set()
+        peer.connected.set()
+        peer.thread.join(timeout=3)
+        assert not peer.thread.is_alive() and peer.error is None
 
 
 def feedback(
