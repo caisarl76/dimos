@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# ---------------------------------------------------------------------------------------------
 # Ported sources
 #
 # - Robot, gravity, Decoder and the gain, scale and default-pose constants they use are ported
@@ -27,7 +26,6 @@
 # - IdlePlanner and anchor6 from the G1 sync artifacts' arm_reference.py (not in the repo), the
 #   planner context from demo_sim_arm_reference.py's planner_final, and startup_on_floor, the
 #   guard loop and the CLI from sonic_sim_peer.py in the same directory (Dimensional Inc.).
-# ---------------------------------------------------------------------------------------------
 
 """Real-time MuJoCo stand-in for the guarded native SONIC controller (offline; no robot).
 

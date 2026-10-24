@@ -29,7 +29,7 @@ import pytest
 import zmq
 
 from dimos.msgs.sensor_msgs.Image import Image
-from dimos.robot.unitree.g1.sonic_arm_reference import Keyframe, keyframe_plan
+from dimos.robot.unitree.g1.sonic_arm_reference import PEAK_SPEED, RATE, Keyframe, keyframe_plan
 from dimos.robot.unitree.g1.sonic_delivery_observation import (
     SonicCameraDelivery,
     SonicJointDelivery,
@@ -271,6 +271,7 @@ ARM_PROFILE = SonicModelProfile(
     handback_timeout=0.4,
     max_observation_age=6.0,
     max_tick_gap=0.19,
+    hand_step_limit=PEAK_SPEED / RATE,  # as SONIC_ARM_PROFILE
 )
 PEER_TOKEN = 0.125  # ScriptedPeer token_state
 FAKE_GAIN = 0.25  # Fake token value 0 per rad of summed joint offset; keeps big poses in the bound.
@@ -286,12 +287,21 @@ class FakeEncoder:
         return tokens
 
 
+def real_hold_plan(base: NDArray[np.float64], keyframes: Sequence[Keyframe], **kwargs: Any) -> Any:
+    """The real engine with short leads and moves but the requested holds."""
+    return keyframe_plan(
+        base, keyframes, **(kwargs | dict(lead_s=0.1, move_s=0.3, peak_speed=100.0))
+    )
+
+
 def fast_keyframe_plan(
     base: NDArray[np.float64], keyframes: Sequence[Keyframe], **kwargs: Any
 ) -> Any:
     """The real engine with short leads, moves and holds, so a run takes about a second."""
-    capped = [replace(k, hold_s=min(k.hold_s, 0.1)) for k in keyframes]
-    return keyframe_plan(base, capped, **kwargs, lead_s=0.1, move_s=0.3, peak_speed=100.0)
+    capped = [replace(k, hold_s=min(k.hold_s, 0.1), min_s=min(k.min_s, 0.1)) for k in keyframes]
+    fast: dict[str, Any] = dict(lead_s=0.1, move_s=0.3, peak_speed=100.0)
+    fast["return_min_s"] = min(kwargs.get("return_min_s", 0.0), 0.1)
+    return keyframe_plan(base, capped, **(kwargs | fast))
 
 
 def wait_until(condition: Callable[[], Any], timeout: float = 10.0) -> None:

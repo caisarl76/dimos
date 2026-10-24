@@ -26,7 +26,7 @@ library. Neither CycloneDDS nor the Unitree DDS SDK was installed here.
 Real DDS hardware workflows still require that separate setup.
 
 The sync replaced RoboPlan with `0.7.0` and `dimos-lcm` with `0.1.6`, rebuilt
-the editable DimOS package, and installed their missing locked dependencies.
+the editable dimOS package, and installed their missing locked dependencies.
 A repeated dry run reported **no changes**. Neither `pyproject.toml` nor
 `uv.lock` needed editing. The three previously missing APIs are present in
 `roboplan.core`: `SceneContext`, `loadUrdfSceneDescriptionFromXml`, and

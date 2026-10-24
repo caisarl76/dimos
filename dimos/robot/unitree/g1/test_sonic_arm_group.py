@@ -33,7 +33,6 @@ from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     Keyframe,
     group_margins,
-    keyframe_plan,
     pose_margins,
     token_schedule,
 )
@@ -52,6 +51,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     feedback,
     feeding_arms,
     no_pose,
+    real_hold_plan,
     task,
     tokens,
     wait_until,
@@ -117,7 +117,7 @@ def swing(arm, degrees=20.0, hold=1.0):
     return arm, partial(
         arm.prepare,
         f"swing{degrees:g}",
-        lambda base: [Keyframe(base + delta, hold)],
+        lambda base, hands: [Keyframe(base + delta, hold)],
         group_margins(0.15, 0.2, 0.3),
         require_check=False,
     )
@@ -126,7 +126,7 @@ def swing(arm, degrees=20.0, hold=1.0):
 def pose(arm, name="left_arm_forward_horizontal"):
     """A job: arm's prepare for a one-keyframe full-range left-arm pose."""
 
-    def keyframes_of(base):
+    def keyframes_of(base, hands):
         goal = base.copy()
         goal[15:19] = POSES[name]
         return [Keyframe(goal, 1.0)]
@@ -353,7 +353,7 @@ def test_both_with_different_start_poses_reports_both(arms, mocker):
 def test_both_mixed_outcome_retreats_peer_and_fails_naming_both(arms, dual_executions, mocker):
     def plan(base, keyframes, **kwargs):  # Holds up to 1 s: 222 holds 1 s, 223 0.1 s.
         capped = [replace(k, hold_s=min(k.hold_s, 1.0)) for k in keyframes]
-        return keyframe_plan(base, capped, **kwargs, lead_s=0.1, move_s=0.3, peak_speed=100.0)
+        return real_hold_plan(base, capped, **kwargs)
 
     mocker.patch.object(sonic_arm_skill, "keyframe_plan", plan)
     mocker.patch.object(arms[1], "_wait_done", return_value=None)
@@ -428,11 +428,7 @@ def test_both_stop_while_one_arms_sends_no_chunk_to_either(arms, dual_executions
 
 
 def test_each_arm_samples_its_own_hold_until_a_peer_abort(arms, mocker):
-    mocker.patch.object(
-        sonic_arm_skill,
-        "keyframe_plan",
-        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
-    )
+    mocker.patch.object(sonic_arm_skill, "keyframe_plan", real_hold_plan)  # real holds
 
     def stamped(s):  # The feeder's time since this arm's own chunk 0, in the left wrist pitch.
         return {20: 0.01 * s}
@@ -454,11 +450,7 @@ def test_each_arm_samples_its_own_hold_until_a_peer_abort(arms, mocker):
 
 
 def real_holds(mocker):
-    mocker.patch.object(
-        sonic_arm_skill,
-        "keyframe_plan",
-        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),
-    )
+    mocker.patch.object(sonic_arm_skill, "keyframe_plan", real_hold_plan)
 
 
 def both_sent(arms):

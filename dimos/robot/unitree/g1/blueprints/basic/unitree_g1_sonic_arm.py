@@ -30,9 +30,15 @@ Operator rule: call stop_arm and wait for its tool update before `dimos stop` or
 controller. Shutdown also retreats a running motion first, but only best-effort: the execution
 module may stop at the same time and hand the raised arm to the native planner.
 
-move_left_arm_joints also needs the gear_sonic MuJoCo model for its path check:
+move_left_arm_joints and the imported perform_gesture gestures also need the gear_sonic MuJoCo
+model for their path check:
 --sonicarmskillcontainer.collision-model-path=<gear_sonic>/data/robot_model/model_data/g1/scene_43dof.xml
     dimos mcp call observe
+
+Dex3 hands: hands_mounted defaults to false (pc2_223 has no hands; the hand columns are still sent
+and ignored there). A robot with Dex3 hands (pc2_222) runs with
+--sonicarmskillcontainer.hands-mounted=true. Without it the operator RPC check_dex3_finger_order
+refuses ("no hands configured"), and a hand-only motion reports its hand feedback as unavailable.
 
 The head camera is the G1's D435i colour stream, read through V4L2 (no depth). On another USB
 topology, select its device with
@@ -55,6 +61,8 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     HEAD_CAMERA_QUAT_XYZW,
     HEAD_CAMERA_SIZE,
     HEAD_CAMERA_XYZ,
+    PEAK_SPEED,
+    RATE,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import SonicArmSkillContainer
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
@@ -96,6 +104,7 @@ SONIC_ARM_PROFILE = SonicModelProfile(
     handback_policy="native_planner",
     max_observation_age=35.0,
     max_duration=75.0,
+    hand_step_limit=PEAK_SPEED / RATE,
 )
 
 

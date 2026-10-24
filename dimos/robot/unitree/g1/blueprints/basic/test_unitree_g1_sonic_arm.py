@@ -21,9 +21,15 @@ from dimos.hardware.sensors.camera.module import CameraModule
 from dimos.hardware.sensors.camera.webcam import Webcam, WebcamConfig
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import (
     HEAD_CAMERA_DEVICE,
+    SONIC_ARM_PROFILE,
     _head_camera,
     unitree_g1_sonic_arm,
 )
+from dimos.robot.unitree.g1.sonic_arm_reference import PEAK_SPEED, RATE
+
+
+def test_single_robot_profile_limits_hand_steps() -> None:
+    assert SONIC_ARM_PROFILE.hand_step_limit == pytest.approx(PEAK_SPEED / RATE)
 
 
 def _started_head_camera(cli: list[str], environ: dict[str, str]) -> WebcamConfig:

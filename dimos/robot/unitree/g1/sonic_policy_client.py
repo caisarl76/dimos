@@ -26,7 +26,6 @@ import math
 import time
 from typing import Any
 
-import cv2
 import msgpack  # type: ignore[import-untyped]
 import numpy as np
 from numpy.typing import NDArray
@@ -148,6 +147,8 @@ class SonicPolicyClient:
         for frame in images:
             if set(frame) != set(info.image_shapes):
                 raise ValueError("image keys must match policy")
+            import cv2
+
             encoded = {}
             for key, (_, height, width) in info.image_shapes.items():
                 rgb = np.asarray(frame[key])

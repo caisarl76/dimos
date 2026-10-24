@@ -72,6 +72,7 @@ class SonicModelProfile:
     blend_seconds: float = 0.3
     token_bound: float = 1.25
     token_step_limit: float = 0.05
+    hand_step_limit: float | None = None
     observation_time_basis: ObservationTimeBasis = "acquisition"
 
     def __post_init__(self) -> None:
@@ -100,6 +101,11 @@ class SonicModelProfile:
                 raise ValueError(f"{name} must be positive")
         if not TICK_SECONDS <= self.max_tick_gap < 0.2:
             raise ValueError("max_tick_gap must be below the prototype's 200 ms lease")
+        if (
+            self.hand_step_limit is not None
+            and _finite(self.hand_step_limit, "hand_step_limit") <= 0
+        ):
+            raise ValueError("hand_step_limit must be positive")
 
 
 class SessionPhase(StrEnum):
@@ -542,5 +548,11 @@ class SonicTaskSession:
                 -self.profile.token_step_limit,
                 self.profile.token_step_limit,
             )
+            if self.profile.hand_step_limit is not None:
+                action[64:] = self._last_action[64:] + np.clip(
+                    action[64:] - self._last_action[64:],
+                    -self.profile.hand_step_limit,
+                    self.profile.hand_step_limit,
+                )
         if now - self._last_emit + 1e-9 >= TICK_SECONDS:
             self._pose(action)

@@ -23,6 +23,8 @@ from dataclasses import replace
 from functools import partial
 import json
 import math
+import os
+from pathlib import Path
 import re
 import threading
 import time
@@ -33,6 +35,7 @@ import numpy as np
 import pytest
 
 from dimos.agents.mcp.tool_stream import NOTIFICATIONS_MESSAGE_METHOD, TOOL_STREAM_STOPPED_METHOD
+from dimos.agents.skill_result import SkillResult
 from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.core.coordination.blueprint_config.sources import validate_global_values
 from dimos.core.module import Module
@@ -41,6 +44,7 @@ from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill, sonic_t
 from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_agentic import (
     unitree_g1_sonic_arm_agentic,
 )
+from dimos.robot.unitree.g1.imported_gestures import HAND_LIMITS, HAND_ORDER, RETAINED
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     RATE,
@@ -54,6 +58,7 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import GESTURES, SonicArmSkillContainer, query_boxes
+from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
 from dimos.robot.unitree.g1.sonic_test_support import (
@@ -70,6 +75,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     gate_start,
     needs_scene,
     pose_values,
+    real_hold_plan,
     stop_in_background,
     tokens,
     wait_until,
@@ -99,6 +105,7 @@ def execution_config(peer, tmp_path):
             # Execution module, skill, scripted peer and feeders share one process here, and the
             # event loop occasionally stalls ~170 ms (about 1 run in 30): allow up to the 200 ms lease.
             max_tick_gap=0.19,
+            hand_step_limit=PEAK_SPEED / RATE,  # as SONIC_ARM_PROFILE
         ),
     )
 
@@ -129,10 +136,11 @@ def real_launch_skill(execution, tool_transport, mocker):
 
 
 @contextmanager
-def feeding(module, body_q=lambda t: np.zeros(29)):
+def feeding(module, body_q=lambda t: np.zeros(29), hands=None):
     """A feeder plays body telemetry into the skill (t = seconds since entering).
 
-    Yields a function that stops the feeder early.
+    `hands(t)`, if given, plays the 14 Dex3 hand readings too (left then right). Yields a
+    function that stops the feeder early.
     """
     stopped = threading.Event()
 
@@ -141,8 +149,13 @@ def feeding(module, body_q=lambda t: np.zeros(29)):
         while not stopped.is_set():
             state = module._execution.get_feedback()
             if state is not None:
-                q = tuple(float(v) for v in body_q(time.monotonic() - start))
-                module.handle_feedback(replace(state, body_q=q))
+                t = time.monotonic() - start
+                q = tuple(float(v) for v in body_q(t))
+                state = replace(state, body_q=q)
+                if hands is not None:
+                    h = [float(v) for v in hands(t)]
+                    state = replace(state, left_hand_q=tuple(h[:7]), right_hand_q=tuple(h[7:]))
+                module.handle_feedback(state)
             time.sleep(0.01)
 
     def stop():
@@ -290,7 +303,7 @@ def test_long_hold_splits_inside_the_hold_and_passes_the_age_check(skill, mocker
     mocker.patch.object(
         sonic_arm_skill,
         "keyframe_plan",
-        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+        real_hold_plan,  # real holds
     )
     mocker.patch.object(sonic_arm_skill, "_MAX_CHUNK_ROWS", 120)
     submit = mocker.spy(module._execution, "submit_chunk")
@@ -1159,7 +1172,9 @@ def test_gesture_checks_the_path_when_configured_and_runs_without(skill):
         module.perform_gesture("stop_sign")
     module._arm._checker = None
     result = call_with_feed(
-        module, lambda: module.perform_gesture("stop_sign"), reaching(GESTURES["stop_sign"][0][0])
+        module,
+        lambda: module.perform_gesture("stop_sign"),
+        reaching(sonic_arm_skill.LEFT_ARM_GESTURES["stop_sign"][0][0]),
     )
     assert "returned" in result.message, result
 
@@ -1177,7 +1192,7 @@ def test_report_extra_is_merged_into_the_metadata(skill):
         module,
         lambda: module._run(
             "probe",
-            lambda base: [Keyframe(base + 0.3 * np.eye(29)[15], 0.1)],
+            lambda base, hands: [Keyframe(base + 0.3 * np.eye(29)[15], 0.1)],
             allowed,
             require_check=False,
             report_extra=extra,
@@ -1199,7 +1214,7 @@ def _hold_run(module, mocker, body_q, report_extra):
     mocker.patch.object(
         sonic_arm_skill,
         "keyframe_plan",
-        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+        real_hold_plan,  # real holds
     )
     submit = mocker.spy(module._execution, "submit_chunk")
     t0 = time.monotonic()
@@ -1207,7 +1222,7 @@ def _hold_run(module, mocker, body_q, report_extra):
         module,
         lambda: module._run(
             "probe",
-            lambda base: [Keyframe(base + 0.3 * np.eye(29)[15], 2.0)],
+            lambda base, hands: [Keyframe(base + 0.3 * np.eye(29)[15], 2.0)],
             pose_margins(0.15, 0.45, 0.35),
             require_check=False,
             report_extra=report_extra,
@@ -1249,7 +1264,7 @@ def test_samples_stop_at_a_mid_hold_stop(real_launch_skill, mocker):
     mocker.patch.object(
         sonic_arm_skill,
         "keyframe_plan",
-        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+        real_hold_plan,  # real holds
     )
     updates = mocker.spy(module, "tool_update")
     t0 = []
@@ -1596,7 +1611,7 @@ def test_point_at_object_reports_measured_error_from_hold_samples(skill, mocker)
     mocker.patch.object(
         sonic_arm_skill,
         "keyframe_plan",
-        partial(keyframe_plan, lead_s=0.1, move_s=0.3, peak_speed=100.0),  # real holds
+        real_hold_plan,  # real holds
     )
     seeing(module, mocker, [["box", 300, 200, 340, 240]])
 
@@ -1703,7 +1718,7 @@ def one_joint_prepare(module, mocker=None):
     delta = np.zeros(29)
     delta[15] = -math.radians(20)
     return module._arm.prepare(
-        "p", lambda base: [Keyframe(base + delta, 1.0)], allowed, require_check=False
+        "p", lambda base, hands: [Keyframe(base + delta, 1.0)], allowed, require_check=False
     )
 
 
@@ -1755,3 +1770,425 @@ def test_execute_rechecks_the_pose(skill, mocker):
         with pytest.raises(RuntimeError, match="the body moved"):
             module._arm.execute(prepared)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+# Imported gestures, per-row Dex3 hands and the operator-only finger-order check.
+
+PEER_HANDS = np.r_[[0.1] * 7, [0.2] * 7]  # ScriptedPeer's left_hand_q, then right_hand_q
+# Command order (thumb_0, thumb_1, thumb_2, middle_0, middle_1, index_0, index_1), left then right:
+# LEFT index open, middle closed, thumb half; RIGHT middle open, index closed, thumb rotated.
+FINGER_POSE = np.array(
+    [0.0, 0.0, 0.875, -1.57, -1.75, 0.0, 0.0, 0.6, 0.0, -1.75, 0.0, 0.0, 1.57, 1.75]
+)
+ENCODER = Path(os.environ.get("GEAR_SONIC_ENCODER", "/nonexistent"))
+
+
+def hands_of(chunk):
+    return np.asarray(chunk)[:, 64:]
+
+
+def padded(rows, pad=LEAD_IN_ROWS):
+    """Pose-row hands [N,14] -> token rows: the token schedule's blends hold the end rows."""
+    return np.vstack([np.repeat(rows[:1], pad, 0), rows, np.repeat(rows[-1:], pad, 0)])
+
+
+def test_gesture_names_match_the_gesture_table():
+    names = set(sonic_arm_skill.GestureName.__args__)
+    assert names == set(GESTURES)
+    assert len(names) == len(sonic_arm_skill.LEFT_ARM_GESTURES) + len(RETAINED)
+    assert set(RETAINED) <= names
+    for name in names:
+        assert f"`{name}`" in G1_SONIC_ARM_SYSTEM_PROMPT, name
+    _, move_s, return_min_s, arms, envelope = sonic_arm_skill.gesture_plan_inputs(
+        "wave", np.zeros(29), PEER_HANDS
+    )
+    assert (move_s, return_min_s, arms, envelope) == (2.0, 0.0, ("left",), "pose")
+    _, move_s, return_min_s, arms, envelope = sonic_arm_skill.gesture_plan_inputs(
+        "two_hand_hearts", np.zeros(29), PEER_HANDS
+    )
+    assert (move_s, return_min_s, arms, envelope) == (0.5, 5.0, ("left", "right"), "two_arm")
+
+
+def test_every_gesture_fits_the_time_limit_from_the_robot_idle():
+    for name in GESTURES:
+        keyframes, move_s, return_min_s, _, _ = sonic_arm_skill.gesture_plan_inputs(
+            name, ROBOT_IDLE, np.zeros(14)
+        )
+        plan = keyframe_plan(
+            ROBOT_IDLE, keyframes, base_hands=np.zeros(14), move_s=move_s, return_min_s=return_min_s
+        )
+        assert len(plan.poses) / RATE <= sonic_arm_skill.GESTURE_MAX_S == 45.0, name
+
+
+@pytest.mark.parametrize("name", sorted(GESTURES))
+def test_every_gesture_from_the_robot_idle_splits_into_session_chunks(name):
+    """_move's plan, real 2 s token blends and split mask: every chunk fits a session chunk, and
+    each split row has still tokens, poses and hands. beckon (802 pose rows, no hold) once had no
+    still row and did not fit one chunk with both blends (1002 rows)."""
+    pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+    assert pad == 100
+    keyframes, move_s, return_min_s, _, _ = sonic_arm_skill.gesture_plan_inputs(
+        name, ROBOT_IDLE, np.zeros(14)
+    )
+    kplan = keyframe_plan(
+        ROBOT_IDLE,
+        keyframes,
+        base_hands=np.zeros(14),
+        move_s=move_s,
+        return_min_s=return_min_s,
+        split_every=sonic_arm_skill._MAX_CHUNK_ROWS - sonic_arm_skill._CHUNK_OVERLAP - pad,
+        one_chunk=sonic_arm_skill._MAX_CHUNK_ROWS - 2 * pad,
+    )
+    tokens = token_schedule(np.full(64, PEER_TOKEN), FakeEncoder("unused").encode(kplan.poses))
+    token_still = sonic_arm_skill.token_still(tokens)
+    plan_still = np.r_[np.zeros(pad, bool), kplan.still, np.zeros(pad, bool)]
+    chunks = sonic_arm_skill.chunk_rows(len(tokens), token_still & plan_still)
+    assert all(end - start <= sonic_arm_skill._MAX_CHUNK_ROWS for start, end in chunks), chunks
+    assert chunks[-1][1] == len(tokens)
+    hands = np.vstack(
+        [np.repeat(kplan.hands[:1], pad, 0), kplan.hands, np.repeat(kplan.hands[-1:], pad, 0)]
+    )
+    for start, _ in chunks[1:]:
+        assert token_still[start] and plan_still[start], (name, start)
+        assert np.ptp(hands[start : start + 15], axis=0).max() == 0.0, (name, start)
+    if name == "beckon":
+        assert len(chunks) == 2  # 864 pose rows with the split hold: too long for one chunk.
+
+
+def two_hand_hearts_plan():
+    """The plan _move builds for two_hand_hearts from the peer's measured pose (fast engine)."""
+    base = np.zeros(29)
+    keyframes, move_s, return_min_s, _, _ = sonic_arm_skill.gesture_plan_inputs(
+        "two_hand_hearts", base, PEER_HANDS
+    )
+    return sonic_arm_skill.keyframe_plan(
+        base, keyframes, base_hands=PEER_HANDS, move_s=move_s, return_min_s=return_min_s
+    )
+
+
+def test_two_hand_hearts_submits_the_plan_hands_row_for_row(skill, mocker):
+    module, _ = skill
+    module._arm._both_checker = FakeChecker()
+    submit = mocker.spy(module._execution, "submit_chunk")
+    result = call_with_feed(
+        module, lambda: module.perform_gesture("two_hand_hearts"), lambda t: np.zeros(29)
+    )
+    assert result.metadata["motion"] == "two_hand_hearts" and module._arm._both_checker.calls >= 1
+    kplan = two_hand_hearts_plan()
+    assert np.ptp(kplan.hands, axis=0).max() > 0.1  # The fingers move: not the measured hands.
+    [first] = [c.args[3] for c in submit.call_args_list]
+    assert len(first) == len(kplan.poses) + 2 * LEAD_IN_ROWS
+    rows = np.linspace(0, len(kplan.poses) - 1, 25).astype(int)
+    assert np.array_equal(hands_of(first)[LEAD_IN_ROWS + rows], kplan.hands[rows])
+    assert np.array_equal(hands_of(first), padded(kplan.hands))
+
+
+def test_hand_steps_stay_limited_through_a_stop_at_peak_finger_velocity(skill, mocker):
+    module, peer = skill
+    module._arm._both_checker = FakeChecker()
+    kplan = two_hand_hearts_plan()
+    steps = np.abs(np.diff(kplan.hands, axis=0)).max(axis=1)
+    peak = int(np.argmax(steps)) + 1
+    assert steps.max() > PEAK_SPEED / RATE  # Unclamped, the plan would step past the limit.
+    submit = mocker.spy(module._execution, "submit_chunk")
+    _, stops = stop_at_row(module, mocker, LEAD_IN_ROWS + peak, on_row=module._arm.stop.set)
+    result = call_with_feed(
+        module, lambda: module.perform_gesture("two_hand_hearts"), lambda t: np.zeros(29)
+    )
+    assert "stopped early: stop requested" in result.message, result
+    [(row, _, _)] = stops
+    # The retreat's hand columns are the plan's own way back (retreat_hands), blend rows included.
+    segment, offset = sonic_arm_reference.retreat_route(kplan, row - LEAD_IN_ROWS)
+    unit = sonic_arm_reference.retreat_hands(kplan, segment)
+    retreat = submit.call_args_list[1].args[3]
+    assert np.array_equal(hands_of(retreat), padded(unit)[LEAD_IN_ROWS + offset :])
+    sent = np.array(
+        [pose_values(p)[64:] for p in peer.snapshot() if p.startswith(b"pose")], np.float64
+    )
+    sent_steps = np.abs(np.diff(sent, axis=0)).max(axis=1)
+    assert sent_steps.max() <= PEAK_SPEED / RATE + 1e-6
+    assert sent_steps.max() > 0.5 * PEAK_SPEED / RATE  # The hands did move on the wire.
+    assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_support_person_from_a_bent_elbow_is_refused_before_sending(skill, mocker):
+    module, peer = skill
+    module._arm._both_checker = FakeChecker()
+    real = module._execution.get_feedback
+
+    def bent():
+        state = real()
+        q = list(state.body_q)
+        q[18] = -0.8  # left elbow; support_person adds -0.5, past the -1.0472 limit
+        return replace(state, body_q=tuple(q))
+
+    mocker.patch.object(module._execution, "get_feedback", bent)
+    with pytest.raises(
+        ValueError, match=r"support_person keyframes\[1\]: left_elbow = -1\.3 outside its limit"
+    ):
+        module.perform_gesture("support_person")
+    assert module._arm._both_checker.calls == 0
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+    assert module._execution.get_status()["task"] is None
+
+
+def test_imported_gestures_need_the_both_arm_path_check(real_launch_skill, mocker):
+    module, peer = real_launch_skill
+    start_tool = mocker.spy(module, "start_tool")
+    with pytest.raises(RuntimeError, match="both-arm path check"):
+        module.perform_gesture("two_hand_hearts")
+    assert start_tool.call_count == 0 and module._running is None  # Refused before starting.
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_imported_gesture_paths_go_through_the_both_arm_checker(skill):
+    module, peer = skill
+    module._arm._checker = FakeChecker()
+    module._arm._both_checker = FakeChecker("left_elbow_link (other arm)")
+    with pytest.raises(RuntimeError, match=r"left_elbow_link \(other arm\); nothing sent"):
+        module.perform_gesture("two_hand_hearts")
+    assert module._arm._checker.calls == 0 and module._arm._both_checker.calls >= 1
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_start_builds_the_both_arm_checker_from_the_collision_model(mocker):
+    checker = mocker.patch.object(sonic_arm_skill, "ArmCollisionChecker")
+    mocker.patch.object(sonic_arm_skill, "ArmKinematics")
+    mocker.patch.object(sonic_arm_skill, "SonicEncoder", FakeEncoder)
+    module = SonicArmSkillContainer(encoder_path="unused.onnx", collision_model_path="scene.xml")
+    # start() builds the SonicArm over the wired execution; this test never moves it.
+    mocker.patch.object(module, "_execution", mocker.MagicMock(), create=True)
+    transport = make_transport(f"/arm-skill-test/{uuid4().hex}", SonicFeedback)
+    module.set_transport("feedback", transport)
+    try:
+        transport.start()
+        module.start()
+        scene = Path("scene.xml")
+        assert checker.call_args_list == [
+            mocker.call(scene),
+            mocker.call(scene, arms=("left", "right")),
+        ]
+    finally:
+        module.stop()
+        transport.stop()
+
+
+def test_finger_check_submits_the_asymmetric_pose_with_the_body_at_its_start(
+    real_launch_skill, mocker
+):
+    module, _ = real_launch_skill
+    mocker.patch.object(module.config, "hands_mounted", True)
+    submit = mocker.spy(module._execution, "submit_chunk")
+    encode = mocker.spy(module._arm._encoder, "encode")
+    with feeding(module):
+        assert module.check_dex3_finger_order() == "started"
+        assert module.operator_result() is None
+        wait_until(lambda: module.operator_result() is not None)
+    hands = hands_of(submit.call_args_list[0].args[3])
+    assert any(np.array_equal(h, FINGER_POSE) for h in hands)
+    assert np.array_equal(hands[0], PEER_HANDS) and np.array_equal(hands[-1], PEER_HANDS)
+    poses = encode.call_args_list[0].args[0]
+    assert np.all(poses == poses[0])  # Arms and body stay at the measured start.
+    result = module.operator_result()
+    assert "LEFT index open, middle closed, thumb half" in result, result
+    assert "RIGHT middle open, index closed, thumb rotated" in result, result
+    assert module._running is None and module._arm._watch is None
+
+
+def test_failed_finger_check_delivers_the_hand_diagnostics(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    mocker.patch.object(module.config, "hands_mounted", True)
+    mocker.patch.object(sonic_arm_skill, "keyframe_plan", real_hold_plan)  # real holds
+    with feeding(module, hands=lambda t: PEER_HANDS):  # Constant readings: they do not follow.
+        assert module.check_dex3_finger_order() == "started"
+        wait_until(lambda: module.operator_result() is not None, 30)
+    result = module.operator_result()
+    assert f'"message": "{sonic_arm_skill.FINGER_CHECK} failed: ' in result, result
+    assert "hand did not follow" in result, result
+    assert "hand_held" in result and "hand_target" in result, result
+
+
+def test_finger_check_refuses_while_a_motion_runs(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    mocker.patch.object(module.config, "hands_mounted", True)
+    gate, _ = gate_start(module, mocker)
+    assert "started" in module.move_upper_body("left_arm_forward", 20.0)
+    with pytest.raises(RuntimeError, match="an arm move is already running"):
+        module.check_dex3_finger_order()
+    gate.set()
+    wait_until(lambda: module._running is None)
+    assert module.operator_result() is None
+
+
+def test_finger_check_without_hands_configured_is_refused(real_launch_skill):
+    module, peer = real_launch_skill
+    with pytest.raises(RuntimeError, match="no hands configured"):
+        module.check_dex3_finger_order()
+    assert module._running is None and module.operator_result() is None
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_finger_check_is_an_operator_rpc_not_a_skill(real_launch_skill):
+    module, _ = real_launch_skill
+    names = {s.func_name for s in module.get_skills()}
+    assert "perform_gesture" in names and "stop_arm" in names
+    assert not {"check_dex3_finger_order", "operator_result"} & names
+    for rpc in (
+        SonicArmSkillContainer.check_dex3_finger_order,
+        SonicArmSkillContainer.operator_result,
+    ):
+        assert getattr(rpc, "__rpc__", False) and not getattr(rpc, "__skill__", False)
+
+
+def hand_only_run(module, mocker, hands=None):
+    """A motion that moves only the hands, with a real 2 s hold, while hand telemetry plays."""
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        real_hold_plan,  # real holds
+    )
+    with feeding(module, hands=hands):
+        return module._run(
+            "fingers",
+            lambda base, base_hands: [Keyframe(base.copy(), 2.0, hands=FINGER_POSE)],
+            group_margins(0.15, 0.2, 0.3),
+            require_check=False,
+        )
+
+
+def test_hand_only_motion_with_following_hands_reports_the_pose_held(skill, mocker):
+    module, _ = skill
+    mocker.patch.object(module.config, "hands_mounted", True)
+    result = hand_only_run(module, mocker, hands=lambda t: FINGER_POSE + 0.05)
+    assert "hand pose held" in result.message, result
+    text = result.agent_encode()[0]["text"]
+    assert "NaN" not in text and "did not follow" not in text, text
+    assert result.metadata["hand_hold_samples"] > 10
+    assert result.metadata["hand_worst_error_rad"] == pytest.approx(0.05, abs=1e-6)
+    assert len(result.metadata["hand_held"]) == 14 and len(result.metadata["hand_target"]) == 14
+    assert result.metadata["hand_held"] == np.round(FINGER_POSE + 0.05, 3).tolist()
+
+
+def test_finger_check_pose_is_within_the_hand_limits():
+    for side, offset in (("left", 0), ("right", 7)):
+        for slot, (lo, hi) in enumerate(HAND_LIMITS[side]):
+            value = sonic_arm_skill.FINGER_CHECK_HANDS[offset + slot]
+            assert lo <= value <= hi, (side, HAND_ORDER[slot], value)
+
+
+@pytest.mark.parametrize(
+    ("hands", "worst"),
+    [
+        (lambda t: np.zeros(14), "left middle_1 off by 1.75 rad"),  # all-zero readings
+        (None, "right thumb_2 off by 1.95 rad"),  # the peer's unchanged readings
+    ],
+)
+def test_hand_only_motion_with_hands_that_do_not_move_fails(skill, mocker, hands, worst):
+    module, _ = skill
+    mocker.patch.object(module.config, "hands_mounted", True)
+    with pytest.raises(RuntimeError, match=f"hand did not follow: {worst}") as error:
+        hand_only_run(module, mocker, hands)
+    assert "unavailable" not in str(error.value) and "NaN" not in str(error.value)
+    # What a failed run delivers: the same text and metadata as a successful one.
+    text = SkillResult(f"fingers failed: {error.value}", metadata=error.value.metadata)
+    text = text.agent_encode()[0]["text"]
+    assert '"message": "fingers failed: ' in text and "hand did not follow" in text, text
+    for key in ("hand_base", "hand_target", "hand_held", "hand_worst_finger"):
+        assert key in text, (key, text)
+
+
+def test_hand_only_motion_without_hands_configured_claims_nothing_about_the_pose(skill, mocker):
+    module, _ = skill
+    result = hand_only_run(module, mocker, hands=lambda t: FINGER_POSE)
+    assert "hand feedback unavailable (no hands configured)" in result.message, result
+    text = result.agent_encode()[0]["text"]
+    assert "held" not in text and "did not follow" not in text and "NaN" not in text, text
+
+
+def test_a_finger_only_move_mid_plan_is_never_a_split_point(skill, mocker):
+    module, _ = skill
+    mocker.patch.object(
+        sonic_arm_skill,
+        "keyframe_plan",
+        real_hold_plan,  # real holds
+    )
+    # The latest split the first chunk allows (row 115) lies inside the finger move (rows 106-122):
+    # the tokens stay still there, since they do not encode the hands.
+    mocker.patch.object(sonic_arm_skill, "_MAX_CHUNK_ROWS", 140)
+    submit = mocker.spy(module._execution, "submit_chunk")
+    arm = 0.3 * np.eye(29)[15]
+    call_with_feed(
+        module,
+        lambda: module._run(
+            "fingers",
+            lambda base, hands: [
+                Keyframe(base + arm, 1.5),
+                Keyframe(base + arm, 1.5, hands=FINGER_POSE),
+            ],
+            pose_margins(0.15, 0.45, 0.35),
+            require_check=False,
+        ),
+        lambda t: np.zeros(29),
+    )
+    chunks = [c.args[3] for c in submit.call_args_list]
+    assert len(chunks) >= 2
+    starts = np.cumsum([0] + [len(c) - 25 for c in chunks[:-1]])
+    plan = np.zeros((starts[-1] + len(chunks[-1]), 78))
+    for start, rows in zip(starts, chunks, strict=True):
+        plan[start : start + len(rows)] = rows
+    moving = np.flatnonzero(np.any(np.diff(hands_of(plan), axis=0) != 0, axis=1))
+    assert len(moving) and moving.min() > LEAD_IN_ROWS  # The fingers move mid-plan.
+    for split in starts[1:]:
+        window = plan[split - 1 : split + sonic_arm_reference._SPLIT_POSE_ROWS - 1]
+        assert np.all(window == window[0]), (split, moving.min(), moving.max())
+
+
+@pytest.fixture
+def worker_arm(peer, execution_config, dimos_cluster):
+    """The execution module and the arm container each in a worker, wired as the blueprint does."""
+    profile = replace(execution_config["profile"], max_observation_age=25.0, max_duration=60.0)
+    execution = dimos_cluster.deploy(
+        SonicExecutionModule, **(execution_config | {"profile": profile})
+    )
+    arm = dimos_cluster.deploy(
+        SonicArmSkillContainer, encoder_path=ENCODER, hands_mounted=True, return_watch_seconds=0.0
+    )
+    transport = make_transport(f"/arm-skill-worker-test/{uuid4().hex}", SonicFeedback)
+    try:
+        execution.set_transport("feedback", transport)
+        arm.set_transport("feedback", transport)
+        arm.set_module_ref("_execution", execution)
+        execution.start()
+        peer.reference_endpoint = execution.get_status()["reference_endpoint"]
+        peer.connected.set()
+        wait_until(lambda: execution.get_status()["ready"], timeout=3)
+        arm.start()
+        yield arm, execution
+    finally:
+        arm.stop()
+        execution.stop()
+
+
+@pytest.mark.skipif(not ENCODER.is_file(), reason="GEAR_SONIC_ENCODER is unset or missing")
+def test_finger_check_through_the_worker_returns_at_once_and_stop_arm_retreats(worker_arm, peer):
+    arm, execution = worker_arm
+    called = time.monotonic()
+    assert arm.check_dex3_finger_order() == "started"
+    assert time.monotonic() - called < 1.0
+    assert arm.operator_result() is None
+
+    # The transmitted hands reached the finger pose: the plan is in the hold. Then a few more.
+    def sent_hands():
+        return [pose_values(p)[64:] for p in peer.snapshot() if p.startswith(b"pose")]
+
+    wait_until(lambda: any(np.allclose(h, FINGER_POSE, atol=1e-3) for h in sent_hands()), 30)
+    arrived = len(sent_hands())
+    wait_until(lambda: len(sent_hands()) >= arrived + 10, 30)
+    called = time.monotonic()
+    assert arm.stop_arm().startswith("Stopping")
+    assert time.monotonic() - called < 1.0
+    wait_until(lambda: arm.operator_result() is not None, 30)
+    result = arm.operator_result()
+    assert "stopped early: stop requested" in result, result
+    task = execution.get_status()["task"]
+    assert task["last_chunk_sequence"] == 1 and task["handback_confirmed"], task  # The retreat.

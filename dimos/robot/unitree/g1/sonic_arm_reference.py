@@ -102,9 +102,13 @@ MOTOR_NAMES = (
         )
     ]
 )
-_LEFT_ARM_LINKS = ("left_shoulder_yaw", "left_elbow", "left_wrist")
-# The left shoulder links next to the torso, absent hands, and the floor.
-_IGNORED = ("left_shoulder_pitch", "left_shoulder_roll", "left_hand", "right_hand", "world")
+_ARM_LINKS = ("shoulder_yaw", "elbow", "wrist")  # each checked arm's links, after "left_"/"right_"
+# Ignored per checked arm: its own shoulder links next to the torso, absent hands, and the floor.
+# The other arm's shoulder pitch and roll links stay checked, as body.
+_IGNORED = {
+    side: (f"{side}_shoulder_pitch", f"{side}_shoulder_roll", "left_hand", "right_hand", "world")
+    for side in ("left", "right")
+}
 # Wrists and shoulder yaws: SONIC's decoder moves these by itself, at low torque, when an arm moves.
 LOOSE_JOINTS = [17, 19, 20, 21, 24, 26, 27, 28]
 # move_left_arm_joints bounds, deg, inside the joint limits. Collisions inside the box are left to the
@@ -212,10 +216,15 @@ def stroke_plan(
     ).poses
 
 
+HAND_JOINTS = 14  # Dex3, 7 per hand, in the deploy's command order
+
+
 @dataclass(frozen=True)
 class Keyframe:
     target: NDArray[np.float64]
     hold_s: float = 0.0
+    hands: NDArray[np.float64] | None = None  # [14]; None keeps the previous hand target
+    min_s: float = 0.0  # minimum duration of the segment arriving here
 
 
 @dataclass(frozen=True)
@@ -233,14 +242,22 @@ class KeyframePlan:
     poses: NDArray[np.float64]
     segments: list[Segment]
     still: NDArray[np.bool_]
+    hands: NDArray[np.float64]  # [N,14], row-aligned with poses
     move_s: float = 2.0
     peak_speed: float = PEAK_SPEED
+    return_min_s: float = 0.0
 
 
 def _segment_poses(
-    src: NDArray[np.float64], dst: NDArray[np.float64], move_s: float, peak_speed: float
+    src: NDArray[np.float64],
+    dst: NDArray[np.float64],
+    move_s: float,
+    peak_speed: float,
+    min_s: float = 0.0,
 ) -> NDArray[np.float64]:
-    duration = max(move_s, 1.875 * float(np.abs(dst - src).max()) / peak_speed)
+    """Min-jerk rows from src to dst. Rows may carry the hands after the 29 joints; every column
+    shares one profile, and the largest change, finger or joint, sets the peak speed."""
+    duration = max(move_s, min_s, 1.875 * float(np.abs(dst - src).max()) / peak_speed)
     rows = math.ceil(duration * RATE) + 1
     # Use the same arithmetic in either direction so a return exactly mirrors the outward path.
     reverse = tuple(src) > tuple(dst)
@@ -254,22 +271,41 @@ def keyframe_plan(
     base: NDArray[Any],
     keyframes: Sequence[Keyframe],
     *,
+    base_hands: NDArray[Any] | None = None,
     lead_s: float = 1.0,
     move_s: float = 2.0,
     peak_speed: float = PEAK_SPEED,
     split_every: int | None = None,
+    return_min_s: float = 0.0,
+    one_chunk: int | None = None,
 ) -> KeyframePlan:
-    """Min-jerk moves through absolute targets and back, with holds long enough for token splits."""
+    """Min-jerk moves through absolute targets and back, with holds long enough for token splits.
+
+    The Dex3 hands (base_hands, default zeros) move with the joints on the same rows.
+    split_every bounds the rows between split points. A plan with no still row at all is sent as
+    one chunk, so one_chunk (the session chunk less both token blends) bounds its total length:
+    a longer one gets a split hold at its last keyframe.
+    """
     base = np.asarray(base, np.float64)
     targets = np.asarray([keyframe.target for keyframe in keyframes], np.float64).reshape(-1, 29)
-    lead = np.tile(base, (round(lead_s * RATE), 1))
+    home = np.zeros(HAND_JOINTS) if base_hands is None else np.asarray(base_hands, np.float64)
+    hand, hand_targets = home, []
+    for keyframe in keyframes:
+        if keyframe.hands is not None:
+            hand = np.asarray(keyframe.hands, np.float64)
+        hand_targets.append(hand)
+    full = np.hstack([targets, np.reshape(hand_targets, (-1, HAND_JOINTS))])
+    full_base = np.concatenate([base, home])
+    lead = np.tile(full_base, (round(lead_s * RATE), 1))
     parts = [lead]
     segments: list[Segment] = []
     row = len(lead)
     last_still = max(0, row - _SPLIT_POSE_ROWS + 1)
-    src = base
-    for k, dst in enumerate([*targets, base]):
-        move = _segment_poses(src, dst, move_s, peak_speed)
+    has_still = last_still > 0
+    src = full_base
+    for k, dst in enumerate([*full, full_base]):
+        min_s = keyframes[k].min_s if k < len(targets) else return_min_s
+        move = _segment_poses(src, dst, move_s, peak_speed, min_s)
         if split_every is not None and len(move) > split_every:
             raise ValueError("segment longer than a session chunk")
         if k:
@@ -277,10 +313,15 @@ def keyframe_plan(
             # Arrival and departure also repeat the target; the window needs both neighbours.
             if hold + 2 >= _SPLIT_POSE_ROWS:
                 last_still = row + hold - _SPLIT_POSE_ROWS + 2
+                has_still = True
             tail = len(lead) if k == len(targets) else 0  # the lead-out stays in the last chunk
-            if split_every is not None and row + hold + len(move) + tail - last_still > split_every:
+            end = row + hold + len(move) + tail
+            if (split_every is not None and end - last_still > split_every) or (
+                one_chunk is not None and k == len(targets) and not has_still and end > one_chunk
+            ):
                 hold = max(hold, _SPLIT_POSE_ROWS)
                 last_still = row + hold - _SPLIT_POSE_ROWS + 2
+                has_still = True
             parts.append(np.tile(src, (hold, 1)))
             row += hold
         parts.append(move)
@@ -288,25 +329,49 @@ def keyframe_plan(
         row += len(move)
         src = dst
     parts.append(lead)
-    poses = np.vstack(parts)
+    rows = np.vstack(parts)
+    poses, hands = rows[:, :29].copy(), rows[:, 29:].copy()
+    # Still: joints and hands both unchanged, so a finger-only move is never a split point.
     still = np.zeros(len(poses), dtype=np.bool_)
     if len(poses) >= _SPLIT_POSE_ROWS:
-        unchanged = np.all(poses[1:] == poses[:-1], axis=1)
+        unchanged = np.all(rows[1:] == rows[:-1], axis=1)
         windows = np.lib.stride_tricks.sliding_window_view(unchanged, _SPLIT_POSE_ROWS - 1)
         still[1 : len(windows) + 1] = windows.all(axis=1)
-    return KeyframePlan(base, targets, poses, segments, still, move_s, peak_speed)
+    return KeyframePlan(
+        base, targets, poses, segments, still, hands, move_s, peak_speed, return_min_s
+    )
+
+
+def _retreat_rows(plan: KeyframePlan, segment: int) -> NDArray[np.float64]:
+    """[M,43] joints then hands: reverse the active outward segment, go directly home, and keep
+    the plan's lead-out. The direct way home gets the plan's return_min_s."""
+    rows = np.hstack([plan.poses, plan.hands])
+    seg = plan.segments[segment]
+    if seg.dst == -1:
+        return rows[seg.start :]
+    parts = [rows[seg.start : seg.end][::-1]]
+    if seg.src >= 0:
+        # The segment starts at keyframe src; row 0 is the base (lead-in or the first segment).
+        src = np.concatenate([plan.targets[seg.src], plan.hands[seg.start]])
+        home = np.concatenate([plan.base, plan.hands[0]])
+        parts.append(_segment_poses(src, home, plan.move_s, plan.peak_speed, plan.return_min_s))
+    parts.append(rows[plan.segments[-1].end :])
+    return np.vstack(parts)
 
 
 def retreat_poses(plan: KeyframePlan, segment: int) -> NDArray[np.float64]:
     """Reverse the active outward segment, go directly home, and keep the plan's lead-out."""
-    seg = plan.segments[segment]
-    if seg.dst == -1:
-        return plan.poses[seg.start :]
-    parts = [plan.poses[seg.start : seg.end][::-1]]
-    if seg.src >= 0:
-        parts.append(_segment_poses(plan.targets[seg.src], plan.base, plan.move_s, plan.peak_speed))
-    parts.append(plan.poses[plan.segments[-1].end :])
-    return np.vstack(parts)
+    return _retreat_rows(plan, segment)[:, :29].copy()
+
+
+def retreat_hands(plan: KeyframePlan, segment: int) -> NDArray[np.float64]:
+    """The Dex3 hand rows [M,14] of retreat_poses(plan, segment), row for row."""
+    return _retreat_rows(plan, segment)[:, 29:].copy()
+
+
+def hand_rows(plan: KeyframePlan) -> NDArray[np.float64]:
+    """The plan's Dex3 hand rows [N,14], row-aligned with plan.poses."""
+    return plan.hands
 
 
 def retreat_route(plan: KeyframePlan, row: int) -> tuple[int, int] | None:
@@ -385,6 +450,11 @@ def pose_margins(body: float, moving_arm: float, other_arm: float) -> NDArray[np
     return margins
 
 
+def two_arm_margins(body: float, arms: float) -> NDArray[np.float64]:
+    """Envelope for poses that move both arms: legs and waist `body`, every arm joint `arms`."""
+    return pose_margins(body, arms, arms)
+
+
 def pixel_ray(u: float, v: float) -> NDArray[np.float64]:
     """Unit ray through head-camera pixel (u, v), torso_link frame."""
     fx, fy, cx, cy = HEAD_CAMERA_K
@@ -397,18 +467,29 @@ def pixel_ray(u: float, v: float) -> NDArray[np.float64]:
 
 
 class ArmCollisionChecker:
-    """Kinematic check that a planned left-arm path keeps clear of the body.
+    """Kinematic check that a planned arm path keeps clear of the body.
 
     Uses the G1 SONIC MuJoCo model (gear_sonic scene_43dof.xml). Every geom gets `margin` of extra
     reach and MuJoCo adds the two, so a contact means the left upper arm, elbow or wrist links come
-    within 2 * margin of the torso, pelvis, legs or right arm. The Dex3 hand geoms are ignored (no
-    hands are installed). Pairs already that close at the start pose (the robot's idle left wrist
-    rests about 2 cm from the hip) are allowed unless the path brings them `closer` nearer.
+    within 2 * margin of the torso, pelvis, legs or right arm. With `arms=("left", "right")` the
+    right arm's links are checked the same way against the body, and the two arms against each
+    other. Each arm ignores only its own shoulder pitch and roll links; the other arm's are body,
+    reported by name like the torso. The Dex3 hand geoms are ignored (no hands are installed,
+    TODO(dex3)). Pairs already that close at the start pose (the robot's idle left wrist rests
+    about 2 cm from the hip) are allowed unless the path brings them `closer` nearer.
     Not thread-safe: every call reuses the instance's one MjData; the skill uses it only from its
     single motion thread.
     """
 
-    def __init__(self, scene: Path, margin: float = 0.01, closer: float = 0.005) -> None:
+    def __init__(
+        self,
+        scene: Path,
+        margin: float = 0.01,
+        closer: float = 0.005,
+        arms: tuple[str, ...] = ("left",),
+    ) -> None:
+        if arms not in (("left",), ("left", "right")):
+            raise ValueError(f'arms must be ("left",) or ("left", "right"), not {arms}')
         import mujoco
 
         self._mujoco = mujoco
@@ -418,34 +499,44 @@ class ArmCollisionChecker:
         self._closer = closer
         body = [self._m.body(self._m.geom_bodyid[g]).name for g in range(self._m.ngeom)]
         self._body = body
-        self._arm = {g for g in range(self._m.ngeom) if body[g].startswith(_LEFT_ARM_LINKS)}
+        self._side = {
+            g: side
+            for side in arms
+            for g in range(self._m.ngeom)
+            if body[g].startswith(tuple(f"{side}_{link}" for link in _ARM_LINKS))
+        }
         self._qadr = [self._m.jnt_qposadr[self._m.joint(n + "_joint").id] for n in MOTOR_NAMES]
 
     def _near(self, q: NDArray[Any]) -> dict[tuple[int, int], float]:
-        """Arm-to-body geom pairs within the margin at pose q, with their distances."""
+        """(arm, other) geom pairs within the margin at pose q, with their distances: arm-to-body,
+        and left-arm-to-right-arm when both arms are checked."""
         self._mujoco.mj_resetData(self._m, self._d)  # type: ignore[attr-defined]
         self._d.qpos[2] = 0.79
         self._d.qpos[self._qadr] = q
         self._mujoco.mj_forward(self._m, self._d)
         near: dict[tuple[int, int], float] = {}
         for c in self._d.contact[: self._d.ncon]:
-            a, b = int(c.geom1), int(c.geom2)
-            if (a in self._arm) != (b in self._arm):
-                arm, other = (a, b) if a in self._arm else (b, a)
-                if not self._body[other].startswith(_IGNORED):
-                    near[(arm, other)] = min(float(c.dist), near.get((arm, other), np.inf))
+            arm, other = int(c.geom1), int(c.geom2)
+            side, other_side = self._side.get(arm), self._side.get(other)
+            if side == other_side:  # body to body, or within one arm
+                continue
+            if side is None or other_side == "left":
+                arm, other = other, arm
+            if other in self._side or not self._body[other].startswith(_IGNORED[self._side[arm]]):
+                near[(arm, other)] = min(float(c.dist), near.get((arm, other), np.inf))
         return near
 
     def first_contact(
         self, poses: NDArray[Any], every: int = 5, start: NDArray[Any] | None = None
     ) -> str | None:
-        """First body near the arm, or None. Tolerate contacts from start (default poses[0])."""
+        """First body near an arm, "<link> (other arm)" for the right arm near the left, or None.
+        Tolerate contacts from start (default poses[0])."""
         poses = np.asarray(poses)
         baseline = self._near(poses[0] if start is None else start)
         for q in poses[::every]:
             for (arm, other), dist in self._near(q).items():
                 if (arm, other) not in baseline or dist < baseline[(arm, other)] - self._closer:
-                    return str(self._body[other])
+                    return str(self._body[other]) + (" (other arm)" if other in self._side else "")
         return None
 
 

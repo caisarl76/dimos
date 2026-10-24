@@ -38,18 +38,24 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     ArmKinematics,
     Keyframe,
     SonicEncoder,
+    hand_rows,
     keyframe_plan,
+    min_jerk,
     pixel_ray,
+    retreat_hands,
     retreat_poses,
     retreat_route,
     stroke_plan,
+    two_arm_margins,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     GESTURE_MAX_S,
     GESTURES,
+    LEFT_ARM_GESTURES,
     GestureName,
     chunk_rows,
     gesture_keyframes,
+    gesture_plan_inputs,
     token_still,
 )
 from dimos.robot.unitree.g1.sonic_test_support import ROBOT_IDLE, SCENE, needs_scene
@@ -206,6 +212,124 @@ def test_pose_still_requires_the_whole_encoder_lookahead_and_gradient_window():
     )
 
 
+BASE_HANDS = np.linspace(-0.3, 0.3, 14)
+
+
+def hands(**fingers):
+    """Base hands with some of the 14 Dex3 slots set: hands(h3=1.0)."""
+    values = BASE_HANDS.copy()
+    for name, value in fingers.items():
+        values[int(name[1:])] = value
+    return values
+
+
+def rows_for(seconds):
+    return math.ceil(seconds * RATE) + 1
+
+
+def test_hand_rows_follow_the_joint_min_jerk_profile():
+    target = kf(-0.6, 0.3, 0, 0.6, hold=1.0).target
+    hand_target = hands(h0=0.9, h9=-1.0)
+    plan = keyframe_plan(BASE, [Keyframe(target, 1.0, hands=hand_target)], base_hands=BASE_HANDS)
+    assert plan.hands.shape == (len(plan.poses), 14)
+    assert hand_rows(plan) is plan.hands
+    out, back = plan.segments
+    profile = min_jerk(out.end - out.start)[:, None]
+    np.testing.assert_allclose(
+        plan.hands[out.start : out.end], BASE_HANDS + profile * (hand_target - BASE_HANDS)
+    )
+    np.testing.assert_allclose(plan.poses[out.start : out.end], BASE + profile * (target - BASE))
+    assert (plan.hands[: out.start] == BASE_HANDS).all()
+    assert (plan.hands[out.end - 1 : back.start + 1] == hand_target).all()
+    assert (plan.hands[back.end - 1 :] == BASE_HANDS).all()
+    np.testing.assert_array_equal(plan.hands, plan.hands[::-1])  # the return mirrors the way out
+
+
+def test_a_finger_change_stretches_the_segment_to_the_peak_speed():
+    target = kf(0.29, 0.19, 0, 0.59).target  # 0.1 rad of shoulder pitch: 2 s alone
+    plan = keyframe_plan(
+        BASE, [Keyframe(target, hands=hands(h4=BASE_HANDS[4] + 1.75))], base_hands=BASE_HANDS
+    )
+    for segment in plan.segments:
+        assert segment.end - segment.start == rows_for(1.875 * 1.75 / PEAK_SPEED)
+    assert np.abs(np.diff(plan.hands, axis=0)).max() * RATE <= PEAK_SPEED + 1e-9
+
+
+def test_a_keyframe_without_hands_keeps_the_previous_hand_target():
+    held = hands(h2=0.5)
+    plan = keyframe_plan(
+        BASE,
+        [Keyframe(kf(-0.3, 0.3, 0, 0.5).target, hands=held), kf(-0.5, 0.3, 0, 0.5)],
+        base_hands=BASE_HANDS,
+    )
+    second = plan.segments[1]
+    assert (plan.hands[second.start : second.end] == held).all()
+
+
+def test_min_s_stretches_a_short_move_and_return_min_s_the_final_segment():
+    target = kf(0.29, 0.19, 0, 0.59).target
+    plan = keyframe_plan(BASE, [Keyframe(target, min_s=1.5)], move_s=0.5, return_min_s=2.5)
+    out, back = plan.segments
+    assert (out.end - out.start, back.end - back.start) == (rows_for(1.5), rows_for(2.5))
+    plain = keyframe_plan(BASE, [Keyframe(target)], move_s=0.5).segments
+    assert [s.end - s.start for s in plain] == [rows_for(0.5)] * 2
+
+
+def test_retreat_hands_reverse_and_return_home_row_aligned_with_the_poses():
+    keyframes = [
+        Keyframe(kf(-0.3, 1.3, 0, 0).target, 0.5, hands=hands(h0=1.0)),
+        Keyframe(kf(-0.3, 1.3, -0.35, 0).target),
+        Keyframe(kf(-0.3, 1.3, 0.35, 0).target, hands=hands(h0=-0.5, h8=1.2), min_s=1.0),
+    ]
+    plan = keyframe_plan(BASE, keyframes, base_hands=BASE_HANDS, return_min_s=3.0)
+    for s, seg in enumerate(plan.segments):
+        poses, unit = retreat_poses(plan, s), retreat_hands(plan, s)
+        assert unit.shape == (len(poses), 14), s
+        np.testing.assert_array_equal(unit[-1], BASE_HANDS)
+        np.testing.assert_array_equal(poses[-1], BASE)
+        if seg.dst == -1:
+            np.testing.assert_array_equal(unit, plan.hands[seg.start :])
+            continue
+        n = seg.end - seg.start
+        np.testing.assert_array_equal(unit[:n], plan.hands[seg.start : seg.end][::-1])
+        if seg.src >= 0:  # the direct way home moves joints and hands on one min-jerk profile
+            home = slice(n, len(unit) - (len(plan.poses) - plan.segments[-1].end))
+            assert home.stop - home.start >= rows_for(3.0)
+            profile = min_jerk(home.stop - home.start)[:, None]
+            src = plan.hands[seg.start]
+            np.testing.assert_allclose(unit[home], src + profile * (BASE_HANDS - src))
+        for rows in (poses, unit):
+            assert np.abs(np.diff(rows, axis=0)).max() * RATE <= PEAK_SPEED + 1e-9
+
+
+def test_a_finger_only_move_is_never_still_but_the_following_hold_is():
+    target = kf(-0.6, 0.3, 0, 0.6).target
+    plan = keyframe_plan(
+        BASE,
+        [Keyframe(target, 2.0, hands=hands(h3=1.0)), Keyframe(target, 2.0, hands=hands(h3=-1.0))],
+        base_hands=BASE_HANDS,
+    )
+    fingers, home = plan.segments[1], plan.segments[2]
+    assert (plan.poses[fingers.start : fingers.end] == target).all()  # the joints do not move
+    assert not plan.still[fingers.start : fingers.end].any()
+    assert plan.still[fingers.end : home.start].any()
+
+
+def test_without_hands_the_plan_has_zero_hand_rows_and_unchanged_poses():
+    keyframes = [kf(-0.3, 1.3, 0, 0, hold=1.0), kf(-0.3, 1.3, -0.35, 0), kf(-1.2, 0.3, 0, 0.6)]
+    plan = keyframe_plan(BASE, keyframes, split_every=600)
+    np.testing.assert_array_equal(plan.hands, np.zeros((len(plan.poses), 14)))
+    for s in range(len(plan.segments)):
+        np.testing.assert_array_equal(
+            retreat_hands(plan, s), np.zeros((len(retreat_poses(plan, s)), 14))
+        )
+    # Constant hands add no displacement, so the joint rows are byte for byte the same.
+    steady = [Keyframe(k.target, k.hold_s, hands=BASE_HANDS) for k in keyframes]
+    with_hands = keyframe_plan(BASE, steady, base_hands=BASE_HANDS, split_every=600)
+    assert with_hands.poses.tobytes() == plan.poses.tobytes()
+    assert with_hands.still.tobytes() == plan.still.tobytes()
+
+
 @needs_scene
 def test_retreats_keep_the_measured_start_contact_baseline():
     checker = ArmCollisionChecker(SCENE)
@@ -217,6 +341,98 @@ def test_retreats_keep_the_measured_start_contact_baseline():
     unit = retreat_poses(plan, 1)
     assert checker.first_contact(unit) is not None
     assert checker.first_contact(unit, start=ROBOT_IDLE) is None
+
+
+BOTH_ARMS = ("left", "right")
+
+
+def both_arms(left, right):
+    """ROBOT_IDLE with shoulder pitch, roll, yaw and elbow of each arm set."""
+    pose = ROBOT_IDLE.copy()
+    pose[15:19] = left
+    pose[22:26] = right
+    return pose
+
+
+@needs_scene
+def test_two_arms_crossed_in_front_meet_each_other_not_the_body():
+    # Shoulders yawed inward: the wrists meet 0.33 m ahead of the torso, well clear of it.
+    crossed = both_arms([-1.0, 0.2, -0.8, 0.8], [-1.0, -0.2, 0.8, 0.8])
+    path = stroke_plan(ROBOT_IDLE, crossed - ROBOT_IDLE)
+    contact = ArmCollisionChecker(SCENE, arms=BOTH_ARMS).first_contact(path, start=ROBOT_IDLE)
+    assert contact == "right_wrist_yaw_link (other arm)"
+    # The left-arm checker sees the right arm as body, by name, as before.
+    left = ArmCollisionChecker(SCENE, arms=("left",))
+    assert left.first_contact(path, start=ROBOT_IDLE) == "right_wrist_yaw_link"
+
+
+@needs_scene
+def test_a_right_arm_swung_into_the_torso_is_reported():
+    inward = np.zeros(29)
+    inward[23] = 0.7  # right shoulder roll into the torso, the mirror of the left-arm check
+    path = stroke_plan(ROBOT_IDLE, inward)
+    both = ArmCollisionChecker(SCENE, arms=BOTH_ARMS)
+    assert both.first_contact(path, start=ROBOT_IDLE) == "torso_link"
+    assert ArmCollisionChecker(SCENE).first_contact(path, start=ROBOT_IDLE) is None  # left only
+
+
+@needs_scene
+def test_explicit_left_arm_matches_the_default_on_the_checker_cases():
+    explicit, default = ArmCollisionChecker(SCENE, arms=("left",)), ArmCollisionChecker(SCENE)
+    rest = ROBOT_IDLE.copy()
+    rest[15:19] = rest[22:26] * [1, -1, 1, 1]
+    cases = []
+    for base, joint, delta in ((rest, 16, -0.7), (ROBOT_IDLE, 16, -0.25), (ROBOT_IDLE, 15, -1.5)):
+        move = np.zeros(29)
+        move[joint] = delta
+        cases.append((stroke_plan(base, move), base))
+    for poses, base in cases:
+        for start in (None, base):
+            assert explicit.first_contact(poses, start=start) == default.first_contact(
+                poses, start=start
+            )
+    assert explicit.first_contact(cases[0][0]) == "torso_link"
+    assert explicit.first_contact(cases[1][0]) == "left_hip_roll_link"
+
+
+@needs_scene
+@pytest.mark.parametrize("arms", [("left",), BOTH_ARMS])
+@pytest.mark.parametrize("right_pitch", [ROBOT_IDLE[22], -1.0])
+def test_left_wrist_on_the_right_shoulder_links_is_still_reported(arms, right_pitch):
+    """An arm ignores only its own shoulder pitch and roll links, never the other arm's."""
+    reach = both_arms([-2.4, 0.2, -1.5, -0.18], ROBOT_IDLE[22:26])  # left hand over the head
+    reach[22] = right_pitch
+    contact = ArmCollisionChecker(SCENE, arms=arms).first_contact(reach[None], start=ROBOT_IDLE)
+    assert contact in ("right_shoulder_pitch_link", "right_shoulder_roll_link")
+
+
+@needs_scene
+@pytest.mark.parametrize("left_pitch", [ROBOT_IDLE[15], -1.0])
+def test_right_wrist_on_the_left_shoulder_links_is_reported(left_pitch):
+    reach = both_arms(ROBOT_IDLE[15:19], [-2.4, -0.2, 1.5, -0.18])  # the mirror pose
+    reach[15] = left_pitch
+    checker = ArmCollisionChecker(SCENE, arms=BOTH_ARMS)
+    contact = checker.first_contact(reach[None], start=ROBOT_IDLE)
+    assert contact in ("left_shoulder_pitch_link", "left_shoulder_roll_link")
+
+
+@needs_scene
+def test_the_measured_start_pose_has_no_false_contacts_with_both_arms():
+    """At idle both arms touch their own shoulder links; only the real left wrist-to-hip gap
+    (about 2 cm) is near, exactly as with the left arm alone."""
+    both = ArmCollisionChecker(SCENE, arms=BOTH_ARMS)
+    left = ArmCollisionChecker(SCENE, arms=("left",))
+    assert both._near(ROBOT_IDLE) == left._near(ROBOT_IDLE)
+    assert {left._body[other] for _, other in left._near(ROBOT_IDLE)} == {"left_hip_roll_link"}
+    forward = both_arms(ROBOT_IDLE[15:19] - [0.4, 0, 0, 0], ROBOT_IDLE[22:26] - [0.4, 0, 0, 0])
+    assert both.first_contact(stroke_plan(ROBOT_IDLE, forward - ROBOT_IDLE)) is None
+
+
+def test_two_arm_margins_cover_both_arms():
+    margins = two_arm_margins(0.15, 0.45)
+    assert margins.shape == (29,)
+    assert np.all(margins[:15] == 0.15)
+    assert np.all(margins[15:29] == 0.45)
 
 
 @needs_encoder
@@ -269,16 +485,25 @@ def test_chunks_greedily_take_the_latest_still_row_with_room_for_overlap():
 
 @pytest.mark.parametrize("name", get_args(GestureName))
 def test_each_gesture_plans_within_the_limits(name):
-    plan = keyframe_plan(BASE, gesture_keyframes(name, BASE), split_every=1000 - 25 - 100)
+    keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(name, BASE, np.zeros(14))
+    plan = keyframe_plan(
+        BASE,
+        keyframes,
+        base_hands=np.zeros(14),
+        move_s=move_s,
+        return_min_s=return_min_s,
+        split_every=1000 - 25 - 100,
+    )
     assert len(plan.poses) / RATE <= GESTURE_MAX_S
     assert all(len(retreat_poses(plan, s)) + 100 <= 1000 for s in range(len(plan.segments)))
-    assert np.abs(np.diff(plan.poses, axis=0)).max() * RATE <= PEAK_SPEED + 1e-9
+    rows = np.hstack([plan.poses, plan.hands])  # fingers share the joints' peak speed
+    assert np.abs(np.diff(rows, axis=0)).max() * RATE <= PEAK_SPEED + 1e-9
     assert set(GESTURES) == set(get_args(GestureName))
 
 
 def test_gesture_keyframes_move_only_the_left_arm_from_the_measured_base():
     base = ROBOT_IDLE.copy()
-    for name in GESTURES:
+    for name in LEFT_ARM_GESTURES:
         for keyframe in gesture_keyframes(name, base):
             assert np.array_equal(
                 np.delete(keyframe.target, [15, 16, 17, 18]), np.delete(base, [15, 16, 17, 18])
@@ -292,8 +517,15 @@ def test_gesture_keyframes_move_only_the_left_arm_from_the_measured_base():
 @needs_scene
 @pytest.mark.parametrize("name", get_args(GestureName))
 def test_each_gesture_and_its_retreats_clear_the_body(name):
-    checker = ArmCollisionChecker(SCENE)
-    plan = keyframe_plan(ROBOT_IDLE, gesture_keyframes(name, ROBOT_IDLE))
+    """With the gesture's own checker arms and timing, from the robot's measured idle."""
+    keyframes, move_s, return_min_s, arms, envelope = gesture_plan_inputs(
+        name, ROBOT_IDLE, np.zeros(14)
+    )
+    assert envelope == ("pose" if arms == ("left",) else "two_arm")
+    checker = ArmCollisionChecker(SCENE, arms=arms)
+    plan = keyframe_plan(
+        ROBOT_IDLE, keyframes, base_hands=np.zeros(14), move_s=move_s, return_min_s=return_min_s
+    )
     assert checker.first_contact(plan.poses, start=ROBOT_IDLE) is None
     for s in range(len(plan.segments)):
         assert checker.first_contact(retreat_poses(plan, s), start=ROBOT_IDLE) is None, s
