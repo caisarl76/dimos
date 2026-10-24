@@ -1,0 +1,56 @@
+{
+  "keyframes": [
+    {
+      "delta": {},
+      "t": 0.0
+    },
+    {
+      "absolute": {
+        "right_elbow": -0.128,
+        "right_shoulder_pitch": -0.368,
+        "right_shoulder_roll": -0.498,
+        "right_shoulder_yaw": 0.907,
+        "right_wrist_pitch": 0.016,
+        "right_wrist_roll": 1.382,
+        "right_wrist_yaw": 0.0
+      },
+      "hands": {
+        "right": {
+          "index_0": 1.3,
+          "index_1": 1.5,
+          "middle_0": 1.3,
+          "middle_1": 1.5,
+          "thumb_0": 0.7,
+          "thumb_1": 0.5,
+          "thumb_2": -0.2
+        }
+      },
+      "t": 3.0
+    },
+    {
+      "absolute": {
+        "right_elbow": -0.128,
+        "right_shoulder_pitch": -0.368,
+        "right_shoulder_roll": -0.498,
+        "right_shoulder_yaw": 0.907,
+        "right_wrist_pitch": 0.016,
+        "right_wrist_roll": 1.382,
+        "right_wrist_yaw": 0.0
+      },
+      "hands": {
+        "right": {
+          "index_0": 1.3,
+          "index_1": 1.5,
+          "middle_0": 1.3,
+          "middle_1": 1.5,
+          "thumb_0": 0.7,
+          "thumb_1": 0.5,
+          "thumb_2": -0.2
+        }
+      },
+      "t": 8.0
+    }
+  ],
+  "name": "good",
+  "return_s": 3.0
+}

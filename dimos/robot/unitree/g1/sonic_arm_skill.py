@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from functools import partial
 import math
 from pathlib import Path
 import threading
@@ -50,9 +51,11 @@ from dimos.core.stream import In
 from dimos.models.vl.base import VlModel
 from dimos.models.vl.openai import OpenAIVlModel
 from dimos.msgs.sensor_msgs.Image import Image
+from dimos.robot.unitree.g1.imported_gestures import HAND_ORDER, load_gestures, resolve
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     _SPLIT_STILL_ROWS,
     ARM_JOINTS,
+    HAND_JOINTS,
     HEAD_CAMERA_SIZE,
     JOINT_BOUNDS,
     LEFT_SHOULDER_PITCH,
@@ -65,12 +68,15 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     Keyframe,
     SonicEncoder,
     group_margins,
+    hand_rows,
     keyframe_plan,
     pose_margins,
+    retreat_hands,
     retreat_poses,
     retreat_route,
     stroke_plan,
     token_schedule,
+    two_arm_margins,
 )
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.spec.utils import Spec
@@ -109,11 +115,22 @@ POSES: dict[str, tuple[float, float, float, float]] = {
     "left_hand_over_head": (-2.80, 0.50, 0.00, 1.20),
     "left_hand_over_head_sideways": (0.00, 2.10, 0.00, 1.20),
 }
-GestureName = Literal["wave", "point_forward", "stop_sign", "raise_hand", "beckon"]
+GestureName = Literal[
+    "wave",
+    "point_forward",
+    "stop_sign",
+    "raise_hand",
+    "beckon",
+    "wave_one_hand",
+    "v_sign",
+    "good",
+    "support_person",
+    "two_hand_hearts",
+]
 _WAVE_RAISE = (-0.3, 1.3, 0.0, 0.0)
 # Left-arm gestures as absolute (shoulder pitch, roll, yaw, elbow) rad and the hold at each, s; the
 # engine adds the way back to the measured start. Wave swings the shoulder yaw, beckon the elbow.
-GESTURES: dict[str, list[tuple[tuple[float, float, float, float], float]]] = {
+LEFT_ARM_GESTURES: dict[str, list[tuple[tuple[float, float, float, float], float]]] = {
     "wave": [
         (_WAVE_RAISE, 0.0),
         *[((-0.3, 1.3, yaw, 0.0), 0.0) for yaw in (-0.35, 0.35) * 3],
@@ -129,7 +146,23 @@ GESTURES: dict[str, list[tuple[tuple[float, float, float, float], float]]] = {
         *[((-1.2, 0.3, 0.0, elbow), 0.0) for elbow in (0.0, 0.6) * 2],
     ],
 }
-GESTURE_MAX_S = 40.0  # longest plan a gesture may take, lead-in and way home included
+GESTURE_MAX_S = 45.0  # longest plan a gesture may take, lead-in and way home included
+# Imported motions (gestures/): segments last at least their source dt, 0.5 s and the peak-speed
+# time (fingers included); the way home at least the motion's return_s.
+IMPORTED_MOVE_S = 0.5
+Envelope = Literal["pose", "two_arm"]
+# The operator's Dex3 finger-order check, command order (thumb_0, thumb_1, thumb_2, middle_0,
+# middle_1, index_0, index_1), left then right: a swapped index/middle shows by eye.
+FINGER_CHECK = "check_dex3_finger_order"
+FINGER_CHECK_POSE = (
+    "LEFT index open, middle closed, thumb half; RIGHT middle open, index closed, thumb rotated"
+)
+FINGER_CHECK_HANDS = np.array(
+    [0.0, 0.0, 0.875, -1.57, -1.75, 0.0, 0.0, 0.6, 0.0, -1.75, 0.0, 0.0, 1.57, 1.75]
+)
+FINGER_CHECK_HOLD_S = 3.0
+_HAND_HELD = 0.2  # rad: every finger's median over the hold within this of its target
+_FINGERS = [f"{side} {finger}" for side in ("left", "right") for finger in HAND_ORDER]
 _LEFT_ARM_TARGET = [15, 16, 17, 18]
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _MAX_CHUNK_ROWS = 1000  # SonicTaskSession accepts chunks of at most 1000 rows (20 s).
@@ -137,6 +170,9 @@ _CHUNK_OVERLAP = 25  # rows the first chunk runs past the split, so it never run
 _HOLD_BOUNDS = (1.0, 20.0)  # seconds
 _NO_PATH_CHECK = "collision_model_path is not configured; joint targets need the path check"
 _NO_ARM_MODEL = "collision_model_path is not configured; point_at needs the arm model"
+_NO_BOTH_PATH_CHECK = (
+    "collision_model_path is not configured; imported gestures need the both-arm path check"
+)
 _FRAME_TIMEOUT_S = 5.0
 # How long Module.stop() waits for a running motion to retreat and hand back: the longest retreat
 # is one session chunk (20 s), then _wait_done (handback_timeout 2 s + 1 s) and at most 5 s of
@@ -202,14 +238,89 @@ def token_still(tokens: NDArray[Any]) -> NDArray[np.bool_]:
     return still
 
 
-def gesture_keyframes(name: str, base: NDArray[np.float64]) -> list[Keyframe]:
-    """The gesture's keyframes: its left-arm targets over `base` (wrists and everything else kept)."""
+def _left_arm_keyframes(
+    name: str, base: NDArray[np.float64], base_hands: NDArray[np.float64]
+) -> list[Keyframe]:
+    """A left-arm gesture's targets over `base` (wrists, hands and everything else kept)."""
     keyframes = []
-    for arm, hold in GESTURES[name]:
+    for arm, hold in LEFT_ARM_GESTURES[name]:
         target = base.copy()
         target[_LEFT_ARM_TARGET] = arm
         keyframes.append(Keyframe(target, hold))
     return keyframes
+
+
+class _MotionFailedError(RuntimeError):
+    """A motion that failed but still has a report to deliver with the failure text."""
+
+    def __init__(self, metadata: dict[str, Any], message: str) -> None:
+        super().__init__(message)
+        self.metadata = metadata
+
+
+@dataclass(frozen=True)
+class GestureSpec:
+    name: str
+    keyframes_of: Callable[[NDArray[np.float64], NDArray[np.float64]], list[Keyframe]]
+    arms: tuple[str, ...]  # ArmCollisionChecker arms: ("left",) or ("left", "right")
+    envelope: Envelope  # "pose": pose_margins; "two_arm": two_arm_margins
+    move_s: float
+    return_min_s: float
+
+
+def _gesture_table() -> dict[str, GestureSpec]:
+    table = {
+        name: GestureSpec(name, partial(_left_arm_keyframes, name), ("left",), "pose", 2.0, 0.0)
+        for name in LEFT_ARM_GESTURES
+    }
+    for name, g in load_gestures().items():
+        table[name] = GestureSpec(
+            name,
+            partial(resolve, g),
+            ("left", "right"),
+            "two_arm",
+            IMPORTED_MOVE_S,
+            g.return_s,
+        )
+    return table
+
+
+GESTURES: dict[str, GestureSpec] = _gesture_table()
+
+
+def gesture_plan_inputs(
+    name: str, base: NDArray[np.float64], base_hands: NDArray[np.float64]
+) -> tuple[list[Keyframe], float, float, tuple[str, ...], Envelope]:
+    """(keyframes, move_s, return_min_s, arms, envelope) of a gesture from the measured pose.
+
+    No container state: the dual container calls it too. Plan with keyframe_plan(base, keyframes,
+    base_hands=base_hands, move_s=move_s, return_min_s=return_min_s); path-check with
+    ArmCollisionChecker(scene, arms=arms); envelope picks gesture_margins. Raises ValueError for an
+    unknown name or a resolved target outside a joint limit.
+    """
+    if name not in GESTURES:
+        raise ValueError(f"name must be one of {sorted(GESTURES)}")
+    spec = GESTURES[name]
+    keyframes = spec.keyframes_of(np.asarray(base, np.float64), np.asarray(base_hands, np.float64))
+    return keyframes, spec.move_s, spec.return_min_s, spec.arms, spec.envelope
+
+
+def gesture_margins(
+    envelope: Envelope, body: float, pose_arm: float, other_arm: float
+) -> NDArray[np.float64]:
+    """The envelope before the planned displacement is added: pose_margins for a left-arm gesture,
+    two_arm_margins (both arms `pose_arm`) for an imported one."""
+    if envelope == "two_arm":
+        return two_arm_margins(body, pose_arm)
+    return pose_margins(body, pose_arm, other_arm)
+
+
+def gesture_keyframes(
+    name: str, base: NDArray[np.float64], base_hands: NDArray[np.float64] | None = None
+) -> list[Keyframe]:
+    """The gesture's keyframes over the measured pose (hands default to zeros, as keyframe_plan's)."""
+    hands = np.zeros(HAND_JOINTS) if base_hands is None else base_hands
+    return gesture_plan_inputs(name, base, hands)[0]
 
 
 def _check_hold(hold_seconds: float) -> None:
@@ -260,6 +371,9 @@ class SonicArmSkillConfig(ModuleConfig):
     # environment); None disables the skill. vl_box_scale is the model's box coordinate convention.
     vl_model: str | None = None
     vl_box_scale: BoxScale = "pixels"
+    # Dex3 hands installed (pc2_222). Only this says the hand readings mean anything; without it a
+    # hand-only motion reports its hand feedback as unavailable and the finger check refuses.
+    hands_mounted: bool = False
 
 
 @dataclass
@@ -279,6 +393,7 @@ class _Watch:
     hold_rows: tuple[int, int] | None = None  # token-plan rows of the deepest keyframe's hold
     plan_start: float | None = None  # monotonic time of the first chunk's row 0
     hold_q: list[NDArray[np.float64]] = field(default_factory=list)  # body_q inside the hold
+    hold_hands: list[NDArray[np.float64]] = field(default_factory=list)  # [14] hands, same window
 
 
 class SonicArmSkillContainer(Module):
@@ -300,6 +415,8 @@ class SonicArmSkillContainer(Module):
         self._watch: _Watch | None = None
         self._encoder: SonicEncoder | None = None
         self._checker: ArmCollisionChecker | None = None
+        self._both_checker: ArmCollisionChecker | None = None  # arms=("left", "right")
+        self._last_operator_result: str | None = None
         self._kinematics: ArmKinematics | None = None
         self._vl: VlModel | None = None
         super().__init__(**kwargs)
@@ -309,6 +426,9 @@ class SonicArmSkillContainer(Module):
         self._encoder = SonicEncoder(self.config.encoder_path)
         if self.config.collision_model_path is not None:
             self._checker = ArmCollisionChecker(self.config.collision_model_path)
+            self._both_checker = ArmCollisionChecker(
+                self.config.collision_model_path, arms=("left", "right")
+            )
             self._kinematics = ArmKinematics(self.config.collision_model_path)
         if self.config.vl_model is not None:
             self._vl = OpenAIVlModel(model_name=self.config.vl_model)
@@ -340,9 +460,11 @@ class SonicArmSkillContainer(Module):
             if watch.returning:
                 watch.return_dq = max(watch.return_dq, (float(dq[k]), k))
                 return
-            progress = float(q @ watch.delta / (watch.delta @ watch.delta))
-            if progress > watch.reached:
-                watch.reached, watch.reached_q = progress, np.asarray(feedback.body_q, np.float64)
+            if watch.delta.any():  # A hand-only motion has no body progress.
+                progress = float(q @ watch.delta / (watch.delta @ watch.delta))
+                if progress > watch.reached:
+                    watch.reached = progress
+                    watch.reached_q = np.asarray(feedback.body_q, np.float64)
             watch.deviation = np.maximum(watch.deviation, np.abs(q))
             watch.stream_dq = max(watch.stream_dq, (float(dq[k]), k))
             if dq[k] > watch.max_dq:
@@ -366,6 +488,9 @@ class SonicArmSkillContainer(Module):
                 and watch.hold_rows[0] <= (received - watch.plan_start) * RATE <= watch.hold_rows[1]
             ):
                 watch.hold_q.append(np.asarray(feedback.body_q, np.float64))
+                watch.hold_hands.append(
+                    np.r_[feedback.left_hand_q, feedback.right_hand_q].astype(np.float64)
+                )
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
     def move_upper_body(self, motion: UpperBodyMotion, angle_deg: float) -> str:
@@ -397,7 +522,10 @@ class SonicArmSkillContainer(Module):
                 self.config.body_margin, self.config.arm_margin, self.config.wrist_margin
             )
             return lambda: self._run(
-                motion, lambda base: [Keyframe(base + delta, 1.0)], allowed, require_check=False
+                motion,
+                lambda base, hands: [Keyframe(base + delta, 1.0)],
+                allowed,
+                require_check=False,
             )
 
         return self._launch("move_upper_body", prepare)
@@ -473,37 +601,64 @@ class SonicArmSkillContainer(Module):
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
     def perform_gesture(self, name: GestureName) -> str:
-        """Perform a left-arm gesture, then bring the arm back and hand control back.
+        """Perform a gesture, then bring the arms back and hand control back.
 
-        Gestures: "wave" (raises the hand and swings it side to side three times, about 26 s),
+        Left arm only: "wave" (raises the hand and swings it side to side three times, about 26 s),
         "point_forward" (arm out in front, about 15 s), "stop_sign" (raised forward palm out, about 14 s),
         "raise_hand" (arm up, about 21 s) and "beckon" (forearm curls in and out twice, about 20 s).
-        Slow (peak 0.75 rad/s). Requires the SONIC controller running in confirmed planner idle; it
-        never starts or stops the controller. Stops early and returns control to the planner if the
-        legs, waist or the other arm stray, or the arm strays far from the plan. Returns at once; a
-        tool update reports the result.
+        Imported, either or both arms, with the Dex3 hands where noted: "wave_one_hand" (right
+        arm waves, about 16 s), "v_sign" (right arm, V with the fingers, about 18 s), "good" (right
+        arm, thumbs up, about 19-20 s), "support_person" (both arms forward, about 17 s) and
+        "two_hand_hearts" (both arms and hands form a heart, about 31 s).
+        Slow (peak 0.75 rad/s, fingers too). Requires the SONIC
+        controller running in confirmed planner idle; it never starts or stops the controller. Stops
+        early and returns control to the planner if the legs or waist stray, or an arm strays far
+        from the plan. Returns at once; a tool update reports the result.
 
         Args:
-            name: One of "wave", "point_forward", "stop_sign", "raise_hand", "beckon".
+            name: One of the gesture names above.
         """
 
         def prepare() -> Callable[[], SkillResult]:
             if name not in GESTURES:
                 raise ValueError(f"name must be one of {sorted(GESTURES)}")
+            spec = GESTURES[name]
+            if spec.arms != ("left",) and self._both_checker is None:
+                raise RuntimeError(_NO_BOTH_PATH_CHECK)
 
-            def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
-                keyframes = gesture_keyframes(name, base)
-                seconds = len(keyframe_plan(base, keyframes).poses) / RATE
+            def keyframes_of(
+                base: NDArray[np.float64], base_hands: NDArray[np.float64]
+            ) -> list[Keyframe]:
+                keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(name, base, base_hands)
+                plan = keyframe_plan(
+                    base,
+                    keyframes,
+                    base_hands=base_hands,
+                    move_s=move_s,
+                    return_min_s=return_min_s,
+                )
+                seconds = len(plan.poses) / RATE
                 if seconds > GESTURE_MAX_S:
                     raise ValueError(
                         f"{name} would take {seconds:.0f} s, more than {GESTURE_MAX_S:g} s; nothing sent"
                     )
                 return keyframes
 
-            allowed = pose_margins(
-                self.config.body_margin, self.config.pose_arm_margin, self.config.other_arm_margin
+            allowed = gesture_margins(
+                spec.envelope,
+                self.config.body_margin,
+                self.config.pose_arm_margin,
+                self.config.other_arm_margin,
             )
-            return lambda: self._run(name, keyframes_of, allowed, require_check=False)
+            return lambda: self._run(
+                name,
+                keyframes_of,
+                allowed,
+                require_check=False,
+                move_s=spec.move_s,
+                return_min_s=spec.return_min_s,
+                arms=spec.arms,
+            )
 
         return self._launch("perform_gesture", prepare)
 
@@ -584,6 +739,50 @@ class SonicArmSkillContainer(Module):
             self._stop.set()
         return "Stopping: the arm returns smoothly to its start pose; a tool update reports the result."
 
+    @rpc
+    def check_dex3_finger_order(self) -> str:
+        """Operator only (not a skill): a background motion that holds the measured body and
+        moves the Dex3 hands to an asymmetric pose for 3 s, then back, through the same guarded,
+        hand-speed-limited session. Returns "started" at once; stop_arm stops it, and
+        operator_result() reports it. The operator confirms FINGER_CHECK_POSE by eye.
+        """
+
+        def keyframes_of(base: NDArray[np.float64], hands: NDArray[np.float64]) -> list[Keyframe]:
+            return [Keyframe(base.copy(), FINGER_CHECK_HOLD_S, hands=FINGER_CHECK_HANDS)]
+
+        allowed = group_margins(
+            self.config.body_margin, self.config.arm_margin, self.config.wrist_margin
+        )
+        label = f"{FINGER_CHECK} ({FINGER_CHECK_POSE})"
+        with self._lifecycle:
+            self._admit()
+            if not self.config.hands_mounted:
+                raise RuntimeError("no hands configured (hands_mounted is False); nothing sent")
+            self._last_operator_result = None
+            self._begin(
+                FINGER_CHECK,
+                lambda: self._run(label, keyframes_of, allowed, require_check=False),
+                self._store_operator_result,
+                lambda: None,
+            )
+        return "started"
+
+    @rpc
+    def operator_result(self) -> str | None:
+        """The last operator motion's final report, or None while it runs (or before any)."""
+        with self._lifecycle:
+            return self._last_operator_result
+
+    def _store_operator_result(self, text: str) -> None:
+        self._last_operator_result = text
+
+    def _admit(self) -> None:
+        """Refuse a new motion while one runs or once stop() has begun. Hold _lifecycle."""
+        if self._closing:
+            raise RuntimeError("the arm skill is shutting down; nothing started")
+        if self._running is not None:
+            raise RuntimeError("an arm move is already running")
+
     def _launch(self, tool: str, prepare: Callable[[], Callable[[], SkillResult]]) -> str:
         """Start a motion in the background; its result is the tool stream's final update.
 
@@ -599,45 +798,74 @@ class SonicArmSkillContainer(Module):
                     f"{tool} is already running; its result will follow as a tool update. "
                     "Call stop_arm to stop it."
                 )
-            if self._closing:
-                raise RuntimeError("the arm skill is shutting down; nothing started")
-            if self._running is not None:
-                raise RuntimeError("an arm move is already running")
+            self._admit()
             work = prepare()
             self.start_tool(tool)
-            self._running = tool
-            self._stop.clear()
-            self._motion = threading.Thread(
-                target=self._finish, args=(tool, work), name=f"arm-{tool}", daemon=True
+            self._begin(
+                tool,
+                work,
+                lambda text: self.tool_update(tool, text),
+                lambda: self.stop_tool(tool),
             )
-            try:
-                self._motion.start()
-            except BaseException:
-                self.stop_tool(tool)
-                self._running = None
-                raise
         return f"{tool} started; a tool update reports the result. Call stop_arm to stop early."
 
-    def _finish(self, tool: str, work: Callable[[], SkillResult]) -> None:
+    def _begin(
+        self,
+        name: str,
+        work: Callable[[], SkillResult],
+        deliver: Callable[[str], None],
+        release: Callable[[], None],
+    ) -> None:
+        """Run `work` on the motion thread as `name`. Hold _lifecycle; release() undoes the caller's
+        setup if the thread cannot start."""
+        self._running = name
+        self._stop.clear()
+        self._motion = threading.Thread(
+            target=self._finish,
+            args=(name, work, deliver, release),
+            name=f"arm-{name}",
+            daemon=True,
+        )
+        try:
+            self._motion.start()
+        except BaseException:
+            release()
+            self._running = None
+            raise
+
+    def _finish(
+        self,
+        name: str,
+        work: Callable[[], SkillResult],
+        deliver: Callable[[str], None],
+        release: Callable[[], None],
+    ) -> None:
         started = time.monotonic()
         try:
             result = work()
             elapsed_ms = (time.monotonic() - started) * 1000.0
             text = replace(result, duration_ms=elapsed_ms).agent_encode()[0]["text"]
+        except _MotionFailedError as exc:
+            failed = SkillResult(
+                f"{name} failed: {exc}",
+                metadata=exc.metadata,
+                duration_ms=(time.monotonic() - started) * 1000.0,
+            )
+            text = failed.agent_encode()[0]["text"]
         except Exception as exc:
-            text = f"{tool} failed: {exc}"
+            text = f"{name} failed: {exc}"
         except BaseException as exc:
-            text = f"{tool} failed: {type(exc).__name__}"
+            text = f"{name} failed: {type(exc).__name__}"
             raise  # After the cleanup below, so the motion never stays held.
         finally:
-            logger.info("Arm skill result", tool=tool, result=text)
+            logger.info("Arm skill result", tool=name, result=text)
             # One critical section: a call arriving now either rebinds a stream that still has
             # this update to come, or finds nothing running and opens a fresh one.
             with self._lifecycle:
                 try:
-                    self.tool_update(tool, text)
+                    deliver(text)
                 finally:
-                    self.stop_tool(tool)
+                    release()
                     self._running = None
                     with self._lock:
                         self._watch = None
@@ -681,7 +909,7 @@ class SonicArmSkillContainer(Module):
         assert kinematics is not None and checker is not None
         solved: list[tuple[NDArray[np.float64], float, NDArray[np.float64]]] = []
 
-        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+        def keyframes_of(base: NDArray[np.float64], hands: NDArray[np.float64]) -> list[Keyframe]:
             point, distance = kinematics.aim_point(base, u, v)
             q4 = kinematics.solve_forearm(
                 base,
@@ -737,7 +965,7 @@ class SonicArmSkillContainer(Module):
         assert kinematics is not None
         solved: list[NDArray[np.float64]] = []
 
-        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+        def keyframes_of(base: NDArray[np.float64], hands: NDArray[np.float64]) -> list[Keyframe]:
             # Solved from the measured pose, so the waist and wrists are the robot's own.
             goal = base.copy()
             goal[_LEFT_ARM_TARGET] = kinematics.solve(base, azimuth_deg, elevation_deg)
@@ -768,7 +996,7 @@ class SonicArmSkillContainer(Module):
         *,
         require_check: bool,
     ) -> SkillResult:
-        def keyframes_of(base: NDArray[np.float64]) -> list[Keyframe]:
+        def keyframes_of(base: NDArray[np.float64], hands: NDArray[np.float64]) -> list[Keyframe]:
             goal = base.copy()
             goal[_LEFT_ARM_TARGET] = target
             return [Keyframe(goal, hold_seconds)]
@@ -781,25 +1009,43 @@ class SonicArmSkillContainer(Module):
     def _run(
         self,
         label: str,
-        keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]],
+        keyframes_of: Callable[[NDArray[np.float64], NDArray[np.float64]], list[Keyframe]],
         allowed: NDArray[np.float64],
         *,
         require_check: bool,
         report_extra: Callable[[NDArray[np.float64], NDArray[np.float64] | None], dict[str, Any]]
         | None = None,
+        move_s: float = 2.0,
+        return_min_s: float = 0.0,
+        arms: tuple[str, ...] = ("left",),
     ) -> SkillResult:
-        if require_check and self._checker is None:
+        checker = self._checker if arms == ("left",) else self._both_checker
+        if require_check and checker is None:
             raise RuntimeError(_NO_PATH_CHECK)
-        return self._move(label, keyframes_of, allowed, report_extra)
+        return self._move(
+            label,
+            keyframes_of,
+            allowed,
+            report_extra,
+            move_s=move_s,
+            return_min_s=return_min_s,
+            checker=checker,
+        )
 
     def _move(
         self,
         label: str,
-        keyframes_of: Callable[[NDArray[np.float64]], list[Keyframe]],
+        keyframes_of: Callable[[NDArray[np.float64], NDArray[np.float64]], list[Keyframe]],
         allowed: NDArray[np.float64],
         report_extra: Callable[[NDArray[np.float64], NDArray[np.float64] | None], dict[str, Any]]
         | None = None,
+        *,
+        move_s: float = 2.0,
+        return_min_s: float = 0.0,
+        checker: ArmCollisionChecker | None = None,
     ) -> SkillResult:
+        """Plan from the measured body and hands (keyframes_of(base, base_hands)), check, encode,
+        stream with per-row hands, and report."""
         assert self._encoder is not None
         status = self._execution.get_status()
         profile = status["profile"]
@@ -809,24 +1055,45 @@ class SonicArmSkillContainer(Module):
         if state is None or state.token_state is None:
             raise RuntimeError("no fresh controller feedback; nothing sent")
         base = np.asarray(state.body_q, np.float64)
-        keyframes = keyframes_of(base)
+        base_hands = np.r_[state.left_hand_q, state.right_hand_q].astype(np.float64)
+        keyframes = keyframes_of(base, base_hands)
         targets = np.asarray([k.target for k in keyframes], np.float64).reshape(-1, 29)
         deltas = targets - base
-        if not np.abs(deltas).max() > math.radians(1):
+        hand = base_hands
+        hand_targets = []
+        for k in keyframes:  # A keyframe without hands keeps the previous hand target.
+            hand = hand if k.hands is None else np.asarray(k.hands, np.float64)
+            hand_targets.append(hand)
+        hand_deltas = np.reshape(hand_targets, (-1, HAND_JOINTS)) - base_hands
+        if not max(np.abs(deltas).max(), np.abs(hand_deltas).max()) > math.radians(1):
             raise ValueError("the arm is already there; nothing to move")
         # Token-plan rows: token_schedule adds the same blend at each end of the poses.
         pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
-        kplan = keyframe_plan(base, keyframes, split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad)
+        kplan = keyframe_plan(
+            base,
+            keyframes,
+            base_hands=base_hands,
+            move_s=move_s,
+            return_min_s=return_min_s,
+            split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
+            one_chunk=_MAX_CHUNK_ROWS - 2 * pad,
+        )
+
+        def padded(hands: NDArray[np.float64]) -> NDArray[np.float64]:
+            """Pose-row hands -> token rows: the blends at each end hold the end rows."""
+            return np.vstack([np.repeat(hands[:1], pad, 0), hands, np.repeat(hands[-1:], pad, 0)])
+
         # Where a safety stop at each segment resumes. A unit that is the tail of the plan reuses
-        # the plan's own tokens.
+        # the plan's own tokens; every unit's hands come from retreat_hands, row for row.
         units = [retreat_poses(kplan, s) for s in range(len(kplan.segments))]
+        unit_hands = [retreat_hands(kplan, s) for s in range(len(kplan.segments))]
         is_tail = [np.array_equal(u, kplan.poses[len(kplan.poses) - len(u) :]) for u in units]
         if any(len(u) + pad > _MAX_CHUNK_ROWS for u in units):
             raise ValueError("a retreat is longer than one session chunk")
         extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
-        if self._checker is not None:
+        if checker is not None:
             for path in (kplan.poses, *extra.values()):
-                if contact := self._checker.first_contact(path, start=base):
+                if contact := checker.first_contact(path, start=base):
                     raise RuntimeError(
                         f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
                     )
@@ -841,9 +1108,10 @@ class SonicArmSkillContainer(Module):
             raise RuntimeError("the body moved while the reference was encoded; nothing sent")
         captured = np.asarray(state.token_state)
         tokens = token_schedule(captured, motion_tokens)
-        hands = np.r_[state.left_hand_q, state.right_hand_q]
-        plan = np.hstack([tokens, np.tile(hands, (len(tokens), 1))])
-        chunks = chunk_rows(len(plan), token_still(tokens))
+        plan = np.hstack([tokens, padded(hand_rows(kplan))])
+        # The tokens do not encode the hands: a split also needs the plan's poses and hands still.
+        plan_still = np.r_[np.zeros(pad, np.bool_), kplan.still, np.zeros(pad, np.bool_)]
+        chunks = chunk_rows(len(plan), token_still(tokens) & plan_still)
 
         def retreat(token_row: int) -> NDArray[np.float64] | None:
             if token_row < pad:  # Still in the lead-in blend: play it backwards to the planner.
@@ -859,7 +1127,7 @@ class SonicArmSkillContainer(Module):
                 else unit_tokens[unit.tobytes()]
             )
             rows = token_schedule(captured, unit_rows)[pad + offset :]
-            return np.hstack([rows, np.tile(hands, (len(rows), 1))])
+            return np.hstack([rows, padded(unit_hands[segment])[pad + offset :]])
 
         longest_chunk = max(end - start for start, end in chunks)
         longest_retreat = max(len(u) + pad for u in units)
@@ -870,7 +1138,8 @@ class SonicArmSkillContainer(Module):
             raise RuntimeError(
                 "the execution profile's observation age and duration must cover the plan",
             )
-        deepest = int(np.argmax(np.linalg.norm(deltas, axis=1)))
+        hand_only = not deltas.any()
+        deepest = int(np.argmax(np.linalg.norm(hand_deltas if hand_only else deltas, axis=1)))
         delta = deltas[deepest]
         seg, nxt = kplan.segments[deepest], kplan.segments[deepest + 1]
         hold = (pad + seg.end - 1 + 25, pad + nxt.start - 25)
@@ -907,7 +1176,7 @@ class SonicArmSkillContainer(Module):
         report = {
             "task_id": task_id,
             "motion": label,
-            "reached_fraction": round(watch.reached, 2),
+            "reached_fraction": None if hand_only else round(watch.reached, 2),
             "planned_deg": {_JOINTS[j]: round(math.degrees(base[j] + delta[j]), 1) for j in moved},
             "reached_deg": {
                 _JOINTS[j]: round(math.degrees(watch.reached_q[j]), 1)
@@ -929,6 +1198,7 @@ class SonicArmSkillContainer(Module):
         }
         with self._lock:
             samples = list(watch.hold_q)
+            hand_samples = list(watch.hold_hands)
         hold_q = np.asarray(samples) if samples else None
         report["hold_samples"] = len(samples)
         if report_extra is not None:
@@ -949,6 +1219,10 @@ class SonicArmSkillContainer(Module):
             raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
         if outcome == "envelope":
             message = f"{label} stopped early: {watch.abort}"
+        elif hand_only:
+            message = self._hand_result(
+                label, report, base_hands, hand_targets[deepest], hand_samples
+            )
         elif watch.reached < 0.5:  # SONIC tracked less than half the planned move.
             message = f"{label} did not follow the reference: reached {100 * watch.reached:.0f}% of the plan"
         elif len(moved) == 1:
@@ -956,6 +1230,54 @@ class SonicArmSkillContainer(Module):
         else:
             message = f"{label} reached {100 * watch.reached:.0f}% of the planned pose and returned"
         return SkillResult(f"{message}; control returned to SONIC's planner", metadata=report)
+
+    def _hand_result(
+        self,
+        label: str,
+        report: dict[str, Any],
+        base_hands: NDArray[np.float64],
+        target: NDArray[np.float64],
+        samples: list[NDArray[np.float64]],
+    ) -> str:
+        """A hand-only motion's outcome, from configuration and hold-window tracking evidence.
+
+        Without hands_mounted nothing is claimed. With it, zero or unchanged readings are a hand
+        that did not move: "held" needs every finger's median over the hold within _HAND_HELD of
+        its target; anything else raises.
+        """
+        if not self.config.hands_mounted:
+            return f"{label}: hand feedback unavailable (no hands configured)"
+        report["hand_hold_samples"] = len(samples)
+        if not samples:
+            logger.warning("Hand result: no hand readings in the hold", label=label)
+            raise _MotionFailedError(
+                report,
+                f"{label}: hand did not follow: no hand readings in the hold; "
+                "control returned to SONIC's planner",
+            )
+        held = np.median(np.asarray(samples), axis=0)
+        base_l, target_l, held_l = (np.round(x, 3).tolist() for x in (base_hands, target, held))
+        report.update(hand_base=base_l, hand_target=target_l, hand_held=held_l)
+        logger.info("Hand result", label=label, base=base_l, target=target_l, held=held_l)
+        error = np.abs(held - target)
+        worst = int(np.argmax(error))
+        planned = target - base_hands
+        reach = float((held - base_hands) @ planned / (planned @ planned))
+        report.update(
+            hand_reached_fraction=round(reach, 2),
+            hand_worst_finger=_FINGERS[worst],
+            hand_worst_error_rad=round(float(error[worst]), 3),
+        )
+        if error[worst] > _HAND_HELD:
+            raise _MotionFailedError(
+                report,
+                f"{label}: hand did not follow: {_FINGERS[worst]} off by {error[worst]:.2f} rad "
+                f"(hold median; reached {100 * reach:.0f}%); control returned to SONIC's planner",
+            )
+        return (
+            f"{label}: hand pose held (every finger's hold median within {_HAND_HELD:g} rad; "
+            f"reached {100 * reach:.0f}%, worst {_FINGERS[worst]} off by {error[worst]:.2f} rad)"
+        )
 
     def _stream(
         self,

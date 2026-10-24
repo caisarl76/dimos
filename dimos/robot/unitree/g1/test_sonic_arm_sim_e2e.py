@@ -43,18 +43,22 @@ import pytest
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import SONIC_ARM_PROFILE
+from dimos.robot.unitree.g1.imported_gestures import RETAINED
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     LEFT_ARM,
+    MOTOR_NAMES,
     RATE,
+    RIGHT_ARM,
+    group_margins,
     keyframe_plan,
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     _CHUNK_OVERLAP,
     _MAX_CHUNK_ROWS,
-    GESTURES,
+    LEFT_ARM_GESTURES,
     SonicArmSkillContainer,
-    gesture_keyframes,
+    gesture_plan_inputs,
 )
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
@@ -83,9 +87,17 @@ ARM_RETURN_RAD = 0.05
 RESULT_TIMEOUT_S = 120.0
 STOP_FRACTION = 0.6
 HANDBACK = "control returned to SONIC's planner"
+BOTH_ARMS = LEFT_ARM + RIGHT_ARM
+# Imported gestures (design, Validation): every joint a keyframe commands (> COMMANDED_RAD from the
+# measured base, wrists included) comes within TRACK_RAD of its target at least once in the
+# keyframe's window: arrival + TRACK_OFFSET_S to departure + TRACK_OFFSET_S, or +-TRACK_OFFSET_S
+# around the arrival for a keyframe without a hold.
+TRACK_RAD = 0.25
+TRACK_OFFSET_S = 0.3
+COMMANDED_RAD = 0.01
 
 CASES: list[tuple[str, str, dict[str, Any]]] = [
-    *[(f"gesture-{name}", "perform_gesture", {"name": name}) for name in GESTURES],
+    *[(f"gesture-{name}", "perform_gesture", {"name": name}) for name in LEFT_ARM_GESTURES],
     *[
         (f"point_at({az}, {el})", "point_at", {"azimuth_deg": az, "elevation_deg": el})
         # (85, 20), not (90, 20): that is near the reach limit (22.5 deg achieved, (90, 15) is
@@ -153,7 +165,7 @@ def _stop_peer(process: subprocess.Popen[str]) -> None:
 
 
 @contextmanager
-def stand_in(tmp: Path) -> Iterator[Sim]:
+def stand_in(tmp: Path, hands_mounted: bool = False) -> Iterator[Sim]:
     """A fresh stand-in standing from its deterministic startup, with the execution module and the
     skill built against it. The stand-in has exited (and written its npz) when this returns.
 
@@ -209,7 +221,10 @@ def stand_in(tmp: Path) -> Iterator[Sim]:
             profile=SONIC_ARM_PROFILE,
         )
         skill = SonicArmSkillContainer(
-            encoder_path=ENCODER, max_dq=MAX_DQ, collision_model_path=SCENE
+            encoder_path=ENCODER,
+            max_dq=MAX_DQ,
+            collision_model_path=SCENE,
+            hands_mounted=hands_mounted,
         )
         skill._execution = execution  # type: ignore[assignment]  # what the blueprint injects
         transport = make_transport(f"/arm-skill-e2e/{uuid4().hex}", SonicFeedback)
@@ -240,16 +255,24 @@ def _run(
     feedback = execution.get_feedback()
     assert feedback is not None
     base = np.asarray(feedback.body_q, np.float64)
+    base_hands = np.r_[feedback.left_hand_q, feedback.right_hand_q].astype(np.float64)
     window = Window(name, time.monotonic(), 0.0, {})
     assert "started" in getattr(skill, tool)(**kwargs)
     if stop:
         wait_until(lambda: submit.call_count >= 1, timeout=60)
         plan_start = submit.call_args_list[0].args[2]
         pad = 100  # token_schedule's 2 s blend at each end
+        keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(
+            kwargs["name"], base, base_hands
+        )
         kplan = keyframe_plan(
             base,
-            gesture_keyframes(kwargs["name"], base),
+            keyframes,
+            base_hands=base_hands,
+            move_s=move_s,
+            return_min_s=return_min_s,
             split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
+            one_chunk=_MAX_CHUNK_ROWS - 2 * pad,
         )
         seconds = (len(kplan.poses) + 2 * pad) / RATE
         window.planned_end = plan_start + seconds
@@ -268,14 +291,17 @@ def _run(
     return window
 
 
-def _physics(sim: Sim, w: Window) -> list[str]:
+def _physics(
+    sim: Sim, w: Window, arms: list[int] = LEFT_ARM, before_planned_end: bool = True
+) -> list[str]:
     """Print the case's row and return its physics failures: upright, feet down, no fast joint,
-    and the left arm back where it started (before the planned end, for a stopped case)."""
+    and the `arms` joints back where they started (before the planned end, for a stopped case,
+    when `before_planned_end`; otherwise that timing is only printed)."""
     log = np.load(sim.log)
     t, q, dq = log["t"], log["q"], np.abs(log["dq"])
     rows = np.flatnonzero((t >= w.start) & (t <= w.end))
     assert len(rows) > 10, w.name
-    arm = np.abs(q[rows][:, LEFT_ARM] - q[rows[0], LEFT_ARM]).max(axis=1)
+    arm = np.abs(q[rows][:, arms] - q[rows[0], arms]).max(axis=1)
     meta = w.result.get("metadata", {})
     message = w.result["message"]
     outcome = (
@@ -297,15 +323,20 @@ def _physics(sim: Sim, w: Window) -> list[str]:
         f"tilt {tilt:.2f} deg": tilt <= CASE_MAX_TILT_DEG.get(w.name, MAX_TILT_DEG),
         f"floor contacts {contacts}": contacts >= MIN_CONTACTS,
         f"peak dq {peak:.2f} rad/s": peak <= MAX_DQ,
-        f"left arm ends {arm[-1]:.3f} rad from its start": arm[-1] <= ARM_RETURN_RAD,
+        f"{'left arm' if arms == LEFT_ARM else 'arms'} end {arm[-1]:.3f} rad from the start": arm[
+            -1
+        ]
+        <= ARM_RETURN_RAD,
     }
     if w.stop_at is not None:
         assert w.planned_end is not None
         away = np.flatnonzero(arm > ARM_RETURN_RAD)
         back = t[rows[away[-1] + 1]] if len(away) and away[-1] + 1 < len(rows) else t[rows[0]]
-        checks[f"arm back {back - w.planned_end:+.1f} s from the planned end"] = (
-            back < w.planned_end
-        )
+        print(f"{w.name}: arms back {back - w.planned_end:+.1f} s from the planned end")
+        if before_planned_end:
+            checks[f"arm back {back - w.planned_end:+.1f} s from the planned end"] = (
+                back < w.planned_end
+            )
     return [k for k, ok in checks.items() if not ok]
 
 
@@ -323,12 +354,26 @@ def test_skill_completes_and_hands_back(
     assert not failures, failures
 
 
-def test_stop_arm_mid_wave_retreats_before_the_planned_end(
-    tmp_path: Path, tool_transport: Any, mocker: Any
+@pytest.mark.parametrize(
+    "gesture,arms,before_planned_end",
+    # two_hand_hearts: a retreat from 60% is planned to end ~3 s after the plan's own end, so
+    # that timing is printed, not asserted; both arms must still be back home.
+    [("wave", LEFT_ARM, True), ("two_hand_hearts", BOTH_ARMS, False)],
+    ids=["wave", "two_hand_hearts"],
+)
+def test_stop_arm_mid_gesture_retreats(
+    tmp_path: Path,
+    tool_transport: Any,
+    mocker: Any,
+    gesture: str,
+    arms: list[int],
+    before_planned_end: bool,
 ) -> None:
     with stand_in(tmp_path) as sim:
-        window = _run(sim, mocker, "stop-mid-wave", "perform_gesture", {"name": "wave"}, stop=True)
-    failures = _physics(sim, window)
+        window = _run(
+            sim, mocker, f"stop-mid-{gesture}", "perform_gesture", {"name": gesture}, stop=True
+        )
+    failures = _physics(sim, window, arms, before_planned_end)
     assert window.extra["stop_reply"].startswith("Stopping"), window.extra["stop_reply"]
     message = window.result["message"]
     assert "stopped early: stop requested" in message and message.endswith(HANDBACK), message
@@ -337,6 +382,125 @@ def test_stop_arm_mid_wave_retreats_before_the_planned_end(
     chunks = [e for e in map(json.loads, journal) if e["event"] == "chunk_accepted"]
     retreats = [e for e in chunks if e["sequence"] >= 1 and e["monotonic"] >= window.stop_at]
     assert len(retreats) == 1, [(e["sequence"], e["monotonic"]) for e in chunks]
+    assert not failures, failures
+
+
+def _tracking(sim: Sim, w: Window, name: str, plans: Any) -> list[str]:
+    """Print the worst commanded joint per keyframe and return the keyframes that missed TRACK_RAD.
+
+    The plan is rebuilt as _move builds it, from the base and hands _move measured (the arguments
+    of its keyframe_plan call, the one with split_every), and must equal the plan it streamed. Its
+    rows start at the first chunk's observed_at (journal), on the npz's monotonic clock.
+    """
+    call = plans.call_args_list[-1]
+    assert "split_every" in call.kwargs, plans.call_args_list
+    base = np.asarray(call.args[0], np.float64)
+    base_hands = np.asarray(call.kwargs["base_hands"], np.float64)
+    keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(name, base, base_hands)
+    pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+    kplan = keyframe_plan(
+        base,
+        keyframes,
+        base_hands=base_hands,
+        move_s=move_s,
+        return_min_s=return_min_s,
+        split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
+        one_chunk=_MAX_CHUNK_ROWS - 2 * pad,
+    )
+    assert np.array_equal(kplan.poses, plans.spy_return.poses), "rebuilt plan != streamed plan"
+    journal = Path(w.result["metadata"]["journal_path"]).read_text().splitlines()
+    first = next(e for e in map(json.loads, journal) if e["event"] == "chunk_accepted")
+    assert first["sequence"] == 0, first
+    plan_start = float(first["observed_at"])
+    log = np.load(sim.log)
+    t, q = log["t"], log["q"]
+    print(
+        f"\n{'case':<26}{'kf':>3}{'from s':>8}{'to s':>8}{'cmd':>5}  {'worst joint':<24}{'err':>7}"
+    )
+    failures = []
+    for k, key in enumerate(keyframes):
+        seg, nxt = kplan.segments[k], kplan.segments[k + 1]
+        arrival = plan_start + (pad + seg.end - 1) / RATE
+        departure = plan_start + (pad + nxt.start) / RATE
+        lo, hi = (
+            (arrival + TRACK_OFFSET_S, departure + TRACK_OFFSET_S)
+            if nxt.start > seg.end
+            else (arrival - TRACK_OFFSET_S, arrival + TRACK_OFFSET_S)
+        )
+        rows = (t >= lo) & (t <= hi)
+        joints = np.flatnonzero(np.abs(key.target - base) > COMMANDED_RAD)
+        assert rows.any() and len(joints), (k, lo - plan_start, hi - plan_start, joints)
+        error = np.abs(q[rows][:, joints] - key.target[joints]).min(axis=0)
+        worst = int(np.argmax(error))
+        joint, err = MOTOR_NAMES[joints[worst]], float(error[worst])
+        print(
+            f"{w.name:<26}{k:>3}{lo - plan_start:>8.2f}{hi - plan_start:>8.2f}{len(joints):>5}  "
+            f"{joint:<24}{err:>7.3f}{'' if err <= TRACK_RAD else '  MISSED'}"
+        )
+        if err > TRACK_RAD:
+            failures.append(f"keyframe {k}: {joint} off by {err:.3f} rad")
+    return failures
+
+
+@pytest.mark.parametrize("name", RETAINED)
+def test_imported_gesture_tracks_and_hands_back(
+    tmp_path: Path, tool_transport: Any, mocker: Any, name: str
+) -> None:
+    plans = mocker.spy(sonic_arm_skill, "keyframe_plan")
+    with stand_in(tmp_path) as sim:
+        window = _run(sim, mocker, f"gesture-{name}", "perform_gesture", {"name": name})
+    message = window.result["message"]
+    # A refusal sends nothing, so there is no motion to check: report the refusal itself.
+    assert "nothing sent" not in message, message
+    failures = _physics(sim, window, BOTH_ARMS)
+    # Tracking first, so it is printed even when a standard assert below fails.
+    tracking = _tracking(sim, window, name, plans) if "metadata" in window.result else ["no report"]
+    reached = window.result.get("metadata", {}).get("reached_fraction")
+    print(f"{window.name}: reached {reached} (recorded, not asserted)")
+    assert "stopped early" not in message and "failed" not in message, message
+    assert f"of the planned pose and returned; {HANDBACK}" in message, message
+    assert message.endswith(HANDBACK), message
+    assert not failures, failures
+    assert not tracking, tracking
+
+
+def test_finger_check_without_hands_reports_did_not_follow(
+    tmp_path: Path, tool_transport: Any, mocker: Any
+) -> None:
+    """The stand-in has no hands and reports zero hand positions. Configured with hands, the
+    finger check must read those zeros as a hand that did not follow, not as unavailable."""
+    with stand_in(tmp_path, hands_mounted=True) as sim:
+        skill = sim.skill
+        window = Window("finger-check", time.monotonic(), 0.0, {})
+        assert skill.check_dex3_finger_order() == "started"
+        wait_until(lambda: skill.operator_result() is not None, timeout=RESULT_TIMEOUT_S)
+        wait_until(lambda: skill._running is None, timeout=10)
+        window.end = time.monotonic()
+        text = skill.operator_result()
+        assert text is not None
+        window.result = {"message": text}
+    failures = _physics(sim, window, BOTH_ARMS)
+    log = np.load(sim.log)
+    q = log["q"][(log["t"] >= window.start) & (log["t"] <= window.end)]
+    # While SONIC follows the still reference the body settles away from the planner stance: the
+    # stand-in measured 0.083 rad (left shoulder yaw), legs 0.072. So the body must stay inside the
+    # finger check's own envelope while it runs, and be back within ARM_RETURN_RAD after handback.
+    config = sim.skill.config
+    envelope = group_margins(config.body_margin, config.arm_margin, config.wrist_margin)
+    drift = np.abs(q - q[0]).max(axis=0)
+    worst = int(np.argmax(drift / envelope))
+    end = np.abs(q[-1] - q[0])
+    print(
+        f"finger-check: body drift {drift[worst]:.4f} rad ({MOTOR_NAMES[worst]}, envelope "
+        f"{envelope[worst]:.2f}) over {len(q)} samples; legs {drift[:12].max():.4f}, waist "
+        f"{drift[12:15].max():.4f}, arms {drift[BOTH_ARMS].max():.4f}; at the end "
+        f"{end.max():.4f} ({MOTOR_NAMES[int(np.argmax(end))]})"
+    )
+    assert "failed" in text and "hand did not follow" in text and "hold median" in text, text
+    assert "unavailable" not in text and "nan" not in text.lower(), text
+    assert text.endswith(HANDBACK), text
+    assert np.all(drift <= envelope), (MOTOR_NAMES[worst], drift[worst], envelope[worst])
+    assert end.max() <= ARM_RETURN_RAD, (MOTOR_NAMES[int(np.argmax(end))], end.max())
     assert not failures, failures
 
 
