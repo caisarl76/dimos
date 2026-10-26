@@ -736,7 +736,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
           flags: OS-${{ matrix.os }},Py-${{ matrix.pyver }}
           use_oidc: true
@@ -994,7 +994,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
           flags: SelfHosted-${{ matrix.os }}
           use_oidc: true
@@ -1150,7 +1150,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
           flags: SelfHosted-Large
           use_oidc: true
@@ -1392,7 +1392,7 @@ jobs:
       with:
         run_command: send-notifications
         use_oidc: true
-        fail_ci_if_error: true
+        fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
         # Install the CLI from PyPI (pinned) instead of cli.codecov.io:
         # the GPG key for the default download path is served from a dead
         # keybase.io URL, failing every upload. See
