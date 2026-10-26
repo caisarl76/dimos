@@ -688,7 +688,9 @@ jobs:
         # upstream's to fix, and fail-fast would cancel the Ubuntu jobs with them).
         os: ${{ fromJSON(github.repository == 'dimensionalOS/dimos' && '["macos-latest", "ubuntu-latest"]' || '["ubuntu-latest"]') }}
         experimental: [false]
-        include: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.deps == 'true') && '[{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false}]' || '[]') }}
+        # Each leg runs half of the default suite; see "Select test partition".
+        part: [1, 2]
+        include: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.deps == 'true') && '[{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false,"part":1},{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false,"part":2}]' || '[]') }}
       fail-fast: true
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
@@ -773,18 +775,34 @@ jobs:
         run: python3 bin/native-modules --link-results .cachix-marker/links.txt
       - name: Install dependencies
         run: uv sync --group tests --frozen
+      # Part 1 is PART1's paths; part 2 is the rest of dimos/, so a new test directory lands in
+      # part 2 and the two parts are always the whole suite. PART1 is ~50% of the measured
+      # test time (local --durations=0 run, 2026-10-26); rebalance it when the halves drift.
+      - name: Select test partition
+        env:
+          PART1: dimos/robot dimos/core dimos/protocol
+        run: |
+          if [ "${{ matrix.part }}" = 1 ]; then
+            echo "TEST_PATHS=$PART1" >> "$GITHUB_ENV"
+          else
+            echo "TEST_PATHS=dimos$(printf -- ' --ignore=%s' $PART1)" >> "$GITHUB_ENV"
+          fi
       - name: Run tests
-        run: uv run pytest --numprocesses=logical --cov=dimos/ --junitxml=junit.xml -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)'
+        # --timeout overrides addopts' 600 s, so a hung test fails (stacks dumped) inside the job's
+        # 20 min instead of the job being cancelled; tests with their own timeout mark keep it.
+        # Coverage on 3.12 only: older Pythons trace with sys.settrace, which is much slower and
+        # skews timing-sensitive tests.
+        run: uv run pytest --numprocesses=logical --timeout=120 ${{ matrix.pyver == '3.12' && '--cov=dimos/' || '--no-cov' }} --junitxml=junit.xml -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)' $TEST_PATHS
       # Serial and after the parallel run: it binds the livox SDK's fixed ports.
       - name: Native module e2e tests
-        if: steps.native-marker.outputs.cache-hit == 'true'
+        if: steps.native-marker.outputs.cache-hit == 'true' && matrix.part == 1
         run: uv run pytest -m native_e2e dimos/hardware/sensors/lidar/livox/test_e2e.py --no-cov
       - name: Re-run the failing tests with maximum verbosity
         if: failure()
         env:
           COLOR: yes
         run: >-  # `exit 1` makes sure that the job remains red with flaky runs
-          uv run pytest --no-cov -vvvvv --lf  -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)' && exit 1
+          uv run pytest --no-cov -vvvvv --lf --timeout=120 -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)' $TEST_PATHS && exit 1
         shell: bash
       - name: Print crash diagnostics
         if: failure()
@@ -797,14 +815,16 @@ jobs:
             echo "::endgroup::"
           done
       - name: Turn coverage into xml
+        if: matrix.pyver == '3.12'
         run: uv run python -m coverage xml
       - name: Upload coverage
+        if: matrix.pyver == '3.12'
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
           fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
-          flags: OS-${{ matrix.os }},Py-${{ matrix.pyver }}
+          flags: OS-${{ matrix.os }},Py-${{ matrix.pyver }},Part-${{ matrix.part }}
           use_oidc: true
           # Install the CLI from PyPI (pinned) instead of cli.codecov.io:
           # the GPG key for the default download path is served from a dead
@@ -1451,6 +1471,9 @@ jobs:
     - web
     - tests
     - self-hosted-tests
+    # benchmark itself, not only benchmark-track: a failed benchmark skips its tracker, and a
+    # skip alone must never pass this gate.
+    - benchmark
     - benchmark-track
     #- self-hosted-large-tests
 
@@ -1463,7 +1486,7 @@ jobs:
       uses: re-actors/alls-green@release/v1
       with:
         # Fork-only: the path-gated jobs may skip there (a failure still fails this).
-        allowed-skips: ${{ github.repository == 'dimensionalOS/dimos' && 'self-hosted-tests, self-hosted-large-tests' || 'self-hosted-tests, self-hosted-large-tests, rust, pyo3, md-babel, web, benchmark-track' }}
+        allowed-skips: ${{ github.repository == 'dimensionalOS/dimos' && 'self-hosted-tests, self-hosted-large-tests' || 'self-hosted-tests, self-hosted-large-tests, rust, pyo3, md-babel, web, benchmark, benchmark-track' }}
         jobs: ${{ toJSON(needs) }}
     - name: Trigger Codecov notifications
       uses: codecov/codecov-action@v7
