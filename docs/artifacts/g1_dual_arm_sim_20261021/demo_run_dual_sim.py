@@ -218,6 +218,9 @@ def main() -> None:
         checks.append(call("move_left_arm_pose", robot="both", pose="left_arm_side_horizontal"))
         checks.append(call("perform_gesture", robot="both", name="wave"))
         checks.append(call("move_upper_body", robot="223", motion="left_arm_forward", angle_deg=20))
+        # EXTRA_GESTURES=a,b runs each named gesture on both robots (e.g. the imported ones).
+        for name in filter(None, os.environ.get("EXTRA_GESTURES", "").split(",")):
+            checks.append(call("perform_gesture", robot="both", name=name))
 
         # Stop mid-wave: both must retreat smoothly. Stop 6 s after both stand-ins arm, not after the
         # call: encoding both waves takes longer than that, and a stop then sends nothing.

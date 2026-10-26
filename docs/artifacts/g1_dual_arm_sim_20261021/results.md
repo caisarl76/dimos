@@ -120,6 +120,36 @@ the two robots at 10 % and 50 % of each joint's own stroke:
 - **Follow-up:** replace `start_skew_s` with a progress-based onset (e.g. 10 % of the planned displacement),
   so that the reported number reflects the main stroke.
 
+## run06: Phase 2 merged (imported gestures + Dex3 hands), 2026-10-26
+
+Branch at `ba3f79958` (Tier-1 v2 `a7fa5fb1c` merged and ported), `PEAK_SPEED` 0.75, in-repo stand-in,
+0.99× real time, host load ~2, no reference expiry. The stand-ins have no hands, so this checks arm motion,
+sync and the hand-row stream, not finger motion. Run with `EXTRA_GESTURES` set to the five retained imported
+gestures on `robot="both"`.
+
+| Check | Result | start / submit skew |
+|---|---|---|
+| `move_left_arm_pose(both, side)` | 91 % / 92 %, returned | 0.003 / 0.001 s |
+| `perform_gesture(both, wave)` | 98 % / 99 %, returned | 0.006 / 0.000 s |
+| `move_upper_body(223, …)` | 223 reached 16.8°; 222 never armed | – |
+| `perform_gesture(both, wave_one_hand)` | 99 % / 100 %, returned | 0.006 / 0.001 s |
+| `perform_gesture(both, v_sign)` | 102 % / 102 %, returned | 0.005 / 0.000 s |
+| `perform_gesture(both, good)` | 102 % / 103 %, returned | 0.011 / 0.000 s |
+| `perform_gesture(both, support_person)` | 98 % / 99 %, returned | 0.022 / 0.000 s |
+| `perform_gesture(both, two_hand_hearts)` | 97 % / 98 %, returned | 0.000 / 0.000 s |
+| wave + `stop_arm` | both "stopped early: stop requested", returned | – |
+| agent "both robots wave" | 98 % / 98 % | 0.011 s |
+| 223 killed, then `both` | nothing sent to any robot | – |
+
+Whole run:
+- peak arm-joint speed 1.81 / 1.51 rad/s (limit 2.0);
+- tilt ≤ 2.06°;
+- floor contacts dipped to 6 on 222 for a single 20 ms sample during `wave_one_hand` (223: 7 for 0.16 s), a
+  momentary foot unload with tilt 1.85°, not instability.
+
+`wave_two_hands` and `open_window` stay dropped (Tier-1's checks; the user chose to leave `wave_two_hands`
+dropped).
+
 ## Not covered (hardware, next)
 
 This doesn't cover the real guarded controllers, the SSH tunnels, a dropped tunnel (which still
