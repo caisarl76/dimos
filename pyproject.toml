@@ -284,6 +284,12 @@ unitree-dds = [
     "mcap>=1.2.0",  # decode Go2 DDS mcap recordings (go2 dds store)
 ]
 
+# Read-only feedback from an independently operated C++ GEAR-SONIC runtime.
+sonic-feedback = [
+    "pyzmq>=27.1.0",
+    "msgpack>=1.1.2",
+]
+
 # Coordinators, arm hardware adapters, and keyboard/Cartesian control.
 control = [
     "piper-sdk",
@@ -398,7 +404,7 @@ autofix = ["ruff==0.14.3"]
 
 # Project deps shared by `tests` and `lint`.
 project-deps = [
-    "dimos[web,visualization,webrtc]",
+    "dimos[web,visualization,webrtc,sonic-feedback]",
     # Blackwell (sm_120) needs torch 2.7 from pytorch-cu128. Cap below 2.8.
     "torch>=2.1,<2.8",
     "torchvision>=0.16,<0.23",
@@ -669,6 +675,7 @@ python-dotenv = "dotenv"
 python-socketio = "socketio"
 PyTurboJPEG = "turbojpeg"
 pyyaml = "yaml"
+pyzmq = "zmq"
 rerun-sdk = "rerun"
 unitree-sdk2py-dimos = "unitree_sdk2py"
 usd-core = "pxr"
@@ -869,6 +876,7 @@ ignore = [
     "dimos/web/dimos_interface/themes.json",
     "dimos/manipulation/manipulation_module.py",
     "dimos/manipulation/test_roboplan.py",
+    "dimos/robot/unitree/g1/test_sonic_arm_skill.py",
     "misc/DimSim/scenes/apartment/objects/manifest.json",
     "misc/DimSim/src/engine.js",
     # Generated golden vectors (web/shared/fixtures/gen.ts); grows per panel kind.

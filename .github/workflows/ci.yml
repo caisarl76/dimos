@@ -52,6 +52,52 @@ jobs:
           git show "${policy_ref}:${policy_path}" > "$RUNNER_TEMP/commit-message-policy.py"
           python3 "$RUNNER_TEMP/commit-message-policy.py" --check
 
+  changes:
+    # Fork-only path filter: fork PRs skip the jobs their paths can't affect, to keep fork CI
+    # short. Upstream, pushes and anything without a PR base get every output true.
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # For checkout
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      docs: ${{ steps.filter.outputs.docs }}
+      native: ${{ steps.filter.outputs.native }}
+      bench: ${{ steps.filter.outputs.bench }}
+      deps: ${{ steps.filter.outputs.deps }}
+    steps:
+      - name: Checkout
+        if: github.repository != 'dimensionalOS/dimos' && github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Decide which path groups changed
+        id: filter
+        env:
+          UPSTREAM: ${{ github.repository == 'dimensionalOS/dimos' }}
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          all() { for g in web docs native bench deps; do echo "$g=true" >> "$GITHUB_OUTPUT"; done; exit 0; }
+          { [ "$UPSTREAM" = true ] || [ "$EVENT" != pull_request ] || [ -z "$BASE" ]; } && all
+          files=$(git diff --name-only "$BASE...$HEAD") || all
+          echo "$files"
+          has() { grep -qE "$1" <<< "$files" && echo true || echo false; }
+          # Every job installs from the lockfile and runs this workflow.
+          [ "$(has '^(\.github/workflows/ci\.yml|pyproject\.toml|uv\.lock|\.python-version)$')" = true ] && all
+          # The Go2 replay stack (static import closure of the unitree-go2 blueprint, by directory);
+          # the web e2e runs unitree-go2-basic on it too.
+          bench='^dimos/[^/]+\.py$|^dimos/(core|protocol|msgs|mapping|navigation|memory|utils|spec|types|porcelain|visualization|models)/|^dimos/(perception/detection/type|perception/fiducial|simulation/dimsim|simulation/mujoco|agents/mcp|stream/audio|web/websocket_vis|robot/unitree/go2|robot/unitree/type)/|^dimos/(agents|robot/unitree)/[^/]+\.py$|^dimos/robot/(get_all|external)_blueprints\.py$|^dimos/cli/theme\.py$|^data/\.lfs/go2_short\.db\.tar\.gz$|^bin/benchmark-analysis$|^\.github/benchmark-analysis/'
+          {
+            echo "deps=false"
+            echo "bench=$(has "$bench")"
+            echo "web=$(has "^(web|dimos/web|docker/relay)/|^dimos/e2e_tests/(conftest|dimos_cli_call|test_[a-z0-9_]+_browser)\.py$|$bench")"
+            echo "docs=$(has '^docs/|^README\.md$|^bin/run-doc-codeblocks$|^data/\.lfs/(go2_bigoffice\.db|unitree_go2_bigoffice_map\.pickle)\.tar\.gz$')"
+            echo "native=$(has '\.rs$|(^|/)(Cargo\.(toml|lock)|rust-toolchain(\.toml)?)$|(^|/)(rust|\.cargo)/|^native/|^dimos/cli/bake/|^bin/pyo3-extensions$|^dimos/mapping/ray_tracing/|^dimos/navigation/global_planner/mls_planner/|^dimos/navigation/trajectory_follower/fancy/|^dimos/mapping/relocalization/lidar/test_replay\.py$')"
+          } >> "$GITHUB_OUTPUT"
+
   compute-ros-pin:
     # Extracts the ros-dev image digest pinned in docker/ros-dev-pin/Dockerfile
     # so downstream jobs can reference it from their `container:` field.
@@ -336,6 +382,9 @@ jobs:
 
 
   rust:
+    # Fork-only gate (see changes): skipped when no Rust/bake sources changed.
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
@@ -375,9 +424,10 @@ jobs:
           enable-cache: true
           prune-cache: true
       - name: Install dependency for pyaudio
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev
       - name: Install dependencies
         run: uv sync --group tests --frozen
       # Needs Python and Rust: `dimos bake` is Python that writes a Rust program and compiles it, and the tests jobs have no Rust.
@@ -399,6 +449,9 @@ jobs:
   # The PyO3 extensions, the one rust artefact nix does not build: pytest imports them, so they must
   # match uv's interpreter. They are abi3, so one Python per OS covers every version.
   pyo3:
+    # Fork-only gate (see changes): skipped when no PyO3 extension or its tests changed.
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     timeout-minutes: 30
     strategy:
       matrix:
@@ -427,9 +480,10 @@ jobs:
         uses: astral-sh/setup-uv@v10.2.0
       - name: Install dependency for pyaudio (Ubuntu)
         if: runner.os == 'Linux'
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev
       - name: Install dependency for pyaudio (macOS)
         if: runner.os == 'macOS'
         run: brew install portaudio
@@ -442,6 +496,9 @@ jobs:
         run: uv run python bin/pyo3-extensions --test
 
   md-babel:
+    # Fork-only gate (see changes): skipped when no executed Markdown changed.
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
@@ -453,9 +510,10 @@ jobs:
         run: git lfs pull --include="data/.lfs/go2_bigoffice.db.tar.gz,data/.lfs/unitree_go2_bigoffice_map.pickle.tar.gz" --exclude=""
       # Docs decode JPEG from SQLite via PyTurboJPEG; pyaudio needs portaudio.
       - name: Install system dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libturbojpeg portaudio19-dev
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends libturbojpeg portaudio19-dev
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
@@ -509,6 +567,9 @@ jobs:
         run: ./bin/run-doc-codeblocks --ci --no-cache
 
   web:
+    # Fork-only gate (see changes): skipped when neither web/ nor the go2 replay stack changed.
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
@@ -583,9 +644,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install native dependencies (pyaudio build, JPEG encoding, audio decode)
+        # Same packages as the tests job's apt step, so the same cap; it leaves the rest of
+        # the 30-minute job for Playwright and the e2e instead of hanging on a slow mirror.
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev libturbojpeg ffmpeg
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev libturbojpeg ffmpeg
       - name: Fetch the go2_short replay dataset
         run: git lfs pull --include="data/.lfs/go2_short.db.tar.gz" --exclude=""
       - name: Install dependencies
@@ -612,18 +676,19 @@ jobs:
     if: |
       !cancelled() &&
       contains(fromJSON('["success", "skipped"]'), needs.cachix-build-check.result) &&
-      contains(fromJSON('["success", "skipped"]'), needs.cachix-build.result)
-    needs: [cachix-build-check, cachix-build]
+      contains(fromJSON('["success", "skipped"]'), needs.cachix-build.result) &&
+      needs.changes.result == 'success'
+    needs: [cachix-build-check, cachix-build, changes]
     timeout-minutes: 20
     strategy:
       matrix:
-        pyver: ['3.10', '3.11', '3.12']
-        os: ["macos-latest", "ubuntu-latest"]
+        # Fork-only: without a dependency change, forks test 3.12 on ubuntu-latest alone.
+        pyver: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.deps == 'true') && '["3.10", "3.11", "3.12"]' || '["3.12"]') }}
+        # Upstream tests macOS and Ubuntu; forks run Ubuntu only (their macOS failures are
+        # upstream's to fix, and fail-fast would cancel the Ubuntu jobs with them).
+        os: ${{ fromJSON(github.repository == 'dimensionalOS/dimos' && '["macos-latest", "ubuntu-latest"]' || '["ubuntu-latest"]') }}
         experimental: [false]
-        include:
-          - os: "ubuntu-24.04-arm"
-            pyver: "3.12"
-            experimental: false
+        include: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.deps == 'true') && '[{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false}]' || '[]') }}
       fail-fast: true
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
@@ -661,9 +726,10 @@ jobs:
       # pyaudio needs portaudio; relay/audio tests need TurboJPEG and ffmpeg.
       - name: Install system dependencies (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev libturbojpeg ffmpeg
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev libturbojpeg ffmpeg
       - name: Install dependency for pyaudio (macOS)
         if: startsWith(matrix.os, 'macos')
         run: brew install portaudio ffmpeg
@@ -736,7 +802,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
           flags: OS-${{ matrix.os }},Py-${{ matrix.pyver }}
           use_oidc: true
@@ -759,9 +825,11 @@ jobs:
   self-hosted-tests:
     # Runs on push, merge_group (trusted — a maintainer must approve + queue the
     # PR), and same-repo PRs. Skipped on fork PRs, which would expose the
-    # self-hosted runner to untrusted code from external contributors.
+    # self-hosted runner to untrusted code from external contributors. Upstream only: forks of
+    # this repository have no self-hosted runners, so the job would queue indefinitely there.
     if: |
       !cancelled() &&
+      github.repository == 'dimensionalOS/dimos' &&
       (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository) &&
       needs.cachix-build-check.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.cachix-build.result)
@@ -994,7 +1062,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
           flags: SelfHosted-${{ matrix.os }}
           use_oidc: true
@@ -1041,6 +1109,7 @@ jobs:
     # Skip on PRs from forks which would expose the self-hosted runner to untrusted code from external contributors.
     if: |
       !cancelled() &&
+      github.repository == 'dimensionalOS/dimos' &&
       (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) &&
       needs.cachix-build-check.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.cachix-build.result)
@@ -1096,9 +1165,10 @@ jobs:
           uv venv .codecov-venv
           uv pip install --python .codecov-venv/bin/python codecov-cli==11.2.8
       - name: Install apt dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
             `# Compiler toolchain for the in-tree pybind11 C++ extension.` \
             build-essential \
             `# Runtime lib for opencv-python (cv2 loads libGL.so.1 on import).` \
@@ -1150,7 +1220,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
           files: ./coverage.xml
           flags: SelfHosted-Large
           use_oidc: true
@@ -1181,6 +1251,10 @@ jobs:
           if [ "$size_mb" -gt 25600 ]; then uv cache prune --ci; fi
 
   benchmark:
+    # Fork-only gate (see changes): skipped when the Go2 replay stack is untouched;
+    # benchmark-track and benchmark-analysis need it, so they skip with it.
+    needs: changes
+    if: needs.changes.outputs.bench == 'true'
     timeout-minutes: 30
     # The hosted runner that exposes a PMU, for the instruction counts.
     runs-on: ubuntu-24.04-arm
@@ -1203,9 +1277,10 @@ jobs:
           fi
       # pyaudio build needs portaudio; the recording's JPEG frames need turbojpeg.
       - name: Install system dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev libturbojpeg
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev libturbojpeg
       # LCM lidar/image UDP fragments drop with small kernel buffers; the
       # in-process configurator (64MB) skips under pytest, so do it here.
       - name: Raise UDP receive buffers for LCM
@@ -1213,9 +1288,10 @@ jobs:
       # Hardware counters don't move with the core's clock or idle state, unlike
       # CPU time.
       - name: Install perf
+        timeout-minutes: 10
         run: |
-          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" ||
-            sudo apt-get install -y linux-tools-generic
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends linux-tools-common "linux-tools-$(uname -r)" ||
+            sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends linux-tools-generic
           # The wrapper wants a build for the running kernel; any build can count.
           sudo ln -sfn "$(ls /usr/lib/linux-tools/*/perf | head -1)" /usr/local/bin/perf
           # Ubuntu's default forbids unprivileged perf; 2 allows counting one's
@@ -1366,6 +1442,7 @@ jobs:
     if: always()
 
     needs:
+    - changes
     - commit-messages
     - lint
     - rust
@@ -1385,14 +1462,15 @@ jobs:
     - name: Decide whether the needed jobs succeeded or failed
       uses: re-actors/alls-green@release/v1
       with:
-        allowed-skips: self-hosted-tests, self-hosted-large-tests
+        # Fork-only: the path-gated jobs may skip there (a failure still fails this).
+        allowed-skips: ${{ github.repository == 'dimensionalOS/dimos' && 'self-hosted-tests, self-hosted-large-tests' || 'self-hosted-tests, self-hosted-large-tests, rust, pyo3, md-babel, web, benchmark-track' }}
         jobs: ${{ toJSON(needs) }}
     - name: Trigger Codecov notifications
       uses: codecov/codecov-action@v7
       with:
         run_command: send-notifications
         use_oidc: true
-        fail_ci_if_error: true
+        fail_ci_if_error: ${{ github.repository == 'dimensionalOS/dimos' }}
         # Install the CLI from PyPI (pinned) instead of cli.codecov.io:
         # the GPG key for the default download path is served from a dead
         # keybase.io URL, failing every upload. See
