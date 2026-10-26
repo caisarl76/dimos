@@ -12,12 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Iterator
+from pathlib import Path
+import shutil
+import tempfile
+
 import pytest
 
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 from dimos.robot.unitree.g1.sonic_test_support import ScriptedPeer
 from dimos.utils.testing.waiting import wait_until
+
+
+@pytest.fixture
+def ipc_dir() -> Iterator[Path]:
+    """A short directory for ipc:// sockets: macOS caps AF_UNIX paths at 103 bytes, and pytest's
+    tmp_path there (/private/var/folders/...) leaves too little room for a socket name."""
+    path = Path(tempfile.mkdtemp(prefix="sonic", dir="/tmp"))
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 @pytest.fixture

@@ -156,13 +156,20 @@ def test_invalid_freshness_threshold_is_rejected(threshold):
         FeedbackBuffer(stale_after=threshold)
 
 
+# Expiry tests take a short window; the rest assert fresh feedback, so their window must outlast
+# a slow runner's wait_until polls (0.1 s sleeps) and RPCs after the packet arrived.
+expires_quickly = pytest.mark.parametrize("telemetry", [0.2], indirect=True)
+
+
 @pytest.fixture
-def telemetry():
+def telemetry(request):
     # XPUB lets the fixture wait for subscription readiness without sleeps.
     with zmq.Context() as context, context.socket(zmq.XPUB) as publisher:
         publisher.setsockopt(zmq.LINGER, 0)
         port = publisher.bind_to_random_port("tcp://127.0.0.1")
-        module = SonicFeedbackModule(endpoint=f"tcp://127.0.0.1:{port}", stale_after=0.2)
+        module = SonicFeedbackModule(
+            endpoint=f"tcp://127.0.0.1:{port}", stale_after=getattr(request, "param", 30.0)
+        )
         try:
             module.start()
             assert publisher.poll(3000)
@@ -215,6 +222,7 @@ def test_absent_publisher_and_stopped_module_never_report_fresh(telemetry):
     assert module.get_feedback() is None
 
 
+@expires_quickly
 def test_lost_stream_expires_without_republishing_old_measurements(telemetry, payload):
     module, publisher = telemetry
     received = []
@@ -378,6 +386,7 @@ def test_guard_reaches_typed_stream_and_status_rpc(telemetry, payload, guard_pay
         unsubscribe()
 
 
+@expires_quickly
 def test_stale_guard_never_reports_current_handover_confirmation(telemetry, payload, guard_payload):
     module, publisher = telemetry
     payload["reference_guard"] = guard_payload
@@ -399,6 +408,7 @@ def test_missing_guard_replaces_previous_confirmation(telemetry, payload, guard_
     assert module.get_feedback().reference_guard is None
 
 
+@expires_quickly
 def test_malformed_guard_does_not_refresh_last_confirmed_sample(telemetry, payload, guard_payload):
     module, publisher = telemetry
     publisher.send(b"g1_debug" + msgpack.packb(payload | {"reference_guard": guard_payload}))
