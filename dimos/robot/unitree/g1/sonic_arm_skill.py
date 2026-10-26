@@ -1368,7 +1368,7 @@ class SonicArmSkillContainer(Module):
 
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(start, end))
-        self._speak()
+        self._speak(watch)
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
@@ -1409,7 +1409,9 @@ class SonicArmSkillContainer(Module):
 
     def _with_line(self, line: str, run: Callable[[], SkillResult]) -> SkillResult:
         """run() with `line` spoken at its first chunk; the result's metadata says how it went."""
-        self._voice_line, self._voice = line, None
+        self._voice_line = line
+        with self._voice_lock:
+            self._voice = None
         try:
             result = run()
             report = self._voice_report(line)
@@ -1418,18 +1420,23 @@ class SonicArmSkillContainer(Module):
             self._hush()  # The line never outlives its motion, however that ended.
         return replace(result, metadata={**result.metadata, "voice": report})
 
-    def _speak(self) -> None:
-        """Start the pending voice line, unless stop_arm came first. The line never blocks motion."""
+    def _speak(self, watch: _Watch) -> None:
+        """Start the pending voice line, unless a stop or a safety abort came first. The line never
+        blocks motion."""
         line, self._voice_line = self._voice_line, None
         if line is None:
             return
+        with self._lock:
+            aborted = watch.abort is not None
         with self._voice_lock:
-            if self._stop.is_set():
+            if aborted or self._stop.is_set():
                 return
             c = self.config
             try:
                 self._voice = subprocess.Popen(
-                    self._voice_ssh(f"play {c.voice_dir}/{line}.wav {c.voice_volume}"),
+                    self._voice_ssh(
+                        f"{c.voice_command} play {c.voice_dir}/{line}.wav {c.voice_volume}"
+                    ),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
                 )
@@ -1437,15 +1444,26 @@ class SonicArmSkillContainer(Module):
                 logger.warning(f"voice line {line} not started: {exc}")
 
     def _hush(self) -> None:
-        """Cut a playing line: the local ssh, then the robot's player, which outlives the ssh."""
+        """Cut a playing line: the local ssh, then on the robot the player, which outlives the ssh
+        (pkill, even while it is still starting), and the audio it already streamed (stop)."""
         with self._voice_lock:
             voice = self._voice
             if voice is None or voice.poll() is not None:
                 return
             voice.kill()
-            subprocess.Popen(
-                self._voice_ssh("stop"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            script = self.config.voice_command
+            assert script is not None
+            player = re.escape(
+                Path(script.split()[-1]).name
+            )  # "g1_audio\.py": never matches itself
+            try:
+                subprocess.Popen(
+                    self._voice_ssh(f"pkill -f '{player} play'; {script} stop"),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except OSError as exc:
+                logger.warning(f"voice line not cut on the robot: {exc}")
 
     def _voice_report(self, line: str) -> str:
         voice = self._voice
@@ -1462,11 +1480,11 @@ class SonicArmSkillContainer(Module):
         logger.warning(f"voice line {line} failed (exit {code}): {error}")
         return f"{line}: failed (exit {code}) {error[-200:]}"
 
-    def _voice_ssh(self, args: str) -> list[str]:
-        host, script = self.config.voice_host, self.config.voice_command
-        assert host is not None and script is not None
-        command = f"{script} {args}"
-        return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", host, command]
+    def _voice_ssh(self, command: str) -> list[str]:
+        """ssh argv running `command` on the voice host; -n keeps it off this process's stdin."""
+        host = self.config.voice_host
+        assert host is not None
+        return ["ssh", "-n", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", "--", host, command]
 
     def _task(self) -> dict[str, Any]:
         task: dict[str, Any] = self._execution.get_status()["task"]

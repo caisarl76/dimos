@@ -1181,10 +1181,20 @@ def test_gesture_line_plays_on_the_robot_at_the_first_chunk_and_stop_cuts_it(ski
     (argv,), _ = shell.Popen.call_args
     assert argv[-2:] == ["pc2", "python3 ~/g1_audio.py play ~/lines/01_intro.wav 60"]
     assert result.metadata["voice"] == "01_intro: played"
+    assert argv[:3] == ["ssh", "-n", "-o"] and argv[-3] == "--"
     shell.Popen.return_value.poll.return_value = None  # still playing
     module._hush()
     shell.Popen.return_value.kill.assert_called_once()
-    assert shell.Popen.call_args.args[0][-1] == "python3 ~/g1_audio.py stop"
+    cut = shell.Popen.call_args.args[0][-1]
+    assert cut == "pkill -f 'g1_audio\\.py play'; python3 ~/g1_audio.py stop"
+    assert not re.search(r"g1_audio\.py play", cut)  # the cut's own shell never matches
+    assert re.search(r"g1_audio\.py play", argv[-1])  # the player does
+    shell.Popen.side_effect = OSError("fork failed")  # a failed cut is logged, never raised
+    module._hush()
+    shell.Popen.side_effect, calls = None, shell.Popen.call_count
+    module._voice_line = "01_intro"  # a safety abort before the first chunk: nothing is spoken
+    module._speak(sonic_arm_skill._Watch(np.zeros(29), np.zeros(29), 3.0, np.zeros(29), abort="x"))
+    assert shell.Popen.call_count == calls and module._voice_line is None
 
 
 def test_a_late_finish_lands_in_the_final_hold_and_still_finishes(skill, mocker):
