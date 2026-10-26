@@ -209,6 +209,40 @@ def test_compiler_emits_cross_host_module_reference_and_provider_rpc_name() -> N
     )
 
 
+def test_compiler_resolves_module_reference_remapped_to_instance_name() -> None:
+    blueprint = autoconnect(
+        ProviderModule.blueprint(instance_name="p_a"),
+        ProviderModule.blueprint(instance_name="p_b"),
+        ConsumerModule.blueprint(),
+    ).remappings([(ConsumerModule, "provider", "p_b")])
+    config = BlueprintConfigParser(blueprint).parse(environ={})
+
+    fragments = compile_fragments(
+        blueprint,
+        config,
+        {"p_a": "host-a", "p_b": "host-b", "consumermodule": "host-a"},
+        run_id="run-1",
+        generation=1,
+        application_name="compiler-test",
+        application_revision="revision-1",
+    )
+
+    [reference] = fragments["host-a"].load_payload().remote_module_references
+    assert (reference.provider_name, reference.provider_host_id) == ("p_b", "host-b")
+
+
+def test_compiler_rejects_module_reference_remapped_to_unknown_instance() -> None:
+    blueprint = autoconnect(
+        ProviderModule.blueprint(instance_name="p_a"),
+        ConsumerModule.blueprint(),
+    ).remappings([(ConsumerModule, "provider", "nope")])
+
+    with pytest.raises(ValueError, match="'nope', but no module has that name"):
+        resolve_hosted_assignments(
+            blueprint, (), local_host_id="controller", application_revision="revision-1"
+        )
+
+
 def test_compiler_keeps_same_host_module_reference_local_with_hosted_rpc_names() -> None:
     blueprint = autoconnect(ProviderModule.blueprint(), ConsumerModule.blueprint())
     config = BlueprintConfigParser(blueprint).parse(environ={})

@@ -18,7 +18,6 @@ A fake encoder writes the planned left-shoulder-pitch offset into token value 0;
 thread plays body telemetry into the skill's watch. The plan is shortened to about 1.2 s.
 """
 
-import asyncio
 from contextlib import contextmanager
 from dataclasses import replace
 from functools import partial
@@ -35,15 +34,13 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
-from dimos.agents.capabilities import CapabilityRegistry
-from dimos.agents.mcp import mcp_server
 from dimos.agents.mcp.tool_stream import NOTIFICATIONS_MESSAGE_METHOD, TOOL_STREAM_STOPPED_METHOD
 from dimos.agents.skill_result import SkillResult
 from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.core.coordination.blueprint_config.sources import validate_global_values
 from dimos.core.module import Module
 from dimos.core.transport_factory import make_transport
-from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill
+from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill, sonic_test_support
 from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_agentic import (
     unitree_g1_sonic_arm_agentic,
 )
@@ -65,22 +62,31 @@ from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
 from dimos.robot.unitree.g1.sonic_test_support import (
+    FAKE_GAIN,
     LEASE_STALL_RERUN,
+    PEER_TOKEN,
     ROBOT_IDLE,
     SCENE,
     WAIT_S,
+    FakeEncoder,
     FakeVl,
     IMAGE_640x480,
+    fast_keyframe_plan,
     feedback,
+    frames,
+    gate_start,
     needs_scene,
     pose_values,
+    real_hold_plan,
+    stop_in_background,
+    tokens,
+    unheld,
+    wait_until,
 )
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
 
 pytestmark = LEASE_STALL_RERUN
 
-PEER_TOKEN = 0.125  # ScriptedPeer token_state
-FAKE_GAIN = 0.25  # Fake token value 0 per rad of summed joint offset; keeps big poses in the bound.
 LEAD_IN_ROWS = 10  # The fixture's 0.2 s token blend at 50 Hz.
 
 
@@ -107,31 +113,6 @@ def execution_config(peer, tmp_path):
             hand_step_limit=PEAK_SPEED / RATE,  # as SONIC_ARM_PROFILE
         ),
     )
-
-
-class FakeEncoder:
-    def __init__(self, path):
-        pass
-
-    def encode(self, poses):
-        tokens = np.full((len(poses), 64), PEER_TOKEN)
-        tokens[:, 0] += FAKE_GAIN * (poses - poses[0]).sum(axis=1)  # The planned offsets.
-        return tokens
-
-
-def real_hold_plan(base, keyframes, **kwargs):
-    """The real engine with short leads and moves but the requested holds."""
-    return keyframe_plan(
-        base, keyframes, **(kwargs | dict(lead_s=0.1, move_s=0.3, peak_speed=100.0))
-    )
-
-
-def fast_keyframe_plan(base, keyframes, **kwargs):
-    """The real engine with short leads, moves and holds, so a run takes about a second."""
-    capped = [replace(k, hold_s=min(k.hold_s, 0.1), min_s=min(k.min_s, 0.1)) for k in keyframes]
-    fast = dict(lead_s=0.1, move_s=0.3, peak_speed=100.0)
-    fast["return_min_s"] = min(kwargs.get("return_min_s", 0.0), 0.1)
-    return keyframe_plan(base, capped, **(kwargs | fast))
 
 
 @pytest.fixture
@@ -200,31 +181,10 @@ def run(module, angle_deg, body_q=lambda t: np.zeros(29), motion="left_arm_forwa
         return module.move_upper_body(motion, angle_deg)
 
 
-def wait_until(condition, timeout=WAIT_S):
-    deadline = time.monotonic() + timeout
-    while not condition():
-        assert time.monotonic() < deadline, "timed out"
-        time.sleep(0.01)
-
-
 def follows(t, delta=-np.radians(20), joint=15):  # The moving joint at the plan's depth mid-run.
     q = np.zeros(29)
     q[joint] = delta if 0.5 < t < 0.9 else 0.0
     return q
-
-
-def unheld(chunk):
-    """A last chunk less its finish hold, which must repeat the chunk's own last row."""
-    rows, hold = (
-        chunk[: -sonic_arm_skill._FINISH_HOLD_ROWS],
-        chunk[-sonic_arm_skill._FINISH_HOLD_ROWS :],
-    )
-    assert np.all(hold == rows[-1])
-    return rows
-
-
-def tokens(packets):
-    return np.array([np.frombuffer(p[1284:1540], "<f4") for p in packets if p.startswith(b"pose")])
 
 
 def test_pure_reference_parts():
@@ -338,7 +298,7 @@ def test_retreat_resumes_at_the_matching_point_of_the_way_back(skill, mocker):
 
 def test_one_keyframe_moves_encode_the_plan_once(skill, mocker):
     module, _ = skill
-    spy = mocker.spy(module._encoder, "encode")
+    spy = mocker.spy(module._arm._encoder, "encode")
     run(module, 20.0, follows)
     assert spy.call_count == 1  # the retreat reuses the plan's own way back
 
@@ -428,7 +388,7 @@ def test_session_failure_is_not_reported_as_success(skill, mocker):
     def drop_feedback():
         wait_until(lambda: submit.call_count == 1)  # The motion is streaming.
         peer.pause_feedback.set()  # The execution session fails on stale feedback...
-        wait_until(lambda: module._task()["phase"] == SessionPhase.HANDBACK)
+        wait_until(lambda: module._arm._task()["phase"] == SessionPhase.HANDBACK)
         peer.pause_feedback.clear()  # ...and confirms the planner once feedback returns.
 
     dropper = threading.Thread(target=drop_feedback, daemon=True)
@@ -528,43 +488,6 @@ def test_failed_session_at_finish_is_not_reported_as_success(skill, mocker):
         run(module, 20.0, follows)
 
 
-def frames(transport, method):
-    return [c.args[0] for c in transport.publish.call_args_list if c.args[0]["method"] == method]
-
-
-def gate_start(module, mocker):
-    """Holds the motion before its execution task starts until the returned event is set."""
-    gate = threading.Event()
-    real = module._execution.start_task
-    start = mocker.patch.object(
-        module._execution, "start_task", side_effect=lambda: gate.wait(10) and real()
-    )
-    return gate, start
-
-
-@pytest.fixture
-def mcp(real_launch_skill, tool_transport, monkeypatch):
-    """McpServer's tools/call and tool-stream handlers over the arm module, with a fresh registry."""
-    module, _ = real_launch_skill
-    skills = {s.func_name: s for s in module.get_skills()}
-    registry = CapabilityRegistry()
-    monkeypatch.setattr(mcp_server.app.state, "skills_by_name", skills)
-    monkeypatch.setattr(mcp_server.app.state, "cap_registry", registry)
-    monkeypatch.setattr(mcp_server.app.state, "event_loop", None)
-    # Every stop frame reaches the server's handler, which releases the hold it carries.
-    tool_transport.publish.side_effect = mcp_server._fan_out_to_sse_queues
-    rpc_calls = {name: getattr(module, name) for name in skills}
-
-    def call(name, **arguments):
-        params = {"name": name, "arguments": arguments}
-        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}
-        response = asyncio.run(mcp_server.handle_request(request, list(skills.values()), rpc_calls))
-        result = response["result"]
-        return result["content"][0]["text"], result.get("isError", False)
-
-    return call, registry
-
-
 def test_motion_skill_returns_at_once_and_reports_through_the_tool_stream(
     real_launch_skill, mocker
 ):
@@ -605,13 +528,13 @@ def test_stop_mid_motion_retreats_smoothly_and_hands_back(real_launch_skill, moc
 def test_stop_during_encoding_sends_nothing(real_launch_skill, mocker):
     module, peer = real_launch_skill
     updates = mocker.spy(module, "tool_update")
-    encode = module._encoder.encode
+    encode = module._arm._encoder.encode
 
     def stop_then_encode(poses):
         assert module.stop_arm().startswith("Stopping")
         return encode(poses)
 
-    mocker.patch.object(module._encoder, "encode", side_effect=stop_then_encode)
+    mocker.patch.object(module._arm._encoder, "encode", side_effect=stop_then_encode)
     module.move_upper_body("left_arm_forward", 20.0)
     wait_until(lambda: updates.call_count == 1)
     assert updates.call_args.args[1] == "move_upper_body failed: stopped on request; nothing sent"
@@ -642,9 +565,9 @@ def stop_at_row(module, mocker, row, on_row=lambda: None):
     mocker.patch.object(
         sonic_arm_skill, "time", SimpleNamespace(monotonic=monotonic, sleep=time.sleep)
     )
-    real_stream = module._stream
+    real_stream = module._arm._stream
 
-    def stream(task_id, plan, chunks, retreat, profile, watch):
+    def stream(task_id, plan, chunks, retreat, profile, watch, group=None):
         last.watch = watch  # Runs on the stream thread: its clock readings watch for the row.
 
         def recorded(token_row):
@@ -653,9 +576,9 @@ def stop_at_row(module, mocker, row, on_row=lambda: None):
             stops.append((token_row, implied, retreat(token_row)))
             return stops[-1][2]
 
-        return real_stream(task_id, plan, chunks, recorded, profile, watch)
+        return real_stream(task_id, plan, chunks, recorded, profile, watch, group)
 
-    mocker.patch.object(module, "_stream", side_effect=stream)
+    mocker.patch.object(module._arm, "_stream", side_effect=stream)
     return reached, stops
 
 
@@ -678,7 +601,7 @@ def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
         assert reached.wait(WAIT_S)
         module.stop()
         # stop() returned only after the retreat and the motion's own final update.
-        assert module._stop.is_set()
+        assert module._arm.stop.is_set()
         assert [c.args[1] for c in submit.call_args_list] == [0, 1]
         assert updates.call_count == 1
     assert "stopped early: stop requested" in json.loads(updates.call_args.args[1])["message"]
@@ -687,6 +610,53 @@ def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
     assert row == implied >= LEAD_IN_ROWS + 5, stops
     assert np.array_equal(unheld(submit.call_args_list[1].args[3]), built)
     assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_motion_racing_module_stop_is_refused_and_nothing_outlives_stop(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    gate, start_task = gate_start(module, mocker)
+    stopper, release = stop_in_background(module, mocker)
+    try:
+        with pytest.raises(RuntimeError, match="the arm skill is shutting down"):
+            module.move_upper_body("left_arm_forward", 20.0)
+        assert module.stop_arm() == "No arm motion is running."
+    finally:
+        release.set()
+        stopper.join(10)
+    alive = module._motion is not None and module._motion.is_alive()
+    assert not stopper.is_alive() and not alive
+    assert all(arm.stop.is_set() for arm in module._launched)
+    assert module._running is None and not module._tools
+    gate.set()
+    assert start_task.call_count == 0
+
+
+def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_ends(
+    real_launch_skill, mcp, tool_transport, mocker
+):
+    module, _ = real_launch_skill
+    call, registry = mcp
+    gate, start_task = gate_start(module, mocker)
+    assert "started" in call("move_upper_body", motion="left_arm_forward", angle_deg=20.0)[0]
+    wait_until(lambda: start_task.call_count == 1)  # Parked at the gate, past the stop checks.
+    stopper = threading.Thread(target=module.stop)
+    stopper.start()
+    try:
+        wait_until(module._arm.stop.is_set)  # stop() has begun and waits for the motion.
+        assert module.stop_arm().startswith("Stopping")
+        text, error = call("move_upper_body", motion="left_arm_forward", angle_deg=20.0)
+        assert "already running" in text and not error  # Admits nothing; rebinds the hold.
+        assert registry.snapshot() == {"movement": "move_upper_body"}
+        assert not frames(tool_transport, TOOL_STREAM_STOPPED_METHOD)
+    finally:
+        gate.set()
+        stopper.join(10)
+    assert not stopper.is_alive() and not module._motion.is_alive() and module._arm.stop.is_set()
+    assert registry.snapshot() == {} and not module._tools
+    assert len(frames(tool_transport, TOOL_STREAM_STOPPED_METHOD)) == 1
+    text, error = call("move_upper_body", motion="left_arm_forward", angle_deg=20.0)
+    assert error and "the arm skill is shutting down" in text, text
+    assert registry.snapshot() == {} and not module._tools
 
 
 def test_motion_called_during_module_stop_is_refused_and_nothing_outlives_stop(
@@ -721,7 +691,7 @@ def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     module, _ = skill
     spy = mocker.spy(module._execution, "submit_chunk")
     # Stopped a few rows into the fixture's lead-in blend, seen by that same loop pass.
-    _, stops = stop_at_row(module, mocker, 3, on_row=module._stop.set)
+    _, stops = stop_at_row(module, mocker, 3, on_row=module._arm.stop.set)
     result = run(module, 20.0, follows)
     assert "stopped early: stop requested" in result.message, result
     [(row, implied, _)] = stops
@@ -911,7 +881,7 @@ def test_base_exception_in_the_motion_still_closes_the_stream(real_launch_skill,
     assert excepthook.call_args.args[0].exc_type is Interrupted
     assert updates.call_args.args[1] == "move_upper_body failed: Interrupted"
     assert stop_tool.call_count == 1 and not module._tools and module._running is None
-    assert module._watch is None
+    assert module._arm._watch is None
 
 
 def test_agent_prompt_names_only_skills_the_blueprint_has():
@@ -1081,7 +1051,7 @@ def test_joint_targets_need_the_path_check(real_launch_skill, mocker):
 )
 def test_joint_targets_outside_the_box_send_nothing(skill, angles):
     module, peer = skill
-    module._checker = FakeChecker()
+    module._arm._checker = FakeChecker()
     with pytest.raises(ValueError, match="must be within"):
         module.move_left_arm_joints(*angles)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
@@ -1089,22 +1059,22 @@ def test_joint_targets_outside_the_box_send_nothing(skill, angles):
 
 def test_unsafe_joint_target_path_is_refused_before_sending(skill):
     module, peer = skill
-    module._checker = FakeChecker("torso_link")
+    module._arm._checker = FakeChecker("torso_link")
     with pytest.raises(RuntimeError, match="torso_link; nothing sent"):
         module.move_left_arm_joints(11.0, -10.0, 0.0, 34.0)
-    assert module._checker.calls == 1
+    assert module._arm._checker.calls == 1
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
 def test_checked_joint_target_runs(skill):
     module, _ = skill
-    module._checker = FakeChecker()
+    module._arm._checker = FakeChecker()
     target = np.radians([-90.0, 11.0, 0.0, 70.0])
     result = call_with_feed(
         module, lambda: module.move_left_arm_joints(-90.0, 11.0, 0.0, 70.0), reaching(target)
     )
     assert "returned" in result.message, result
-    assert module._checker.calls == 1
+    assert module._arm._checker.calls == 1
 
 
 @needs_scene
@@ -1155,7 +1125,7 @@ def raised_start(module, mocker, pitch=-1.0):
 def test_gesture_from_a_raised_arm_returns_to_where_it_started(skill, mocker):
     module, peer = skill
     raised = raised_start(module, mocker)
-    encode = mocker.spy(module._encoder, "encode")
+    encode = mocker.spy(module._arm._encoder, "encode")
     result = call_with_feed(module, lambda: module.perform_gesture("beckon"), lambda t: raised)
     assert result.metadata["motion"] == "beckon" and result.metadata["keyframes"] == 5
     poses = encode.call_args_list[0].args[0]  # the plan; later calls are retreat units
@@ -1193,18 +1163,20 @@ def test_gesture_line_plays_on_the_robot_at_the_first_chunk_and_stop_cuts_it(ski
     assert result.metadata["voice"] == "01_intro: played"
     assert argv[:3] == ["ssh", "-n", "-o"] and argv[-3] == "--"
     shell.Popen.return_value.poll.return_value = None  # still playing
-    module._hush()
+    module._arm.hush()
     shell.Popen.return_value.kill.assert_called_once()
     cut = shell.Popen.call_args.args[0][-1]
     assert cut == "pkill -f 'g1_audio\\.py play'; python3 ~/g1_audio.py stop"
     assert not re.search(r"g1_audio\.py play", cut)  # the cut's own shell never matches
     assert re.search(r"g1_audio\.py play", argv[-1])  # the player does
     shell.Popen.side_effect = OSError("fork failed")  # a failed cut is logged, never raised
-    module._hush()
+    module._arm.hush()
     shell.Popen.side_effect, calls = None, shell.Popen.call_count
-    module._voice_line = "01_intro"  # a safety abort before the first chunk: nothing is spoken
-    module._speak(sonic_arm_skill._Watch(np.zeros(29), np.zeros(29), 3.0, np.zeros(29), abort="x"))
-    assert shell.Popen.call_count == calls and module._voice_line is None
+    module._arm._voice_line = "01_intro"  # a safety abort before the first chunk: nothing is spoken
+    module._arm._speak(
+        sonic_arm_skill._Watch(np.zeros(29), np.zeros(29), 3.0, np.zeros(29), abort="x")
+    )
+    assert shell.Popen.call_count == calls and module._arm._voice_line is None
 
 
 def test_a_late_finish_lands_in_the_final_hold_and_still_finishes(skill, mocker):
@@ -1282,10 +1254,10 @@ def test_unknown_gesture_sends_nothing(skill):
 
 def test_gesture_checks_the_path_when_configured_and_runs_without(skill):
     module, _ = skill
-    module._checker = FakeChecker("torso_link")
+    module._arm._checker = FakeChecker("torso_link")
     with pytest.raises(RuntimeError, match="torso_link; nothing sent"):
         module.perform_gesture("stop_sign")
-    module._checker = None
+    module._arm._checker = None
     result = call_with_feed(
         module,
         lambda: module.perform_gesture("stop_sign"),
@@ -1353,7 +1325,7 @@ def test_hold_samples_come_only_from_the_hold_window(skill, mocker):
     result, t0, plan_start = _hold_run(
         module, mocker, _stamped, lambda base, hold_q: seen.append(hold_q) or {}
     )
-    first, last = module._watch.hold_rows
+    first, last = module._arm._watch.hold_rows
     times = [t0 + 10 * q[15] for q in seen[0]]
     assert result.metadata["hold_samples"] == len(times) > 0
     assert plan_start + first / 50 - 0.03 <= min(times)
@@ -1390,8 +1362,8 @@ def test_samples_stop_at_a_mid_hold_stop(real_launch_skill, mocker):
 
     with feeding(module, stamped):
         module.move_left_arm_pose("left_arm_side_horizontal", hold_seconds=2.0)
-        wait_until(lambda: module._watch is not None)
-        watch = module._watch  # The motion clears it when done.
+        wait_until(lambda: module._arm._watch is not None)
+        watch = module._arm._watch  # The motion clears it when done.
         wait_until(lambda: len(watch.hold_q) >= 5)
         stopped = time.monotonic()
         module.stop_arm()
@@ -1570,7 +1542,7 @@ def test_point_at_needs_the_arm_model(real_launch_skill, mocker):
 @pytest.mark.parametrize("hold", [0.5, 21.0])
 def test_point_at_hold_outside_1_to_20_sends_nothing(skill, hold):
     module, peer = skill
-    module._checker, module._kinematics = FakeChecker(), FakeKinematics()
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics()
     with pytest.raises(ValueError, match="hold_seconds"):
         module.point_at(30.0, -20.0, hold)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
@@ -1578,7 +1550,7 @@ def test_point_at_hold_outside_1_to_20_sends_nothing(skill, hold):
 
 def test_unreachable_direction_sends_nothing(skill):
     module, peer = skill
-    module._checker, module._kinematics = FakeChecker(), FakeKinematics(reachable=False)
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics(reachable=False)
     with pytest.raises(ValueError, match="more than 3 deg off"):
         module.point_at(30.0, -20.0)
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
@@ -1588,13 +1560,13 @@ def test_unreachable_direction_sends_nothing(skill):
 def test_point_at_solves_from_the_measured_base_and_reports_the_direction(skill, mocker):
     module, _ = skill
     raised = raised_start(module, mocker, pitch=-0.3)
-    module._checker, module._kinematics = FakeChecker(), FakeKinematics()
+    module._arm._checker, module._kinematics = FakeChecker(), FakeKinematics()
     result = call_with_feed(
         module, lambda: module.point_at(30.0, -20.0), reaching(FakeKinematics.POSE)
     )
     assert "returned" in result.message, result
     assert np.array_equal(module._kinematics.bases[0], raised)  # The real start, not a rest pose.
-    assert module._checker.calls == 1
+    assert module._arm._checker.calls == 1
     assert result.metadata["requested_direction_deg"] == [30.0, -20.0]
     assert result.metadata["achieved_direction_deg"] == [31.0, -20.0]
     assert result.metadata["planned_deg"]["left_elbow"] == pytest.approx(
@@ -1605,7 +1577,7 @@ def test_point_at_solves_from_the_measured_base_and_reports_the_direction(skill,
 @needs_scene
 def test_point_at_with_the_real_arm_model(skill):
     module, _ = skill
-    module._checker = FakeChecker()
+    module._arm._checker = FakeChecker()
     module._kinematics = sonic_arm_reference.ArmKinematics(SCENE)
     target = module._kinematics.solve(np.zeros(29), 45.0, -30.0)
     result = call_with_feed(module, lambda: module.point_at(45.0, -30.0), reaching(target))
@@ -1623,7 +1595,7 @@ def test_point_at_near_the_body_is_refused_by_the_path_check(skill, mocker):
         "get_feedback",
         lambda: replace(real(), body_q=tuple(float(v) for v in ROBOT_IDLE)),
     )
-    module._checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
+    module._arm._checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
     module._kinematics = sonic_arm_reference.ArmKinematics(SCENE)
     with pytest.raises(RuntimeError, match="comes within 2 cm of the torso_link; nothing sent"):
         module.point_at(0.0, -60.0)  # low and straight ahead: the upper arm meets the torso
@@ -1644,7 +1616,7 @@ def seeing(module, mocker, payload, kinematics=None):
     """The skill with a fake vision model, arm model and head-camera frame."""
     mocker.patch.object(module.config, "vl_model", "fake-vl")
     module._vl = FakeVl(payload)
-    module._checker, module._kinematics = FakeChecker(), kinematics or FakeKinematics()
+    module._arm._checker, module._kinematics = FakeChecker(), kinematics or FakeKinematics()
     mocker.patch.object(module.color_image, "get_next", return_value=IMAGE_640x480)
 
 
@@ -1717,7 +1689,7 @@ def test_point_at_object_aims_the_forearm_at_the_largest_box(skill, mocker):
     kin = module._kinematics
     assert kin.pixels == [(pytest.approx(180.2), 360.0)]
     assert np.array_equal(kin.bases[0], raised)  # The measured start, not a rest pose.
-    assert module._checker.calls == 2  # The solver's path check, then the plan's own.
+    assert module._arm._checker.calls == 2  # The solver's path check, then the plan's own.
     meta = result.metadata
     assert meta["mode"] == "forearm" and meta["label"] == "big box"
     assert meta["box_px"] == [100, 300, 260, 420]
@@ -1771,13 +1743,13 @@ def at_idle(module, mocker):
         "get_feedback",
         lambda: replace(real(), body_q=tuple(float(v) for v in ROBOT_IDLE)),
     )
-    module._checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
+    module._arm._checker = sonic_arm_reference.ArmCollisionChecker(SCENE)
     module._kinematics = sonic_arm_reference.ArmKinematics(SCENE)
 
 
 def idle_reaching(module, u, v):
     """Telemetry at the robot's idle with the left arm 80% of the way to the solved pose."""
-    kin, checker = module._kinematics, module._checker
+    kin, checker = module._kinematics, module._arm._checker
     point, _ = kin.aim_point(ROBOT_IDLE, u, v)
     q4 = kin.solve_forearm(
         ROBOT_IDLE,
@@ -1843,6 +1815,65 @@ def test_point_at_object_rejects_bad_arguments_before_looking(
 
 def test_agentic_blueprint_global_config_is_valid():
     validate_global_values(unitree_g1_sonic_arm_agentic.global_config_overrides)
+
+
+def one_joint_prepare(module, mocker=None):
+    allowed = group_margins(0.15, 0.2, 0.3)
+    delta = np.zeros(29)
+    delta[15] = -math.radians(20)
+    return module._arm.prepare(
+        "p", lambda base, hands: [Keyframe(base + delta, 1.0)], allowed, require_check=False
+    )
+
+
+def test_prepare_sends_nothing_and_execute_runs_it(skill):
+    module, peer = skill
+    with feeding(module, follows):
+        prepared = one_joint_prepare(module)
+        assert not any(p.startswith(b"pose") for p in peer.snapshot())
+        result = module._arm.execute(prepared)
+    assert "returned" in result.message, result
+    assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_prepare_refuses_a_chunk_the_session_would_reject(skill, mocker):
+    module, peer = skill
+    mocker.patch.object(sonic_test_support, "FAKE_GAIN", 50.0)
+    with feeding(module, follows), pytest.raises(ValueError, match="token bound exceeded"):
+        one_joint_prepare(module)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_move_stop_move_again_with_the_real_launcher(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    submit = mocker.spy(module._execution, "submit_chunk")
+    updates = mocker.spy(module, "tool_update")
+    with feeding(module, follows):
+        module.move_upper_body("left_arm_forward", 20.0)
+        wait_until(lambda: submit.call_count == 1)
+        module.stop_arm()
+        wait_until(lambda: updates.call_count == 1)
+        assert "stop requested" in updates.call_args_list[0].args[1]
+        wait_until(lambda: module._running is None)
+        module.move_upper_body("left_arm_forward", 20.0)
+        wait_until(lambda: updates.call_count == 2)
+    second = updates.call_args_list[1].args[1]
+    assert "returned" in second and "stop requested" not in second, second
+
+
+def test_execute_rechecks_the_pose(skill, mocker):
+    module, peer = skill
+    with feeding(module, follows):
+        prepared = one_joint_prepare(module)
+        state = module._execution.get_feedback()
+        q = list(state.body_q)
+        q[3] += 0.1
+        mocker.patch.object(
+            module._execution, "get_feedback", return_value=replace(state, body_q=tuple(q))
+        )
+        with pytest.raises(RuntimeError, match="the body moved"):
+            module._arm.execute(prepared)
+    assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
 # Imported gestures, per-row Dex3 hands and the operator-only finger-order check.
@@ -1942,12 +1973,12 @@ def two_hand_hearts_plan():
 
 def test_two_hand_hearts_submits_the_plan_hands_row_for_row(skill, mocker):
     module, _ = skill
-    module._both_checker = FakeChecker()
+    module._arm._both_checker = FakeChecker()
     submit = mocker.spy(module._execution, "submit_chunk")
     result = call_with_feed(
         module, lambda: module.perform_gesture("two_hand_hearts"), lambda t: np.zeros(29)
     )
-    assert result.metadata["motion"] == "two_hand_hearts" and module._both_checker.calls >= 1
+    assert result.metadata["motion"] == "two_hand_hearts" and module._arm._both_checker.calls >= 1
     kplan = two_hand_hearts_plan()
     assert np.ptp(kplan.hands, axis=0).max() > 0.1  # The fingers move: not the measured hands.
     [first] = [unheld(c.args[3]) for c in submit.call_args_list]
@@ -1959,13 +1990,13 @@ def test_two_hand_hearts_submits_the_plan_hands_row_for_row(skill, mocker):
 
 def test_hand_steps_stay_limited_through_a_stop_at_peak_finger_velocity(skill, mocker):
     module, peer = skill
-    module._both_checker = FakeChecker()
+    module._arm._both_checker = FakeChecker()
     kplan = two_hand_hearts_plan()
     steps = np.abs(np.diff(kplan.hands, axis=0)).max(axis=1)
     peak = int(np.argmax(steps)) + 1
     assert steps.max() > PEAK_SPEED / RATE  # Unclamped, the plan would step past the limit.
     submit = mocker.spy(module._execution, "submit_chunk")
-    _, stops = stop_at_row(module, mocker, LEAD_IN_ROWS + peak, on_row=module._stop.set)
+    _, stops = stop_at_row(module, mocker, LEAD_IN_ROWS + peak, on_row=module._arm.stop.set)
     result = call_with_feed(
         module, lambda: module.perform_gesture("two_hand_hearts"), lambda t: np.zeros(29)
     )
@@ -1987,7 +2018,7 @@ def test_hand_steps_stay_limited_through_a_stop_at_peak_finger_velocity(skill, m
 
 def test_support_person_from_a_bent_elbow_is_refused_before_sending(skill, mocker):
     module, peer = skill
-    module._both_checker = FakeChecker()
+    module._arm._both_checker = FakeChecker()
     real = module._execution.get_feedback
 
     def bent():
@@ -2001,7 +2032,7 @@ def test_support_person_from_a_bent_elbow_is_refused_before_sending(skill, mocke
         ValueError, match=r"support_person keyframes\[1\]: left_elbow = -1\.3 outside its limit"
     ):
         module.perform_gesture("support_person")
-    assert module._both_checker.calls == 0
+    assert module._arm._both_checker.calls == 0
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
     assert module._execution.get_status()["task"] is None
 
@@ -2017,11 +2048,11 @@ def test_imported_gestures_need_the_both_arm_path_check(real_launch_skill, mocke
 
 def test_imported_gesture_paths_go_through_the_both_arm_checker(skill):
     module, peer = skill
-    module._checker = FakeChecker()
-    module._both_checker = FakeChecker("left_elbow_link (other arm)")
+    module._arm._checker = FakeChecker()
+    module._arm._both_checker = FakeChecker("left_elbow_link (other arm)")
     with pytest.raises(RuntimeError, match=r"left_elbow_link \(other arm\); nothing sent"):
         module.perform_gesture("two_hand_hearts")
-    assert module._checker.calls == 0 and module._both_checker.calls >= 1
+    assert module._arm._checker.calls == 0 and module._arm._both_checker.calls >= 1
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
 
 
@@ -2030,6 +2061,8 @@ def test_start_builds_the_both_arm_checker_from_the_collision_model(mocker):
     mocker.patch.object(sonic_arm_skill, "ArmKinematics")
     mocker.patch.object(sonic_arm_skill, "SonicEncoder", FakeEncoder)
     module = SonicArmSkillContainer(encoder_path="unused.onnx", collision_model_path="scene.xml")
+    # start() builds the SonicArm over the wired execution; this test never moves it.
+    mocker.patch.object(module, "_execution", mocker.MagicMock(), create=True)
     transport = make_transport(f"/arm-skill-test/{uuid4().hex}", SonicFeedback)
     module.set_transport("feedback", transport)
     try:
@@ -2051,7 +2084,7 @@ def test_finger_check_submits_the_asymmetric_pose_with_the_body_at_its_start(
     module, _ = real_launch_skill
     mocker.patch.object(module.config, "hands_mounted", True)
     submit = mocker.spy(module._execution, "submit_chunk")
-    encode = mocker.spy(module._encoder, "encode")
+    encode = mocker.spy(module._arm._encoder, "encode")
     with feeding(module):
         assert module.check_dex3_finger_order() == "started"
         assert module.operator_result() is None
@@ -2064,7 +2097,7 @@ def test_finger_check_submits_the_asymmetric_pose_with_the_body_at_its_start(
     result = module.operator_result()
     assert "LEFT index open, middle closed, thumb half" in result, result
     assert "RIGHT middle open, index closed, thumb rotated" in result, result
-    assert module._running is None and module._watch is None
+    assert module._running is None and module._arm._watch is None
 
 
 def test_failed_finger_check_delivers_the_hand_diagnostics(real_launch_skill, mocker):

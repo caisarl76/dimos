@@ -390,10 +390,17 @@ class Blueprint:
                 else:
                     new_remap[new_name, stream.name] = f"{prefix}/{effective}"
 
-        # Module-ref remappings (values that are classes/Specs) keep their values.
+        # Module-ref remappings: classes/Specs keep their values; an instance name follows its
+        # instance into the namespace (`expose` is for streams; a ref is not one). A name outside
+        # this blueprint is left as it is.
+        atom_names = {atom.name for atom in self.blueprints}
+        ref_keys = {(atom.name, ref.name) for atom in self.blueprints for ref in atom.module_refs}
         for (instance, ref_name), value in self.remapping_map.items():
             if not isinstance(value, str):
                 new_remap[f"{prefix}/{instance}", ref_name] = value
+            elif (instance, ref_name) in ref_keys:
+                named = f"{prefix}/{value}" if value in atom_names else value
+                new_remap[f"{prefix}/{instance}", ref_name] = named
 
         new_transports = {}
         for (name, type_), transport in self.transport_map.items():

@@ -44,7 +44,7 @@ from dimos.core.coordination.module_coordinator import (
 from dimos.core.coordination.worker_manager_python import WorkerManagerPython
 from dimos.core.core import rpc
 from dimos.core.global_config import GlobalConfig
-from dimos.core.module import Module
+from dimos.core.module import Module, ModuleConfig
 from dimos.core.rpc_client import RPCClient
 from dimos.core.stream import IO, In, Out, Stream
 from dimos.core.transport import CloudflareTransport, PubSubTransport
@@ -1304,3 +1304,97 @@ def test_shutdown_unblocks_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     looper.join(timeout=5)
     assert not looper.is_alive()
     assert stopped.is_set()
+
+
+class ValueProviderConfig(ModuleConfig):
+    value: str = ""
+
+
+class ValueProviderSpec(Spec, Protocol):
+    @rpc
+    def get_value(self) -> str: ...
+
+
+class ValueProvider(Module):
+    config: ValueProviderConfig
+
+    @rpc
+    def get_value(self) -> str:
+        return self.config.value
+
+
+class TwoRefConsumer(Module):
+    _a: ValueProviderSpec
+    _b: ValueProviderSpec
+
+
+def test_module_ref_remapped_to_instance_name() -> None:
+    blueprint = autoconnect(
+        ValueProvider.blueprint(instance_name="p_a", value="a"),
+        ValueProvider.blueprint(instance_name="p_b", value="b"),
+        TwoRefConsumer.blueprint(),
+    ).remappings([(TwoRefConsumer, "_a", "p_a"), (TwoRefConsumer, "_b", "p_b")])
+
+    coordinator = _build_without_rerun(blueprint)
+    try:
+        consumer = coordinator.get_instance(TwoRefConsumer)
+        assert consumer._a.get_value() == "a"
+        assert consumer._b.get_value() == "b"
+    finally:
+        coordinator.stop()
+
+
+def test_module_ref_remapped_to_unknown_instance_name_raises() -> None:
+    blueprint = autoconnect(
+        ValueProvider.blueprint(instance_name="p_a", value="a"),
+        TwoRefConsumer.blueprint(),
+    ).remappings([(TwoRefConsumer, "_a", "p_a"), (TwoRefConsumer, "_b", "nope")])
+
+    with pytest.raises(ValueError, match="nope"):
+        _build_without_rerun(blueprint)
+
+
+def test_namespaced_module_ref_remapped_to_instance_name() -> None:
+    blueprint = (
+        autoconnect(
+            ValueProvider.blueprint(instance_name="p_a", value="a"),
+            ValueProvider.blueprint(instance_name="p_b", value="b"),
+            TwoRefConsumer.blueprint(),
+        )
+        .remappings([(TwoRefConsumer, "_a", "p_a"), (TwoRefConsumer, "_b", "p_b")])
+        .namespace("pair")
+    )
+    consumer_name = f"pair/{TwoRefConsumer.name}"
+    assert blueprint.remapping_map[consumer_name, "_a"] == "pair/p_a"
+    assert blueprint.remapping_map[consumer_name, "_b"] == "pair/p_b"
+
+    coordinator = _build_without_rerun(blueprint)
+    try:
+        consumer = coordinator.get_instance(TwoRefConsumer)
+        assert consumer._a.get_value() == "a"
+        assert consumer._b.get_value() == "b"
+    finally:
+        coordinator.stop()
+
+
+def test_namespace_keeps_a_module_ref_to_an_outside_instance() -> None:
+    inner = TwoRefConsumer.blueprint().remappings([(TwoRefConsumer, "_a", "shared")])
+    remap = inner.namespace("pair").remapping_map
+    assert remap[f"pair/{TwoRefConsumer.name}", "_a"] == "shared"
+
+
+class NotAValueProvider(Module):
+    @rpc
+    def get_other(self) -> str:
+        return ""
+
+
+def test_module_ref_remapped_to_instance_missing_spec_methods_raises() -> None:
+    blueprint = autoconnect(
+        ValueProvider.blueprint(instance_name="p_a", value="a"),
+        NotAValueProvider.blueprint(instance_name="p_x"),
+        TwoRefConsumer.blueprint(),
+    ).remappings([(TwoRefConsumer, "_a", "p_a"), (TwoRefConsumer, "_b", "p_x")])
+
+    with pytest.raises(ValueError, match=r"\._b .*'p_x'.*ValueProviderSpec.*missing: get_value"):
+        _build_without_rerun(blueprint)

@@ -149,6 +149,20 @@ class JsonlSessionJournal:
             os.fsync(file.fileno())
 
 
+def validate_actions(values: NDArray[Any], token_bound: float) -> NDArray[np.float64]:
+    raw = np.asarray(values)
+    if raw.ndim != 2 or raw.shape[1] != 78 or not 1 <= len(raw) <= 1000:
+        raise ValueError("actions must have shape [1..1000, 78]")
+    if raw.dtype.kind not in "fiu":
+        raise ValueError("actions must be numeric, not boolean or strings")
+    actions = raw.astype(np.float64, copy=True)
+    if not np.all(np.isfinite(actions)) or np.max(np.abs(actions)) > np.finfo(np.float32).max:
+        raise ValueError("actions must contain finite float32 values")
+    if np.max(np.abs(actions[:, :64])) > token_bound:
+        raise ValueError("token bound exceeded")
+    return actions
+
+
 class SonicTaskSession:
     """One-shot session; no threads, sockets, native process control or retries.
 
@@ -249,17 +263,7 @@ class SonicTaskSession:
         return action
 
     def _actions(self, values: NDArray[Any]) -> NDArray[np.float64]:
-        raw = np.asarray(values)
-        if raw.ndim != 2 or raw.shape[1] != 78 or not 1 <= len(raw) <= 1000:
-            raise ValueError("actions must have shape [1..1000, 78]")
-        if raw.dtype.kind not in "fiu":
-            raise ValueError("actions must be numeric, not boolean or strings")
-        actions = raw.astype(np.float64, copy=True)
-        if not np.all(np.isfinite(actions)) or np.max(np.abs(actions)) > np.finfo(np.float32).max:
-            raise ValueError("actions must contain finite float32 values")
-        if np.max(np.abs(actions[:, :64])) > self.profile.token_bound:
-            raise ValueError("token bound exceeded")
-        return actions
+        return validate_actions(values, self.profile.token_bound)
 
     def start(self, state: SonicFeedback, *, now: float) -> None:
         if self.status.phase != SessionPhase.IDLE:
