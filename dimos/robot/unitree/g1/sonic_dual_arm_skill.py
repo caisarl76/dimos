@@ -24,7 +24,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from functools import partial
-from typing import Any, Literal, Self
+import sys
+from typing import Any, Literal
 
 from pydantic import model_validator
 
@@ -54,6 +55,11 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     upper_body_move,
 )
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 Robot = Literal["222", "223", "both"]
 _ROBOTS = ("222", "223")

@@ -82,6 +82,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     stop_in_background,
     task,
     tokens,
+    unheld,
     wait_until,
 )
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_DUAL_ARM_SYSTEM_PROMPT
@@ -256,8 +257,9 @@ def test_peer_stop_during_wave_retreats_continuously(inline, stop_s, mocker):
         result = module.perform_gesture("both", "wave")
     assert "stopped early" in result.message and "left_knee" in result.message, result
     assert "stopped early: 222: left_knee" in result.message.split("; 223: ")[1], result
-    first, retreat = submit.call_args_list[0].args[3], submit.call_args_list[-1].args[3]
-    assert submit.call_count == 2 and len(retreat) < len(first) / 2
+    calls = submit.call_args_list
+    first, retreat = unheld(calls[0].args[3]), unheld(calls[-1].args[3])
+    assert len(calls) == 2 and len(retreat) < len(first) / 2
     for _, peer in executions:
         wait_until(
             lambda p=peer: tokens(p.snapshot())[-1, 0] == pytest.approx(PEER_TOKEN, abs=1e-3)
@@ -525,7 +527,7 @@ def test_both_two_hand_hearts_streams_each_robots_own_moving_hands_step_limited(
     for (_, peer), submit, measured in zip(executions, submits, (FIST, UNWIRED), strict=True):
         kplan = planned("two_hand_hearts", measured)
         assert np.ptp(kplan.hands, axis=0).max() > 0.1  # The fingers move: not the measured hands.
-        [first] = [c.args[3] for c in submit.call_args_list]
+        [first] = [unheld(c.args[3]) for c in submit.call_args_list]
         assert np.array_equal(hands_of(first), padded(kplan.hands))  # Its own hands, row for row.
         lengths.append(len(first))
         steps = np.abs(np.diff(sent_hands(peer), axis=0)).max(axis=1)
@@ -646,7 +648,7 @@ def test_one_robots_fault_or_stop_retreats_both_with_their_hands(hands, mocker, 
         assert "stopped early: stop requested" in second, second
     for (_, peer), submit, measured in zip(executions, submits, (FIST, UNWIRED), strict=True):
         kplan = planned("two_hand_hearts", measured)
-        plan, retreat = (c.args[3] for c in submit.call_args_list)
+        plan, retreat = (unheld(c.args[3]) for c in submit.call_args_list)
         moving = np.any(np.diff(hands_of(plan), axis=0) != 0, axis=1)
         # The way back starts at a plan row where the fingers were moving, not at a jump...
         starts = np.flatnonzero(np.all(hands_of(plan)[1:] == hands_of(retreat)[0], axis=1))

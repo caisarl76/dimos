@@ -55,6 +55,7 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     _CHUNK_OVERLAP,
+    _FINISH_HOLD_ROWS,
     _MAX_CHUNK_ROWS,
     LEFT_ARM_GESTURES,
     SonicArmSkillContainer,
@@ -272,7 +273,7 @@ def _run(
             move_s=move_s,
             return_min_s=return_min_s,
             split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
-            one_chunk=_MAX_CHUNK_ROWS - 2 * pad,
+            one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
         )
         seconds = (len(kplan.poses) + 2 * pad) / RATE
         window.planned_end = plan_start + seconds
@@ -405,7 +406,7 @@ def _tracking(sim: Sim, w: Window, name: str, plans: Any) -> list[str]:
         move_s=move_s,
         return_min_s=return_min_s,
         split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
-        one_chunk=_MAX_CHUNK_ROWS - 2 * pad,
+        one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
     )
     assert np.array_equal(kplan.poses, plans.spy_return.poses), "rebuilt plan != streamed plan"
     journal = Path(w.result["metadata"]["journal_path"]).read_text().splitlines()

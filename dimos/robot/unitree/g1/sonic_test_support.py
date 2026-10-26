@@ -30,6 +30,7 @@ import zmq
 
 from dimos.msgs.sensor_msgs.Image import Image
 from dimos.robot.unitree.g1.sonic_arm_reference import PEAK_SPEED, RATE, Keyframe, keyframe_plan
+from dimos.robot.unitree.g1.sonic_arm_skill import _FINISH_HOLD_ROWS
 from dimos.robot.unitree.g1.sonic_delivery_observation import (
     SonicCameraDelivery,
     SonicJointDelivery,
@@ -331,6 +332,13 @@ def wait_until(condition: Callable[[], Any], timeout: float = 10.0) -> None:
 
 def tokens(packets: list[bytes]) -> NDArray[np.float32]:
     return np.array([np.frombuffer(p[1284:1540], "<f4") for p in packets if p.startswith(b"pose")])
+
+
+def unheld(chunk: NDArray[np.float64]) -> NDArray[np.float64]:
+    """A last chunk less its finish hold, which must repeat the chunk's own last row."""
+    rows, hold = chunk[:-_FINISH_HOLD_ROWS], chunk[-_FINISH_HOLD_ROWS:]
+    assert np.all(hold == rows[-1])
+    return rows
 
 
 def frames(transport: Any, method: str) -> list[Any]:

@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
-from enum import StrEnum
+from enum import Enum
 import hashlib
 import json
 import math
@@ -108,7 +108,7 @@ class SonicModelProfile:
             raise ValueError("hand_step_limit must be positive")
 
 
-class SessionPhase(StrEnum):
+class SessionPhase(str, Enum):  # TODO(PY311): switch to enum.StrEnum
     IDLE = "idle"
     SEEDING = "seeding"
     ARMING = "arming"

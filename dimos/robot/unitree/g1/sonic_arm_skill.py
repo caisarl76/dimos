@@ -171,6 +171,8 @@ _LEFT_ARM_TARGET = [15, 16, 17, 18]
 _MOVED_LIMIT = 0.05  # rad: body motion allowed while encoding.
 _MAX_CHUNK_ROWS = 1000  # SonicTaskSession accepts chunks of at most 1000 rows (20 s).
 _CHUNK_OVERLAP = 25  # rows the first chunk runs past the split, so it never runs dry
+# Rows a plan's last chunk repeats its final row for, so a late finish lands in a still pose.
+_FINISH_HOLD_ROWS = 25
 _HOLD_BOUNDS = (1.0, 20.0)  # seconds
 # Fraction of the planned displacement, measured from the pose at the chunk-0 send, that marks the
 # stroke's start. Projected on the plan so secondary-joint drift in the token blend does not count.
@@ -226,7 +228,7 @@ def chunk_rows(plan_rows: int, still: NDArray[np.bool_]) -> list[tuple[int, int]
     """Greedy session chunks, restarting the blend only at stationary token-plan rows."""
     chunks = []
     start = 0
-    while plan_rows - start > _MAX_CHUNK_ROWS:
+    while plan_rows - start > _MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS:
         candidates = np.flatnonzero(still[start + 1 : start + _MAX_CHUNK_ROWS - _CHUNK_OVERLAP + 1])
         if not len(candidates):
             raise ValueError("plan cannot be split into session chunks")
@@ -235,6 +237,24 @@ def chunk_rows(plan_rows: int, still: NDArray[np.bool_]) -> list[tuple[int, int]
         start = split
     chunks.append((start, plan_rows))
     return chunks
+
+
+def with_finish_hold(rows: NDArray[np.float64]) -> NDArray[np.float64]:
+    """A last chunk with its final row held _FINISH_HOLD_ROWS more rows.
+
+    The stream calls finish_task 2 rows before the plan ends; without the hold, a stall of a few
+    ticks over those 40 ms ran the chunk dry first, failing the task. Callers reserve the rows.
+    """
+    if len(rows) + _FINISH_HOLD_ROWS > _MAX_CHUNK_ROWS:
+        raise RuntimeError(
+            f"a {len(rows)}-row chunk leaves no room for its {_FINISH_HOLD_ROWS}-row finish hold"
+        )
+    return np.vstack([rows, np.repeat(rows[-1:], _FINISH_HOLD_ROWS, 0)])
+
+
+def rows_of(plan: NDArray[np.float64], start: int, end: int) -> NDArray[np.float64]:
+    """A plan chunk as sent: the plan's last chunk carries the finish hold."""
+    return with_finish_hold(plan[start:end]) if end == len(plan) else plan[start:end]
 
 
 def token_still(tokens: NDArray[Any]) -> NDArray[np.bool_]:
@@ -721,7 +741,7 @@ class SonicArm:
             move_s=move_s,
             return_min_s=return_min_s,
             split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
-            one_chunk=_MAX_CHUNK_ROWS - 2 * pad,
+            one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
         )
 
         def padded(hands: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -733,7 +753,7 @@ class SonicArm:
         units = [retreat_poses(kplan, s) for s in range(len(kplan.segments))]
         unit_hands = [retreat_hands(kplan, s) for s in range(len(kplan.segments))]
         is_tail = [np.array_equal(u, kplan.poses[len(kplan.poses) - len(u) :]) for u in units]
-        if any(len(u) + pad > _MAX_CHUNK_ROWS for u in units):
+        if any(len(u) + pad + _FINISH_HOLD_ROWS > _MAX_CHUNK_ROWS for u in units):
             raise ValueError("a retreat is longer than one session chunk")
         extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
         if checker is not None:
@@ -779,7 +799,8 @@ class SonicArm:
         longest_chunk = max(end - start for start, end in chunks)
         longest_retreat = max(len(u) + pad for u in units)
         if (
-            profile["max_observation_age"] <= max(longest_chunk, longest_retreat) / RATE + 0.5
+            profile["max_observation_age"]
+            <= max(longest_chunk, longest_retreat) / RATE + _FINISH_HOLD_ROWS / RATE
             or profile["max_duration"] <= len(plan) / RATE + longest_retreat / RATE + 2.0
         ):
             raise RuntimeError(
@@ -792,10 +813,12 @@ class SonicArm:
         hold = (pad + seg.end - 1 + 25, pad + nxt.start - 25)
         allowed = allowed + np.abs(deltas).max(axis=0)
         token_bound = profile["token_bound"]
-        for start, end in chunks:  # What the session would reject is refused with nothing sent.
-            validate_actions(plan[start:end], token_bound)
+        # What the session would reject is refused with nothing sent: the rows as _stream sends
+        # them, finish holds (hand columns included) and all.
+        for start, end in chunks:
+            validate_actions(rows_of(plan, start, end), token_bound)
         for segment in range(len(units)):
-            validate_actions(retreat_rows(segment, 0), token_bound)
+            validate_actions(with_finish_hold(retreat_rows(segment, 0)), token_bound)
         return _Prepared(
             label=label,
             base=base,
@@ -935,6 +958,8 @@ class SonicArm:
             raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
         if outcome == "envelope":
             message = f"{label} stopped early: {watch.abort}"
+            if task["outcome"] != "finished":
+                message += f"; session {task['outcome']}: {task.get('reason')}"
         elif prepared.hand_only:
             message = self._hand_result(
                 label, report, prepared.base_hands, prepared.hand_target, hand_samples
@@ -1037,7 +1062,7 @@ class SonicArm:
         with self._lock:  # Once, here: past any joint-start barrier, never on a retreat.
             watch.send_at = watch.plan_start = plan_start
         start, end = chunks[0]
-        task = self._execution.submit_chunk(task_id, 0, plan_start, plan[start:end])
+        task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(plan, start, end))
         watch.ack_at = time.monotonic()
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
@@ -1054,8 +1079,10 @@ class SonicArm:
                 if (rows := retreat(int((now - plan_start) * RATE))) is not None:
                     pending = []  # The way back replaces the rest of the plan.
                     sequence += 1
-                    task = self._execution.submit_chunk(task_id, sequence, now, rows)
-                    plan, plan_start = rows, now
+                    task = self._execution.submit_chunk(
+                        task_id, sequence, now, with_finish_hold(rows)
+                    )
+                    plan, plan_start = rows, now  # The finish check runs on the un-held length.
                 retreat_start = now
             elif retreat_start is not None and overspeed_at > retreat_start:
                 self._execution.cancel_task(task_id)  # A joint ran away during the way back.
@@ -1069,7 +1096,7 @@ class SonicArm:
                 start, end = pending.pop(0)
                 sequence += 1
                 task = self._execution.submit_chunk(
-                    task_id, sequence, plan_start + start / RATE, plan[start:end]
+                    task_id, sequence, plan_start + start / RATE, rows_of(plan, start, end)
                 )
             elif now >= next_check:
                 task, next_check = self._task(), now + 0.1

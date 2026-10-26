@@ -399,8 +399,8 @@ def test_execution_profile_preflight_rejects_without_start(
 
 
 @pytest.fixture
-def policy_wire(tmp_path):
-    endpoint = f"ipc://{tmp_path}/policy.sock"
+def policy_wire(ipc_dir):
+    endpoint = f"ipc://{ipc_dir}/policy.sock"
     ready, stopped = threading.Event(), threading.Event()
     requests = []
 

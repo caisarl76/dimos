@@ -41,8 +41,8 @@ def request_args():
     )
 
 
-def test_real_wire_preserves_rgb_state_and_observation_identity(tmp_path, request_args):
-    endpoint = f"ipc://{tmp_path}/policy.sock"
+def test_real_wire_preserves_rgb_state_and_observation_identity(ipc_dir, request_args):
+    endpoint = f"ipc://{ipc_dir}/policy.sock"
     ready = Event()
     actions = np.arange(156, dtype=np.float32).reshape(2, 78) / 1000
 
@@ -141,8 +141,8 @@ def test_bad_observations_are_rejected_before_network(mocker, request_args, chan
     ask.assert_not_called()
 
 
-def test_timeout_does_not_poison_next_request(tmp_path):
-    endpoint = f"ipc://{tmp_path}/missing.sock"
+def test_timeout_does_not_poison_next_request(ipc_dir):
+    endpoint = f"ipc://{ipc_dir}/missing.sock"
     client = SonicPolicyClient(endpoint, timeout_seconds=0.02)
     with pytest.raises(TimeoutError):
         client.get_info()

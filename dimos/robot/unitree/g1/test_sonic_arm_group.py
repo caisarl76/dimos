@@ -54,6 +54,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     real_hold_plan,
     task,
     tokens,
+    unheld,
     wait_until,
 )
 
@@ -162,6 +163,27 @@ def test_both_start_together_and_hand_back(arms):
         assert status["outcome"] == "finished" and status["handback_confirmed"], status
         assert result.metadata[arm.name]["reached_fraction"] == pytest.approx(1.0, abs=0.05)
     assert result.metadata["start_skew_s"] < 0.3, result.metadata
+
+
+def test_both_late_finish_on_one_lands_in_its_final_hold_and_both_finish(arms, mocker):
+    """223's finish_task stalls past the 2 rows (40 ms) left; its finish hold covers the stall."""
+    real = arms[1]._execution.finish_task
+
+    def late(task_id):
+        time.sleep(0.15)  # A stalled stream thread: a few ticks.
+        return real(task_id)
+
+    mocker.patch.object(arms[1]._execution, "finish_task", side_effect=late)
+    submit = mocker.spy(arms[1]._execution, "submit_chunk")
+    with feeding_arms(arms):
+        result = run_arms([swing(arm) for arm in arms])
+    assert result.message.startswith("222: swing20 reached"), result
+    assert "; 223: swing20 reached" in result.message and "stopped" not in result.message, result
+    for arm in arms:
+        status = task(arm)
+        assert status["outcome"] == "finished" and status["handback_confirmed"], status
+    [chunk] = [c.args[3] for c in submit.call_args_list]  # One chunk, sent with its hold.
+    unheld(chunk)
 
 
 def test_both_peer_never_arms_moves_neither(arms, dual_executions, mocker):
