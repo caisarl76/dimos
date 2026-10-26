@@ -883,6 +883,7 @@ def test_finger_check_through_the_worker_returns_at_once_and_stop_arm_retreats(w
 # Voice lines: perform_gesture's line plays over ssh on each robot with a voice host.
 
 COMMAND = "python3 ~/g1_audio.py"
+CUT = f"pkill -f 'g1_audio\\.py play'; {COMMAND} stop"  # Kills a still-starting player too.
 ONLY_223 = {"voice_host_223": "pc2", "voice_command": COMMAND}  # The demo: 222 has no wavs yet.
 BOTH_VOICES = {"voice_host_222": "pc2_222", **ONLY_223}
 
@@ -900,7 +901,7 @@ def voices(module, mocker, code=0):
     def popen(argv, **kwargs):
         if isinstance(code, BaseException):
             raise code
-        assert argv[0] == "ssh" and "BatchMode=yes" in argv
+        assert argv[:2] == ["ssh", "-n"] and "BatchMode=yes" in argv and argv[-3] == "--"
         host, command = argv[-2:]
         process = mocker.MagicMock()
         process.poll.return_value = code
@@ -911,7 +912,8 @@ def voices(module, mocker, code=0):
             process.poll.return_value = -9
 
         process.kill.side_effect = kill
-        log.append((command.removeprefix(f"{COMMAND} ").split()[0], host, command))
+        kind = "stop" if command == CUT else command.removeprefix(f"{COMMAND} ").split()[0]
+        log.append((kind, host, command))
         return process
 
     shell.Popen.side_effect = popen
@@ -1004,7 +1006,7 @@ def test_stop_arm_cuts_every_robots_line_at_once(real_launch_skill, mocker):
         at_stop = list(log)  # stop_arm itself cut both lines, not each robot's retreat later.
         wait_until(lambda: updates.call_count == 1)
     for host in ("pc2_222", "pc2"):
-        assert ("kill", host) in at_stop and ("stop", host, f"{COMMAND} stop") in at_stop
+        assert ("kill", host) in at_stop and ("stop", host, CUT) in at_stop
         assert log.count(("kill", host)) == 1
     update = json.loads(updates.call_args.args[1])
     assert update["message"].count("stop requested") == 2, update
@@ -1024,7 +1026,7 @@ def test_the_other_robots_fault_cuts_the_line_as_this_robot_retreats(inline, moc
     # Cut right after 223's way back is sent, not only once its motion ends.
     retreat, kill = log.index(("submit_chunk", "223", 1)), log.index(("kill", "pc2"))
     assert retreat < kill < log.index(("finish_task", "223", None)), log
-    assert ("stop", "pc2", f"{COMMAND} stop") in log
+    assert ("stop", "pc2", CUT) in log
     assert result.metadata["223"]["voice"] == "01_intro: cut off"
 
 
@@ -1036,7 +1038,89 @@ def test_module_stop_cuts_the_line(real_launch_skill, mocker):
         module.perform_gesture("223", "wave", line="01_intro")
         wait_until(lambda: played(log))
         module.stop()
-    assert log.count(("kill", "pc2")) == 1 and ("stop", "pc2", f"{COMMAND} stop") in log
+    assert log.count(("kill", "pc2")) == 1 and ("stop", "pc2", CUT) in log
+
+
+def failing_cut(mocker, host):
+    """Makes the cut ssh to `host` fail to start (OSError); spies on the module's warnings."""
+    popen = sonic_arm_skill.subprocess.Popen
+    play = popen.side_effect
+
+    def side_effect(argv, **kwargs):
+        if argv[-2:] == [host, CUT]:
+            raise OSError("fork failed")
+        return play(argv, **kwargs)
+
+    popen.side_effect = side_effect
+    return mocker.patch.object(sonic_arm_skill.logger, "warning")
+
+
+@pytest.mark.parametrize("real_launch_skill", [BOTH_VOICES], indirect=True)
+def test_a_failed_cut_on_one_robot_still_cuts_the_other_and_both_retreat(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    log = voices(module, mocker, code=None)
+    warning = failing_cut(mocker, "pc2_222")
+    updates = mocker.spy(module, "tool_update")
+    with feeding_arms(module._arms()):
+        module.perform_gesture("both", "wave", line="01_intro")
+        wait_until(lambda: len(played(log)) == 2)
+        assert module.stop_arm().startswith("Stopping")  # 222's cut raised inside stop_arm.
+        at_stop = list(log)
+        wait_until(lambda: updates.call_count == 1)
+    assert ("kill", "pc2_222") in at_stop and ("stop", "pc2_222", CUT) not in log
+    assert ("kill", "pc2") in at_stop and ("stop", "pc2", CUT) in at_stop  # 223 still cut.
+    assert "voice line not cut on the robot: fork failed" in warning.call_args.args[0]
+    update = json.loads(updates.call_args.args[1])
+    assert update["message"].count("stop requested") == 2, update
+    for arm in module._arms():
+        assert task(arm)["handback_confirmed"], task(arm)
+
+
+@pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
+def test_a_failed_cut_mid_retreat_never_stops_the_way_back(inline, mocker):
+    module, _ = inline
+    log = voices(module, mocker, code=None)
+    warning = failing_cut(mocker, "pc2")
+
+    def knee(s):
+        return {3: 0.2 if s > 0.6 else 0.0}
+
+    with feeding_arms(module._arms(), shape=zero, extra=(knee, None)):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert "stopped early: 222: left_knee" in result.message.split("; 223: ")[1], result
+    retreat, kill = log.index(("submit_chunk", "223", 1)), log.index(("kill", "pc2"))
+    assert retreat < kill < log.index(("finish_task", "223", None)), log
+    assert "voice line not cut on the robot: fork failed" in warning.call_args.args[0]
+    assert result.metadata["223"]["voice"] == "01_intro: cut off"
+    assert task(module._by_robot["223"])["handback_confirmed"]
+
+
+@pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
+@pytest.mark.parametrize("first", ["peer abort", "own abort", "own stop"])
+def test_a_line_called_off_before_its_first_chunk_is_never_spoken(inline, mocker, first):
+    """A peer's or this arm's abort, or a stop, landing between the joint start and 223's first
+    chunk: 223 retreats without ever starting its line."""
+    module, _ = inline
+    log = voices(module, mocker, code=None)
+    arm_222, arm_223 = module._by_robot["222"], module._by_robot["223"]
+    record = arm_223._execution.submit_chunk.side_effect
+
+    def submit(*args):
+        if args[1] == 0:
+            if first == "peer abort":
+                arm_222._fail(arm_222._watch, "fault")
+            elif first == "own abort":
+                arm_223._fail(arm_223._watch, "fault")
+            else:
+                arm_223.stop.set()
+        return record(*args)
+
+    arm_223._execution.submit_chunk.side_effect = submit
+    with feeding_arms(module._arms()):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert result.message.count("stopped early") == 2, result
+    assert played(log) == [] and ("kill", "pc2") not in log, log
+    assert result.metadata["223"]["voice"] == "01_intro: not played"
 
 
 @pytest.mark.parametrize(

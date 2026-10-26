@@ -902,7 +902,9 @@ class SonicArm:
         Any non-success sets this arm's watch.abort, so peers still streaming in its group retreat.
         A voice line's outcome goes into the result's metadata; the line never outlives the move.
         """
-        self._voice_line, self._voice = prepared.line, None
+        self._voice_line = prepared.line
+        with self._voice_lock:
+            self._voice = None
         try:
             result = self._execute(prepared, group)
             if prepared.line is None:
@@ -1116,7 +1118,6 @@ class SonicArm:
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(plan, start, end))
         watch.ack_at = time.monotonic()
-        self._speak()
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
@@ -1128,7 +1129,11 @@ class SonicArm:
                     if watch.abort is None and (peer_abort := peer.abort) is not None:
                         watch.abort = f"{name}: {peer_abort}"
                 abort, overspeed_at = watch.abort, watch.overspeed_at
-            if abort is not None and retreat_start is None:
+            if abort is None:
+                # Starts the pending line once, after chunk 0 and the checks above: a stop, or
+                # this arm's or a peer's abort, that came first leaves it unstarted.
+                self._speak(watch)
+            elif retreat_start is None:
                 if (rows := retreat(int((now - plan_start) * RATE))) is not None:
                     pending = []  # The way back replaces the rest of the plan.
                     sequence += 1
@@ -1158,18 +1163,23 @@ class SonicArm:
                 return f"session ended: {task['reason']}"
             time.sleep(0.005)
 
-    def _speak(self) -> None:
-        """Start the pending voice line, unless stop_arm came first. The line never blocks motion."""
+    def _speak(self, watch: _Watch) -> None:
+        """Start the pending voice line, unless a stop or a safety abort came first. The line never
+        blocks motion."""
         line, self._voice_line = self._voice_line, None
         if line is None:
             return
+        with self._lock:
+            aborted = watch.abort is not None
         with self._voice_lock:
-            if self.stop.is_set():
+            if aborted or self.stop.is_set():
                 return
             c = self.config
             try:
                 self._voice = subprocess.Popen(
-                    self._voice_ssh(f"play {c.voice_dir}/{line}.wav {c.voice_volume}"),
+                    self._voice_ssh(
+                        f"{c.voice_command} play {c.voice_dir}/{line}.wav {c.voice_volume}"
+                    ),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
                 )
@@ -1177,15 +1187,31 @@ class SonicArm:
                 logger.warning(f"voice line {line} not started: {exc}", arm=self.name)
 
     def hush(self) -> None:
-        """Cut a playing line: the local ssh, then the robot's player, which outlives the ssh."""
+        """Cut a playing line: the local ssh, then on the robot the player, which outlives the ssh
+        (pkill, even while it is still starting), and the audio it already streamed (stop).
+
+        The remote command is `pkill -f 'g1_audio\\.py play'; <voice_command> stop` (the escaped
+        name of voice_command's script): the escaped dot keeps pkill off the shell running it.
+        Never raises: a failed cut ssh is logged.
+        """
         with self._voice_lock:
             voice = self._voice
             if voice is None or voice.poll() is not None:
                 return
             voice.kill()
-            subprocess.Popen(
-                self._voice_ssh("stop"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
+            script = self.config.voice_command
+            assert script is not None
+            player = re.escape(
+                Path(script.split()[-1]).name
+            )  # "g1_audio\.py": never matches itself
+            try:
+                subprocess.Popen(
+                    self._voice_ssh(f"pkill -f '{player} play'; {script} stop"),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except OSError as exc:
+                logger.warning(f"voice line not cut on the robot: {exc}", arm=self.name)
 
     def _voice_report(self, line: str) -> str:
         voice = self._voice
@@ -1202,11 +1228,11 @@ class SonicArm:
         logger.warning(f"voice line {line} failed (exit {code}): {error}", arm=self.name)
         return f"{line}: failed (exit {code}) {error[-200:]}"
 
-    def _voice_ssh(self, args: str) -> list[str]:
-        host, script = self.config.voice_host, self.config.voice_command
-        assert host is not None and script is not None
-        command = f"{script} {args}"
-        return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", host, command]
+    def _voice_ssh(self, command: str) -> list[str]:
+        """ssh argv running `command` on the voice host; -n keeps it off this process's stdin."""
+        host = self.config.voice_host
+        assert host is not None
+        return ["ssh", "-n", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", "--", host, command]
 
     def _task(self) -> dict[str, Any]:
         task: dict[str, Any] = self._execution.get_status()["task"]
