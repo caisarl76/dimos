@@ -566,9 +566,10 @@ def test_solve_refuses_a_direction_the_arm_cannot_reach(kinematics):
 
 @needs_scene
 def test_solve_is_fast(kinematics):
-    started = time.monotonic()
+    # CPU time: the solver's own cost, not how long a loaded runner kept it waiting.
+    started = time.process_time()
     kinematics.solve(ROBOT_IDLE, 45.0, -30.0)
-    assert time.monotonic() - started < 0.5
+    assert time.process_time() - started < 0.5
 
 
 @needs_scene
@@ -653,9 +654,9 @@ def test_forearm_covers_the_whole_image(kinematics):
         for u in FOREARM_US:
             point, t = kinematics.aim_point(ROBOT_IDLE, u, v)
             assert AIM_RANGE_M[0] <= t <= AIM_RANGE_M[1]
-            started = time.monotonic()
+            started = time.process_time()  # CPU time, as in test_solve_is_fast
             q4 = kinematics.solve_forearm(ROBOT_IDLE, point, clear)
-            times.append(time.monotonic() - started)
+            times.append(time.process_time() - started)
             pose = with_arm(ROBOT_IDLE, q4)
             error = kinematics.forearm_error(pose, point)
             rows.append((u, v, t, error, times[-1]))

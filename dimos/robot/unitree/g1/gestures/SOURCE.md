@@ -10,8 +10,17 @@
 
 The motion data of `wave_one_hand`, `v_sign`, `good`, `support_person` and `two_hand_hearts`
 (and of the two dropped below): the top-level `name`, `return_s` and `keyframes`, and each
-keyframe's `t`, `delta`, `absolute` and `hands`. Values are unchanged; the files are re-serialized
-with sorted keys and an indent of 2.
+keyframe's `t`, `delta`, `absolute` and `hands`. Values are unchanged, except for the one change
+listed below; the files are re-serialized with sorted keys and an indent of 2.
+
+## Changed after import
+
+- `wave_one_hand` (2026-10-26, at the user's request after a pc2_222 run): the source has no
+  `hands` targets, so it waved with the deploy fist. Every keyframe from the first raise on
+  (`t` >= 2.2; never `t` = 0) now sets the right hand open, all seven Dex3 joints 0.0 (the right hand
+  of the dropped `wave_two_hands`). The left hand is not named, so it stays at the deploy fist, and
+  both hands return to the measured start on the way back. The finger travel counts toward the
+  peak-speed timing, so the raise and the return each take 4.4 s instead of about 2 s.
 
 ## What was stripped
 

@@ -42,6 +42,10 @@ from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 if TYPE_CHECKING:
     from dimos.robot.unitree.g1.sonic_arm_skill import SonicArm
 
+# The longest a test waits for a condition. A loaded CI runner under coverage needs seconds for
+# what takes milliseconds locally (a worker deploy took over 5 s); a passing test never waits it.
+WAIT_S = 30.0
+
 
 class ScriptedPeer:
     def __init__(self) -> None:
@@ -70,7 +74,7 @@ class ScriptedPeer:
                 port = pub.bind_to_random_port("tcp://127.0.0.1")
                 self.feedback_endpoint = f"tcp://127.0.0.1:{port}"
                 self.ready.set()
-                if not self.connected.wait(5) or self.stopping.is_set():
+                if not self.connected.wait(WAIT_S) or self.stopping.is_set():
                     return
                 assert self.reference_endpoint is not None
                 sub.connect(self.reference_endpoint)
@@ -137,12 +141,12 @@ def scripted_peer() -> Iterator[ScriptedPeer]:
     peer = ScriptedPeer()
     peer.thread.start()
     try:
-        assert peer.ready.wait(5) and peer.error is None
+        assert peer.ready.wait(WAIT_S) and peer.error is None
         yield peer
     finally:
         peer.stopping.set()
         peer.connected.set()
-        peer.thread.join(timeout=3)
+        peer.thread.join(timeout=WAIT_S)
         assert not peer.thread.is_alive() and peer.error is None
 
 
@@ -323,7 +327,7 @@ def fast_keyframe_plan(
     return keyframe_plan(base, capped, **(kwargs | fast))
 
 
-def wait_until(condition: Callable[[], Any], timeout: float = 10.0) -> None:
+def wait_until(condition: Callable[[], Any], timeout: float = WAIT_S) -> None:
     deadline = time.monotonic() + timeout
     while not condition():
         assert time.monotonic() < deadline, "timed out"

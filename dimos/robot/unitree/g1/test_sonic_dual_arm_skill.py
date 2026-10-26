@@ -34,6 +34,7 @@ import numpy as np
 import pytest
 
 from dimos.agents.mcp.tool_stream import TOOL_STREAM_STOPPED_METHOD
+from dimos.core.coordination.blueprint_config.errors import BlueprintConfigError
 from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
 from dimos.core.global_config import GlobalConfig
 from dimos.core.transport_factory import make_transport
@@ -71,6 +72,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     ARM_PROFILE,
     FAKE_GAIN,
     PEER_TOKEN,
+    WAIT_S,
     FakeEncoder,
     fast_keyframe_plan,
     feeding_arms,
@@ -305,7 +307,7 @@ def test_call_during_completion_gets_a_fresh_stream(real_launch_skill, mocker):
 
     def blocking_first_update(name, message):
         if updates.call_count == 1:
-            release.wait(10)
+            release.wait(WAIT_S)
         real_update(name, message)
 
     updates = mocker.patch.object(module, "tool_update", side_effect=blocking_first_update)
@@ -680,6 +682,18 @@ def test_both_execution_profiles_limit_hand_steps():
         assert profile.hand_step_limit == pytest.approx(PEAK_SPEED / RATE), robot
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("encoder-path", ""), ("encoder-path", "/tmp"), ("collision-model-path", "")],
+)
+def test_the_dual_container_refuses_an_empty_or_directory_model_path(field, value):
+    cli = [f"--dualsonicarmskillcontainer.{field}={value}"]
+    if field != "encoder-path":
+        cli.insert(0, "--dualsonicarmskillcontainer.encoder-path=unused.onnx")
+    with pytest.raises(BlueprintConfigError, match=f"{field.replace('-', '_')} must be a file"):
+        BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(cli, environ={})
+
+
 def test_hands_are_configured_per_robot(real_launch_skill):
     parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
         [
@@ -807,7 +821,7 @@ def worker_dual(dimos_cluster, tmp_path):
                 execution.start()
                 peers[robot].reference_endpoint = execution.get_status()["reference_endpoint"]
                 peers[robot].connected.set()
-                wait_until(lambda e=execution: e.get_status()["ready"], timeout=3)
+                wait_until(lambda e=execution: e.get_status()["ready"], timeout=WAIT_S)
             container.start()
             yield container, executions, peers
         finally:

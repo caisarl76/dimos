@@ -66,6 +66,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     PEER_TOKEN,
     ROBOT_IDLE,
     SCENE,
+    WAIT_S,
     FakeEncoder,
     FakeVl,
     IMAGE_640x480,
@@ -288,7 +289,7 @@ def test_retreat_resumes_at_the_matching_point_of_the_way_back(skill, mocker):
     rows = retreat[3]
     assert np.array_equal(rows, first[len(first) - len(rows) :])
     kplan = sonic_arm_skill.keyframe_plan(np.zeros(29), [Keyframe(np.full(29, 0.5), 1.0)])
-    pad = (len(first) - len(kplan.poses)) // 2
+    pad = (len(unheld(first)) - len(kplan.poses)) // 2  # The blends, not the finish hold.
     assert len(first) - len(rows) >= pad + kplan.segments[-1].start
 
 
@@ -594,7 +595,7 @@ def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
 
         mocker.patch.object(Module, "stop", quiet_teardown)
         module.move_upper_body("left_arm_forward", 20.0)
-        assert reached.wait(10)
+        assert reached.wait(WAIT_S)
         module.stop()
         # stop() returned only after the retreat and the motion's own final update.
         assert module._arm.stop.is_set()
@@ -815,7 +816,7 @@ def test_call_arriving_during_completion_gets_a_fresh_stream(real_launch_skill, 
 
     def blocking_first_update(name, message):
         if updates.call_count == 1:
-            release.wait(10)
+            release.wait(WAIT_S)
         real_update(name, message)
 
     updates = mocker.patch.object(module, "tool_update", side_effect=blocking_first_update)
@@ -2243,7 +2244,7 @@ def worker_arm(peer, execution_config, dimos_cluster):
         execution.start()
         peer.reference_endpoint = execution.get_status()["reference_endpoint"]
         peer.connected.set()
-        wait_until(lambda: execution.get_status()["ready"], timeout=3)
+        wait_until(lambda: execution.get_status()["ready"], timeout=WAIT_S)
         arm.start()
         yield arm, execution
     finally:

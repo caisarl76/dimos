@@ -57,6 +57,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     _CHUNK_OVERLAP,
     _FINISH_HOLD_ROWS,
     _MAX_CHUNK_ROWS,
+    FINGER_CHECK,
     LEFT_ARM_GESTURES,
     SonicArmSkillContainer,
     gesture_plan_inputs,
@@ -497,9 +498,13 @@ def test_finger_check_without_hands_reports_did_not_follow(
         f"{drift[12:15].max():.4f}, arms {drift[BOTH_ARMS].max():.4f}; at the end "
         f"{end.max():.4f} ({MOTOR_NAMES[int(np.argmax(end))]})"
     )
-    assert "failed" in text and "hand did not follow" in text and "hold median" in text, text
+    result = json.loads(text)  # A failed hand result keeps its diagnostics as SkillResult JSON.
+    message = result["message"]
+    assert message.startswith(f"{FINGER_CHECK} failed: "), message
+    assert "hand did not follow" in message and "hold median" in message, message
     assert "unavailable" not in text and "nan" not in text.lower(), text
-    assert text.endswith(HANDBACK), text
+    assert message.endswith(HANDBACK), message
+    assert {"hand_base", "hand_target", "hand_held"} <= set(result["metadata"]), result
     assert np.all(drift <= envelope), (MOTOR_NAMES[worst], drift[worst], envelope[worst])
     assert end.max() <= ARM_RETURN_RAD, (MOTOR_NAMES[int(np.argmax(end))], end.max())
     assert not failures, failures

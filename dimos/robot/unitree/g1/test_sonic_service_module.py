@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -38,6 +39,7 @@ from dimos.robot.unitree.g1.sonic_policy_client import (
     SonicPolicyInfo,
 )
 from dimos.robot.unitree.g1.sonic_service_module import SonicServiceModule
+from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
 from dimos.utils.testing.waiting import wait_until
 
 KEY = "observation.images.egocentric"
@@ -88,11 +90,18 @@ def service(execution, tmp_path, policy, mocker, request):
 
 @pytest.fixture
 def camera(service):
+    with live_camera(service) as stopped:
+        yield stopped
+
+
+@contextmanager
+def live_camera(service, first_sequence=0):
+    """Paired observations every 20 ms; set the yielded event to freeze the camera."""
     stopped = threading.Event()
     errors = []
 
     def feed():
-        sequence = 0
+        sequence = first_sequence
         try:
             while not stopped.is_set():
                 received_at = time.monotonic()
@@ -122,11 +131,13 @@ def camera(service):
     thread = threading.Thread(target=feed)
     thread.start()
     try:
-        wait_until(lambda: service.get_service_status()["observation_age_s"] is not None, timeout=2)
+        wait_until(
+            lambda: service.get_service_status()["observation_age_s"] is not None, timeout=WAIT_S
+        )
         yield stopped
     finally:
         stopped.set()
-        thread.join(timeout=2)
+        thread.join(timeout=WAIT_S)
         assert not thread.is_alive()
         assert errors == []
 
@@ -136,7 +147,7 @@ def request(service, duration=0.12):
 
 
 def terminal(service):
-    wait_until(lambda: service.get_service_status()["service"]["phase"] == "done", timeout=4)
+    wait_until(lambda: service.get_service_status()["service"]["phase"] == "done", timeout=WAIT_S)
     return service.get_service_status()["service"]
 
 
@@ -197,19 +208,19 @@ def test_cancel_does_not_wait_for_inference_and_discards_late_result(
 
     def blocked(**kwargs):
         entered.set()
-        assert release.wait(3)
+        assert release.wait(WAIT_S)
         return policy[2](**kwargs)
 
     policy[1].side_effect = blocked
     try:
         accepted = request(service, 1)
-        assert entered.wait(2)
+        assert entered.wait(WAIT_S)
         with pytest.raises(RuntimeError, match="active"):
             request(service)
         with pytest.raises(ValueError, match="another"):
             service.cancel_service("wrong-id")
         service.cancel_service(accepted["service_id"])
-        wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=1)
+        wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=WAIT_S)
         assert execution[0].get_status()["task"]["handback_confirmed"]
         assert not release.is_set()
     finally:
@@ -224,7 +235,7 @@ def test_cancel_does_not_wait_for_inference_and_discards_late_result(
 def test_frozen_camera_expires_without_refreshing_timestamp(service, camera):
     request(service, 2)
     wait_until(
-        lambda: service.get_service_status()["service"]["accepted_predictions"] >= 2, timeout=2
+        lambda: service.get_service_status()["service"]["accepted_predictions"] >= 2, timeout=WAIT_S
     )
     camera.set()
     done = terminal(service)
@@ -273,9 +284,14 @@ def test_rejected_observation_keeps_previous_source_snapshot(service, policy, ba
     }[bad_sample]
     with pytest.raises(ValueError, match="observation"):
         service.handle_observation(SonicObservation(sequence, timestamp, state, rgb))
-    request(service, 0.03)
-    assert terminal(service)["outcome"] == "finished"
-    assert policy[1].call_args.kwargs["observed_at"] == observed_at
+    kept = service._observation
+    assert (kept.sequence, kept.observed_at) == (3, observed_at)
+    # Newer samples still drive a request. A live feed, not the one kept sample: that is stale
+    # 0.2 s after arrival, which a slow runner reaches before the first chunk is due.
+    with live_camera(service, first_sequence=4):
+        request(service, 0.03)
+        assert terminal(service)["outcome"] == "finished"
+    assert policy[1].call_args.kwargs["observed_at"] > observed_at
 
 
 def test_cancel_during_start_binds_returned_task_then_hands_back(
@@ -286,13 +302,13 @@ def test_cancel_during_start_binds_returned_task_then_hands_back(
 
     def delayed():
         entered.set()
-        assert release.wait(2)
+        assert release.wait(WAIT_S)
         return original()
 
     mocker.patch.object(execution[0], "start_task", side_effect=delayed)
     try:
         accepted = request(service)
-        assert entered.wait(2)
+        assert entered.wait(WAIT_S)
         service.cancel_service(accepted["service_id"])
     finally:
         release.set()
@@ -323,32 +339,34 @@ def test_shutdown_requests_handback_before_draining_inference(service, camera, e
 
     def blocked(**kwargs):
         entered.set()
-        assert release.wait(3)
+        assert release.wait(WAIT_S)
         return policy[2](**kwargs)
 
     policy[1].side_effect = blocked
     request(service, 1)
-    assert entered.wait(2)
+    assert entered.wait(WAIT_S)
     camera.set()
     with ThreadPoolExecutor(max_workers=1) as pool:
         stopped = pool.submit(service.stop)
         try:
-            wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=1)
+            wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=WAIT_S)
             assert execution[0].get_status()["task"]["handback_confirmed"]
         finally:
             release.set()
-        stopped.result(timeout=2)
+        stopped.result(timeout=WAIT_S)
     assert service.get_service_status()["service"]["outcome"] == "cancelled"
 
 
 def test_unconfirmed_handback_latches_fault_and_freezes_progress(service, camera, execution):
     accepted = request(service, 2)
     wait_until(
-        lambda: service.get_service_status()["service"]["accepted_predictions"] >= 2, timeout=2
+        lambda: service.get_service_status()["service"]["accepted_predictions"] >= 2, timeout=WAIT_S
     )
     execution[1].pause_feedback.set()
     service.cancel_service(accepted["service_id"])
-    wait_until(lambda: service.get_service_status()["service"]["phase"] == "recovering", timeout=1)
+    wait_until(
+        lambda: service.get_service_status()["service"]["phase"] == "recovering", timeout=WAIT_S
+    )
     stopped_progress = service.get_service_status()["service"]["progress"]
     done = terminal(service)
     assert done["progress"] == stopped_progress
@@ -365,16 +383,16 @@ def test_preflight_cancel_takes_priority_over_expired_camera(service, camera, ex
 
     def blocked():
         entered.set()
-        assert release.wait(2)
+        assert release.wait(WAIT_S)
         return info
 
     policy[0].side_effect = blocked
     try:
         accepted = request(service)
-        assert entered.wait(2)
+        assert entered.wait(WAIT_S)
         camera.set()
         service.cancel_service(accepted["service_id"])
-        wait_until(lambda: service.get_service_status()["observation_age_s"] > 0.2, timeout=1)
+        wait_until(lambda: service.get_service_status()["observation_age_s"] > 0.2, timeout=WAIT_S)
     finally:
         release.set()
     done = terminal(service)
@@ -427,11 +445,11 @@ def policy_wire(ipc_dir):
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(serve)
         try:
-            assert ready.wait(2)
+            assert ready.wait(WAIT_S)
             yield endpoint, requests
         finally:
             stopped.set()
-            future.result(timeout=2)
+            future.result(timeout=WAIT_S)
 
 
 @pytest.fixture
@@ -440,7 +458,12 @@ def worker_service(peer, execution_config, policy_wire, tmp_path):
     publisher = make_transport(f"/service-worker-test/{uuid4().hex}", SonicObservation)
     blueprint = (
         autoconnect(
-            SonicExecutionModule.blueprint(**execution_config),
+            # Three processes and a real policy wire: a loaded runner takes over 0.5 s from an
+            # observation to its chunk, so allow the chunk's own 1 s horizon.
+            SonicExecutionModule.blueprint(
+                **execution_config
+                | {"profile": replace(execution_config["profile"], max_observation_age=1.0)}
+            ),
             SonicServiceModule.blueprint(
                 policies={"pi05": policy_wire[0]},
                 execution_profile_name="scripted-peer",
@@ -474,19 +497,19 @@ def worker_service(peer, execution_config, policy_wire, tmp_path):
         native = coordinator.get_instance(SonicExecutionModule)
         peer.reference_endpoint = native.get_status()["reference_endpoint"]
         peer.connected.set()
-        wait_until(lambda: native.get_status()["ready"], timeout=3)
+        wait_until(lambda: native.get_status()["ready"], timeout=WAIT_S)
         publisher.start()
         with ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(feed)
             try:
                 wait_until(
                     lambda: module.get_service_status()["observation_age_s"] is not None,
-                    timeout=3,
+                    timeout=WAIT_S,
                 )
                 yield module, native
             finally:
                 stopped.set()
-                future.result(timeout=2)
+                future.result(timeout=WAIT_S)
     finally:
         publisher.stop()
         if coordinator is not None:
@@ -531,7 +554,8 @@ def test_worker_injected_rpc_uses_bounded_timeout(dimos_cluster, tmp_path):
         started = time.monotonic()
         request(module)
         done = terminal(module)
-        assert time.monotonic() - started < 2
+        # Bounded by the 0.1 s RPC timeout, not the 120 s default; the margin is for a loaded runner.
+        assert time.monotonic() - started < 10
         assert done["outcome"] == "failed" and done["execution_task_id"] is None
         assert "RPC uncertain" in module.get_service_status()["error"]
         assert not module.get_service_status()["accepting_requests"]
@@ -606,15 +630,15 @@ def test_delivery_expiry_recovers_while_first_inference_is_still_blocked(
 
     def blocked(**kwargs):
         entered.set()
-        assert release.wait(3)
+        assert release.wait(WAIT_S)
         return policy[2](**kwargs)
 
     policy[1].side_effect = blocked
     try:
         request(service, 2)
-        assert entered.wait(2)
+        assert entered.wait(WAIT_S)
         camera.set()
-        wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=1)
+        wait_until(lambda: execution[0].get_status()["task"]["phase"] == "done", timeout=WAIT_S)
         task = execution[0].get_status()["task"]
         assert task["handback_confirmed"] and "delivery" in task["reason"]
         assert not release.is_set()
@@ -676,14 +700,14 @@ def test_delivery_source_fault_during_policy_preflight_never_starts_execution(
 
     def blocked_info():
         entered.set()
-        assert release.wait(3)
+        assert release.wait(WAIT_S)
         return info
 
     policy[0].side_effect = blocked_info
     service.handle_observation(delivery_observation(0))
     try:
         request(service)
-        assert entered.wait(2)
+        assert entered.wait(WAIT_S)
         with pytest.raises(ValueError, match="source changed"):
             service.handle_observation(delivery_observation(1, "replacement"))
     finally:

@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import Field
+from pydantic import Field, ValidationInfo, field_validator
 
 from dimos.agents.annotation import skill
 from dimos.agents.capabilities import CAP_MOVEMENT
@@ -545,6 +545,15 @@ class SonicArmSkillConfig(ModuleConfig):
     voice_command: str | None = None  # the robot's "<python> <path>/g1_audio.py"; needs voice_host
     voice_dir: str = "~/lines"
     voice_volume: int = Field(default=60, ge=0, le=100)
+
+    @field_validator("encoder_path", "collision_model_path")
+    @classmethod
+    def _file_path(cls, path: Path | None, info: ValidationInfo) -> Path | None:
+        # An empty value (an unset shell variable) parses as Path("."); fail here, by name,
+        # instead of with an IsADirectoryError at start(). The file itself is opened at start().
+        if path is not None and (path == Path(".") or path.is_dir()):
+            raise ValueError(f"{info.field_name} must be a file, got {str(path)!r}")
+        return path
 
 
 @dataclass
