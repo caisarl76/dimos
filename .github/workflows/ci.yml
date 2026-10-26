@@ -759,9 +759,11 @@ jobs:
   self-hosted-tests:
     # Runs on push, merge_group (trusted — a maintainer must approve + queue the
     # PR), and same-repo PRs. Skipped on fork PRs, which would expose the
-    # self-hosted runner to untrusted code from external contributors.
+    # self-hosted runner to untrusted code from external contributors. Upstream only: forks of
+    # this repository have no self-hosted runners, so the job would queue indefinitely there.
     if: |
       !cancelled() &&
+      github.repository == 'dimensionalOS/dimos' &&
       (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository) &&
       needs.cachix-build-check.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.cachix-build.result)
@@ -1041,6 +1043,7 @@ jobs:
     # Skip on PRs from forks which would expose the self-hosted runner to untrusted code from external contributors.
     if: |
       !cancelled() &&
+      github.repository == 'dimensionalOS/dimos' &&
       (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) &&
       needs.cachix-build-check.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.cachix-build.result)
