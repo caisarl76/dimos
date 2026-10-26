@@ -33,6 +33,8 @@ from dataclasses import dataclass, field, replace
 from functools import partial
 import math
 from pathlib import Path
+import re
+import subprocess
 import threading
 import time
 from typing import Any, Literal, Protocol
@@ -180,6 +182,7 @@ _FRAME_TIMEOUT_S = 5.0
 # is one session chunk (20 s), then _wait_done (handback_timeout 2 s + 1 s) and at most 5 s of
 # return_watch_seconds; it also covers a stop that lands during encoding (wave: ~14 s on pc2).
 _STOP_JOIN_S = 30.0
+_LINE_NAME = re.compile(r"[A-Za-z0-9_-]+")  # A wav name, safe in the remote shell command.
 BOX_PROMPT = """Find every `{query}` in this image.
 
 Reply with only JSON, no other text: a list of boxes, one per match,
@@ -389,6 +392,12 @@ class SonicArmSkillConfig(ModuleConfig):
     # Dex3 hands installed (pc2_222). Only this says the hand readings mean anything; without it a
     # hand-only motion reports its hand feedback as unavailable and the finger check refuses.
     hands_mounted: bool = False
+    # Voice lines for perform_gesture(line=...), played on the robot's speaker over ssh by
+    # physical_focus_demo's g1_audio.py (16 kHz mono wavs in voice_dir). None turns voice off.
+    voice_host: str | None = None  # ssh alias of the robot PC
+    voice_command: str | None = None  # the robot's "<python> <path>/g1_audio.py"; needs voice_host
+    voice_dir: str = "~/lines"
+    voice_volume: int = Field(default=60, ge=0, le=100)
 
     @field_validator("encoder_path", "collision_model_path")
     @classmethod
@@ -443,6 +452,9 @@ class SonicArmSkillContainer(Module):
         self._last_operator_result: str | None = None
         self._kinematics: ArmKinematics | None = None
         self._vl: VlModel | None = None
+        self._voice_lock = threading.Lock()  # Orders a line's start against stop_arm's cut.
+        self._voice_line: str | None = None  # The running gesture's line, until its first chunk.
+        self._voice: subprocess.Popen[bytes] | None = None
         super().__init__(**kwargs)
 
     @rpc
@@ -469,6 +481,7 @@ class SonicArmSkillContainer(Module):
                 self._stop.set()
         if motion is not None:
             motion.join(timeout=_STOP_JOIN_S)
+        self._hush()
         super().stop()
 
     @rpc
@@ -624,7 +637,7 @@ class SonicArmSkillContainer(Module):
         return self._launch("move_left_arm_joints", prepare)
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
-    def perform_gesture(self, name: GestureName) -> str:
+    def perform_gesture(self, name: GestureName, line: str | None = None) -> str:
         """Perform a gesture, then bring the arms back and hand control back.
 
         Left arm only: "wave" (raises the hand and swings it side to side three times, about 26 s),
@@ -641,11 +654,18 @@ class SonicArmSkillContainer(Module):
 
         Args:
             name: One of the gesture names above.
+            line: Optional voice line (wav name, e.g. "01_intro") spoken as the motion starts.
         """
 
         def prepare() -> Callable[[], SkillResult]:
             if name not in GESTURES:
                 raise ValueError(f"name must be one of {sorted(GESTURES)}")
+            if line is not None and None in (self.config.voice_host, self.config.voice_command):
+                raise ValueError(
+                    "voice is not configured (voice_host, voice_command); nothing sent"
+                )
+            if line is not None and not _LINE_NAME.fullmatch(line):
+                raise ValueError("line must be a wav name of letters, digits, _ and -")
             spec = GESTURES[name]
             if spec.arms != ("left",) and self._both_checker is None:
                 raise RuntimeError(_NO_BOTH_PATH_CHECK)
@@ -674,15 +694,19 @@ class SonicArmSkillContainer(Module):
                 self.config.pose_arm_margin,
                 self.config.other_arm_margin,
             )
-            return lambda: self._run(
-                name,
-                keyframes_of,
-                allowed,
-                require_check=False,
-                move_s=spec.move_s,
-                return_min_s=spec.return_min_s,
-                arms=spec.arms,
-            )
+
+            def run() -> SkillResult:
+                return self._run(
+                    name,
+                    keyframes_of,
+                    allowed,
+                    require_check=False,
+                    move_s=spec.move_s,
+                    return_min_s=spec.return_min_s,
+                    arms=spec.arms,
+                )
+
+            return run if line is None else partial(self._with_line, line, run)
 
         return self._launch("perform_gesture", prepare)
 
@@ -761,6 +785,7 @@ class SonicArmSkillContainer(Module):
             if self._running is None:
                 return "No arm motion is running."
             self._stop.set()
+        self._hush()
         return "Stopping: the arm returns smoothly to its start pose; a tool update reports the result."
 
     @rpc
@@ -1332,6 +1357,7 @@ class SonicArmSkillContainer(Module):
 
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(start, end))
+        self._speak()
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
@@ -1349,6 +1375,7 @@ class SonicArmSkillContainer(Module):
                     )
                     plan, plan_start = rows, now
                 retreat_start = now
+                self._hush()  # After the retreat is sent, so the voice never delays it.
             elif retreat_start is not None and overspeed_at > retreat_start:
                 self._execution.cancel_task(task_id)  # A joint ran away during the way back.
                 return "envelope"
@@ -1368,6 +1395,67 @@ class SonicArmSkillContainer(Module):
             if task["phase"] not in ("waiting_for_chunk", "running"):
                 return f"session ended: {task['reason']}"
             time.sleep(0.005)
+
+    def _with_line(self, line: str, run: Callable[[], SkillResult]) -> SkillResult:
+        """run() with `line` spoken at its first chunk; the result's metadata says how it went."""
+        self._voice_line, self._voice = line, None
+        try:
+            result = run()
+            report = self._voice_report(line)
+        finally:
+            self._voice_line = None
+            self._hush()  # The line never outlives its motion, however that ended.
+        return replace(result, metadata={**result.metadata, "voice": report})
+
+    def _speak(self) -> None:
+        """Start the pending voice line, unless stop_arm came first. The line never blocks motion."""
+        line, self._voice_line = self._voice_line, None
+        if line is None:
+            return
+        with self._voice_lock:
+            if self._stop.is_set():
+                return
+            c = self.config
+            try:
+                self._voice = subprocess.Popen(
+                    self._voice_ssh(f"play {c.voice_dir}/{line}.wav {c.voice_volume}"),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                )
+            except OSError as exc:
+                logger.warning(f"voice line {line} not started: {exc}")
+
+    def _hush(self) -> None:
+        """Cut a playing line: the local ssh, then the robot's player, which outlives the ssh."""
+        with self._voice_lock:
+            voice = self._voice
+            if voice is None or voice.poll() is not None:
+                return
+            voice.kill()
+            subprocess.Popen(
+                self._voice_ssh("stop"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+    def _voice_report(self, line: str) -> str:
+        voice = self._voice
+        if voice is None:
+            return f"{line}: not played"
+        code = voice.poll()
+        if code is None:
+            return f"{line}: still playing"
+        if code == 0:
+            return f"{line}: played"
+        if code < 0:
+            return f"{line}: cut off"
+        error = voice.stderr.read().decode(errors="replace").strip() if voice.stderr else ""
+        logger.warning(f"voice line {line} failed (exit {code}): {error}")
+        return f"{line}: failed (exit {code}) {error[-200:]}"
+
+    def _voice_ssh(self, args: str) -> list[str]:
+        host, script = self.config.voice_host, self.config.voice_command
+        assert host is not None and script is not None
+        command = f"{script} {args}"
+        return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", host, command]
 
     def _task(self) -> dict[str, Any]:
         task: dict[str, Any] = self._execution.get_status()["task"]
