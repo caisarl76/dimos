@@ -25,6 +25,7 @@ from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_observation import POLICY_JOINT_NAMES
 from dimos.robot.unitree.g1.sonic_observation_module import SonicObservationModule
 from dimos.robot.unitree.g1.sonic_observation_pairing import SonicMeasuredState
+from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -123,7 +124,7 @@ def test_typed_inputs_publish_oldest_source_time_and_expire(adapter, image, stat
     module, outputs = adapter
     module.measured_state.transport.publish(state)
     module.color_image.transport.publish(image)
-    wait_until(lambda: len(outputs) == 1, timeout=2)
+    wait_until(lambda: len(outputs) == 1, timeout=WAIT_S)
     assert outputs[0].observed_at == pytest.approx(9.97)
     np.testing.assert_array_equal(outputs[0].rgb[0, 0], [10, 20, 30])
     assert module.get_observation_status()["state"] == "fresh"
@@ -232,7 +233,7 @@ def test_duplicate_start_preserves_pending_state(adapter, image, state):
     module.handle_measured_state(state)
     module.start()
     module.handle_color_image(image)
-    wait_until(lambda: len(outputs) == 1, timeout=2)
+    wait_until(lambda: len(outputs) == 1, timeout=WAIT_S)
     assert outputs[0].observed_at == pytest.approx(9.97)
 
 
@@ -251,7 +252,7 @@ def test_clock_sampling_uncertainty_is_preserved_in_output(adapters, image, stat
         )
     )
     module.handle_color_image(replace(image, ts=999.99))
-    wait_until(lambda: len(outputs) == 1, timeout=2)
+    wait_until(lambda: len(outputs) == 1, timeout=WAIT_S)
     assert outputs[0].observed_at == pytest.approx(9.976)
     assert module.get_observation_status()["clock_mapping_uncertainty_s"] == pytest.approx(0.004)
 
@@ -275,7 +276,7 @@ def test_typed_state_uncertainty_is_preserved_in_age_and_service_snapshot(adapte
         replace(state, acquisition_uncertainty_seconds=(0.001, 0.004, 0.001))
     )
     module.color_image.transport.publish(image)
-    wait_until(lambda: len(outputs) == 1, timeout=2)
+    wait_until(lambda: len(outputs) == 1, timeout=WAIT_S)
     assert outputs[0].observed_at == pytest.approx(9.966)
     assert module.get_observation_status()["measured_state_age_s"] == pytest.approx(0.034)
 

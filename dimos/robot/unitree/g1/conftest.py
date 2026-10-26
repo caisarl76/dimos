@@ -21,7 +21,7 @@ import pytest
 
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
-from dimos.robot.unitree.g1.sonic_test_support import ScriptedPeer
+from dimos.robot.unitree.g1.sonic_test_support import WAIT_S, ScriptedPeer
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -41,13 +41,13 @@ def peer():
     peer = ScriptedPeer()
     peer.thread.start()
     try:
-        assert peer.ready.wait(5)
+        assert peer.ready.wait(WAIT_S)
         assert peer.error is None
         yield peer
     finally:
         peer.stopping.set()
         peer.connected.set()
-        peer.thread.join(timeout=3)
+        peer.thread.join(timeout=WAIT_S)
         assert not peer.thread.is_alive()
         assert peer.error is None
 
@@ -67,6 +67,9 @@ def execution_config(peer, tmp_path):
             blend_seconds=0.04,
             first_chunk_timeout=1.0,
             handback_timeout=0.4,
+            # The module, scripted peer and test threads share one process: a loaded runner stalls
+            # it 150 ms at a time, past the default 100 ms tick gap. Allow up to the 200 ms lease.
+            max_tick_gap=0.19,
         ),
     )
 
@@ -78,7 +81,7 @@ def execution(peer, execution_config):
         module.start()
         peer.reference_endpoint = module.get_status()["reference_endpoint"]
         peer.connected.set()
-        wait_until(lambda: module.get_status()["ready"], timeout=3)
+        wait_until(lambda: module.get_status()["ready"], timeout=WAIT_S)
         yield module, peer
     finally:
         module.stop()

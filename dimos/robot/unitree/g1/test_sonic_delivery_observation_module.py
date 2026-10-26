@@ -20,7 +20,7 @@ import pytest
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1.sonic_delivery_observation_module import SonicDeliveryObservationModule
 from dimos.robot.unitree.g1.sonic_observation import POLICY_JOINT_NAMES
-from dimos.robot.unitree.g1.sonic_test_support import camera, joints
+from dimos.robot.unitree.g1.sonic_test_support import WAIT_S, camera, joints
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -63,7 +63,7 @@ def publish_all(module):
 def test_typed_delivery_streams_keep_original_receiver_time(adapter, clock):
     module, outputs = adapter
     publish_all(module)
-    wait_until(lambda: len(outputs) == 1, timeout=2)
+    wait_until(lambda: len(outputs) == 1, timeout=WAIT_S)
     assert outputs[0].observed_at == 10.0
     assert outputs[0].time_basis == "delivery"
     assert module.get_observation_status()["acquisition_age_s"] is None
@@ -74,7 +74,7 @@ def test_typed_delivery_streams_keep_original_receiver_time(adapter, clock):
 def test_fault_survives_duplicate_start_and_cannot_be_reset_by_restart(adapter):
     module, outputs = adapter
     publish_all(module)
-    wait_until(lambda: len(outputs) == 1, timeout=2)
+    wait_until(lambda: len(outputs) == 1, timeout=WAIT_S)
     module.handle_left_hand_delivery(
         joints("left_hand", marker=2, received_at=10.02, source_id="replacement")
     )

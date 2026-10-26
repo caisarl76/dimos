@@ -32,6 +32,10 @@ from dimos.robot.unitree.g1.sonic_delivery_observation import (
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback, SonicReferenceGuard
 from dimos.robot.unitree.g1.sonic_observation import SonicDeliveryStamp
 
+# The longest a test waits for a condition. A loaded CI runner under coverage needs seconds for
+# what takes milliseconds locally (a worker deploy took over 5 s); a passing test never waits it.
+WAIT_S = 30.0
+
 
 class ScriptedPeer:
     def __init__(self) -> None:
@@ -57,7 +61,7 @@ class ScriptedPeer:
                 port = pub.bind_to_random_port("tcp://127.0.0.1")
                 self.feedback_endpoint = f"tcp://127.0.0.1:{port}"
                 self.ready.set()
-                if not self.connected.wait(5) or self.stopping.is_set():
+                if not self.connected.wait(WAIT_S) or self.stopping.is_set():
                     return
                 assert self.reference_endpoint is not None
                 sub.connect(self.reference_endpoint)

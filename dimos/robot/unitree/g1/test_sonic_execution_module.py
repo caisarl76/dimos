@@ -24,6 +24,7 @@ import pytest
 import zmq
 
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
+from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -34,7 +35,7 @@ def worker_execution(peer, execution_config, dimos_cluster):
         module.start()
         peer.reference_endpoint = module.get_status()["reference_endpoint"]
         peer.connected.set()
-        wait_until(lambda: module.get_status()["ready"], timeout=3)
+        wait_until(lambda: module.get_status()["ready"], timeout=WAIT_S)
         yield module
     finally:
         module.stop()
@@ -42,7 +43,7 @@ def worker_execution(peer, execution_config, dimos_cluster):
 
 def begin(module):
     status = module.start_task()
-    wait_until(lambda: module.get_status()["task"]["phase"] == "waiting_for_chunk", timeout=3)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "waiting_for_chunk", timeout=WAIT_S)
     return status["task_id"]
 
 
@@ -72,9 +73,9 @@ def test_finish_streams_actions_and_confirms_handback_without_task_success(execu
     module, peer = execution
     task_id = begin(module)
     submit(module, task_id)
-    wait_until(lambda: module.get_status()["task"]["last_frame_index"] > 8, timeout=2)
+    wait_until(lambda: module.get_status()["task"]["last_frame_index"] > 8, timeout=WAIT_S)
     module.finish_task(task_id)
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=2)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     status = module.get_status()
     assert status["task"]["outcome"] == "finished"
     assert status["task"]["handback_confirmed"] is True
@@ -97,7 +98,7 @@ def test_overlap_old_task_ids_and_late_chunks_are_rejected(execution):
     with pytest.raises(RuntimeError, match="active"):
         module.start_task()
     module.cancel_task(first)
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=2)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     assert module.get_status()["task"]["outcome"] == "cancelled"
     second = begin(module)
     assert second != first
@@ -115,7 +116,7 @@ def test_observation_time_is_preserved_and_stale_chunks_cannot_refresh_session(e
     submit(module, task_id)
     with pytest.raises(ValueError, match="observation"):
         submit(module, task_id, sequence=1, observed_at=time.monotonic() - 5)
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=3)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     status = module.get_status()["task"]
     assert status["outcome"] == "failed"
     assert status["reason"] == "observation stale"
@@ -126,7 +127,7 @@ def test_missing_feedback_fails_without_claiming_handback(execution):
     module, peer = execution
     begin(module)
     peer.pause_feedback.set()
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=3)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     status = module.get_status()["task"]
     assert status["outcome"] == "failed"
     assert "feedback stale" in status["reason"]
@@ -138,7 +139,7 @@ def test_action_source_failure_is_distinct_from_finish(execution):
     module, _ = execution
     task_id = begin(module)
     module.fail_task(task_id, "policy worker failed")
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=2)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     status = module.get_status()["task"]
     assert status["outcome"] == "failed"
     assert status["reason"] == "policy worker failed"
@@ -161,7 +162,7 @@ def test_subscription_loss_fails_and_stops_policy_output(execution):
     task_id = begin(module)
     submit(module, task_id)
     peer.drop_pose_subscription.set()
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=2)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     status = module.get_status()
     assert status["state"] == "fault"
     assert status["task"]["outcome"] == "failed"
@@ -188,12 +189,14 @@ def test_concurrent_stops_do_not_close_loop_before_bounded_handback(execution, m
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             first = pool.submit(module.stop)
-            wait_until(lambda: module.get_status()["task"]["phase"] == "handback", timeout=1)
+            wait_until(lambda: module.get_status()["task"]["phase"] == "handback", timeout=WAIT_S)
             second = pool.submit(module.stop)
-            first.result(timeout=2)
-            second.result(timeout=2)
+            first.result(timeout=WAIT_S)
+            second.result(timeout=WAIT_S)
         assert phases_at_close == ["done", "done"]
-        assert time.monotonic() - started < 2
+        # Bounded by the profile's 0.4 s handback timeout (a hung stop never returns); the
+        # margin is for a loaded runner.
+        assert time.monotonic() - started < 5
         status = module.get_status()["task"]
         assert status["outcome"] == "failed"
         assert status["handback_confirmed"] is False
@@ -207,7 +210,7 @@ def test_worker_rpc_preserves_chunks_and_terminal_results(worker_execution):
     submit(module, task_id)
     assert module.get_status()["task"]["last_chunk_sequence"] == 0
     module.finish_task(task_id)
-    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=2)
+    wait_until(lambda: module.get_status()["task"]["phase"] == "done", timeout=WAIT_S)
     status = module.get_status()["task"]
     assert status["outcome"] == "finished"
     assert status["handback_confirmed"] is True
