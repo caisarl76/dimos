@@ -14,6 +14,17 @@
         "right_wrist_roll": -1.03,
         "right_wrist_yaw": -1.24
       },
+      "hands": {
+        "right": {
+          "index_0": 0.0,
+          "index_1": 0.0,
+          "middle_0": 0.0,
+          "middle_1": 0.0,
+          "thumb_0": 0.0,
+          "thumb_1": 0.0,
+          "thumb_2": 0.0
+        }
+      },
       "t": 2.2
     },
     {
@@ -25,6 +36,17 @@
         "right_wrist_pitch": -0.154,
         "right_wrist_roll": -0.61,
         "right_wrist_yaw": -1.09
+      },
+      "hands": {
+        "right": {
+          "index_0": 0.0,
+          "index_1": 0.0,
+          "middle_0": 0.0,
+          "middle_1": 0.0,
+          "thumb_0": 0.0,
+          "thumb_1": 0.0,
+          "thumb_2": 0.0
+        }
       },
       "t": 3.0
     },
@@ -38,6 +60,17 @@
         "right_wrist_roll": -0.977,
         "right_wrist_yaw": -1.189
       },
+      "hands": {
+        "right": {
+          "index_0": 0.0,
+          "index_1": 0.0,
+          "middle_0": 0.0,
+          "middle_1": 0.0,
+          "thumb_0": 0.0,
+          "thumb_1": 0.0,
+          "thumb_2": 0.0
+        }
+      },
       "t": 3.7
     },
     {
@@ -49,6 +82,17 @@
         "right_wrist_pitch": -0.155,
         "right_wrist_roll": -0.669,
         "right_wrist_yaw": -1.066
+      },
+      "hands": {
+        "right": {
+          "index_0": 0.0,
+          "index_1": 0.0,
+          "middle_0": 0.0,
+          "middle_1": 0.0,
+          "thumb_0": 0.0,
+          "thumb_1": 0.0,
+          "thumb_2": 0.0
+        }
       },
       "t": 4.45
     },
@@ -62,6 +106,17 @@
         "right_wrist_roll": -0.929,
         "right_wrist_yaw": -1.074
       },
+      "hands": {
+        "right": {
+          "index_0": 0.0,
+          "index_1": 0.0,
+          "middle_0": 0.0,
+          "middle_1": 0.0,
+          "thumb_0": 0.0,
+          "thumb_1": 0.0,
+          "thumb_2": 0.0
+        }
+      },
       "t": 5.3
     },
     {
@@ -73,6 +128,17 @@
         "right_wrist_pitch": -0.118,
         "right_wrist_roll": -0.626,
         "right_wrist_yaw": -0.914
+      },
+      "hands": {
+        "right": {
+          "index_0": 0.0,
+          "index_1": 0.0,
+          "middle_0": 0.0,
+          "middle_1": 0.0,
+          "thumb_0": 0.0,
+          "thumb_1": 0.0,
+          "thumb_2": 0.0
+        }
       },
       "t": 6.1
     }
