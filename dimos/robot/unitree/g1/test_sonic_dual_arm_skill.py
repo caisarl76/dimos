@@ -977,6 +977,67 @@ def test_both_with_a_line_speaks_on_each_robot_with_a_voice_after_its_own_first_
         assert metadata["voice"] == "01_intro: played"
 
 
+def later_motion(module, mocker, rows):
+    """Moves each robot's prepared motion_row `rows[robot]` rows later (as a longer lead-in would);
+    returns the prepared watches by robot."""
+    watches = {}
+    for robot, arm in module._by_robot.items():
+        real = arm.prepare
+
+        def prepare(*args, robot=robot, real=real, **kwargs):
+            prepared = real(*args, **kwargs)
+            prepared.watch.motion_row += rows.get(robot, 0)
+            watches[robot] = prepared.watch
+            return prepared
+
+        mocker.patch.object(arm, "prepare", side_effect=prepare)
+    return watches
+
+
+@pytest.mark.parametrize("real_launch_skill", [{**BOTH_VOICES, "voice_lead_s": 0.2}], indirect=True)
+def test_both_robots_launch_their_line_voice_lead_s_before_their_own_arm_moves(inline, mocker):
+    module, _ = inline
+    assert all(arm.config.voice_lead_s == 0.2 for arm in module._arms())  # shared, on both
+    voices(module, mocker)
+    launched = {}
+    play = sonic_arm_skill.subprocess.Popen.side_effect
+
+    def popen(argv, **kwargs):
+        launched.setdefault(argv[-2], time.monotonic())
+        return play(argv, **kwargs)
+
+    sonic_arm_skill.subprocess.Popen.side_effect = popen
+    watches = later_motion(module, mocker, {"223": 50})  # 223's arm starts moving 1 s later.
+    with feeding_arms(module._arms()):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert "222: wave reached" in result.message and "; 223: wave reached" in result.message
+    # fast_keyframe_plan's 0.1 s lead-in after the 0.2 s test blend: row 15, 0.3 s.
+    assert (watches["222"].motion_row, watches["223"].motion_row) == (15, 65)
+    for robot, host, at in (("222", "pc2_222", 0.3 - 0.2), ("223", "pc2", 1.3 - 0.2)):
+        since = launched[host] - watches[robot].plan_start
+        assert at <= since < at + 0.15, (robot, since)  # Never early; late only by a loop stall.
+        assert result.metadata[robot]["voice"] == "01_intro: played"
+
+
+@pytest.mark.parametrize("real_launch_skill", [{**ONLY_223, "voice_lead_s": 0.0}], indirect=True)
+def test_a_peer_abort_before_this_robots_speak_time_leaves_its_line_unspoken(inline, mocker):
+    """222 faults about 0.6 s in; 223's arm would start moving (and speak) only 2 s in."""
+    module, _ = inline
+    log = voices(module, mocker, code=None)
+    watches = later_motion(module, mocker, {"223": 100 - 15})
+
+    def knee(s):
+        return {3: 0.2 if s > 0.6 else 0.0}
+
+    with feeding_arms(module._arms(), shape=zero, extra=(knee, None)):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert watches["223"].motion_row == 100  # inside the 179-row plan: only the abort kept it quiet
+    assert "stopped early: 222: left_knee" in result.message.split("; 223: ")[1], result
+    assert ("submit_chunk", "223", 1) in log  # 223 retreated
+    assert played(log) == [] and ("kill", "pc2") not in log, log
+    assert result.metadata["223"]["voice"] == "01_intro: not played"
+
+
 @pytest.mark.parametrize(
     ("real_launch_skill", "robot", "refusal"),
     [
@@ -1154,12 +1215,14 @@ def test_voice_hosts_are_configured_per_robot(real_launch_skill):
             "--dualsonicarmskillcontainer.voice-host-223=pc2",
             "--dualsonicarmskillcontainer.voice-command=~/venv/bin/python ~/g1_audio.py",
             "--dualsonicarmskillcontainer.voice-volume=80",
+            "--dualsonicarmskillcontainer.voice-lead-s=0.9",
         ],
         environ={},
     )
     config = DualSonicArmSkillConfig(**parsed.module_kwargs("dualsonicarmskillcontainer"))
     assert (config.voice_host_222, config.voice_host_223) == (None, "pc2")
     assert (config.voice_command, config.voice_volume) == ("~/venv/bin/python ~/g1_audio.py", 80)
+    assert config.voice_lead_s == 0.9
     with pytest.raises(ValueError, match="voice_host_222 / voice_host_223"):
         DualSonicArmSkillConfig(encoder_path="unused.onnx", voice_host="pc2")
     module, _ = real_launch_skill  # Configured with ONLY_223.

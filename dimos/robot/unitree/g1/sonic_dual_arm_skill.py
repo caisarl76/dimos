@@ -74,8 +74,9 @@ class DualSonicArmSkillConfig(SonicArmSkillConfig):
     hands_mounted_222: bool = False
     hands_mounted_223: bool = False
     # Voice lines per robot (perform_gesture's line): the ssh alias of each robot's PC; None keeps
-    # that robot silent. voice_command, voice_dir and voice_volume are shared. The single-robot
-    # voice_host would speak on both, so it is refused here.
+    # that robot silent. voice_command, voice_dir, voice_volume and voice_lead_s are shared (each
+    # robot times its line from its own plan). The single-robot voice_host would speak on both,
+    # so it is refused here.
     voice_host_222: str | None = None
     voice_host_223: str | None = None
 

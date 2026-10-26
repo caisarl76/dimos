@@ -87,13 +87,15 @@ the command's python and script paths must exist on every robot with a voice hos
        --dualsonicarmskillcontainer.voice-host-223=pc2 \\
        --dualsonicarmskillcontainer.voice-command="~/miniconda3/envs/unitree/bin/python ~/g1_audio.py"
        (optional, defaults shown: --dualsonicarmskillcontainer.voice-dir=~/lines,
-        --dualsonicarmskillcontainer.voice-volume=60, 0-100)
+        --dualsonicarmskillcontainer.voice-volume=60, 0-100,
+        --dualsonicarmskillcontainer.voice-lead-s=1.4, 0-3: launch-to-heard delay, measured on 223)
        dimos mcp call perform_gesture --json-args '{"robot": "both", "name": "wave", "line": "01_intro"}'
 
    With "both", only the robots with a voice host speak (here 223); a line is refused, with
-   nothing sent, when no selected robot has one. Each robot's line starts once its own first
-   chunk is sent, and is cut when its motion ends, when it retreats (stop_arm, a safety stop, the
-   other robot's stop) and on shutdown: stop_arm cuts the line. A failed line is reported in that
+   nothing sent, when no selected robot has one. Each robot launches its line voice-lead-s before
+   its own arm starts moving (timed from its own plan), never once a stop or abort is seen; it is
+   cut when its motion ends, when it retreats (stop_arm, a safety stop, the other robot's stop)
+   and on shutdown: stop_arm cuts the line. A failed line is reported in that
    robot's result metadata ("voice") and never fails the motion. Before setting
    voice-host-222=pc2_222, put the wavs in 222's ~/lines (and g1_audio.py at the same path).
 

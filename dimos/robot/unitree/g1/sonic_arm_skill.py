@@ -551,6 +551,9 @@ class SonicArmSkillConfig(ModuleConfig):
     voice_command: str | None = None  # the robot's "<python> <path>/g1_audio.py"; needs voice_host
     voice_dir: str = "~/lines"
     voice_volume: int = Field(default=60, ge=0, le=100)
+    # s from launching a line to hearing it (ssh + the robot's audio SDK; 1.4 measured on pc2_223):
+    # the line is launched this long before the arm starts moving, so it is heard as it moves.
+    voice_lead_s: float = Field(default=1.4, ge=0.0, le=3.0)
 
     @field_validator("encoder_path", "collision_model_path")
     @classmethod
@@ -577,6 +580,7 @@ class _Watch:
     abort: str | None = None
     overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
     hold_rows: tuple[int, int] | None = None  # token-plan rows of the deepest keyframe's hold
+    motion_row: int = 0  # token-plan row where the arm starts moving (after the lead-in and blend)
     plan_start: float | None = None  # monotonic time of the first chunk's row 0
     hold_q: list[NDArray[np.float64]] = field(default_factory=list)  # body_q inside the hold
     hold_hands: list[NDArray[np.float64]] = field(default_factory=list)  # [14] hands, same window
@@ -617,7 +621,7 @@ class _Prepared:
     keyframes: int
     encode_s: float
     report_extra: ReportExtra | None
-    line: str | None = None  # A voice line spoken once the first chunk is sent.
+    line: str | None = None  # A voice line, heard as the arm starts moving.
 
 
 class SonicArm:
@@ -654,7 +658,7 @@ class SonicArm:
         self._watch: _Watch | None = None
         self.stop = threading.Event()
         self._voice_lock = threading.Lock()  # Orders a line's start against stop_arm's cut.
-        self._voice_line: str | None = None  # The running move's line, until its first chunk.
+        self._voice_line: str | None = None  # The running move's line, until it is started.
         self._voice: subprocess.Popen[bytes] | None = None
 
     @property
@@ -749,7 +753,7 @@ class SonicArm:
         line: str | None = None,
     ) -> _Prepared:
         """Plan from the measured body and hands (keyframes_of(base, base_hands)), check and encode
-        a move with per-row hands; `line` is spoken once its first chunk is sent. Raises with
+        a move with per-row hands; `line` is heard as the arm starts moving. Raises with
         nothing sent."""
         checker = self._checker_for(arms)
         if require_check and checker is None:
@@ -879,6 +883,7 @@ class SonicArm:
                 max_dq=self.config.max_dq,
                 delta=delta,
                 hold_rows=hold if hold[0] <= hold[1] else None,
+                motion_row=pad + kplan.segments[0].start,
             ),
             keyframes=len(keyframes),
             encode_s=encode_s,
@@ -1118,6 +1123,8 @@ class SonicArm:
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(plan, start, end))
         watch.ack_at = time.monotonic()
+        # Fixed here: a retreat moves plan_start, but nothing is spoken once an abort is set.
+        speak_at = plan_start + watch.motion_row / RATE - self.config.voice_lead_s
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
@@ -1130,9 +1137,11 @@ class SonicArm:
                         watch.abort = f"{name}: {peer_abort}"
                 abort, overspeed_at = watch.abort, watch.overspeed_at
             if abort is None:
-                # Starts the pending line once, after chunk 0 and the checks above: a stop, or
-                # this arm's or a peer's abort, that came first leaves it unstarted.
-                self._speak(watch)
+                # Starts the pending line once, voice_lead_s before the arm starts moving so it is
+                # heard as it moves, and only after the checks above: a stop, or this arm's or a
+                # peer's abort, that came first leaves it unstarted (execute drops it at the end).
+                if self._voice_line is not None and now >= speak_at:
+                    self._speak(watch)
             elif retreat_start is None:
                 if (rows := retreat(int((now - plan_start) * RATE))) is not None:
                     pending = []  # The way back replaces the rest of the plan.
