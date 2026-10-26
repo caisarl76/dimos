@@ -16,9 +16,10 @@
 
 from collections.abc import AsyncIterator
 import math
+import sys
 import threading
 from time import monotonic, time as wall_time
-from typing import Any, Self
+from typing import Any
 
 from pydantic import Field, model_validator
 
@@ -36,6 +37,11 @@ from dimos.robot.unitree.g1.sonic_observation_pairing import (
     SonicMeasuredState,
     SonicObservationPairer,
 )
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 class SonicObservationConfig(ModuleConfig):
