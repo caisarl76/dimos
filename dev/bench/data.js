@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792030637768,
-  "repoUrl": "https://github.com/dimensionalOS/dimos",
+  "lastUpdate": 1793008947390,
+  "repoUrl": "https://github.com/caisarl76/dimos",
   "entries": {
     "go2 replay realtime (arm64)": [
       {
@@ -4374,6 +4374,60 @@ window.BENCHMARK_DATA = {
             "value": 115.434,
             "unit": "G",
             "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 854/855; perf counted 100.0%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "caisarl76@gmail.com",
+            "name": "Jihun Kim(김지훈)",
+            "username": "caisarl76"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "624bba27685fe0cef3e4a0a1cc08cad499f4899e",
+          "message": "Merge PR #1: G1 SONIC arm skills, imported gestures, voice lines\n\nG1 SONIC arm skills (Tier 1, forearm pointing, 0.75 rad/s), imported and hand-authored gestures with Dex3 hands, gesture voice lines, and the CI fixes that make the suite pass on loaded runners.",
+          "timestamp": "2026-10-26T18:59:30+09:00",
+          "tree_id": "540d80dc530a13051eb7f2fa48124cfc583db70a",
+          "url": "https://github.com/caisarl76/dimos/commit/624bba27685fe0cef3e4a0a1cc08cad499f4899e"
+        },
+        "date": 1793008946346,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "peak memory",
+            "value": 1605.117,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "peak threads",
+            "value": 360,
+            "unit": "threads",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "network (transport)",
+            "value": 2722.032,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "disk write",
+            "value": 1.695,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "instructions",
+            "value": 115.116,
+            "unit": "G",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
           }
         ]
       }
