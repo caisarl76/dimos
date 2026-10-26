@@ -81,8 +81,9 @@ Operator finger check (an RPC, not an agent skill), with a running blueprint and
 Voice lines (perform_gesture's `line`) play <voice-dir>/<line>.wav (16 kHz mono) on a robot's
 speaker over ssh, through its g1_audio.py. A robot speaks only with its own voice host set (the
 single-robot voice-host is refused here); voice-command, voice-dir and voice-volume are shared, so
-the command's python and script paths must exist on every robot with a voice host. Today only
-223 has the wavs, so add to step 3's `dimos run`:
+the command's python and script paths must exist on every robot with a voice host. Both robots
+have the wavs (01-04, 06-09) and g1_audio.py; the demo gives only 223 a voice, so add to step
+3's `dimos run` (and voice-host-222=pc2_222 for 222 to speak too):
 
        --dualsonicarmskillcontainer.voice-host-223=pc2 \\
        --dualsonicarmskillcontainer.voice-command="~/miniconda3/envs/unitree/bin/python ~/g1_audio.py"
@@ -96,8 +97,7 @@ the command's python and script paths must exist on every robot with a voice hos
    its own arm starts moving (timed from its own plan), never once a stop or abort is seen; it is
    cut when its motion ends, when it retreats (stop_arm, a safety stop, the other robot's stop)
    and on shutdown: stop_arm cuts the line. A failed line is reported in that
-   robot's result metadata ("voice") and never fails the motion. Before setting
-   voice-host-222=pc2_222, put the wavs in 222's ~/lines (and g1_audio.py at the same path).
+   robot's result metadata ("voice") and never fails the motion.
 
 Hardware order for the imported gestures (after the two-stand-in run):
    1. 223: perform_gesture "support_person", then "two_hand_hearts" (arms only: 223 has no hands).
