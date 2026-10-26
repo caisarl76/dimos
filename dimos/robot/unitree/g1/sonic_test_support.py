@@ -45,6 +45,11 @@ if TYPE_CHECKING:
 # The longest a test waits for a condition. A loaded CI runner under coverage needs seconds for
 # what takes milliseconds locally (a worker deploy took over 5 s); a passing test never waits it.
 WAIT_S = 30.0
+# Tests that drive a real 50 Hz session: a runner stall of 200 ms or more trips the production
+# lease ("feedback stale" / "tick deadline missed"). Retry only those; any other failure fails.
+LEASE_STALL_RERUN = pytest.mark.flaky(
+    reruns=2, only_rerun=["tick deadline missed", "feedback stale"]
+)
 
 
 class ScriptedPeer:

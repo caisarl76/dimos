@@ -39,8 +39,10 @@ from dimos.robot.unitree.g1.sonic_policy_client import (
     SonicPolicyInfo,
 )
 from dimos.robot.unitree.g1.sonic_service_module import SonicServiceModule
-from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
+from dimos.robot.unitree.g1.sonic_test_support import LEASE_STALL_RERUN, WAIT_S
 from dimos.utils.testing.waiting import wait_until
+
+pytestmark = LEASE_STALL_RERUN
 
 KEY = "observation.images.egocentric"
 

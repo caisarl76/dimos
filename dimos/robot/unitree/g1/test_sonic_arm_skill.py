@@ -63,6 +63,7 @@ from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
 from dimos.robot.unitree.g1.sonic_test_support import (
     FAKE_GAIN,
+    LEASE_STALL_RERUN,
     PEER_TOKEN,
     ROBOT_IDLE,
     SCENE,
@@ -83,6 +84,8 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     wait_until,
 )
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
+
+pytestmark = LEASE_STALL_RERUN
 
 LEAD_IN_ROWS = 10  # The fixture's 0.2 s token blend at 50 Hz.
 

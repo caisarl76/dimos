@@ -24,8 +24,10 @@ import pytest
 import zmq
 
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
-from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
+from dimos.robot.unitree.g1.sonic_test_support import LEASE_STALL_RERUN, WAIT_S
 from dimos.utils.testing.waiting import wait_until
+
+pytestmark = LEASE_STALL_RERUN
 
 
 @pytest.fixture
