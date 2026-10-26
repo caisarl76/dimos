@@ -1175,9 +1175,16 @@ def test_gesture_line_plays_on_the_robot_at_the_first_chunk_and_stop_cuts_it(ski
     with pytest.raises(ValueError, match="wav name"):
         module.perform_gesture("beckon", line="../x; reboot")
     assert not shell.Popen.called and not peer.snapshot()
+    mocker.patch.object(module.config, "voice_lead_s", 0.0)
+    submit, launched = mocker.spy(module._execution, "submit_chunk"), []
+    shell.Popen.side_effect = lambda *a, **k: launched.append(time.monotonic()) or mocker.DEFAULT
     result = call_with_feed(
         module, lambda: module.perform_gesture("beckon", line="01_intro"), lambda t: raised
     )
+    # Launched as the arm starts moving: after fast_keyframe_plan's 0.1 s lead-in and the 0.2 s test
+    # blend, not at chunk 0.
+    assert launched[0] - submit.call_args_list[0].args[2] == pytest.approx(0.3, abs=0.05)
+    shell.Popen.side_effect = None
     (argv,), _ = shell.Popen.call_args
     assert argv[-2:] == ["pc2", "python3 ~/g1_audio.py play ~/lines/01_intro.wav 60"]
     assert result.metadata["voice"] == "01_intro: played"

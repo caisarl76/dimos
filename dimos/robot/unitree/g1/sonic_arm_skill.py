@@ -404,6 +404,9 @@ class SonicArmSkillConfig(ModuleConfig):
     voice_command: str | None = None  # the robot's "<python> <path>/g1_audio.py"; needs voice_host
     voice_dir: str = "~/lines"
     voice_volume: int = Field(default=60, ge=0, le=100)
+    # s from launching a line to hearing it (ssh + the robot's audio SDK; 1.4 measured on pc2_223):
+    # the line is launched this long before the arm starts moving, so it is heard as it moves.
+    voice_lead_s: float = Field(default=1.4, ge=0.0, le=3.0)
 
     @field_validator("encoder_path", "collision_model_path")
     @classmethod
@@ -430,6 +433,7 @@ class _Watch:
     abort: str | None = None
     overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
     hold_rows: tuple[int, int] | None = None  # token-plan rows of the deepest keyframe's hold
+    motion_row: int = 0  # token-plan row where the arm starts moving (after the lead-in and blend)
     plan_start: float | None = None  # monotonic time of the first chunk's row 0
     hold_q: list[NDArray[np.float64]] = field(default_factory=list)  # body_q inside the hold
     hold_hands: list[NDArray[np.float64]] = field(default_factory=list)  # [14] hands, same window
@@ -1211,6 +1215,7 @@ class SonicArmSkillContainer(Module):
             max_dq=self.config.max_dq,
             delta=delta,
             hold_rows=hold if hold[0] <= hold[1] else None,
+            motion_row=pad + kplan.segments[0].start,
         )
         with self._lock:
             self._watch = watch
@@ -1368,7 +1373,7 @@ class SonicArmSkillContainer(Module):
 
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(start, end))
-        self._speak(watch)
+        speak_at = plan_start + watch.motion_row / RATE - self.config.voice_lead_s
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
@@ -1377,6 +1382,8 @@ class SonicArmSkillContainer(Module):
                 if self._stop.is_set() and watch.abort is None:
                     watch.abort = "stop requested"  # Retreats like a safety stop.
                 abort, overspeed_at = watch.abort, watch.overspeed_at
+            if abort is None and self._voice_line is not None and now >= speak_at:
+                self._speak(watch)  # Heard as the arm starts moving; never after a stop or abort.
             if abort is not None and retreat_start is None:
                 if (rows := retreat(int((now - plan_start) * RATE))) is not None:
                     pending = []  # The way back replaces the rest of the plan.
@@ -1408,7 +1415,7 @@ class SonicArmSkillContainer(Module):
             time.sleep(0.005)
 
     def _with_line(self, line: str, run: Callable[[], SkillResult]) -> SkillResult:
-        """run() with `line` spoken at its first chunk; the result's metadata says how it went."""
+        """run() with `line` heard as the arm starts moving; the result's metadata says how it went."""
         self._voice_line = line
         with self._voice_lock:
             self._voice = None
