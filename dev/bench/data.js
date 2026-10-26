@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793008947390,
+  "lastUpdate": 1793010084314,
   "repoUrl": "https://github.com/caisarl76/dimos",
   "entries": {
     "go2 replay realtime (arm64)": [
@@ -4428,6 +4428,58 @@ window.BENCHMARK_DATA = {
             "value": 115.116,
             "unit": "G",
             "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "caisarl76",
+            "name": "Jihun Kim"
+          },
+          "committer": {
+            "email": "caisarl76",
+            "name": "Jihun Kim"
+          },
+          "distinct": true,
+          "id": "9908f3af9ecff5835761cee30e15dacaed588f4f",
+          "message": "ci: split the Linux suite in two, bound each test, gate on the benchmark\n\n- ci-complete now needs benchmark itself: a failed benchmark skipped\n  benchmark-track, and the fork allowed that skip, so the gate could\n  pass. benchmark may skip only where the path filter skips it.\n- The hosted suite runs with --timeout=120 (addopts' 600 s outlasted\n  the job's 20 min), so a hung test fails with its stacks dumped\n  instead of the job being cancelled. Tests with a timeout mark keep it.\n- Each tests leg runs one of two partitions: dimos/robot, dimos/core\n  and dimos/protocol (about half the measured time), or the rest of\n  dimos/ with those ignored, so the parts always cover the whole suite.\n  Coverage is measured on Python 3.12 only, per partition.",
+          "timestamp": "2026-10-26T19:18:31+09:00",
+          "tree_id": "6c403fb9729506c4f7cb2150d5eaec8983349915",
+          "url": "https://github.com/caisarl76/dimos/commit/9908f3af9ecff5835761cee30e15dacaed588f4f"
+        },
+        "date": 1793010083241,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "peak memory",
+            "value": 1583.766,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 855/855; perf counted 100.0%"
+          },
+          {
+            "name": "peak threads",
+            "value": 366,
+            "unit": "threads",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 855/855; perf counted 100.0%"
+          },
+          {
+            "name": "network (transport)",
+            "value": 2730.07,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 855/855; perf counted 100.0%"
+          },
+          {
+            "name": "disk write",
+            "value": 1.738,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 855/855; perf counted 100.0%"
+          },
+          {
+            "name": "instructions",
+            "value": 115.152,
+            "unit": "G",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 855/855; perf counted 100.0%"
           }
         ]
       }
