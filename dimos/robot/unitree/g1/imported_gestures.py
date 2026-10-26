@@ -46,6 +46,15 @@ RETAINED: tuple[str, ...] = (
     "support_person",
     "two_hand_hearts",
 )
+# Hand-authored for the G1 223 demo (gestures/SOURCE.md, "Hand-authored"), same format and checks.
+AUTHORED: tuple[str, ...] = (
+    "invite",
+    "take_left",
+    "take_right",
+    "entrance_left",
+    "entrance_right",
+    "thanks",
+)
 
 # (lower, upper) rad: the G1 URDF joint limits, copied from physical_ai_agent upper_body.LIMITS.
 UB_LIMITS: dict[str, tuple[float, float]] = {
@@ -197,9 +206,9 @@ def parse_gesture(obj: Any, source: str = "") -> ImportedGesture:
 
 
 def load_gestures() -> dict[str, ImportedGesture]:
-    """The RETAINED gestures, read from the JSON files next to this module."""
+    """The RETAINED and AUTHORED gestures, read from the JSON files next to this module."""
     out = {}
-    for name in RETAINED:
+    for name in RETAINED + AUTHORED:
         gesture = parse_gesture(json.loads((DATA_DIR / f"{name}.json").read_text()), name)
         if gesture.name != name:
             raise ValueError(f"{name}.json names itself {gesture.name!r}")

@@ -252,9 +252,13 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         Imported, either or both arms, with the Dex3 hands where noted: "wave_one_hand" (right
         arm waves, about 16 s), "v_sign" (right arm, V with the fingers, about 18 s), "good" (right
         arm, thumbs up, about 19-20 s), "support_person" (both arms forward, about 17 s) and
-        "two_hand_hearts" (both arms and hands form a heart, about 31 s). Each robot plans from its
-        own measured pose and hands, so with "both" an imported gesture's timing may differ a little
-        between the robots. Slow (peak 0.75 rad/s, fingers too). Requires the SONIC controller
+        "two_hand_hearts" (both arms and hands form a heart, about 31 s).
+        Demo, arms only: "invite" (both hands up, palms forward, swaying once, about 16 s),
+        "take_left"/"take_right" (that arm points down and out, palm forward, about 15 s),
+        "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
+        about 15 s) and "thanks" (hands held together in front of the waist, about 17 s). Each robot
+        plans from its own measured pose and hands, so with "both" an imported gesture's timing may
+        differ a little between the robots. Slow (peak 0.75 rad/s, fingers too). Requires the SONIC controller
         running in confirmed planner idle; it never starts or stops the controller. Stops early and
         returns control to the planner if the legs or waist stray, or an arm strays far from the
         plan. Returns at once; a tool update reports the result.

@@ -43,7 +43,7 @@ import pytest
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import SONIC_ARM_PROFILE
-from dimos.robot.unitree.g1.imported_gestures import RETAINED
+from dimos.robot.unitree.g1.imported_gestures import AUTHORED, RETAINED
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     LEFT_ARM,
     MOTOR_NAMES,
@@ -444,7 +444,7 @@ def _tracking(sim: Sim, w: Window, name: str, plans: Any) -> list[str]:
     return failures
 
 
-@pytest.mark.parametrize("name", RETAINED)
+@pytest.mark.parametrize("name", RETAINED + AUTHORED)
 def test_imported_gesture_tracks_and_hands_back(
     tmp_path: Path, tool_transport: Any, mocker: Any, name: str
 ) -> None:

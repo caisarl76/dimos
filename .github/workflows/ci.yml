@@ -618,7 +618,9 @@ jobs:
     strategy:
       matrix:
         pyver: ['3.10', '3.11', '3.12']
-        os: ["macos-latest", "ubuntu-latest"]
+        # Upstream tests macOS and Ubuntu; forks run Ubuntu only (their macOS failures are
+        # upstream's to fix, and fail-fast would cancel the Ubuntu jobs with them).
+        os: ${{ fromJSON(github.repository == 'dimensionalOS/dimos' && '["macos-latest", "ubuntu-latest"]' || '["ubuntu-latest"]') }}
         experimental: [false]
         include:
           - os: "ubuntu-24.04-arm"
