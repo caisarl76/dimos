@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""unitree-g1-sonic-arm-dual plus an LLM agent that can call the two robots' left-arm skills.
+"""unitree-g1-sonic-arm-dual plus an LLM agent that can call the two robots' arm skills and gestures.
 
 Needs the model's API key (e.g. OPENAI_API_KEY) in the environment or .env. Talk to it with
 `dimos agent-send "make both robots wave"`.

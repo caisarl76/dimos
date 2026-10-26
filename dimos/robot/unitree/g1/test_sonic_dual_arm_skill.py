@@ -27,6 +27,7 @@ import re
 import threading
 import time
 from types import SimpleNamespace
+from typing import get_args
 from uuid import uuid4
 
 import numpy as np
@@ -173,6 +174,11 @@ def test_dual_prompt_names_only_dual_skills():
         k for k, v in vars(DualSonicArmSkillContainer).items() if getattr(v, "__skill__", False)
     }
     assert named and named <= skills, named - skills
+
+
+def test_dual_prompt_names_every_gesture():
+    for name in get_args(sonic_arm_skill.GestureName):
+        assert f"`{name}`" in G1_SONIC_DUAL_ARM_SYSTEM_PROMPT, name
 
 
 @pytest.mark.parametrize("robot", ["222", 222])  # `dimos mcp call --arg robot=222` sends an int.

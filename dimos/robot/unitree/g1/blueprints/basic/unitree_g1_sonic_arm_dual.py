@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Two G1s' left-arm skills from one workstation, over independently launched SONIC controllers.
+"""Two G1s' arm skills and gestures (left arm; both arms and Dex3 hands for imported gestures), over independently launched SONIC controllers.
 
 Runbook. Each G1's PC2 runs its guarded SONIC launcher, which binds telemetry on 127.0.0.1:5557
 and reads references from 127.0.0.1:5556. Use each PC2's ssh alias (today: 222 `pc2_222`, 223
