@@ -1,0 +1,24 @@
+name: Fork nightly CI
+# Fork-only: dispatches ci.yml on main every night, which then runs the full fork matrix
+# (3.10/3.11/3.12 and ARM, with coverage) and every path-gated job. Upstream's ci.yml
+# triggers stay as they are.
+on:
+  schedule:
+    - cron: "0 18 * * *"  # 03:00 KST
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  dispatch-ci:
+    if: github.repository != 'dimensionalOS/dimos'
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # For `gh workflow run`
+    steps:
+      - name: Dispatch ci.yml on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run ci.yml --ref main

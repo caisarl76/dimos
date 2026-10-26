@@ -55,6 +55,8 @@ jobs:
   changes:
     # Fork-only path filter: fork PRs skip the jobs their paths can't affect, to keep fork CI
     # short. Upstream, pushes and anything without a PR base get every output true.
+    # scope is `targeted` when a fork PR touches only dimos/robot/unitree/g1/ and docs (docs/,
+    # *.md outside dimos/), so tests runs one small job; anything else is `full`.
     timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:
@@ -65,6 +67,7 @@ jobs:
       native: ${{ steps.filter.outputs.native }}
       bench: ${{ steps.filter.outputs.bench }}
       deps: ${{ steps.filter.outputs.deps }}
+      scope: ${{ steps.filter.outputs.scope }}
     steps:
       - name: Checkout
         if: github.repository != 'dimensionalOS/dimos' && github.event_name == 'pull_request'
@@ -80,7 +83,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          all() { for g in web docs native bench deps; do echo "$g=true" >> "$GITHUB_OUTPUT"; done; exit 0; }
+          all() { for g in web docs native bench deps; do echo "$g=true" >> "$GITHUB_OUTPUT"; done; echo "scope=full" >> "$GITHUB_OUTPUT"; exit 0; }
           { [ "$UPSTREAM" = true ] || [ "$EVENT" != pull_request ] || [ -z "$BASE" ]; } && all
           files=$(git diff --name-only "$BASE...$HEAD") || all
           echo "$files"
@@ -92,6 +95,8 @@ jobs:
           bench='^dimos/[^/]+\.py$|^dimos/(core|protocol|msgs|mapping|navigation|memory|utils|spec|types|porcelain|visualization|models)/|^dimos/(perception/detection/type|perception/fiducial|simulation/dimsim|simulation/mujoco|agents/mcp|stream/audio|web/websocket_vis|robot/unitree/go2|robot/unitree/type)/|^dimos/(agents|robot/unitree)/[^/]+\.py$|^dimos/robot/(get_all|external)_blueprints\.py$|^dimos/cli/theme\.py$|^data/\.lfs/go2_short\.db\.tar\.gz$|^bin/benchmark-analysis$|^\.github/benchmark-analysis/'
           {
             echo "deps=false"
+            # Targeted: no file outside dimos/robot/unitree/g1/, docs/ and *.md outside dimos/.
+            echo "scope=$([ -z "$(awk '!/^(dimos\/robot\/unitree\/g1|docs)\// && !(/\.md$/ && !/^dimos\//)' <<< "$files")" ] && echo targeted || echo full)"
             echo "bench=$(has "$bench")"
             echo "web=$(has "^(web|dimos/web|docker/relay)/|^dimos/e2e_tests/(conftest|dimos_cli_call|test_[a-z0-9_]+_browser)\.py$|$bench")"
             echo "docs=$(has '^docs/|^README\.md$|^bin/run-doc-codeblocks$|^data/\.lfs/(go2_bigoffice\.db|unitree_go2_bigoffice_map\.pickle)\.tar\.gz$')"
@@ -389,6 +394,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: "0"
+      # Cached as .debs (see "Restore apt archives"): a stalled Ubuntu mirror can't block a hit.
+      APT_PACKAGES: portaudio19-dev
     permissions:
       contents: read  # For checkout
 
@@ -423,11 +430,32 @@ jobs:
         with:
           enable-cache: true
           prune-cache: true
+      # Every apt step reuses these restore/install/save steps' YAML anchors (&apt-*).
+      - name: Restore apt archives
+        uses: actions/cache/restore@v6
+        with:
+          path: &apt-path ~/.apt-archives/*.deb
+          key: &apt-key apt-${{ runner.os }}-${{ runner.arch }}-${{ env.APT_PACKAGES }}-${{ github.run_id }}
+          restore-keys: &apt-restore-keys apt-${{ runner.os }}-${{ runner.arch }}-${{ env.APT_PACKAGES }}-
       - name: Install dependency for pyaudio
+        id: apt
         timeout-minutes: 10
-        run: |
+        run: &apt-install |
+          dir="$HOME/.apt-archives"
+          mkdir -p "$dir/partial"
+          # Restored archives install offline, with no mirror; if they no longer fit this image, download.
+          compgen -G "$dir/*.deb" > /dev/null &&
+            sudo apt-get install -y --no-install-recommends --no-download "$dir"/*.deb && exit 0
+          rm -f "$dir"/*.deb
           sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev
+          sudo apt-get -o Acquire::Retries=3 -o Dir::Cache::archives="$dir" install -y --no-install-recommends $APT_PACKAGES
+          if compgen -G "$dir/*.deb" > /dev/null; then echo "downloaded=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Install dependencies
         run: uv sync --group tests --frozen
       # Needs Python and Rust: `dimos bake` is Python that writes a Rust program and compiles it, and the tests jobs have no Rust.
@@ -459,6 +487,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CARGO_INCREMENTAL: "0"
+      APT_PACKAGES: portaudio19-dev  # See rust.
     permissions:
       contents: read  # For checkout
     steps:
@@ -478,12 +507,24 @@ jobs:
           restore-keys: pyo3-${{ runner.os }}-${{ runner.arch }}-
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
+      - name: Restore apt archives
+        if: runner.os == 'Linux'
+        uses: actions/cache/restore@v6
+        with:
+          path: *apt-path
+          key: *apt-key
+          restore-keys: *apt-restore-keys
       - name: Install dependency for pyaudio (Ubuntu)
         if: runner.os == 'Linux'
+        id: apt
         timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev
+        run: *apt-install
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Install dependency for pyaudio (macOS)
         if: runner.os == 'macOS'
         run: brew install portaudio
@@ -501,6 +542,8 @@ jobs:
     if: needs.changes.outputs.docs == 'true'
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    env:
+      APT_PACKAGES: libturbojpeg portaudio19-dev  # See rust.
     permissions:
       contents: read  # For checkout
 
@@ -509,11 +552,22 @@ jobs:
       - name: Fetch LFS data needed by doc code blocks
         run: git lfs pull --include="data/.lfs/go2_bigoffice.db.tar.gz,data/.lfs/unitree_go2_bigoffice_map.pickle.tar.gz" --exclude=""
       # Docs decode JPEG from SQLite via PyTurboJPEG; pyaudio needs portaudio.
+      - name: Restore apt archives
+        uses: actions/cache/restore@v6
+        with:
+          path: *apt-path
+          key: *apt-key
+          restore-keys: *apt-restore-keys
       - name: Install system dependencies
+        id: apt
         timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends libturbojpeg portaudio19-dev
+        run: *apt-install
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
@@ -572,6 +626,8 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    env:
+      APT_PACKAGES: portaudio19-dev libturbojpeg ffmpeg  # See rust.
     permissions:
       contents: read  # For checkout
 
@@ -643,13 +699,24 @@ jobs:
         uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
+      - name: Restore apt archives
+        uses: actions/cache/restore@v6
+        with:
+          path: *apt-path
+          key: *apt-key
+          restore-keys: *apt-restore-keys
       - name: Install native dependencies (pyaudio build, JPEG encoding, audio decode)
         # Same packages as the tests job's apt step, so the same cap; it leaves the rest of
         # the 30-minute job for Playwright and the e2e instead of hanging on a slow mirror.
+        id: apt
         timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev libturbojpeg ffmpeg
+        run: *apt-install
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Fetch the go2_short replay dataset
         run: git lfs pull --include="data/.lfs/go2_short.db.tar.gz" --exclude=""
       - name: Install dependencies
@@ -682,15 +749,16 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        # Fork-only: without a dependency change, forks test 3.12 on ubuntu-latest alone.
-        pyver: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.deps == 'true') && '["3.10", "3.11", "3.12"]' || '["3.12"]') }}
+        # Fork-only: forks test 3.10/3.11 (and ARM, below) only nightly or on a manual dispatch.
+        pyver: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)) && '["3.10", "3.11", "3.12"]' || '["3.12"]') }}
         # Upstream tests macOS and Ubuntu; forks run Ubuntu only (their macOS failures are
         # upstream's to fix, and fail-fast would cancel the Ubuntu jobs with them).
         os: ${{ fromJSON(github.repository == 'dimensionalOS/dimos' && '["macos-latest", "ubuntu-latest"]' || '["ubuntu-latest"]') }}
         experimental: [false]
-        # Each leg runs half of the default suite; see "Select test partition".
-        part: [1, 2]
-        include: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.deps == 'true') && '[{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false,"part":1},{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false,"part":2}]' || '[]') }}
+        # Each leg runs half of the default suite; see "Select test partition". Fork-only: a
+        # targeted-scope PR (see changes) runs one `targeted` leg instead.
+        part: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || needs.changes.outputs.scope != 'targeted') && '[1, 2]' || '["targeted"]') }}
+        include: ${{ fromJSON((github.repository == 'dimensionalOS/dimos' || contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)) && '[{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false,"part":1},{"os":"ubuntu-24.04-arm","pyver":"3.12","experimental":false,"part":2}]' || '[]') }}
       fail-fast: true
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
@@ -704,6 +772,9 @@ jobs:
       RUST_LOG: "zenoh::net::runtime::orchestrator=debug"
       # Needed because runner's Python does not include sqlite extensions.
       UV_PYTHON_PREFERENCE: only-managed
+      APT_PACKAGES: portaudio19-dev libturbojpeg ffmpeg  # See rust.
+      # Coverage on 3.12 only; fork-only: and only nightly or on a manual dispatch.
+      COVERAGE: ${{ matrix.pyver == '3.12' && (github.repository == 'dimensionalOS/dimos' || contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)) }}
     permissions:
       contents: read  # For checkout
       id-token: write  # For codecov-action's OIDC upload
@@ -726,12 +797,24 @@ jobs:
           deno-version: ${{ steps.deno-version.outputs.version }}
           cache: true
       # pyaudio needs portaudio; relay/audio tests need TurboJPEG and ffmpeg.
+      - name: Restore apt archives
+        if: startsWith(matrix.os, 'ubuntu')
+        uses: actions/cache/restore@v6
+        with:
+          path: *apt-path
+          key: *apt-key
+          restore-keys: *apt-restore-keys
       - name: Install system dependencies (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
+        id: apt
         timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev libturbojpeg ffmpeg
+        run: *apt-install
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Install dependency for pyaudio (macOS)
         if: startsWith(matrix.os, 'macos')
         run: brew install portaudio ffmpeg
@@ -781,8 +864,12 @@ jobs:
       - name: Select test partition
         env:
           PART1: dimos/robot dimos/core dimos/protocol
+          # Fork-only targeted leg: G1 plus the core, RPC, spec and blueprint checks it leans on.
+          TARGETED: dimos/robot/unitree/g1 dimos/core dimos/protocol/rpc dimos/spec dimos/robot/test_all_blueprints.py dimos/robot/test_all_blueprints_generation.py dimos/codebase_checks
         run: |
-          if [ "${{ matrix.part }}" = 1 ]; then
+          if [ "${{ matrix.part }}" = targeted ]; then
+            echo "TEST_PATHS=$TARGETED" >> "$GITHUB_ENV"
+          elif [ "${{ matrix.part }}" = 1 ]; then
             echo "TEST_PATHS=$PART1" >> "$GITHUB_ENV"
           else
             echo "TEST_PATHS=dimos$(printf -- ' --ignore=%s' $PART1)" >> "$GITHUB_ENV"
@@ -790,9 +877,9 @@ jobs:
       - name: Run tests
         # --timeout overrides addopts' 600 s, so a hung test fails (stacks dumped) inside the job's
         # 20 min instead of the job being cancelled; tests with their own timeout mark keep it.
-        # Coverage on 3.12 only. Branch coverage traces every line (CTracer / sys.settrace) on every
-        # version, which slows the suite and skews timing-sensitive tests; the other versions skip it.
-        run: uv run pytest --numprocesses=logical --timeout=120 ${{ matrix.pyver == '3.12' && '--cov=dimos/' || '--no-cov' }} --junitxml=junit.xml -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)' $TEST_PATHS
+        # Coverage only where COVERAGE is set. Branch coverage traces every line (CTracer / sys.settrace)
+        # on every version, which slows the suite and skews timing-sensitive tests; the rest skip it.
+        run: uv run pytest --numprocesses=logical --timeout=120 ${{ env.COVERAGE == 'true' && '--cov=dimos/' || '--no-cov' }} --junitxml=junit.xml -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)' $TEST_PATHS
       # Serial and after the parallel run: it binds the livox SDK's fixed ports.
       - name: Native module e2e tests
         # Once per workflow: Linux x86_64, Python 3.12, part 1. The publish marker is restored only
@@ -817,10 +904,11 @@ jobs:
             echo "::endgroup::"
           done
       - name: Turn coverage into xml
-        if: matrix.pyver == '3.12'
+        if: env.COVERAGE == 'true'
         run: uv run python -m coverage xml
+      # Fork-only: no Codecov uploads or notifications outside upstream.
       - name: Upload coverage
-        if: matrix.pyver == '3.12'
+        if: env.COVERAGE == 'true' && github.repository == 'dimensionalOS/dimos'
         uses: codecov/codecov-action@v7
         with:
           disable_search: true
@@ -835,7 +923,7 @@ jobs:
           use_pypi: true
           version: "11.2.8"
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.repository == 'dimensionalOS/dimos' }}
         uses: codecov/codecov-action@v7
         with:
           report_type: test_results
@@ -1142,6 +1230,15 @@ jobs:
       ALIBABA_API_KEY: ${{ secrets.ALIBABA_API_KEY }}
       TYPESAFENAVIGATIONAGENT__API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
       DIMSIM_RENDER: gpu
+      # See rust. build-essential: the in-tree pybind11 C++ extension. libgl1: opencv-python
+      # (cv2 loads libGL.so.1). libturbojpeg: PyTurboJPEG. portaudio19-dev: PyAudio, built from
+      # source. libatk1.0-0 .. libxrandr2: Chromium for Playwright (dimsim browser tests).
+      # libxkbcommon-x11-0: the Rerun viewer's X11 keyboard bindings when DISPLAY is set.
+      APT_PACKAGES: >-
+        build-essential libgl1 libturbojpeg portaudio19-dev
+        libatk1.0-0 libatk-bridge2.0-0 libcairo2 libcups2 libgbm1
+        libpango-1.0-0 libxcomposite1 libxdamage1 libxkbcommon0 libxrandr2
+        libxkbcommon-x11-0
       # See the `tests` job for why this is set.
       PYTHONFAULTHANDLER: "1"
     timeout-minutes: 30
@@ -1186,24 +1283,22 @@ jobs:
         run: |
           uv venv .codecov-venv
           uv pip install --python .codecov-venv/bin/python codecov-cli==11.2.8
+      - name: Restore apt archives
+        uses: actions/cache/restore@v6
+        with:
+          path: *apt-path
+          key: *apt-key
+          restore-keys: *apt-restore-keys
       - name: Install apt dependencies
+        id: apt
         timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-            `# Compiler toolchain for the in-tree pybind11 C++ extension.` \
-            build-essential \
-            `# Runtime lib for opencv-python (cv2 loads libGL.so.1 on import).` \
-            libgl1 \
-            `# Runtime lib for PyTurboJPEG (fast JPEG encode/decode).` \
-            libturbojpeg \
-            `# Dev package for PyAudio (built from source against PortAudio).` \
-            portaudio19-dev \
-            `# Chromium runtime libs required by Playwright (used by dimsim browser tests).` \
-            libatk1.0-0 libatk-bridge2.0-0 libcairo2 libcups2 libgbm1 \
-            libpango-1.0-0 libxcomposite1 libxdamage1 libxkbcommon0 libxrandr2 \
-            `# Rerun viewer pulls in X11 keyboard bindings when DISPLAY is set.` \
-            libxkbcommon-x11-0
+        run: *apt-install
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Install dependencies
         run: uv sync --group tests-self-hosted --frozen
       - name: Build C++ extensions in-place
@@ -1280,6 +1375,8 @@ jobs:
     timeout-minutes: 30
     # The hosted runner that exposes a PMU, for the instruction counts.
     runs-on: ubuntu-24.04-arm
+    env:
+      APT_PACKAGES: portaudio19-dev libturbojpeg  # See rust; perf's linux-tools are cached with them.
     permissions:  # Restricted to run untested code. Reporting in next job.
       contents: read  # For checkout
     steps:
@@ -1298,11 +1395,16 @@ jobs:
             echo "archive already smudged"
           fi
       # pyaudio build needs portaudio; the recording's JPEG frames need turbojpeg.
+      - name: Restore apt archives
+        uses: actions/cache/restore@v6
+        with:
+          path: *apt-path
+          key: *apt-key
+          restore-keys: *apt-restore-keys
       - name: Install system dependencies
+        id: apt
         timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends portaudio19-dev libturbojpeg
+        run: *apt-install
       # LCM lidar/image UDP fragments drop with small kernel buffers; the
       # in-process configurator (64MB) skips under pytest, so do it here.
       - name: Raise UDP receive buffers for LCM
@@ -1310,15 +1412,27 @@ jobs:
       # Hardware counters don't move with the core's clock or idle state, unlike
       # CPU time.
       - name: Install perf
+        id: perf
         timeout-minutes: 10
         run: |
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends linux-tools-common "linux-tools-$(uname -r)" ||
-            sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends linux-tools-generic
+          # The apt archives may already have installed a perf (any build can count, see below).
+          if ! compgen -G "/usr/lib/linux-tools/*/perf" > /dev/null; then
+            [ "${{ steps.apt.outputs.downloaded }}" = true ] || sudo apt-get -o Acquire::Retries=3 update
+            apt=(sudo apt-get -o Acquire::Retries=3 -o Dir::Cache::archives="$HOME/.apt-archives" install -y --no-install-recommends)
+            "${apt[@]}" linux-tools-common "linux-tools-$(uname -r)" || "${apt[@]}" linux-tools-generic
+            echo "downloaded=true" >> "$GITHUB_OUTPUT"
+          fi
           # The wrapper wants a build for the running kernel; any build can count.
           sudo ln -sfn "$(ls /usr/lib/linux-tools/*/perf | head -1)" /usr/local/bin/perf
           # Ubuntu's default forbids unprivileged perf; 2 allows counting one's
           # own processes in user space.
           sudo sysctl -w kernel.perf_event_paranoid=2
+      - name: Save apt archives
+        if: steps.apt.outputs.downloaded == 'true' || steps.perf.outputs.downloaded == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: *apt-path
+          key: *apt-key
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
@@ -1419,7 +1533,8 @@ jobs:
             $([ "$ACKED" = true ] && echo --acknowledged)
 
   benchmark-analysis:
-    if: github.event_name == 'push'
+    # Fork-only skip: it files GitHub issues, and the fork has issues disabled.
+    if: github.event_name == 'push' && github.repository == 'dimensionalOS/dimos'
     needs: benchmark-track
     timeout-minutes: 10
     runs-on: ubuntu-latest
@@ -1487,10 +1602,12 @@ jobs:
     - name: Decide whether the needed jobs succeeded or failed
       uses: re-actors/alls-green@release/v1
       with:
-        # Fork-only: the path-gated jobs may skip there (a failure still fails this).
+        # Fork-only: the path-gated jobs may skip there (a failure still fails this). tests is never
+        # allowed to skip: a fork PR always runs at least its targeted leg.
         allowed-skips: ${{ github.repository == 'dimensionalOS/dimos' && 'self-hosted-tests, self-hosted-large-tests' || 'self-hosted-tests, self-hosted-large-tests, rust, pyo3, md-babel, web, benchmark, benchmark-track' }}
         jobs: ${{ toJSON(needs) }}
     - name: Trigger Codecov notifications
+      if: github.repository == 'dimensionalOS/dimos'
       uses: codecov/codecov-action@v7
       with:
         run_command: send-notifications
