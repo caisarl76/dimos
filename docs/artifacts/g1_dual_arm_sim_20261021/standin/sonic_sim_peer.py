@@ -1,3 +1,17 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Real-time MuJoCo stand-in for the guarded native SONIC controller (offline; no robot).
 
 Speaks the guarded controller's local protocol to a DimOS SonicExecutionModule: binds a g1_debug
@@ -22,13 +36,12 @@ import argparse
 import signal
 import time
 
-import mujoco
+from arm_reference import Encoder, IdlePlanner
+import demo_sim_arm_reference as sim  # sets up the lerobot harness with the v1.1 model and scene
 import msgpack
+import mujoco
 import numpy as np
 import zmq
-
-import demo_sim_arm_reference as sim  # sets up the lerobot harness with the v1.1 model and scene
-from arm_reference import Encoder, IdlePlanner
 
 TICK = 0.02
 LEASE = 0.2  # the guarded controller's reference timeout
@@ -62,13 +75,20 @@ def startup_on_floor(robot, dec, planner_token_of):
         robot.step(dec(token, *robot.state()), band=True)
     for _ in range(150):  # free standing
         robot.step(dec(token, *robot.state()))
-    return token, {"floor_contacts": robot.floor_contacts(), "pelvis_z": float(robot.d.xpos[robot.pelvis, 2])}
+    return token, {
+        "floor_contacts": robot.floor_contacts(),
+        "pelvis_z": float(robot.d.xpos[robot.pelvis, 2]),
+    }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--feedback", required=True, help="bind address for g1_debug feedback")
-    parser.add_argument("--reference", required=True, help="the execution module's reference endpoint")
+    parser.add_argument(
+        "--reference", required=True, help="the execution module's reference endpoint"
+    )
     parser.add_argument("--name", default="sim")
     parser.add_argument("--log", default=None, help="npz of the simulated state, written on exit")
     args = parser.parse_args()
@@ -97,7 +117,9 @@ def main() -> None:
     planner, expired, rearm_requires_planner = True, False, False
     epoch, accepted, index, token = 0, -1, 0, planner_token
     last_pose = 0.0
-    log: dict[str, list] = {k: [] for k in ("t", "armed", "q", "dq", "pelvis_z", "tilt", "contacts", "tick_ms")}
+    log: dict[str, list] = {
+        k: [] for k in ("t", "armed", "q", "dq", "pelvis_z", "tilt", "contacts", "tick_ms")
+    }
     stop = []
     signal.signal(signal.SIGTERM, lambda *_: stop.append(True))
     next_tick = time.monotonic()
@@ -120,7 +142,9 @@ def main() -> None:
                     accepted = int(np.frombuffer(packet[1540:1548], dtype="<i8")[0])
                     token = np.frombuffer(packet[1284:1540], dtype="<f4").astype(np.float64)
                     last_pose = now
-            if not planner and now - last_pose > LEASE:  # stream gap: the guard returns to the planner
+            if (
+                not planner and now - last_pose > LEASE
+            ):  # stream gap: the guard returns to the planner
                 planner, expired, rearm_requires_planner = True, True, True
                 print(f"[{args.name}] reference expired -> planner", flush=True)
             applied = planner_token if planner or accepted < 0 else token
@@ -128,23 +152,42 @@ def main() -> None:
             started = time.monotonic()
             robot.step(dec(applied, q, dq, quat, gyro))
             index += 1
-            pub.send(b"g1_debug" + msgpack.packb({
-                "index": index, "ros_timestamp": 0.0,
-                "body_q": robot.state()[0].tolist(), "body_dq": robot.state()[1].tolist(),
-                "left_hand_q": [0.0] * 7, "left_hand_dq": [0.0] * 7,
-                "right_hand_q": [0.0] * 7, "right_hand_dq": [0.0] * 7,
-                "token_state": [float(v) for v in applied],
-                "reference_guard": {
-                    "armed": not planner, "expired": expired, "planner_selected": planner,
-                    "planner_confirmed": planner, "rearm_requires_planner": rearm_requires_planner,
-                    "accepted_index": accepted, "applied_index": accepted, "rejected": 0,
-                    "epoch": epoch, "age_ms": (now - last_pose) * 1000 if not planner else -1.0,
-                },
-            }))
-            log["t"].append(now); log["armed"].append(not planner); log["q"].append(q)
-            log["dq"].append(dq); log["pelvis_z"].append(float(robot.d.xpos[robot.pelvis, 2]))
+            pub.send(
+                b"g1_debug"
+                + msgpack.packb(
+                    {
+                        "index": index,
+                        "ros_timestamp": 0.0,
+                        "body_q": robot.state()[0].tolist(),
+                        "body_dq": robot.state()[1].tolist(),
+                        "left_hand_q": [0.0] * 7,
+                        "left_hand_dq": [0.0] * 7,
+                        "right_hand_q": [0.0] * 7,
+                        "right_hand_dq": [0.0] * 7,
+                        "token_state": [float(v) for v in applied],
+                        "reference_guard": {
+                            "armed": not planner,
+                            "expired": expired,
+                            "planner_selected": planner,
+                            "planner_confirmed": planner,
+                            "rearm_requires_planner": rearm_requires_planner,
+                            "accepted_index": accepted,
+                            "applied_index": accepted,
+                            "rejected": 0,
+                            "epoch": epoch,
+                            "age_ms": (now - last_pose) * 1000 if not planner else -1.0,
+                        },
+                    }
+                )
+            )
+            log["t"].append(now)
+            log["armed"].append(not planner)
+            log["q"].append(q)
+            log["dq"].append(dq)
+            log["pelvis_z"].append(float(robot.d.xpos[robot.pelvis, 2]))
             log["tilt"].append(float(np.degrees(np.arccos(np.clip(-h.gravity(quat)[2], -1, 1)))))
-            log["contacts"].append(robot.floor_contacts()); log["tick_ms"].append((time.monotonic() - started) * 1000)
+            log["contacts"].append(robot.floor_contacts())
+            log["tick_ms"].append((time.monotonic() - started) * 1000)
             next_tick += TICK
             delay = next_tick - time.monotonic()
             if delay > 0:
