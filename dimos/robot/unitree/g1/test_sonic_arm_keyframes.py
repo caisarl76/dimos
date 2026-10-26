@@ -477,10 +477,13 @@ def test_chunks_split_only_where_still_and_fit_the_session():
 
 
 def test_chunks_greedily_take_the_latest_still_row_with_room_for_overlap():
-    still = np.zeros(1975, bool)
+    still = np.zeros(1950, bool)
     still[[0, 900, 975, 976]] = True
-    assert chunk_rows(1975, still) == [(0, 1000), (975, 1975)]
-    assert chunk_rows(1000, np.zeros(1000, bool)) == [(0, 1000)]
+    # A middle chunk may fill all 1000 rows; the last keeps 25 free for its finish hold.
+    assert chunk_rows(1950, still) == [(0, 1000), (975, 1950)]
+    assert chunk_rows(975, np.zeros(975, bool)) == [(0, 975)]
+    with pytest.raises(ValueError, match="cannot be split"):
+        chunk_rows(976, np.zeros(976, bool))
 
 
 @pytest.mark.parametrize("name", get_args(GestureName))

@@ -209,6 +209,16 @@ def follows(t, delta=-np.radians(20), joint=15):  # The moving joint at the plan
     return q
 
 
+def unheld(chunk):
+    """A last chunk less its finish hold, which must repeat the chunk's own last row."""
+    rows, hold = (
+        chunk[: -sonic_arm_skill._FINISH_HOLD_ROWS],
+        chunk[-sonic_arm_skill._FINISH_HOLD_ROWS :],
+    )
+    assert np.all(hold == rows[-1])
+    return rows
+
+
 def tokens(packets):
     return np.array([np.frombuffer(p[1284:1540], "<f4") for p in packets if p.startswith(b"pose")])
 
@@ -671,7 +681,7 @@ def test_module_stop_mid_motion_waits_for_the_retreat_and_the_final_update(
     [(row, implied, built)] = stops
     # The row the stream's clock implies at the stop, not one a chunk or the blend pad off.
     assert row == implied >= LEAD_IN_ROWS + 5, stops
-    assert np.array_equal(submit.call_args_list[1].args[3], built)
+    assert np.array_equal(unheld(submit.call_args_list[1].args[3]), built)
     assert module._execution.get_status()["task"]["handback_confirmed"]
 
 
@@ -714,7 +724,7 @@ def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     # The row the stream's clock implies at the stop, not one a chunk or the blend pad off.
     assert row == implied and 3 <= row < LEAD_IN_ROWS, stops
     assert len(spy.call_args_list) == 2
-    first, rows = spy.call_args_list[0].args[3], spy.call_args_list[1].args[3]
+    first, rows = unheld(spy.call_args_list[0].args[3]), unheld(spy.call_args_list[1].args[3])
     assert len(rows) == row + 2  # The blend rows sent so far, reversed, then the planner token.
     assert np.array_equal(rows[:-1], first[row::-1])
     assert np.array_equal(rows[-1], first[-1])  # The captured planner token (and hands).
@@ -1152,6 +1162,28 @@ def test_gesture_from_a_raised_arm_returns_to_where_it_started(skill, mocker):
     assert streamed[-1] == pytest.approx(PEER_TOKEN, abs=1e-3)
 
 
+def test_a_late_finish_lands_in_the_final_hold_and_still_finishes(skill, mocker):
+    """finish_task comes 2 rows (40 ms) before the plan ends; a stall past that is not a failure."""
+    module, peer = skill
+    real = module._execution.finish_task
+
+    def late(task_id):
+        time.sleep(0.15)  # A stalled stream thread: a few ticks.
+        return real(task_id)
+
+    mocker.patch.object(module._execution, "finish_task", side_effect=late)
+    submit = mocker.spy(module._execution, "submit_chunk")
+    result = run(module, 20.0, follows)
+    assert "returned" in result.message, result
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
+    # The frames after the plan's end repeat its final row: still tokens and hands.
+    final = unheld(submit.call_args_list[-1].args[3])[-1]
+    held = [pose_values(p) for p in peer.snapshot() if p.startswith(b"pose")][-2:]
+    for frame in held:
+        assert np.allclose(frame, final, atol=1e-6)  # float32 on the wire
+
+
 def test_stop_mid_wave_reverses_one_swing_then_goes_home(skill, mocker):
     module, _ = skill
     submit = mocker.spy(module._execution, "submit_chunk")
@@ -1168,6 +1200,23 @@ def test_stop_mid_wave_reverses_one_swing_then_goes_home(skill, mocker):
     assert len(retreat) < len(first) / 2  # One swing and the way home, never the gesture again.
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "finished" and status["handback_confirmed"], status
+
+
+def test_a_session_failure_is_not_hidden_behind_stopped_early(skill, mocker):
+    module, _ = skill
+    fail = module._execution.fail_task
+    mocker.patch.object(
+        module._execution, "finish_task", side_effect=lambda task_id: fail(task_id, "injected")
+    )
+
+    def knee(t):
+        q = np.zeros(29)
+        q[3] = 0.2 if t > 1.5 else 0.0
+        return q
+
+    result = call_with_feed(module, lambda: module.perform_gesture("wave"), knee)
+    assert "stopped early" in result.message, result
+    assert "session failed: injected" in result.message, result
 
 
 def test_gesture_longer_than_the_limit_sends_nothing(skill, mocker):
@@ -1319,6 +1368,23 @@ def test_long_plans_split_into_two_chunks_at_the_hold():
     still[200] = True
     with pytest.raises(ValueError):
         sonic_arm_skill.chunk_rows(2500, still)
+
+
+def test_a_last_chunk_that_filled_the_old_boundary_still_gets_a_full_hold():
+    still = np.zeros(1500, bool)
+    still[[510, 1000]] = True  # Old boundary: split at 510, leaving a 990-row last chunk.
+    chunks = sonic_arm_skill.chunk_rows(1500, still)
+    assert chunks == [(0, 535), (510, 1025), (1000, 1500)]
+    rows = np.zeros((chunks[-1][1] - chunks[-1][0], 3))
+    rows[-1] = 1.0
+    held = sonic_arm_skill.with_finish_hold(rows)
+    assert len(held) == len(rows) + sonic_arm_skill._FINISH_HOLD_ROWS == 525
+    assert np.all(held[len(rows) - 1 :] == 1.0)
+    full = sonic_arm_skill._MAX_CHUNK_ROWS - sonic_arm_skill._FINISH_HOLD_ROWS
+    assert len(sonic_arm_skill.with_finish_hold(np.zeros((full, 3)))) == 1000
+    with pytest.raises(RuntimeError, match="finish hold"):
+        sonic_arm_skill.with_finish_hold(np.zeros((full + 1, 3)))
+    assert all(end - start + 25 <= 1000 for start, end in chunks[-1:])
 
 
 def test_split_overhead_plan_streams_without_a_ripple_at_the_second_chunk():
@@ -1799,13 +1865,14 @@ def test_every_gesture_from_the_robot_idle_splits_into_session_chunks(name):
         move_s=move_s,
         return_min_s=return_min_s,
         split_every=sonic_arm_skill._MAX_CHUNK_ROWS - sonic_arm_skill._CHUNK_OVERLAP - pad,
-        one_chunk=sonic_arm_skill._MAX_CHUNK_ROWS - 2 * pad,
+        one_chunk=sonic_arm_skill._MAX_CHUNK_ROWS - sonic_arm_skill._FINISH_HOLD_ROWS - 2 * pad,
     )
     tokens = token_schedule(np.full(64, PEER_TOKEN), FakeEncoder("unused").encode(kplan.poses))
     token_still = sonic_arm_skill.token_still(tokens)
     plan_still = np.r_[np.zeros(pad, bool), kplan.still, np.zeros(pad, bool)]
     chunks = sonic_arm_skill.chunk_rows(len(tokens), token_still & plan_still)
     assert all(end - start <= sonic_arm_skill._MAX_CHUNK_ROWS for start, end in chunks), chunks
+    assert chunks[-1][1] - chunks[-1][0] <= sonic_arm_skill._MAX_CHUNK_ROWS - 25  # Room to hold.
     assert chunks[-1][1] == len(tokens)
     hands = np.vstack(
         [np.repeat(kplan.hands[:1], pad, 0), kplan.hands, np.repeat(kplan.hands[-1:], pad, 0)]
@@ -1838,7 +1905,7 @@ def test_two_hand_hearts_submits_the_plan_hands_row_for_row(skill, mocker):
     assert result.metadata["motion"] == "two_hand_hearts" and module._both_checker.calls >= 1
     kplan = two_hand_hearts_plan()
     assert np.ptp(kplan.hands, axis=0).max() > 0.1  # The fingers move: not the measured hands.
-    [first] = [c.args[3] for c in submit.call_args_list]
+    [first] = [unheld(c.args[3]) for c in submit.call_args_list]
     assert len(first) == len(kplan.poses) + 2 * LEAD_IN_ROWS
     rows = np.linspace(0, len(kplan.poses) - 1, 25).astype(int)
     assert np.array_equal(hands_of(first)[LEAD_IN_ROWS + rows], kplan.hands[rows])
@@ -1862,7 +1929,7 @@ def test_hand_steps_stay_limited_through_a_stop_at_peak_finger_velocity(skill, m
     # The retreat's hand columns are the plan's own way back (retreat_hands), blend rows included.
     segment, offset = sonic_arm_reference.retreat_route(kplan, row - LEAD_IN_ROWS)
     unit = sonic_arm_reference.retreat_hands(kplan, segment)
-    retreat = submit.call_args_list[1].args[3]
+    retreat = unheld(submit.call_args_list[1].args[3])
     assert np.array_equal(hands_of(retreat), padded(unit)[LEAD_IN_ROWS + offset :])
     sent = np.array(
         [pose_values(p)[64:] for p in peer.snapshot() if p.startswith(b"pose")], np.float64
