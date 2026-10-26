@@ -30,7 +30,10 @@ from dimos.core.coordination.blueprints import (
     ModuleRef,
     TransportSpec,
 )
-from dimos.core.coordination.module_coordinator import _verify_no_name_conflicts
+from dimos.core.coordination.module_coordinator import (
+    _check_named_provider,
+    _verify_no_name_conflicts,
+)
 from dimos.core.module import is_module_type
 from dimos.core.transport import ZenohTransport, pZenohTransport
 from dimos.hosted.daemon import HostDescriptor
@@ -505,6 +508,15 @@ def _resolve_reference_target(
     reference: ModuleRef,
 ) -> BlueprintAtom | None:
     replacement = blueprint.remapping_map.get((consumer.name, reference.name))
+    if isinstance(replacement, str):  # Bound by instance name, as in the local coordinator.
+        named = next((a for a in blueprint.active_blueprints if a.name == replacement), None)
+        if named is None:
+            raise ValueError(
+                f"{consumer.name}.{reference.name} is remapped to instance "
+                f"{replacement!r}, but no module has that name."
+            )
+        _check_named_provider(consumer.name, reference, replacement, named.module)
+        return named
     requested = (
         cast("type", replacement)
         if is_module_type(replacement) or is_spec(replacement)

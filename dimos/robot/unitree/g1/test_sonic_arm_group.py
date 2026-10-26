@@ -560,3 +560,58 @@ def test_both_peer_rpc_hang_mid_stream_retreats_the_healthy_arm_promptly(
     assert elapsed < 15, elapsed  # Not the transport's 120 s default.
     assert ends_at_the_planner_smoothly(dual_executions[0][1])
     assert task(arms[0])["handback_confirmed"], task(arms[0])
+
+
+def test_both_session_lost_at_the_barrier_sends_no_chunk_to_either(arms, dual_executions, mocker):
+    """222's feedback goes stale while it waits for 223 to arm: neither robot gets chunk 0."""
+    real = arms[1]._execution.start_task
+    submits = [mocker.spy(arm._execution, "submit_chunk") for arm in arms]
+
+    def start_after_222_fails():
+        wait_until(lambda: (t := task(arms[0])) is not None and t["phase"] == "waiting_for_chunk")
+        dual_executions[0][1].pause_feedback.set()
+        wait_until(lambda: task(arms[0])["phase"] != "waiting_for_chunk")
+        dual_executions[0][1].pause_feedback.clear()  # Back for 222's handback.
+        return real()
+
+    mocker.patch.object(arms[1]._execution, "start_task", side_effect=start_after_222_fails)
+    try:
+        with feeding_arms(arms), pytest.raises(RuntimeError) as raised:
+            run_arms([swing(arm) for arm in arms])
+    finally:
+        dual_executions[0][1].pause_feedback.clear()
+    assert str(raised.value).startswith("222: session ended: feedback stale"), raised.value
+    assert [s.call_count for s in submits] == [0, 0]
+    assert all(planner_token_only(peer) for peer in peers(dual_executions))
+
+
+def test_both_peer_status_lost_in_handback_retreats_the_healthy_arm_promptly(
+    arms, dual_executions, mocker
+):
+    """223 finishes first, then its status RPC fails: 222 retreats now, not at 223's deadline."""
+    broken: list[float] = []
+    status, finish = arms[1]._execution.get_status, arms[1]._execution.finish_task
+
+    def failing_status():
+        if broken:
+            raise RuntimeError("execution worker lost")
+        return status()
+
+    def finish_then_break(task_id):
+        result = finish(task_id)
+        broken.append(time.monotonic())
+        return result
+
+    real_holds(mocker)
+    submits = timed_submits(arms[0], mocker)
+    mocker.patch.object(arms[1]._execution, "get_status", side_effect=failing_status)
+    mocker.patch.object(arms[1]._execution, "finish_task", side_effect=finish_then_break)
+    with feeding_arms(arms), pytest.raises(RuntimeError) as raised:
+        run_arms([swing(arms[0], hold=3.0), swing(arms[1], hold=0.1)])
+    first, second = str(raised.value).split("; 223: ")
+    assert "stopped early: 223: execution status unavailable" in first, first
+    assert second.startswith("planner handback unconfirmed"), second
+    retreats = [t for sequence, t in submits if sequence > 0]
+    assert retreats and retreats[0] - broken[0] < 0.5, (retreats, broken)  # Deadline: 1.4 s.
+    assert ends_at_the_planner_smoothly(dual_executions[0][1])
+    assert task(arms[0])["handback_confirmed"], task(arms[0])

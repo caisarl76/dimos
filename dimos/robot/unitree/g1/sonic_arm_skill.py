@@ -960,7 +960,7 @@ class SonicArm:
             self._cancel(task_id)
         if outcome != "finished":
             self._fail(watch, outcome)
-        task = self._wait_done(profile)
+        task = self._wait_done(profile, watch)
         if task is None or not task["handback_confirmed"]:
             self._fail(watch, "planner handback unconfirmed")
         elif task["outcome"] != "finished":
@@ -1112,11 +1112,20 @@ class SonicArm:
             self._execution.finish_task(task_id)
             return "stopped"
         if barrier is not None:
+            released = threading.Event()
+            lost: list[str] = []
+            threading.Thread(
+                target=self._guard_start, args=(barrier, released, lost), daemon=True
+            ).start()
             try:  # Released together; inside the session's first-chunk timeout.
                 barrier.wait(timeout=profile["first_chunk_timeout"] / 2)
             except threading.BrokenBarrierError:
                 self._cancel(task_id)
+                if lost:
+                    return f"session ended: {lost[0]}"
                 return "stopped" if self.stop.is_set() else "another robot did not arm"
+            finally:
+                released.set()
         plan_start = next_check = time.monotonic()
         with self._lock:  # Once, here: past any joint-start barrier, never on a retreat.
             watch.send_at = watch.plan_start = plan_start
@@ -1243,15 +1252,36 @@ class SonicArm:
         assert host is not None
         return ["ssh", "-n", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", "--", host, command]
 
+    def _guard_start(
+        self, barrier: threading.Barrier, released: threading.Event, lost: list[str]
+    ) -> None:
+        """While this arm waits at the joint-start barrier: if its session leaves
+        waiting_for_chunk (lost feedback or reference) or its status fails, record why in `lost`
+        and break the barrier, so no robot gets chunk 0."""
+        while not released.wait(0.02):
+            try:
+                task = self._task()
+            except Exception as exc:
+                reason = f"{type(exc).__name__}: {exc}"
+            else:
+                if task["phase"] == "waiting_for_chunk":
+                    continue
+                reason = task["reason"]
+            if not released.is_set():
+                lost.append(reason)
+                barrier.abort()
+            return
+
     def _task(self) -> dict[str, Any]:
         task: dict[str, Any] = self._execution.get_status()["task"]
         return task
 
-    def _wait_done(self, profile: dict[str, Any]) -> dict[str, Any] | None:
+    def _wait_done(self, profile: dict[str, Any], watch: _Watch) -> dict[str, Any] | None:
         """The finished task, or None if the handback is unconfirmed by the deadline.
 
         An RPC error or timeout (a dead or wedged worker) counts as unconfirmed, so the result
-        reads as an unconfirmed handback, not a bare RPC error an agent might retry.
+        reads as an unconfirmed handback, not a bare RPC error an agent might retry. The first
+        error also sets watch.abort, so peers still streaming retreat now, not at the deadline.
         """
         deadline = time.monotonic() + profile["handback_timeout"] + 1.0
         while time.monotonic() < deadline:
@@ -1259,6 +1289,7 @@ class SonicArm:
                 task = self._task()
             except Exception as exc:
                 logger.warning("Execution status unavailable", arm=self.name, error=str(exc))
+                self._fail(watch, f"execution status unavailable: {exc}")
             else:
                 if task["phase"] == "done":
                     return task
