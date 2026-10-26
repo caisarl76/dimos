@@ -85,7 +85,7 @@ jobs:
         run: |
           all() { for g in web docs native bench deps; do echo "$g=true" >> "$GITHUB_OUTPUT"; done; echo "scope=full" >> "$GITHUB_OUTPUT"; exit 0; }
           { [ "$UPSTREAM" = true ] || [ "$EVENT" != pull_request ] || [ -z "$BASE" ]; } && all
-          files=$(git diff --name-only "$BASE...$HEAD") || all
+          files=$(git diff --no-renames --name-only "$BASE...$HEAD") || all  # a rename counts at both paths
           echo "$files"
           has() { grep -qE "$1" <<< "$files" && echo true || echo false; }
           # Every job installs from the lockfile and runs this workflow.
@@ -443,9 +443,14 @@ jobs:
         run: &apt-install |
           dir="$HOME/.apt-archives"
           mkdir -p "$dir/partial"
-          # Restored archives install offline, with no mirror; if they no longer fit this image, download.
+          # Restored archives install offline, with no mirror. The hit counts only if every requested
+          # package is then installed (one the cache's image already had is absent from the cache);
+          # otherwise download.
+          # A name may now be its 24.04 "t64" successor (libcups2 -> libcups2t64), so accept either.
+          ok() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'install ok installed'; }
+          installed() { for p in $APT_PACKAGES; do ok "$p" || ok "${p}t64" || return 1; done; }
           compgen -G "$dir/*.deb" > /dev/null &&
-            sudo apt-get install -y --no-install-recommends --no-download "$dir"/*.deb && exit 0
+            sudo apt-get install -y --no-install-recommends --no-download "$dir"/*.deb && installed && exit 0
           rm -f "$dir"/*.deb
           sudo apt-get -o Acquire::Retries=3 update
           sudo apt-get -o Acquire::Retries=3 -o Dir::Cache::archives="$dir" install -y --no-install-recommends $APT_PACKAGES
@@ -906,6 +911,14 @@ jobs:
       - name: Turn coverage into xml
         if: env.COVERAGE == 'true'
         run: uv run python -m coverage xml
+      # The fork uploads no coverage to Codecov, so keep each report with the run.
+      - name: Keep the coverage report
+        if: env.COVERAGE == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.os }}-py${{ matrix.pyver }}-part${{ matrix.part }}
+          path: coverage.xml
+          retention-days: 14
       # Fork-only: no Codecov uploads or notifications outside upstream.
       - name: Upload coverage
         if: env.COVERAGE == 'true' && github.repository == 'dimensionalOS/dimos'
