@@ -47,7 +47,7 @@ from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill
 from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_agentic import (
     unitree_g1_sonic_arm_agentic,
 )
-from dimos.robot.unitree.g1.imported_gestures import HAND_LIMITS, HAND_ORDER, RETAINED
+from dimos.robot.unitree.g1.imported_gestures import AUTHORED, HAND_LIMITS, HAND_ORDER, RETAINED
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     RATE,
@@ -1848,8 +1848,8 @@ def padded(rows, pad=LEAD_IN_ROWS):
 def test_gesture_names_match_the_gesture_table():
     names = set(sonic_arm_skill.GestureName.__args__)
     assert names == set(GESTURES)
-    assert len(names) == len(sonic_arm_skill.LEFT_ARM_GESTURES) + len(RETAINED)
-    assert set(RETAINED) <= names
+    assert len(names) == len(sonic_arm_skill.LEFT_ARM_GESTURES) + len(RETAINED) + len(AUTHORED)
+    assert set(RETAINED + AUTHORED) <= names
     for name in names:
         assert f"`{name}`" in G1_SONIC_ARM_SYSTEM_PROMPT, name
     _, move_s, return_min_s, arms, envelope = sonic_arm_skill.gesture_plan_inputs(

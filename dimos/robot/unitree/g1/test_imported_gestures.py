@@ -52,8 +52,8 @@ def test_arm_names_are_the_fourteen_arm_joints() -> None:
 
 def test_every_retained_gesture_loads() -> None:
     loaded = gestures.load_gestures()
-    assert set(gestures.RETAINED) == set(loaded)
-    for name in gestures.RETAINED:
+    assert set(gestures.RETAINED + gestures.AUTHORED) == set(loaded)
+    for name in gestures.RETAINED + gestures.AUTHORED:
         g = loaded[name]
         assert g.name == name
         keyframes = gestures.resolve(g, BASE, BASE_HANDS)
@@ -61,7 +61,7 @@ def test_every_retained_gesture_loads() -> None:
         assert all(k.target.shape == (29,) and k.hands is not None for k in keyframes)
 
 
-@pytest.mark.parametrize("name", gestures.RETAINED)
+@pytest.mark.parametrize("name", gestures.RETAINED + gestures.AUTHORED)
 def test_first_resolved_keyframe_moves_away_from_base(name: str) -> None:
     g = gestures.load_gestures()[name]
     base = np.zeros(29)
@@ -221,7 +221,7 @@ def test_resolved_target_refusal_support_person() -> None:
 
 def test_doc_and_aliases_stripped() -> None:
     files = sorted(DATA.glob("*.json"))
-    assert {f.stem for f in files} == set(gestures.RETAINED)
+    assert {f.stem for f in files} == set(gestures.RETAINED + gestures.AUTHORED)
     for f in files:
         text = f.read_text()
         assert "_doc" not in text and "aliases" not in text
@@ -234,3 +234,4 @@ def test_source_md_complete() -> None:
     assert "motion_control/motion_control/gestures/data" in text
     assert "2026-10-23" in text
     assert "Dropped" in text
+    assert "Hand-authored" in text and all(f"`{n}`" in text for n in gestures.AUTHORED)

@@ -41,3 +41,25 @@ stand-in, `test_sonic_arm_sim_e2e.py`); their JSON files were deleted.
   cleared the check only from the idle pose used in the unit tests.
 - `wave_two_hands`: right_hip_pitch reached -0.151, -0.152 and -0.151 rad, beyond the 0.15 rad leg
   envelope, in 3 of 3 runs, so the motion stopped early. The arms tracked within 0.163 rad.
+
+## Hand-authored
+
+`invite`, `take_left`, `take_right`, `entrance_left`, `entrance_right` and `thanks` are not
+imported: they were written on 2026-10-26 for the G1 223 demo (voice lines 06_invite, 07_take,
+08_entrance, 09_thanks), in the same format, loaded and checked like the imported gestures
+(`AUTHORED` in `../imported_gestures.py`). Arms only, no hands and no waist (the loader refuses
+waist motion). The poses were set on scene_43dof.xml with MuJoCo kinematics: the pointing arms with
+`ArmKinematics.solve` (take: azimuth 45, elevation -25 deg; entrance: 70, 0), the right arm as the
+left's mirror (roll and yaw negated), each palm turned forward by wrist roll alone (take 0.6,
+entrance 0.85 rad: a near-straight arm's shoulder yaw of 0.45-0.55 was not tracked); invite's palms face forward (shoulder yaw 0.6, wrist roll
+0.5) and sway once by shoulder roll +-0.15 rad; thanks brings the forearms forward first, then
+holds the hands in front of the waist, the left above the right. Every plan cleared the both-arm
+`ArmCollisionChecker` from the stand-in's stance and from ROBOT_IDLE.
+
+Tuned in the MuJoCo stand-in (`test_imported_gesture_tracks_and_hands_back`, 2026-10-26): in this
+sim the right hip pitch creeps during every hold, so holds are 1.5 s (thanks 3 s), the pointing
+arms take 4 s to arrive (3 s dipped the right foot's contacts on arrival), take's wrist roll is
+0.6 (1.15 did the same and the elbow lagged), and invite sways
+once; invite with shoulder yaw 1.2 was not tracked (yaw is a loose joint) and tripped the knee, and
+with its hands 20 cm forward tripped the 0.15 hip envelope; take at 50-60 deg and entrance at 80 deg
+on the right dropped to 6 floor contacts. Final run: all six passed, legs 0.07-0.13 rad.

@@ -128,6 +128,12 @@ GestureName = Literal[
     "good",
     "support_person",
     "two_hand_hearts",
+    "invite",
+    "take_left",
+    "take_right",
+    "entrance_left",
+    "entrance_right",
+    "thanks",
 ]
 _WAVE_RAISE = (-0.3, 1.3, 0.0, 0.0)
 # Left-arm gestures as absolute (shoulder pitch, roll, yaw, elbow) rad and the hold at each, s; the
@@ -647,6 +653,11 @@ class SonicArmSkillContainer(Module):
         arm waves, about 16 s), "v_sign" (right arm, V with the fingers, about 18 s), "good" (right
         arm, thumbs up, about 19-20 s), "support_person" (both arms forward, about 17 s) and
         "two_hand_hearts" (both arms and hands form a heart, about 31 s).
+        Demo, arms only: "invite" (both hands up, palms forward, swaying once, about 16 s),
+        "take_left"/"take_right" (that arm points down and out, palm forward, about 15 s),
+        "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
+        about 15 s) and
+        "thanks" (hands held together in front of the waist, about 17 s).
         Slow (peak 0.75 rad/s, fingers too). Requires the SONIC
         controller running in confirmed planner idle; it never starts or stops the controller. Stops
         early and returns control to the planner if the legs or waist stray, or an arm strays far
