@@ -39,7 +39,7 @@ from typing import Any, Literal, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import Field
+from pydantic import Field, ValidationInfo, field_validator
 
 from dimos.agents.annotation import skill
 from dimos.agents.capabilities import CAP_MOVEMENT
@@ -389,6 +389,15 @@ class SonicArmSkillConfig(ModuleConfig):
     # Dex3 hands installed (pc2_222). Only this says the hand readings mean anything; without it a
     # hand-only motion reports its hand feedback as unavailable and the finger check refuses.
     hands_mounted: bool = False
+
+    @field_validator("encoder_path", "collision_model_path")
+    @classmethod
+    def _file_path(cls, path: Path | None, info: ValidationInfo) -> Path | None:
+        # An empty value (an unset shell variable) parses as Path("."); fail here, by name,
+        # instead of with an IsADirectoryError at start(). The file itself is opened at start().
+        if path is not None and (path == Path(".") or path.is_dir()):
+            raise ValueError(f"{info.field_name} must be a file, got {str(path)!r}")
+        return path
 
 
 @dataclass

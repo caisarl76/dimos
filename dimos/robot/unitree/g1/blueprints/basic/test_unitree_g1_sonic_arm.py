@@ -16,6 +16,7 @@
 import pytest
 import reactivex as rx
 
+from dimos.core.coordination.blueprint_config.errors import BlueprintConfigError
 from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
 from dimos.hardware.sensors.camera.module import CameraModule
 from dimos.hardware.sensors.camera.webcam import Webcam, WebcamConfig
@@ -30,6 +31,19 @@ from dimos.robot.unitree.g1.sonic_arm_reference import PEAK_SPEED, RATE
 
 def test_single_robot_profile_limits_hand_steps() -> None:
     assert SONIC_ARM_PROFILE.hand_step_limit == pytest.approx(PEAK_SPEED / RATE)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("encoder-path", ""), ("encoder-path", "/tmp"), ("collision-model-path", "")],
+)
+def test_an_empty_or_directory_model_path_fails_at_parse_time(field: str, value: str) -> None:
+    # An unset shell variable in the run command must name the field, not fail later at start().
+    cli = [f"--sonicarmskillcontainer.{field}={value}"]
+    if field != "encoder-path":
+        cli.insert(0, "--sonicarmskillcontainer.encoder-path=unused.onnx")
+    with pytest.raises(BlueprintConfigError, match=f"{field.replace('-', '_')} must be a file"):
+        BlueprintConfigParser(unitree_g1_sonic_arm).parse(cli, environ={})
 
 
 def _started_head_camera(cli: list[str], environ: dict[str, str]) -> WebcamConfig:
