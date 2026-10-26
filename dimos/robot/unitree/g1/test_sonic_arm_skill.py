@@ -65,6 +65,7 @@ from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
 from dimos.robot.unitree.g1.sonic_test_support import (
+    LEASE_STALL_RERUN,
     ROBOT_IDLE,
     SCENE,
     WAIT_S,
@@ -75,6 +76,8 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     pose_values,
 )
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
+
+pytestmark = LEASE_STALL_RERUN
 
 PEER_TOKEN = 0.125  # ScriptedPeer token_state
 FAKE_GAIN = 0.25  # Fake token value 0 per rad of summed joint offset; keeps big poses in the bound.
