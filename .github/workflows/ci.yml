@@ -790,12 +790,14 @@ jobs:
       - name: Run tests
         # --timeout overrides addopts' 600 s, so a hung test fails (stacks dumped) inside the job's
         # 20 min instead of the job being cancelled; tests with their own timeout mark keep it.
-        # Coverage on 3.12 only: older Pythons trace with sys.settrace, which is much slower and
-        # skews timing-sensitive tests.
+        # Coverage on 3.12 only. Branch coverage traces every line (CTracer / sys.settrace) on every
+        # version, which slows the suite and skews timing-sensitive tests; the other versions skip it.
         run: uv run pytest --numprocesses=logical --timeout=120 ${{ matrix.pyver == '3.12' && '--cov=dimos/' || '--no-cov' }} --junitxml=junit.xml -m 'not (self_hosted or self_hosted_large or web_browser or bake_e2e or native_e2e)' $TEST_PATHS
       # Serial and after the parallel run: it binds the livox SDK's fixed ports.
       - name: Native module e2e tests
-        if: steps.native-marker.outputs.cache-hit == 'true' && matrix.part == 1
+        # Once per workflow: Linux x86_64, Python 3.12, part 1. The publish marker is restored only
+        # on X64 (see "Restore publish marker"), so ARM never has the binaries.
+        if: steps.native-marker.outputs.cache-hit == 'true' && matrix.part == 1 && matrix.pyver == '3.12'
         run: uv run pytest -m native_e2e dimos/hardware/sensors/lidar/livox/test_e2e.py --no-cov
       - name: Re-run the failing tests with maximum verbosity
         if: failure()
