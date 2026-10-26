@@ -17,7 +17,8 @@
 The same skills as SonicArmSkillContainer, each taking `robot` ("222", "223" or "both"). One robot
 is a single-arm move; "both" starts both arms together and retreats both if either stops (run_arms).
 One motion runs at a time across both robots. Each robot plans from its own measured body and Dex3
-hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223).
+hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223), and so is
+where its voice lines play (voice_host_222/_223).
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     SonicArmExecutionSpec,
     SonicArmSkillConfig,
     UpperBodyMotion,
+    check_line,
     finger_check_move,
     gesture_move,
     left_arm_joints_move,
@@ -71,12 +73,21 @@ class DualSonicArmSkillConfig(SonicArmSkillConfig):
     # refused here.
     hands_mounted_222: bool = False
     hands_mounted_223: bool = False
+    # Voice lines per robot (perform_gesture's line): the ssh alias of each robot's PC; None keeps
+    # that robot silent. voice_command, voice_dir and voice_volume are shared. The single-robot
+    # voice_host would speak on both, so it is refused here.
+    voice_host_222: str | None = None
+    voice_host_223: str | None = None
 
     @model_validator(mode="after")
-    def _hands_per_robot(self) -> Self:
+    def _per_robot(self) -> Self:
         if self.hands_mounted:
             raise ValueError(
                 "the dual container sets hands per robot: use hands_mounted_222 / hands_mounted_223"
+            )
+        if self.voice_host is not None:
+            raise ValueError(
+                "the dual container sets the voice host per robot: use voice_host_222 / voice_host_223"
             )
         return self
 
@@ -113,10 +124,13 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
             )
         executions = {"222": self._execution_222, "223": self._execution_223}
         hands = {"222": self.config.hands_mounted_222, "223": self.config.hands_mounted_223}
+        voices = {"222": self.config.voice_host_222, "223": self.config.voice_host_223}
         self._by_robot = {
             name: SonicArm(
                 name,
-                self.config.model_copy(update={"hands_mounted": hands[name]}),
+                self.config.model_copy(
+                    update={"hands_mounted": hands[name], "voice_host": voices[name]}
+                ),
                 execution,
                 encoder,
                 checker,
@@ -229,7 +243,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         return self._launch_move("move_left_arm_joints", robot, make_move)
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
-    def perform_gesture(self, robot: Robot, name: GestureName) -> str:
+    def perform_gesture(self, robot: Robot, name: GestureName, line: str | None = None) -> str:
         """Perform a gesture on robot 222, 223 or both, then bring the arms back and hand control back.
 
         Left arm only: "wave" (raises the hand and swings it side to side three times, about 26 s),
@@ -248,8 +262,12 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         Args:
             robot: "222", "223" or "both".
             name: One of the gesture names above.
+            line: Optional voice line (wav name, e.g. "01_intro") spoken as the motion starts, by
+                each selected robot that has a voice.
         """
-        return self._launch_move("perform_gesture", robot, lambda: gesture_move(self.config, name))
+        return self._launch_move(
+            "perform_gesture", robot, lambda: gesture_move(self.config, name), line
+        )
 
     @skill
     def stop_arm(self) -> str:
@@ -299,8 +317,11 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
             return self._operator_results[robot]
 
     @staticmethod
-    def _jobs(move: ArmMove, arms: Sequence[SonicArm]) -> list[tuple[SonicArm, Callable[[], Any]]]:
-        """run_arms jobs: each arm prepares `move` from its own measured pose and hands."""
+    def _jobs(
+        move: ArmMove, arms: Sequence[SonicArm], line: str | None = None
+    ) -> list[tuple[SonicArm, Callable[[], Any]]]:
+        """run_arms jobs: each arm prepares `move` from its own measured pose and hands; those
+        with a voice speak `line`."""
         return [
             (
                 arm,
@@ -313,6 +334,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
                     move_s=move.move_s,
                     return_min_s=move.return_min_s,
                     arms=move.arms,
+                    line=line if arm.speaks else None,
                 ),
             )
             for arm in arms
@@ -324,7 +346,13 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
             return [self._by_robot[str(robot)]]
         return list(self._arms())
 
-    def _launch_move(self, tool: str, robot: str, make_move: Callable[[], ArmMove]) -> str:
+    def _launch_move(
+        self,
+        tool: str,
+        robot: str,
+        make_move: Callable[[], ArmMove],
+        line: str | None = None,
+    ) -> str:
         robot = str(robot)  # `dimos mcp call --arg robot=223` sends the integer 223.
         selected = self._select(robot)
 
@@ -332,9 +360,19 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
             if robot not in (*_ROBOTS, "both"):
                 raise ValueError(f"robot must be one of {[*_ROBOTS, 'both']}")
             move = make_move()
+            if line is not None and not any(arm.speaks for arm in selected):
+                where, hosts = (
+                    ("on either robot", "voice_host_222 / voice_host_223")
+                    if robot == "both"
+                    else (f"on {robot}", f"voice_host_{robot}")
+                )
+                raise ValueError(
+                    f"voice is not configured {where} ({hosts}, voice_command); nothing sent"
+                )
+            check_line(line)
             for arm in selected:
                 arm.require_checker(move)
-            jobs = self._jobs(move, selected)
+            jobs = self._jobs(move, selected, line)
             return lambda: run_arms(jobs)
 
         return self._launch(tool, prepare, selected)

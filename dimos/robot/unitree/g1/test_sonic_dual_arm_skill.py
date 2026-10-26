@@ -61,6 +61,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     gesture_plan_inputs,
 )
 from dimos.robot.unitree.g1.sonic_dual_arm_skill import (
+    _ROBOTS,
     DualSonicArmSkillConfig,
     DualSonicArmSkillContainer,
 )
@@ -98,13 +99,19 @@ class AbsoluteEncoder(FakeEncoder):
 
 
 @pytest.fixture
-def real_launch_skill(dual_executions, tool_transport, mocker):
-    """The dual container started on both executions; yields (module, [(execution, peer)])."""
+def real_launch_skill(request, dual_executions, tool_transport, mocker):
+    """The dual container started on both executions; yields (module, [(execution, peer)]).
+
+    Indirect parametrization adds config fields (the voice tests' hosts and command).
+    """
     mocker.patch.object(sonic_dual_arm_skill, "SonicEncoder", AbsoluteEncoder)
     mocker.patch.object(sonic_arm_skill, "keyframe_plan", fast_keyframe_plan)
     mocker.patch.object(sonic_arm_skill, "token_schedule", partial(token_schedule, blend_s=0.2))
     module = DualSonicArmSkillContainer(
-        encoder_path="unused.onnx", return_watch_seconds=0.0, hands_mounted_222=True
+        encoder_path="unused.onnx",
+        return_watch_seconds=0.0,
+        hands_mounted_222=True,
+        **getattr(request, "param", {}),
     )
     (first, _), (second, _) = dual_executions
     mocker.patch.object(module, "_execution_222", first, create=True)
@@ -835,3 +842,202 @@ def test_finger_check_through_the_worker_returns_at_once_and_stop_arm_retreats(w
     status = executions["222"].get_status()["task"]
     assert status["last_chunk_sequence"] == 1 and status["handback_confirmed"], status
     assert no_pose(peers["223"]) and container.operator_result("223") is None
+
+
+# Voice lines: perform_gesture's line plays over ssh on each robot with a voice host.
+
+COMMAND = "python3 ~/g1_audio.py"
+ONLY_223 = {"voice_host_223": "pc2", "voice_command": COMMAND}  # The demo: 222 has no wavs yet.
+BOTH_VOICES = {"voice_host_222": "pc2_222", **ONLY_223}
+
+
+def voices(module, mocker, code=0):
+    """Scripts sonic_arm_skill's ssh; returns one log of the ssh calls and the robots' task calls.
+
+    Entries: ("play" | "stop", host, remote command), ("kill", host), ("submit_chunk", robot,
+    sequence) once the chunk is sent, ("finish_task", robot, None). Each play's process polls as
+    `code` (None: still playing) until killed; an exception `code` is raised by Popen instead.
+    """
+    log = []
+    shell = mocker.patch.object(sonic_arm_skill, "subprocess")
+
+    def popen(argv, **kwargs):
+        if isinstance(code, BaseException):
+            raise code
+        assert argv[0] == "ssh" and "BatchMode=yes" in argv
+        host, command = argv[-2:]
+        process = mocker.MagicMock()
+        process.poll.return_value = code
+        process.stderr.read.return_value = b"aplay: no such file"
+
+        def kill():
+            log.append(("kill", host))
+            process.poll.return_value = -9
+
+        process.kill.side_effect = kill
+        log.append((command.removeprefix(f"{COMMAND} ").split()[0], host, command))
+        return process
+
+    shell.Popen.side_effect = popen
+    for robot, arm in module._by_robot.items():
+        for method in ("submit_chunk", "finish_task"):
+            real = getattr(arm._execution, method)
+
+            def record(*args, robot=robot, method=method, real=real):
+                reply = real(*args)
+                log.append((method, robot, args[1] if method == "submit_chunk" else None))
+                return reply
+
+            mocker.patch.object(arm._execution, method, side_effect=record)
+    return log
+
+
+def played(log):
+    return [entry for entry in log if entry[0] == "play"]
+
+
+@pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
+def test_a_line_on_223_plays_there_once_its_first_chunk_is_sent(inline, mocker):
+    module, executions = inline
+    log = voices(module, mocker)
+    with feeding_arms(module._arms()):
+        result = module.perform_gesture("223", "wave", line="01_intro")
+    assert "wave reached" in result.message, result
+    assert played(log) == [("play", "pc2", f"{COMMAND} play ~/lines/01_intro.wav 60")]
+    assert log.index(played(log)[0]) == log.index(("submit_chunk", "223", 0)) + 1
+    assert result.metadata["voice"] == "01_intro: played"
+    assert no_pose(executions[0][1])
+
+
+@pytest.mark.parametrize(
+    ("real_launch_skill", "hosts"),
+    [(ONLY_223, {"223": "pc2"}), (BOTH_VOICES, {"222": "pc2_222", "223": "pc2"})],
+    indirect=["real_launch_skill"],
+)
+def test_both_with_a_line_speaks_on_each_robot_with_a_voice_after_its_own_first_chunk(
+    inline, mocker, hosts
+):
+    module, _ = inline
+    log = voices(module, mocker)
+    with feeding_arms(module._arms()):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert "222: wave reached" in result.message and "; 223: wave reached" in result.message
+    assert sorted(host for _, host, _ in played(log)) == sorted(hosts.values())
+    for robot in _ROBOTS:
+        metadata = result.metadata[robot]
+        if robot not in hosts:
+            assert "voice" not in metadata, metadata
+            continue
+        play = next(entry for entry in played(log) if entry[1] == hosts[robot])
+        assert log.index(play) > log.index(("submit_chunk", robot, 0)), log
+        assert metadata["voice"] == "01_intro: played"
+
+
+@pytest.mark.parametrize(
+    ("real_launch_skill", "robot", "refusal"),
+    [
+        (ONLY_223, "222", "voice is not configured on 222 (voice_host_222, voice_command)"),
+        ({"voice_host_223": "pc2"}, "223", "on 223 (voice_host_223, voice_command)"),
+        ({}, "both", "on either robot (voice_host_222 / voice_host_223, voice_command)"),
+        ({"voice_host_222": "pc2_222", "voice_host_223": "pc2"}, "both", "on either robot"),
+        (ONLY_223, "223", "line must be a wav name"),
+    ],
+    indirect=["real_launch_skill"],
+)
+def test_a_line_no_selected_robot_can_speak_is_refused_with_nothing_sent(
+    inline, mocker, robot, refusal
+):
+    module, executions = inline
+    log = voices(module, mocker)
+    line = "../x; reboot" if "wav name" in refusal else "01_intro"
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        module.perform_gesture(robot, "wave", line=line)
+    assert log == [] and all(no_pose(peer) for _, peer in executions)
+    assert all(task(arm) is None for arm in module._arms())
+
+
+@pytest.mark.parametrize("real_launch_skill", [BOTH_VOICES], indirect=True)
+def test_stop_arm_cuts_every_robots_line_at_once(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    log = voices(module, mocker, code=None)
+    updates = mocker.spy(module, "tool_update")
+    with feeding_arms(module._arms()):
+        module.perform_gesture("both", "wave", line="01_intro")
+        wait_until(lambda: len(played(log)) == 2)
+        assert module.stop_arm().startswith("Stopping")
+        at_stop = list(log)  # stop_arm itself cut both lines, not each robot's retreat later.
+        wait_until(lambda: updates.call_count == 1)
+    for host in ("pc2_222", "pc2"):
+        assert ("kill", host) in at_stop and ("stop", host, f"{COMMAND} stop") in at_stop
+        assert log.count(("kill", host)) == 1
+    update = json.loads(updates.call_args.args[1])
+    assert update["message"].count("stop requested") == 2, update
+
+
+@pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
+def test_the_other_robots_fault_cuts_the_line_as_this_robot_retreats(inline, mocker):
+    module, _ = inline
+    log = voices(module, mocker, code=None)
+
+    def knee(s):
+        return {3: 0.2 if s > 0.6 else 0.0}
+
+    with feeding_arms(module._arms(), shape=zero, extra=(knee, None)):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert "stopped early: 222: left_knee" in result.message.split("; 223: ")[1], result
+    # Cut right after 223's way back is sent, not only once its motion ends.
+    retreat, kill = log.index(("submit_chunk", "223", 1)), log.index(("kill", "pc2"))
+    assert retreat < kill < log.index(("finish_task", "223", None)), log
+    assert ("stop", "pc2", f"{COMMAND} stop") in log
+    assert result.metadata["223"]["voice"] == "01_intro: cut off"
+
+
+@pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
+def test_module_stop_cuts_the_line(real_launch_skill, mocker):
+    module, _ = real_launch_skill
+    log = voices(module, mocker, code=None)
+    with feeding_arms(module._arms()):
+        module.perform_gesture("223", "wave", line="01_intro")
+        wait_until(lambda: played(log))
+        module.stop()
+    assert log.count(("kill", "pc2")) == 1 and ("stop", "pc2", f"{COMMAND} stop") in log
+
+
+@pytest.mark.parametrize(
+    ("real_launch_skill", "code", "report"),
+    [
+        (ONLY_223, 1, "01_intro: failed (exit 1) aplay: no such file"),
+        (ONLY_223, OSError("no ssh"), "01_intro: not played"),
+    ],
+    indirect=["real_launch_skill"],
+)
+def test_a_failed_line_is_reported_and_never_fails_the_motion(inline, mocker, code, report):
+    module, _ = inline
+    voices(module, mocker, code=code)
+    with feeding_arms(module._arms()):
+        result = module.perform_gesture("both", "wave", line="01_intro")
+    assert "222: wave reached" in result.message and "; 223: wave reached" in result.message
+    assert result.metadata["223"]["voice"] == report
+
+
+@pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
+def test_voice_hosts_are_configured_per_robot(real_launch_skill):
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
+        [
+            "--dualsonicarmskillcontainer.encoder-path=unused.onnx",
+            "--dualsonicarmskillcontainer.voice-host-223=pc2",
+            "--dualsonicarmskillcontainer.voice-command=~/venv/bin/python ~/g1_audio.py",
+            "--dualsonicarmskillcontainer.voice-volume=80",
+        ],
+        environ={},
+    )
+    config = DualSonicArmSkillConfig(**parsed.module_kwargs("dualsonicarmskillcontainer"))
+    assert (config.voice_host_222, config.voice_host_223) == (None, "pc2")
+    assert (config.voice_command, config.voice_volume) == ("~/venv/bin/python ~/g1_audio.py", 80)
+    with pytest.raises(ValueError, match="voice_host_222 / voice_host_223"):
+        DualSonicArmSkillConfig(encoder_path="unused.onnx", voice_host="pc2")
+    module, _ = real_launch_skill  # Configured with ONLY_223.
+    arms = module._by_robot
+    assert (arms["222"].config.voice_host, arms["223"].config.voice_host) == (None, "pc2")
+    assert (arms["222"].speaks, arms["223"].speaks) == (False, True)
+    assert module.config.voice_host is None
