@@ -1162,6 +1162,30 @@ def test_gesture_from_a_raised_arm_returns_to_where_it_started(skill, mocker):
     assert streamed[-1] == pytest.approx(PEER_TOKEN, abs=1e-3)
 
 
+def test_gesture_line_plays_on_the_robot_at_the_first_chunk_and_stop_cuts_it(skill, mocker):
+    module, peer = skill
+    raised = raised_start(module, mocker)
+    mocker.patch.object(module.config, "voice_host", "pc2")
+    shell = mocker.patch.object(sonic_arm_skill, "subprocess")
+    shell.Popen.return_value.poll.return_value = 0
+    with pytest.raises(ValueError, match="voice_command"):
+        module.perform_gesture("beckon", line="01_intro")
+    mocker.patch.object(module.config, "voice_command", "python3 ~/g1_audio.py")
+    with pytest.raises(ValueError, match="wav name"):
+        module.perform_gesture("beckon", line="../x; reboot")
+    assert not shell.Popen.called and not peer.snapshot()
+    result = call_with_feed(
+        module, lambda: module.perform_gesture("beckon", line="01_intro"), lambda t: raised
+    )
+    (argv,), _ = shell.Popen.call_args
+    assert argv[-2:] == ["pc2", "python3 ~/g1_audio.py play ~/lines/01_intro.wav 60"]
+    assert result.metadata["voice"] == "01_intro: played"
+    shell.Popen.return_value.poll.return_value = None  # still playing
+    module._hush()
+    shell.Popen.return_value.kill.assert_called_once()
+    assert shell.Popen.call_args.args[0][-1] == "python3 ~/g1_audio.py stop"
+
+
 def test_a_late_finish_lands_in_the_final_hold_and_still_finishes(skill, mocker):
     """finish_task comes 2 rows (40 ms) before the plan ends; a stall past that is not a failure."""
     module, peer = skill
