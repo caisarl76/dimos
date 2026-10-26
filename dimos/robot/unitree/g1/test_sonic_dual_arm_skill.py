@@ -191,6 +191,12 @@ def test_dual_prompt_names_every_gesture():
         assert f"`{name}`" in G1_SONIC_DUAL_ARM_SYSTEM_PROMPT, name
 
 
+def test_dual_prompt_offers_voice_lines():
+    lines = re.findall(r"`(\d\d_\w+)`", G1_SONIC_DUAL_ARM_SYSTEM_PROMPT)
+    assert {"01_intro", "06_invite", "09_thanks"} <= set(lines)
+    assert all(sonic_arm_skill._LINE_NAME.fullmatch(line) for line in lines)
+
+
 @pytest.mark.parametrize("robot", ["222", 222])  # `dimos mcp call --arg robot=222` sends an int.
 def test_single_robot_command_ignores_the_other_robot(inline, robot):
     module, executions = inline
