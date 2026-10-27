@@ -3,18 +3,24 @@
 #   docker compose -f docker/g1-demo/compose.yaml up -d --build     # tunnel + blueprint
 #   docker compose -f docker/g1-demo/compose.yaml run --rm greeter  # the show; Ctrl-C ends it
 #   docker compose -f docker/g1-demo/compose.yaml exec dimos dimos log -f
+# Shutdown: stop_arm, wait for its tool update in `dimos log -f` (the arm is back), then down.
+# Stopping the container also retreats a running motion, but only best-effort.
 #   docker compose -f docker/g1-demo/compose.yaml exec dimos dimos mcp call stop_arm
 #   docker compose -f docker/g1-demo/compose.yaml down
 # Host prerequisites: `ssh pc2` works without a password (alias, key and known_hosts in ~/.ssh;
 # PC2_SSH_HOST overrides the alias), the SONIC v1.1 encoder (the HF cache file; a symlink is fine)
 # and gear_sonic's g1 model_data directory at the paths below (override SONIC_ENCODER /
-# GEAR_SONIC_G1_DIR in a .env next to this file). On pc2 the operator starts the controller and idle planner, as before; the
+# GEAR_SONIC_G1_DIR in a .env next to this file). The image's user takes the host uid so the
+# mounted ~/.ssh is readable: when `id -u` is not 1000, put `UID=<id -u>` in that .env before
+# building (the shell does not export UID). On pc2 the operator starts the controller and idle planner, as before; the
 # blueprint waits for them. Voice lines play on pc2 through ~/g1_audio.py as before.
 x-image: &image
   image: dimos-g1-demo
   build:
     context: ../..
     dockerfile: docker/g1-demo/Dockerfile
+    args:
+      UID: ${UID:-1000}
   network_mode: host
   volumes:
     - ${HOME}/.ssh:/home/dimos/.ssh:ro
@@ -69,7 +75,7 @@ services:
     # Zenoh's shared-memory pool (the system configurator otherwise prompts for it and blocks).
     ulimits:
       memlock: 67108864
-    # Shutdown retreats a running motion before the controller takes the arm back.
+    # Room for the best-effort retreat of a running motion on shutdown.
     stop_grace_period: 30s
     restart: unless-stopped
 
