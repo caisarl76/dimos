@@ -52,7 +52,7 @@ imported: they were written on 2026-10-26 for the G1 223 demo (voice lines 06_in
 left's mirror (roll and yaw negated), each palm turned forward by wrist roll alone (take 0.6,
 entrance 0.85 rad: a near-straight arm's shoulder yaw of 0.45-0.55 was not tracked); invite's palms face forward (shoulder yaw 0.6, wrist roll
 0.5) and sway once by shoulder roll +-0.15 rad; thanks brings the forearms forward first, then
-holds the hands in front of the waist, the left above the right. Every plan cleared the both-arm
+holds the hands together in front of the belly (2026-10-27, below). Every plan cleared the both-arm
 `ArmCollisionChecker` from the stand-in's stance and from ROBOT_IDLE.
 
 Tuned in the MuJoCo stand-in (`test_imported_gesture_tracks_and_hands_back`, 2026-10-26): in this
@@ -68,13 +68,15 @@ Waist (invite, thanks, bow; 2026-10-26/27, measured in the MuJoCo stand-in). Sig
 
 - invite: `waist_yaw` +0.40, then -0.40, then back to the measured start; the real turn is about
   8.7 deg each way. Leg margin 0.23 rad on all 12 leg joints, hip yaw included.
-- thanks: `waist_pitch` +0.40 on arrival at the raised pose, held 1.5 s, then back to the measured
+- thanks: `waist_pitch` +0.40 on arrival at the belly pose, held 1.5 s, then back to the measured
   start (not 0.0: the stance leans +0.154, and 0.0 would lean back past it); the real bow is
-  21.2 deg absolute, +12.4 deg beyond the 8.8 deg lean of the stance itself (it leans 0.154 rad
-  forward). Leg margin 0.23 rad on the leg joints except hip yaw (0.15).
-- thanks' hands are raised (shoulder pitch -1.05/-0.75, roll 0.50/-0.50, yaw -0.70/0.70 left/right,
-  elbow 0.20): today's pose plus the bow was refused by the path check, the hands at the thighs.
-  The hands-down first keyframe stays.
+  +0.214 rad beyond the stance. Leg margin 0.23 rad on the leg joints except hip yaw (0.15).
+- thanks' hands are at the belly (2026-10-27, user: the raised hands, shoulder pitch -1.05/-0.75 and
+  elbow 0.20 with the wrists 30-37 cm forward, made 223 stumble forward on hardware): shoulder
+  pitch 0.0, roll 0.20/-0.20, yaw -0.30/0.30 left/right, elbow -0.30, so the upper arms hang and
+  the Dex3 hands meet with the wrists 19-21 cm forward of the pelvis. In the bow the upper-body
+  CoM is 9.7 cm forward of the pelvis (was 14.7); MuJoCo legs peak 0.140 (was 0.179), 0.112 on a
+  mid-bow stop. The hands-down first keyframe stays.
 - bow (2026-10-27, user: a new gesture; thanks keeps its own bow): the arms go to shoulder pitch
   -0.40, roll 0.25/-0.25, yaw 0, elbow 1.20 (forearms hanging forward), then `waist_pitch` +0.40,
   held 1.5 s; the way home brings the waist back. The forward shoulder pitch keeps the hands in
