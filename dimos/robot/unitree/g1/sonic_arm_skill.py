@@ -175,9 +175,9 @@ GESTURE_LEG_MARGINS: dict[str, tuple[float, tuple[int, ...]]] = {
     "thanks": (0.23, WIDE_LEG_JOINTS),
     "bow": (0.19, WIDE_LEG_JOINTS),
 }
-# Gestures whose legs (the same joints; WIDE_LEG_JOINTS for the rest) take a robot's
-# wide_leg_margin when it sets one: the waist gestures, and raise_hand, which tripped pc2_222's left
-# knee at +0.152 against body_margin (2026-10-22) while pc2_223 peaked at 0.104.
+# Gestures whose legs take a robot's wide_leg_margin when it sets one (on GESTURE_LEG_MARGINS'
+# joints; WIDE_LEG_JOINTS for raise_hand): the waist gestures, and raise_hand, which tripped
+# pc2_222's left knee at +0.152 against body_margin (2026-10-22) while pc2_223 peaked at 0.104.
 WIDE_LEG_GESTURES = (*GESTURE_LEG_MARGINS, "raise_hand")
 # The operator's Dex3 finger-order check, command order (thumb_0, thumb_1, thumb_2, middle_0,
 # middle_1, index_0, index_1), left then right: a swapped index/middle shows by eye.
@@ -344,6 +344,8 @@ def _gesture_table() -> dict[str, GestureSpec]:
         if not set(joints) <= set(ALL_LEG_JOINTS):
             raise ValueError(f"{name} leg margin names joints {joints} outside the legs")
         table[name] = replace(table[name], leg_margin=margin, leg_joints=joints)
+    if unknown := set(WIDE_LEG_GESTURES) - set(table):
+        raise ValueError(f"WIDE_LEG_GESTURES names {sorted(unknown)}, which are not gestures")
     return table
 
 

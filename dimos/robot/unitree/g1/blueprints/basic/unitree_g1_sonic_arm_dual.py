@@ -81,8 +81,8 @@ Operator finger check (an RPC, not an agent skill), with a running blueprint and
 The leg margin of the wide-leg gestures (invite, thanks, bow, raise_hand) is per robot too:
 wide_leg_margin_222 is 0.25 here (the ceiling; its legs ran 0.04-0.06 rad above MuJoCo's on
 stands), 223 keeps the gesture table's 0.23 / 0.23 / 0.19 (invite / thanks / bow) and body_margin
-0.15 for raise_hand. Hip yaw stays 0.15 in all but invite. Every result names its closest_leg: the leg joint with the least room left
-to its envelope, its deviation and its margin.
+0.15 for raise_hand. Hip yaw stays 0.15 in all but invite. Every result names its closest_leg:
+the leg joint with the least room left to its envelope, its deviation and its margin.
 
 Voice lines (perform_gesture's `line`) play <voice-dir>/<line>.wav (16 kHz mono) on a robot's
 speaker over ssh, through its g1_audio.py. A robot speaks only with its own voice host set (the

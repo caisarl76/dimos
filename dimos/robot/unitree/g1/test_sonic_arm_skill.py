@@ -1295,6 +1295,10 @@ def test_leg_margin_ceiling_is_enforced(mocker):
     mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {"bow": (0.2, (0, 15))})
     with pytest.raises(ValueError, match="outside the legs"):
         sonic_arm_skill._gesture_table()
+    mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {})
+    mocker.patch.object(sonic_arm_skill, "WIDE_LEG_GESTURES", ("raise_hnad",))
+    with pytest.raises(ValueError, match="raise_hnad"):
+        sonic_arm_skill._gesture_table()
 
 
 def test_wide_leg_margin_replaces_the_table_in_the_wide_leg_gestures_only():
