@@ -787,7 +787,9 @@ def test_thanks_bows_forward():
     assert max(pitch) == pytest.approx(0.40) and min(pitch) >= 0.0 and pitch[-1] == 0.0
     keyframes, *_ = gesture_plan_inputs("thanks", BASE, np.zeros(14))
     bow = next(k for k in keyframes if k.target[14] == pytest.approx(0.40))
-    assert bow.target[15] == pytest.approx(-1.05)  # the bow is on the raised pose
+    # the bow is on the hands-at-the-belly pose: upper arms hanging, elbows bent past 90 degrees
+    assert bow.target[15] == bow.target[22] == pytest.approx(0.0)
+    assert bow.target[18] == bow.target[25] == pytest.approx(-0.3)
 
 
 def test_bow_bows_forward_with_the_arms_hanging():
