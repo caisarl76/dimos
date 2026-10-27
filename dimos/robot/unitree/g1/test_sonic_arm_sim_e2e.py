@@ -497,6 +497,18 @@ def _tracking(
     return failures
 
 
+def _settle(sim: Sim, w: Window) -> None:
+    """Wait until the simulator has stepped past handback + SETTLE_S, so its log covers settling.
+    A step's feedback arrives after the step's logged time, hence the two-tick margin."""
+    target = w.end + SETTLE_S + 2 / RATE
+    wait_until(
+        lambda: (f := sim.execution.get_feedback()) is not None and f.received_monotonic >= target,
+        timeout=SETTLE_S + 10.0,
+        interval=0.01,
+        message="the simulator stopped stepping before the settling window ended",
+    )
+
+
 def _wrap_deg(a: Any) -> Any:
     return (np.asarray(a) + 180.0) % 360.0 - 180.0
 
@@ -559,7 +571,7 @@ def test_imported_gesture_tracks_and_hands_back(
     plans = mocker.spy(sonic_arm_skill, "keyframe_plan")
     with stand_in(tmp_path) as sim:
         window = _run(sim, mocker, f"gesture-{name}", "perform_gesture", {"name": name})
-        time.sleep(SETTLE_S + 0.3)  # the log covers settling to handback + SETTLE_S
+        _settle(sim, window)
     message = window.result["message"]
     # A refusal sends nothing, so there is no motion to check: report the refusal itself.
     assert "nothing sent" not in message, message
@@ -637,7 +649,7 @@ def test_stop_mid_waist_retreats_home(
             stop=True,
             stop_when=ready,
         )
-        time.sleep(SETTLE_S + 0.3)  # the log covers settling to handback + SETTLE_S
+        _settle(sim, window)
     failures = _physics(sim, window, BOTH_ARMS, before_planned_end=False)
     body = _body(sim, window, asserted=True)
     assert window.stop_at is not None

@@ -62,7 +62,6 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     GESTURES,
     WIDE_LEG_JOINTS,
     SonicArmSkillContainer,
-    gesture_leg_margin,
     gesture_margins,
     query_boxes,
 )
@@ -1272,8 +1271,13 @@ def test_wide_leg_margin_skips_hip_yaw():
 
 
 def test_invite_widens_hip_yaw_too():
-    invite = gesture_margins("two_arm", 0.15, 0.45, 0.35, *gesture_leg_margin("invite"))
-    thanks = gesture_margins("two_arm", 0.15, 0.45, 0.35, *gesture_leg_margin("thanks"))
+    margins = {
+        name: gesture_margins(
+            "two_arm", 0.15, 0.45, 0.35, GESTURES[name].leg_margin, GESTURES[name].leg_joints
+        )
+        for name in ("invite", "thanks")
+    }
+    invite, thanks = margins["invite"], margins["thanks"]
     assert all(invite[j] == 0.23 for j in range(12))
     assert thanks[2] == thanks[8] == 0.15 and thanks[0] == 0.23
 
@@ -1288,13 +1292,6 @@ def test_leg_margin_ceiling_is_enforced(mocker):
     mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {"bow": (0.2, (0, 15))})
     with pytest.raises(ValueError, match="outside the legs"):
         sonic_arm_skill._gesture_table()
-
-
-def test_gesture_leg_margin_is_portable():
-    assert gesture_leg_margin("invite") == (0.23, ALL_LEG_JOINTS)
-    assert gesture_leg_margin("wave")[0] is None
-    with pytest.raises(ValueError, match="name must be one of"):
-        gesture_leg_margin("dance")
 
 
 def test_waist_envelope_includes_the_planned_waist(skill, mocker):

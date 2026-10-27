@@ -363,14 +363,6 @@ def gesture_plan_inputs(
     return keyframes, spec.move_s, spec.return_min_s, spec.arms, spec.envelope
 
 
-def gesture_leg_margin(name: str) -> tuple[float | None, tuple[int, ...]]:
-    """(leg_margin, leg_joints) of a gesture for gesture_margins. Raises ValueError for an unknown
-    name."""
-    if name not in GESTURES:
-        raise ValueError(f"name must be one of {sorted(GESTURES)}")
-    return GESTURES[name].leg_margin, GESTURES[name].leg_joints
-
-
 def gesture_margins(
     envelope: Envelope,
     body: float,
