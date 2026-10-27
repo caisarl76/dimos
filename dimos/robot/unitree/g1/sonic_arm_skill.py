@@ -138,6 +138,7 @@ GestureName = Literal[
     "entrance_left",
     "entrance_right",
     "thanks",
+    "bow",
 ]
 _WAVE_RAISE = (-0.3, 1.3, 0.0, 0.0)
 # Left-arm gestures as absolute (shoulder pitch, roll, yaw, elbow) rad and the hold at each, s; the
@@ -163,6 +164,17 @@ GESTURE_MAX_S = 45.0  # longest plan a gesture may take, lead-in and way home in
 # time (fingers included); the way home at least the motion's return_s.
 IMPORTED_MOVE_S = 0.5
 Envelope = Literal["pose", "two_arm"]
+# Leg joints (hip pitch/roll/yaw, knee, ankle pitch/roll, left then right) of a gesture whose
+# balance asks more of the legs get a wider margin than body_margin. Hip yaw is 2 and 8.
+ALL_LEG_JOINTS = tuple(range(12))
+WIDE_LEG_JOINTS = (0, 1, 3, 4, 5, 6, 7, 9, 10, 11)
+LEG_MARGIN_CEILING = 0.25  # rad: no gesture may widen the legs past this
+# MuJoCo-measured: invite (a waist turn) loads all twelve; thanks and bow (bows) all but hip yaw.
+GESTURE_LEG_MARGINS: dict[str, tuple[float, tuple[int, ...]]] = {
+    "invite": (0.23, ALL_LEG_JOINTS),
+    "thanks": (0.23, WIDE_LEG_JOINTS),
+    "bow": (0.19, WIDE_LEG_JOINTS),
+}
 # The operator's Dex3 finger-order check, command order (thumb_0, thumb_1, thumb_2, middle_0,
 # middle_1, index_0, index_1), left then right: a swapped index/middle shows by eye.
 FINGER_CHECK = "check_dex3_finger_order"
@@ -302,6 +314,8 @@ class GestureSpec:
     envelope: Envelope  # "pose": pose_margins; "two_arm": two_arm_margins
     move_s: float
     return_min_s: float
+    leg_margin: float | None = None  # None keeps body_margin on the legs
+    leg_joints: tuple[int, ...] = WIDE_LEG_JOINTS
 
 
 def _gesture_table() -> dict[str, GestureSpec]:
@@ -318,6 +332,14 @@ def _gesture_table() -> dict[str, GestureSpec]:
             IMPORTED_MOVE_S,
             g.return_s,
         )
+    for name, (margin, joints) in GESTURE_LEG_MARGINS.items():
+        if name not in table:
+            raise ValueError(f"GESTURE_LEG_MARGINS names {name!r}, which is not a gesture")
+        if margin > LEG_MARGIN_CEILING:
+            raise ValueError(f"{name} leg margin {margin:g} is over {LEG_MARGIN_CEILING:g} rad")
+        if not set(joints) <= set(ALL_LEG_JOINTS):
+            raise ValueError(f"{name} leg margin names joints {joints} outside the legs")
+        table[name] = replace(table[name], leg_margin=margin, leg_joints=joints)
     return table
 
 
@@ -342,13 +364,23 @@ def gesture_plan_inputs(
 
 
 def gesture_margins(
-    envelope: Envelope, body: float, pose_arm: float, other_arm: float
+    envelope: Envelope,
+    body: float,
+    pose_arm: float,
+    other_arm: float,
+    leg_margin: float | None = None,
+    leg_joints: tuple[int, ...] = WIDE_LEG_JOINTS,
 ) -> NDArray[np.float64]:
     """The envelope before the planned displacement is added: pose_margins for a left-arm gesture,
-    two_arm_margins (both arms `pose_arm`) for an imported one."""
+    two_arm_margins (both arms `pose_arm`) for an imported one; `leg_joints` get `leg_margin`
+    when it is given."""
     if envelope == "two_arm":
-        return two_arm_margins(body, pose_arm)
-    return pose_margins(body, pose_arm, other_arm)
+        margins = two_arm_margins(body, pose_arm)
+    else:
+        margins = pose_margins(body, pose_arm, other_arm)
+    if leg_margin is not None:
+        margins[list(leg_joints)] = leg_margin
+    return margins
 
 
 def gesture_keyframes(
@@ -460,7 +492,12 @@ def gesture_move(config: SonicArmSkillConfig, name: str) -> ArmMove:
         return keyframes
 
     allowed = gesture_margins(
-        spec.envelope, config.body_margin, config.pose_arm_margin, config.other_arm_margin
+        spec.envelope,
+        config.body_margin,
+        config.pose_arm_margin,
+        config.other_arm_margin,
+        spec.leg_margin,
+        spec.leg_joints,
     )
     return ArmMove(
         name,
@@ -1678,11 +1715,13 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         arm waves, about 16 s), "v_sign" (right arm, V with the fingers, about 18 s), "good" (right
         arm, thumbs up, about 19-20 s), "support_person" (both arms forward, about 17 s) and
         "two_hand_hearts" (both arms and hands form a heart, about 31 s).
-        Demo, arms only: "invite" (both hands up, palms forward, swaying once, about 16 s),
+        Demo, arms and waist: "invite" (both hands up, palms forward, swaying once, then a waist
+        turn left and right, about 17 s),
         "take_left"/"take_right" (that arm points down and out, palm forward, about 15 s),
         "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
-        about 15 s) and
-        "thanks" (hands held together in front of the waist, about 17 s).
+        about 15 s),
+        "thanks" (hands held together at the chest with a short bow, about 17 s) and "bow" (arms
+        hanging in front, a bow forward from the waist, about 15 s).
         Slow (peak 0.75 rad/s, fingers too). Requires the SONIC
         controller running in confirmed planner idle; it never starts or stops the controller. Stops
         early and returns control to the planner if the legs or waist stray, or an arm strays far

@@ -254,10 +254,12 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         arm waves, about 16 s), "v_sign" (right arm, V with the fingers, about 18 s), "good" (right
         arm, thumbs up, about 19-20 s), "support_person" (both arms forward, about 17 s) and
         "two_hand_hearts" (both arms and hands form a heart, about 31 s).
-        Demo, arms only: "invite" (both hands up, palms forward, swaying once, about 16 s),
+        Demo, arms and waist: "invite" (both hands up, palms forward, swaying once, then a waist
+        turn left and right, about 17 s),
         "take_left"/"take_right" (that arm points down and out, palm forward, about 15 s),
         "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
-        about 15 s) and "thanks" (hands held together in front of the waist, about 17 s). Each robot
+        about 15 s), "thanks" (hands held together at the chest with a short bow, about 17 s) and
+        "bow" (arms hanging in front, a bow forward from the waist, about 15 s). Each robot
         plans from its own measured pose and hands, so with "both" an imported gesture's timing may
         differ a little between the robots. Slow (peak 0.75 rad/s, fingers too). Requires the SONIC controller
         running in confirmed planner idle; it never starts or stops the controller. Stops early and

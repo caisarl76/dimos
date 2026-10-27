@@ -54,6 +54,7 @@ AUTHORED: tuple[str, ...] = (
     "entrance_left",
     "entrance_right",
     "thanks",
+    "bow",
 )
 
 # (lower, upper) rad: the G1 URDF joint limits, copied from physical_ai_agent upper_body.LIMITS.
@@ -77,6 +78,13 @@ UB_LIMITS: dict[str, tuple[float, float]] = {
     "right_wrist_yaw": (-1.614429558, 1.614429558),
 }
 _WAIST = ("waist_yaw", "waist_roll", "waist_pitch")
+# The only gestures that may command the waist, and which joints; the target is absolute and capped.
+WAIST_GESTURES: dict[str, tuple[str, ...]] = {
+    "invite": ("waist_yaw",),
+    "thanks": ("waist_pitch",),
+    "bow": ("waist_pitch",),
+}
+WAIST_CAP_RAD = 0.40
 
 # Dex3 command order, the same on both hands (physical_ai_agent hands.ORDER, right hand confirmed
 # on hardware). Our stream's hand slots use it too (right_hand_order="native").
@@ -149,13 +157,17 @@ def _check_limit(name: str, value: float, limit: tuple[float, float], where: str
         raise ValueError(f"{where}: {name} = {value:.6g} outside its limit [{lo}, {hi}]")
 
 
-def _joints(raw: Any, absolute: bool, where: str) -> dict[int, float]:
+def _joints(raw: Any, absolute: bool, where: str, waist: tuple[str, ...] = ()) -> dict[int, float]:
     out: dict[int, float] = {}
     for name, v in _keys(raw, tuple(UB_LIMITS), where).items():
         value = _number(v, f"{where}.{name}")
-        if name in _WAIST and (absolute or value != 0.0):
+        if name in _WAIST and not (name in waist and absolute) and (absolute or value != 0.0):
             raise ValueError(f"{where}: {name} moves the waist; waist entries must be zero deltas")
         if absolute:
+            if name in _WAIST and abs(value) > WAIST_CAP_RAD:
+                raise ValueError(
+                    f"{where}: {name} = {value:.6g} exceeds the waist cap {WAIST_CAP_RAD}"
+                )
             _check_limit(name, value, UB_LIMITS[name], where)
         out[MOTOR_NAMES.index(name)] = value
     return out
@@ -192,8 +204,9 @@ def parse_gesture(obj: Any, source: str = "") -> ImportedGesture:
         if (i == 0 and t != 0.0) or (i > 0 and t <= keyframes[-1].t):
             raise ValueError(f"{where}: t = {t} must start at 0 and ascend")
         hands = _hands(frame["hands"], f"{where}.hands") if "hands" in frame else None
-        delta = _joints(frame.get("delta", {}), False, f"{where}.delta")
-        absolute = _joints(frame.get("absolute", {}), True, f"{where}.absolute")
+        waist = WAIST_GESTURES.get(name, ())
+        delta = _joints(frame.get("delta", {}), False, f"{where}.delta", waist)
+        absolute = _joints(frame.get("absolute", {}), True, f"{where}.absolute", waist)
         if i == 0 and (absolute or hands is not None or any(delta.values())):
             raise ValueError(
                 f"{where}: the t=0 keyframe is the start pose; only zero deltas allowed"

@@ -564,7 +564,7 @@ def test_both_two_hand_hearts_streams_each_robots_own_moving_hands_step_limited(
         assert task(arm)["handback_confirmed"], task(arm)
 
 
-def test_both_demo_gesture_moves_both_arms_only(hands, mocker):
+def test_both_demo_gesture_moves_both_arms_and_the_waist_yaw(hands, mocker):
     module, executions = hands
     submits = [mocker.spy(execution, "submit_chunk") for execution, _ in executions]
     with feeding_arms(module._arms()):
@@ -575,7 +575,8 @@ def test_both_demo_gesture_moves_both_arms_only(hands, mocker):
         kplan = planned("invite", measured)
         travel = np.ptp(kplan.poses, axis=0)
         assert travel[15:22].max() > 0.1 and travel[22:29].max() > 0.1  # Both arms move...
-        assert travel[:15].max() == 0  # ...the legs and waist do not...
+        assert travel[:12].max() == 0 and travel[13:15].max() == 0  # ...the legs and the
+        assert travel[12] == pytest.approx(0.8)  # waist's roll and pitch do not; its yaw turns...
         [first] = [unheld(c.args[3]) for c in submit.call_args_list]
         assert np.all(hands_of(first) == measured)  # ...nor the fingers: arms only.
         assert len(first) == len(padded(kplan.poses))  # Each robot ran its own plan.
