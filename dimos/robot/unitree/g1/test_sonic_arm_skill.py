@@ -1321,6 +1321,13 @@ def test_wide_leg_margin_replaces_the_table_in_the_wide_leg_gestures_only():
         SonicArmSkillConfig(encoder_path="unused.onnx", wide_leg_margin=0.26)
 
 
+def test_closest_leg_is_the_least_room_left_not_the_largest_deviation():
+    deviation, allowed = np.zeros(29), np.full(29, 0.25)
+    deviation[0], deviation[2], allowed[2] = 0.20, 0.14, 0.15  # hip pitch 0.05 left, hip yaw 0.01
+    closest = sonic_arm_skill._closest_leg(deviation, allowed, np.array([], np.intp))
+    assert closest == {"joint": "left_hip_yaw", "rad": 0.14, "margin_rad": 0.15}
+
+
 def test_waist_envelope_includes_the_planned_waist(skill, mocker):
     module, _ = skill
     module._arm._both_checker = FakeChecker()
