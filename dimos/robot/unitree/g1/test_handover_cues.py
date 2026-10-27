@@ -27,15 +27,14 @@ from dimos.robot.unitree.g1.handover_cues import _FOLLOW, HANDOVER, Cuer, Follow
 
 
 def test_cue_of() -> None:
-    assert cue_of({"kind": "trial_end", "reason": HANDOVER}, "left", "right") == [
-        ("take_left", "07_take")
+    assert cue_of({"kind": "trial_start"}, "left", "right") == [
+        ("take_left", "07_take"),
+        ("entrance_right", "10_entrance"),
     ]
+    assert cue_of({"kind": "trial_end", "reason": HANDOVER}, "right", "right") is None
     assert cue_of({"kind": "trial_end", "reason": "watchdog"}, "right", "right") == []
-    assert cue_of({"kind": "taken_confirmed"}, "right", "left") == [
-        ("entrance_left", "10_entrance")
-    ]
     assert cue_of({"kind": "loop_freeze"}, "right", "right") == []
-    assert cue_of({"kind": "trial_start"}, "right", "right") is None
+    assert cue_of({"kind": "taken_confirmed"}, "right", "right") is None
     assert cue_of({"kind": "rearm_decision"}, "right", "right") is None
 
 
@@ -49,41 +48,46 @@ def test_one_runs_and_the_newest_cue_waits() -> None:
 
     cuer = Cuer(start, "right", "right", timeout_s=60)
     cuer.on_mcp(True)
-    handover = {"kind": "trial_end", "reason": HANDOVER}
+    trial = {"kind": "trial_start"}
 
-    cuer.on_event(handover)
+    cuer.on_event(trial)
     cuer.tick(0)
     assert sent == ["take_right"]
-    cuer.on_event({"kind": "taken_confirmed"})
-    cuer.on_event({"kind": "trial_start"})  # the next round does not drop the waiting entrance
+    cuer.on_event({"kind": "trial_end", "reason": HANDOVER})  # the entrance keeps waiting
     cuer.tick(1)
     assert sent == ["take_right"]  # never cut short
     cuer.on_stopped()
     cuer.tick(2)
     assert sent == ["take_right", "entrance_right"]
 
-    cuer.on_event(handover)  # 223 is behind: the late take gives way to the entrance
-    cuer.on_event({"kind": "taken_confirmed"})
+    cuer.on_event(trial)  # the next round, while the entrance runs
     cuer.on_stopped()
     cuer.tick(3)
-    assert sent == ["take_right", "entrance_right", "entrance_right"]
-
-    cuer.on_event(handover)
-    cuer.on_event({"kind": "loop_freeze"})  # a freeze drops the waiting take
+    cuer.on_event({"kind": "trial_end", "reason": "watchdog"})  # no handover: no entrance
     cuer.on_stopped()
     cuer.tick(4)
-    assert sent[-1] == "entrance_right" and not cuer.waiting
+    assert sent == ["take_right", "entrance_right", "take_right"] and not cuer.waiting
 
-    accept = False  # refused: dropped, not retried
-    cuer.on_event(handover)
+    cuer.on_event(trial)
     cuer.tick(5)
+    cuer.on_event(trial)  # 223 is behind: the newer round replaces the waiting entrance
+    cuer.on_stopped()
     cuer.tick(6)
-    assert sent.count("take_right") == 2 and cuer.busy_until is None
+    assert sent[-2:] == ["take_right", "take_right"]
+    cuer.on_event({"kind": "loop_freeze"})  # a freeze drops the waiting entrance
+    cuer.on_stopped()
+    cuer.tick(7)
+    assert sent.count("entrance_right") == 1 and not cuer.waiting
+
+    accept = False  # refused: dropped, not retried; the next in line is tried
+    cuer.on_event(trial)
+    cuer.tick(8)
+    cuer.tick(9)
+    assert sent[-2:] == ["take_right", "entrance_right"] and cuer.busy_until is None
 
     accept = True  # a lost stop notice frees 223 after the timeout
-    cuer.on_event(handover)
+    cuer.on_event(trial)
     cuer.tick(10)
-    cuer.on_event({"kind": "taken_confirmed"})
     cuer.tick(69)
     assert sent[-1] == "take_right"
     cuer.tick(70)
@@ -100,9 +104,7 @@ def test_step_applies_everything_in_before_starting() -> None:
     cuer = Cuer(start, "right", "right")
     inbox: queue.Queue[tuple[str, Any]] = queue.Queue()
     inbox.put(("mcp", True))
-    inbox.put(("event", {"kind": "trial_end", "reason": HANDOVER}))
-    step(cuer, inbox, timeout=0)
-    inbox.put(("event", {"kind": "taken_confirmed"}))
+    inbox.put(("event", {"kind": "trial_start"}))
     step(cuer, inbox, timeout=0)
     assert sent == ["take_right"] and cuer.waiting
 
@@ -121,26 +123,25 @@ def test_cues_from_an_outage_are_dropped() -> None:
 
     cuer = Cuer(start, "right", "right")
     inbox: queue.Queue[tuple[str, Any]] = queue.Queue()
-    inbox.put(("event", {"kind": "trial_end", "reason": HANDOVER}))  # before the stream is up
+    inbox.put(("event", {"kind": "trial_start"}))  # before the stream is up
     step(cuer, inbox, timeout=0)
     assert sent == []
 
     inbox.put(("mcp", True))
-    inbox.put(("event", {"kind": "trial_end", "reason": HANDOVER}))
-    inbox.put(("event", {"kind": "taken_confirmed"}))
+    inbox.put(("event", {"kind": "trial_start"}))
     step(cuer, inbox, timeout=0)
-    inbox.put(("mcp", False))  # lost while the entrance waits, and a take comes in the outage
-    inbox.put(("event", {"kind": "trial_end", "reason": HANDOVER}))
+    inbox.put(("mcp", False))  # lost while the entrance waits, and a round starts in the outage
+    inbox.put(("event", {"kind": "trial_start"}))
     step(cuer, inbox, timeout=0)
-    assert sent == ["entrance_right"] and not cuer.waiting and cuer.busy_until is None
+    assert sent == ["take_right"] and not cuer.waiting and cuer.busy_until is None
 
-    inbox.put(("event", {"kind": "taken_confirmed"}))  # still down, though a POST may work
+    inbox.put(("event", {"kind": "trial_start"}))  # still down, though a POST may work
     inbox.put(("mcp", True))
     step(cuer, inbox, timeout=0)
-    assert sent == ["entrance_right"]
-    inbox.put(("event", {"kind": "taken_confirmed"}))  # back: new cues play
+    assert sent == ["take_right"]
+    inbox.put(("event", {"kind": "trial_start"}))  # back: new cues play
     step(cuer, inbox, timeout=0)
-    assert sent == ["entrance_right", "entrance_right"]
+    assert sent == ["take_right", "take_right"]
 
 
 def _reader(stream: IO[str]) -> tuple[queue.Queue[str], threading.Thread]:
