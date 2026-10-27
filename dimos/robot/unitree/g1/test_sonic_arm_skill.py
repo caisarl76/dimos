@@ -178,6 +178,9 @@ def feeding(module, body_q=lambda t: np.zeros(29), hands=None):
 
     feeder = threading.Thread(target=feed, daemon=True)
     feeder.start()
+    # The fixture saw SONIC ready once; on a loaded runner the peer's feedback can go stale since,
+    # and the skill refuses to start until it is confirmed planner idle again.
+    wait_until(lambda: module._execution.get_status()["ready"])
     try:
         yield stop
     finally:
