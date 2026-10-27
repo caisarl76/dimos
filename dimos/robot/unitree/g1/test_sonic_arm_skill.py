@@ -61,8 +61,10 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     ALL_LEG_JOINTS,
     GESTURES,
     WIDE_LEG_JOINTS,
+    SonicArmSkillConfig,
     SonicArmSkillContainer,
     gesture_margins,
+    gesture_move,
     query_boxes,
 )
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
@@ -245,6 +247,7 @@ def test_leg_outside_its_envelope_returns_smoothly_then_hands_back(skill):
 
     result = run(module, 20.0, knee)
     assert "stopped early" in result.message and "left_knee" in result.message, result
+    assert result.metadata["closest_leg"] == {"joint": "left_knee", "rad": 0.2, "margin_rad": 0.15}
     status = module._execution.get_status()["task"]
     assert status["outcome"] == "finished" and status["handback_confirmed"], status
     # The stream itself returned to the planner token: no mid-pose snap by the native planner.
@@ -1292,6 +1295,37 @@ def test_leg_margin_ceiling_is_enforced(mocker):
     mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {"bow": (0.2, (0, 15))})
     with pytest.raises(ValueError, match="outside the legs"):
         sonic_arm_skill._gesture_table()
+    mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {})
+    mocker.patch.object(sonic_arm_skill, "WIDE_LEG_GESTURES", ("raise_hnad",))
+    with pytest.raises(ValueError, match="raise_hnad"):
+        sonic_arm_skill._gesture_table()
+
+
+def test_wide_leg_margin_replaces_the_table_in_the_wide_leg_gestures_only():
+    table = SonicArmSkillConfig(encoder_path="unused.onnx")
+    wide = SonicArmSkillConfig(encoder_path="unused.onnx", wide_leg_margin=0.25)
+    bow, invite = gesture_move(wide, "bow").allowed, gesture_move(wide, "invite").allowed
+    assert all(bow[j] == 0.25 for j in WIDE_LEG_JOINTS) and bow[2] == bow[8] == 0.15
+    assert all(invite[j] == 0.25 for j in ALL_LEG_JOINTS)
+    assert gesture_move(table, "bow").allowed[0] == 0.19
+    raised, raised_table = (
+        gesture_move(wide, "raise_hand").allowed,
+        gesture_move(table, "raise_hand").allowed,
+    )
+    assert all(raised[j] == 0.25 for j in WIDE_LEG_JOINTS) and raised[2] == raised[8] == 0.15
+    assert all(raised_table[j] == 0.15 for j in ALL_LEG_JOINTS)
+    assert set(sonic_arm_skill.WIDE_LEG_GESTURES) == {"invite", "thanks", "bow", "raise_hand"}
+    for name in ("wave", "take_left"):
+        assert np.array_equal(gesture_move(wide, name).allowed, gesture_move(table, name).allowed)
+    with pytest.raises(ValueError, match="less than or equal to 0.25"):
+        SonicArmSkillConfig(encoder_path="unused.onnx", wide_leg_margin=0.26)
+
+
+def test_closest_leg_is_the_least_room_left_not_the_largest_deviation():
+    deviation, allowed = np.zeros(29), np.full(29, 0.25)
+    deviation[0], deviation[2], allowed[2] = 0.20, 0.14, 0.15  # hip pitch 0.05 left, hip yaw 0.01
+    closest = sonic_arm_skill._closest_leg(deviation, allowed, np.array([], np.intp))
+    assert closest == {"joint": "left_hip_yaw", "rad": 0.14, "margin_rad": 0.15}
 
 
 def test_waist_envelope_includes_the_planned_waist(skill, mocker):

@@ -17,8 +17,9 @@
 The same skills as SonicArmSkillContainer, each taking `robot` ("222", "223" or "both"). One robot
 is a single-arm move; "both" starts both arms together and retreats both if either stops (run_arms).
 One motion runs at a time across both robots. Each robot plans from its own measured body and Dex3
-hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223), and so is
-where its voice lines play (voice_host_222/_223).
+hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223), and so are
+where its voice lines play (voice_host_222/_223) and its wide-leg gestures' leg margin
+(wide_leg_margin_222/_223).
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from functools import partial
 import sys
 from typing import Any, Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from dimos.agents.annotation import skill
 from dimos.agents.capabilities import CAP_MOVEMENT
@@ -40,6 +41,7 @@ from dimos.robot.unitree.g1.sonic_arm_reference import ArmCollisionChecker, Soni
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     _NO_PATH_CHECK,
     FINGER_CHECK,
+    LEG_MARGIN_CEILING,
     ArmLauncher,
     ArmMove,
     GestureName,
@@ -79,6 +81,10 @@ class DualSonicArmSkillConfig(SonicArmSkillConfig):
     # so it is refused here.
     voice_host_222: str | None = None
     voice_host_223: str | None = None
+    # The wide-leg gestures' leg margin per robot (wide_leg_margin); the blueprint gives 222 the
+    # ceiling. The single-robot wide_leg_margin would widen both, so it is refused here.
+    wide_leg_margin_222: float | None = Field(default=None, gt=0, le=LEG_MARGIN_CEILING)
+    wide_leg_margin_223: float | None = Field(default=None, gt=0, le=LEG_MARGIN_CEILING)
 
     @model_validator(mode="after")
     def _per_robot(self) -> Self:
@@ -89,6 +95,11 @@ class DualSonicArmSkillConfig(SonicArmSkillConfig):
         if self.voice_host is not None:
             raise ValueError(
                 "the dual container sets the voice host per robot: use voice_host_222 / voice_host_223"
+            )
+        if self.wide_leg_margin is not None:
+            raise ValueError(
+                "the dual container sets the wide leg margin per robot: use wide_leg_margin_222 / "
+                "wide_leg_margin_223"
             )
         return self
 
@@ -126,11 +137,16 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         executions = {"222": self._execution_222, "223": self._execution_223}
         hands = {"222": self.config.hands_mounted_222, "223": self.config.hands_mounted_223}
         voices = {"222": self.config.voice_host_222, "223": self.config.voice_host_223}
+        legs = {"222": self.config.wide_leg_margin_222, "223": self.config.wide_leg_margin_223}
         self._by_robot = {
             name: SonicArm(
                 name,
                 self.config.model_copy(
-                    update={"hands_mounted": hands[name], "voice_host": voices[name]}
+                    update={
+                        "hands_mounted": hands[name],
+                        "voice_host": voices[name],
+                        "wide_leg_margin": legs[name],
+                    }
                 ),
                 execution,
                 encoder,
@@ -178,7 +194,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
                 left_forearm_raise 20-60.
         """
         return self._launch_move(
-            "move_upper_body", robot, lambda: upper_body_move(self.config, motion, angle_deg)
+            "move_upper_body", robot, lambda config: upper_body_move(config, motion, angle_deg)
         )
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
@@ -203,7 +219,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         return self._launch_move(
             "move_left_arm_pose",
             robot,
-            lambda: left_arm_pose_move(self.config, pose, hold_seconds),
+            lambda config: left_arm_pose_move(config, pose, hold_seconds),
         )
 
     @skill(uses=[CAP_MOVEMENT], lifecycle="background")
@@ -236,10 +252,10 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         """
         values = (shoulder_pitch_deg, shoulder_roll_deg, shoulder_yaw_deg, elbow_deg)
 
-        def make_move() -> ArmMove:
+        def make_move(config: SonicArmSkillConfig) -> ArmMove:
             if any(arm._checker is None for arm in self._select(robot)):
                 raise RuntimeError(_NO_PATH_CHECK)
-            return left_arm_joints_move(self.config, values, hold_seconds)
+            return left_arm_joints_move(config, values, hold_seconds)
 
         return self._launch_move("move_left_arm_joints", robot, make_move)
 
@@ -273,7 +289,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
                 each selected robot that has a voice.
         """
         return self._launch_move(
-            "perform_gesture", robot, lambda: gesture_move(self.config, name), line
+            "perform_gesture", robot, lambda config: gesture_move(config, name), line
         )
 
     @skill
@@ -309,7 +325,11 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
                 self._operator_results[robot] = text
 
             self._begin(
-                FINGER_CHECK, lambda: run_arms(self._jobs(move, [arm])), [arm], store, lambda: None
+                FINGER_CHECK,
+                lambda: run_arms(self._jobs([(arm, move)])),
+                [arm],
+                store,
+                lambda: None,
             )
         return "started"
 
@@ -325,9 +345,9 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
 
     @staticmethod
     def _jobs(
-        move: ArmMove, arms: Sequence[SonicArm], line: str | None = None
+        moves: Sequence[tuple[SonicArm, ArmMove]], line: str | None = None
     ) -> list[tuple[SonicArm, Callable[[], Any]]]:
-        """run_arms jobs: each arm prepares `move` from its own measured pose and hands; those
+        """run_arms jobs: each arm prepares its move from its own measured pose and hands; those
         with a voice speak `line`."""
         return [
             (
@@ -344,7 +364,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
                     line=line if arm.speaks else None,
                 ),
             )
-            for arm in arms
+            for arm, move in moves
         ]
 
     def _select(self, robot: str) -> list[SonicArm]:
@@ -357,7 +377,7 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         self,
         tool: str,
         robot: str,
-        make_move: Callable[[], ArmMove],
+        make_move: Callable[[SonicArmSkillConfig], ArmMove],
         line: str | None = None,
     ) -> str:
         robot = str(robot)  # `dimos mcp call --arg robot=223` sends the integer 223.
@@ -366,7 +386,8 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         def prepare() -> Callable[[], SkillResult]:
             if robot not in (*_ROBOTS, "both"):
                 raise ValueError(f"robot must be one of {[*_ROBOTS, 'both']}")
-            move = make_move()
+            # Each robot's move from its own config (its wide_leg_margin).
+            moves = [(arm, make_move(arm.config)) for arm in selected]
             if line is not None and not any(arm.speaks for arm in selected):
                 where, hosts = (
                     ("on either robot", "voice_host_222 / voice_host_223")
@@ -377,9 +398,9 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
                     f"voice is not configured {where} ({hosts}, voice_command); nothing sent"
                 )
             check_line(line)
-            for arm in selected:
+            for arm, move in moves:
                 arm.require_checker(move)
-            jobs = self._jobs(move, selected, line)
+            jobs = self._jobs(moves, line)
             return lambda: run_arms(jobs)
 
         return self._launch(tool, prepare, selected)
