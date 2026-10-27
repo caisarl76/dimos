@@ -769,3 +769,43 @@ def test_natural_pose_names_the_first_failed_check(kinematics):
     assert kinematics.natural_pose(wide) == "shoulder_roll"
     back = with_arm(ROBOT_IDLE, np.radians([30.0, 25.0, 0.0, 30.0]))
     assert kinematics.natural_pose(back) == "wrist_behind"
+
+
+def _gesture_waist(name, joint):
+    keyframes, *_ = gesture_plan_inputs(name, BASE, np.zeros(14))
+    return [k.target[MOTOR_NAMES.index(joint)] for k in keyframes]
+
+
+def test_invite_turns_the_waist_both_ways():
+    yaw = _gesture_waist("invite", "waist_yaw")
+    assert yaw[0] == 0.0 and max(yaw) == pytest.approx(0.40) and min(yaw) == pytest.approx(-0.40)
+    assert yaw[-1] == 0.0
+
+
+def test_thanks_bows_forward():
+    pitch = _gesture_waist("thanks", "waist_pitch")
+    assert max(pitch) == pytest.approx(0.40) and min(pitch) >= 0.0 and pitch[-1] == 0.0
+    keyframes, *_ = gesture_plan_inputs("thanks", BASE, np.zeros(14))
+    bow = next(k for k in keyframes if k.target[14] == pytest.approx(0.40))
+    assert bow.target[15] == pytest.approx(-1.05)  # the bow is on the raised pose
+
+
+def test_bow_bows_forward_with_the_arms_hanging():
+    pitch = _gesture_waist("bow", "waist_pitch")
+    assert max(pitch) == pytest.approx(0.40) and min(pitch) >= 0.0
+    keyframes, *_ = gesture_plan_inputs("bow", BASE, np.zeros(14))
+    bow = next(k for k in keyframes if k.target[14] == pytest.approx(0.40))
+    # shoulders pitched forward so the hanging arms clear the thighs as the torso tips
+    assert bow.target[15] == bow.target[22] == pytest.approx(-0.40)
+    assert bow.target[18] == bow.target[25] == pytest.approx(1.2)
+
+
+@needs_scene
+@pytest.mark.parametrize("name", ["invite", "thanks", "bow"])
+def test_waist_gestures_pass_the_path_check(name):
+    keyframes, move_s, return_min_s, arms, _ = gesture_plan_inputs(name, ROBOT_IDLE, np.zeros(14))
+    plan = keyframe_plan(
+        ROBOT_IDLE, keyframes, base_hands=np.zeros(14), move_s=move_s, return_min_s=return_min_s
+    )
+    checker = ArmCollisionChecker(SCENE, arms=("left", "right"))
+    assert checker.first_contact(plan.poses, start=ROBOT_IDLE) is None

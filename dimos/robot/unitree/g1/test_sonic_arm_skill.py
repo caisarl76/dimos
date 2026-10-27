@@ -57,7 +57,15 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     stroke_plan,
     token_schedule,
 )
-from dimos.robot.unitree.g1.sonic_arm_skill import GESTURES, SonicArmSkillContainer, query_boxes
+from dimos.robot.unitree.g1.sonic_arm_skill import (
+    ALL_LEG_JOINTS,
+    GESTURES,
+    WIDE_LEG_JOINTS,
+    SonicArmSkillContainer,
+    gesture_leg_margin,
+    gesture_margins,
+    query_boxes,
+)
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_session import SessionPhase, SonicModelProfile, SonicTaskSession
@@ -1250,6 +1258,62 @@ def test_unknown_gesture_sends_nothing(skill):
     with pytest.raises(ValueError, match="name must be one of"):
         module.perform_gesture("dance")
     assert not any(p.startswith(b"pose") for p in peer.snapshot())
+
+
+def test_only_the_waist_gestures_widen_the_legs():
+    for name, spec in GESTURES.items():
+        assert (spec.leg_margin is None) == (name not in ("invite", "thanks", "bow")), name
+
+
+def test_wide_leg_margin_skips_hip_yaw():
+    margins = gesture_margins("two_arm", 0.15, 0.45, 0.35, leg_margin=0.23)
+    assert margins[2] == margins[8] == 0.15
+    assert all(margins[j] == 0.23 for j in WIDE_LEG_JOINTS)
+
+
+def test_invite_widens_hip_yaw_too():
+    invite = gesture_margins("two_arm", 0.15, 0.45, 0.35, *gesture_leg_margin("invite"))
+    thanks = gesture_margins("two_arm", 0.15, 0.45, 0.35, *gesture_leg_margin("thanks"))
+    assert all(invite[j] == 0.23 for j in range(12))
+    assert thanks[2] == thanks[8] == 0.15 and thanks[0] == 0.23
+
+
+def test_leg_margin_ceiling_is_enforced(mocker):
+    mocker.patch.dict(sonic_arm_skill.GESTURE_LEG_MARGINS, {"invite": (0.26, ALL_LEG_JOINTS)})
+    with pytest.raises(ValueError, match="over"):
+        sonic_arm_skill._gesture_table()
+    mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {"nope": (0.2, ALL_LEG_JOINTS)})
+    with pytest.raises(ValueError, match="not a gesture"):
+        sonic_arm_skill._gesture_table()
+    mocker.patch.object(sonic_arm_skill, "GESTURE_LEG_MARGINS", {"bow": (0.2, (0, 15))})
+    with pytest.raises(ValueError, match="outside the legs"):
+        sonic_arm_skill._gesture_table()
+
+
+def test_gesture_leg_margin_is_portable():
+    assert gesture_leg_margin("invite") == (0.23, ALL_LEG_JOINTS)
+    assert gesture_leg_margin("wave")[0] is None
+    with pytest.raises(ValueError, match="name must be one of"):
+        gesture_leg_margin("dance")
+
+
+def test_waist_envelope_includes_the_planned_waist(skill, mocker):
+    module, _ = skill
+    module._arm._both_checker = FakeChecker()
+    invite = GESTURES["invite"]
+
+    def with_waist(base, hands):
+        keyframes = invite.keyframes_of(base, hands)
+        target = keyframes[0].target.copy()
+        target[12] += 0.40  # waist_yaw
+        return [replace(keyframes[0], target=target), *keyframes[1:]]
+
+    mocker.patch.dict(GESTURES, {"invite": replace(invite, keyframes_of=with_waist)})
+    watch = mocker.spy(sonic_arm_skill, "_Watch")
+    call_with_feed(module, lambda: module.perform_gesture("invite"), lambda t: np.zeros(29))
+    allowed = watch.call_args.kwargs["allowed"]
+    assert allowed[12] >= 0.40 + module.config.body_margin - 1e-9
+    assert all(allowed[j] >= 0.23 for j in range(12))
 
 
 def test_gesture_checks_the_path_when_configured_and_runs_without(skill):

@@ -19,27 +19,42 @@
     },
     {
       "absolute": {
-        "left_elbow": 0.3,
-        "left_shoulder_pitch": -0.5,
-        "left_shoulder_roll": 0.3,
-        "left_shoulder_yaw": -0.85,
-        "right_elbow": 0.3,
-        "right_shoulder_pitch": -0.2,
-        "right_shoulder_roll": -0.3,
-        "right_shoulder_yaw": 0.85
+        "left_elbow": 0.2,
+        "left_shoulder_pitch": -1.05,
+        "left_shoulder_roll": 0.5,
+        "left_shoulder_yaw": -0.7,
+        "right_elbow": 0.2,
+        "right_shoulder_pitch": -0.75,
+        "right_shoulder_roll": -0.5,
+        "right_shoulder_yaw": 0.7,
+        "waist_pitch": 0.4
       },
       "t": 4.0
     },
     {
       "absolute": {
-        "left_elbow": 0.3,
-        "left_shoulder_pitch": -0.5,
-        "left_shoulder_roll": 0.3,
-        "left_shoulder_yaw": -0.85,
-        "right_elbow": 0.3,
-        "right_shoulder_pitch": -0.2,
-        "right_shoulder_roll": -0.3,
-        "right_shoulder_yaw": 0.85
+        "left_elbow": 0.2,
+        "left_shoulder_pitch": -1.05,
+        "left_shoulder_roll": 0.5,
+        "left_shoulder_yaw": -0.7,
+        "right_elbow": 0.2,
+        "right_shoulder_pitch": -0.75,
+        "right_shoulder_roll": -0.5,
+        "right_shoulder_yaw": 0.7,
+        "waist_pitch": 0.4
+      },
+      "t": 5.5
+    },
+    {
+      "absolute": {
+        "left_elbow": 0.2,
+        "left_shoulder_pitch": -1.05,
+        "left_shoulder_roll": 0.5,
+        "left_shoulder_yaw": -0.7,
+        "right_elbow": 0.2,
+        "right_shoulder_pitch": -0.75,
+        "right_shoulder_roll": -0.5,
+        "right_shoulder_yaw": 0.7
       },
       "t": 7.0
     }

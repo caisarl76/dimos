@@ -235,3 +235,56 @@ def test_source_md_complete() -> None:
     assert "2026-10-23" in text
     assert "Dropped" in text
     assert "Hand-authored" in text and all(f"`{n}`" in text for n in gestures.AUTHORED)
+
+
+def _named(name: str, frame: dict[str, Any]) -> dict[str, Any]:
+    return {**_gesture(frame), "name": name}
+
+
+@pytest.mark.parametrize(
+    ("name", "joint"), [("invite", "waist_yaw"), ("thanks", "waist_pitch"), ("bow", "waist_pitch")]
+)
+def test_waist_gestures_may_set_their_waist_joint(name: str, joint: str) -> None:
+    g = gestures.parse_gesture(_named(name, {"t": 1.0, "absolute": {joint: 0.349}}))
+    (k,) = gestures.resolve(g, BASE, BASE_HANDS)
+    assert k.target[MOTOR_NAMES.index(joint)] == 0.349
+
+
+@pytest.mark.parametrize("name", ["invite", "thanks", "bow"])
+def test_waist_roll_is_refused_even_for_the_waist_gestures(name: str) -> None:
+    with pytest.raises(ValueError, match="moves the waist"):
+        gestures.parse_gesture(_named(name, {"t": 1.0, "absolute": {"waist_roll": 0.1}}))
+
+
+@pytest.mark.parametrize(
+    "name",
+    [n for n in gestures.RETAINED + gestures.AUTHORED if n not in gestures.WAIST_GESTURES],
+)
+def test_other_gestures_still_refuse_waist(name: str) -> None:
+    for joint in ("waist_yaw", "waist_pitch"):
+        with pytest.raises(ValueError, match="moves the waist"):
+            gestures.parse_gesture(_named(name, {"t": 1.0, "absolute": {joint: 0.1}}))
+
+
+@pytest.mark.parametrize(
+    ("name", "other"), [("invite", "waist_pitch"), ("thanks", "waist_yaw"), ("bow", "waist_yaw")]
+)
+def test_gesture_may_not_set_the_other_waist_joint(name: str, other: str) -> None:
+    with pytest.raises(ValueError, match="moves the waist"):
+        gestures.parse_gesture(_named(name, {"t": 1.0, "absolute": {other: 0.1}}))
+
+
+@pytest.mark.parametrize("value", [0.41, -0.41, 4.0])
+def test_waist_over_the_cap_is_refused(value: float) -> None:
+    with pytest.raises(ValueError, match=r"waist_yaw.*0\.4"):
+        gestures.parse_gesture(_named("invite", {"t": 1.0, "absolute": {"waist_yaw": value}}))
+
+
+def test_waist_delta_is_refused_for_invite() -> None:
+    with pytest.raises(ValueError, match="moves the waist"):
+        gestures.parse_gesture(_named("invite", {"t": 1.0, "delta": {"waist_yaw": 0.1}}))
+
+
+@pytest.mark.parametrize("name", ["invite", "thanks", "synthetic"])
+def test_zero_waist_delta_is_still_allowed(name: str) -> None:
+    gestures.parse_gesture(_named(name, {"t": 1.0, "delta": {"waist_yaw": 0.0}}))

@@ -52,6 +52,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable
 import hashlib
+import json
 from pathlib import Path
 import signal
 import time
@@ -110,6 +111,35 @@ class Robot:
         self.ctrl_lo, self.ctrl_hi = self.m.actuator_ctrlrange[self.act].T
         self.pelvis = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
         self.floor = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_GEOM, "floor")
+        self.torso = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, "torso_link")
+        self.feet = [
+            mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, f"{side}_ankle_roll_link")
+            for side in ("left", "right")
+        ]
+        self.body_names = [
+            mujoco.mj_id2name(self.m, mujoco.mjtObj.mjOBJ_BODY, b) for b in range(self.m.nbody)
+        ]
+
+        def chain(b: int) -> set[int]:  # b and its ancestors
+            out = {b}
+            while b:
+                b = int(self.m.body_parentid[b])
+                out.add(b)
+            return out
+
+        # Torso side: torso_link and its subtree, arms included, without the Dex3 hand links (the
+        # arm path check ignores them too). Pelvis side: the pelvis and the leg chains, i.e. every
+        # pelvis descendant not under the waist links (waist_yaw/roll_link).
+        waist = chain(self.torso) - {self.torso, self.pelvis, 0}
+        self.torso_side = {
+            b
+            for b in range(self.m.nbody)
+            if self.torso in chain(b)
+            and not str(self.body_names[b]).startswith(("left_hand", "right_hand"))
+        }
+        self.pelvis_side = {
+            b for b in range(self.m.nbody) if self.pelvis in chain(b) and not chain(b) & waist
+        } - self.torso_side
         self.band_wrench: Callable[[], NDArray[np.float64]] = self.hanging_band
 
     def floor_contacts(self) -> int:
@@ -118,6 +148,47 @@ class Robot:
             for i in range(self.d.ncon)
             if self.floor in (self.d.contact[i].geom1, self.d.contact[i].geom2)
         )
+
+    def self_contacts(self) -> list[list[str]]:
+        """Sorted unique [torso-side body, pelvis/leg body] name pairs in contact."""
+        n = self.d.ncon
+        pairs: set[tuple[str, str]] = set()
+        for a, b in zip(
+            self.m.geom_bodyid[self.d.contact.geom1[:n]].tolist(),
+            self.m.geom_bodyid[self.d.contact.geom2[:n]].tolist(),
+            strict=True,
+        ):
+            if b in self.torso_side:
+                a, b = b, a
+            if a in self.torso_side and b in self.pelvis_side:
+                pairs.add((self.body_names[a], self.body_names[b]))
+        return [list(p) for p in sorted(pairs)]
+
+    def body_log(self) -> dict[str, Any]:
+        """The run log's body entries: pelvis x/y and heading (yaw) in the world; torso_link's
+        (yaw, pitch, roll) relative to the pelvis, intrinsic z-y-x of R_pelvis^T R_torso, in deg
+        (+pitch tips the torso's forward axis down, a bow; +yaw turns it left); the left and right
+        ankle_roll_link world x, y and yaw (rad) as feet_xy_yaw [6]; and the self_contacts as one
+        JSON string, so the npz loads without pickle."""
+        rp = self.d.xmat[self.pelvis].reshape(3, 3)
+        r = rp.T @ self.d.xmat[self.torso].reshape(3, 3)
+        feet = []
+        for f in self.feet:
+            rf = self.d.xmat[f]
+            feet += [*self.d.xpos[f, :2], np.arctan2(rf[3], rf[0])]
+        return {
+            "pelvis_xy": self.d.xpos[self.pelvis, :2].copy(),
+            "heading_deg": float(np.degrees(np.arctan2(rp[1, 0], rp[0, 0]))),
+            "torso_rel_deg": np.degrees(
+                [
+                    np.arctan2(r[1, 0], r[0, 0]),
+                    np.arcsin(np.clip(-r[2, 0], -1, 1)),
+                    np.arctan2(r[2, 1], r[2, 2]),
+                ]
+            ),
+            "self_contacts": json.dumps(self.self_contacts()),
+            "feet_xy_yaw": np.array(feet),
+        }
 
     def state(
         self,
@@ -353,7 +424,11 @@ def main(argv: list[str] | None = None) -> None:
     epoch, accepted, index, token = 0, -1, 0, planner_token
     last_pose = 0.0
     log: dict[str, list[Any]] = {
-        k: [] for k in ("t", "armed", "q", "dq", "pelvis_z", "tilt", "contacts", "tick_ms")
+        k: []
+        for k in (
+            *("t", "armed", "q", "dq", "pelvis_z", "tilt", "contacts", "tick_ms"),
+            *("pelvis_xy", "heading_deg", "torso_rel_deg", "self_contacts", "feet_xy_yaw"),
+        )
     }
     stop: list[bool] = []
     signal.signal(signal.SIGTERM, lambda *_: stop.append(True))
@@ -420,6 +495,8 @@ def main(argv: list[str] | None = None) -> None:
             log["pelvis_z"].append(float(robot.d.xpos[robot.pelvis, 2]))
             log["tilt"].append(float(np.degrees(np.arccos(np.clip(-gravity(quat)[2], -1, 1)))))
             log["contacts"].append(robot.floor_contacts())
+            for k, v in robot.body_log().items():
+                log[k].append(v)
             log["tick_ms"].append((time.monotonic() - started) * 1000)
             next_tick += TICK
             delay = next_tick - time.monotonic()

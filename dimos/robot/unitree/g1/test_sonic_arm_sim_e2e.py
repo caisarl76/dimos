@@ -22,7 +22,7 @@ container run in-process with the robot blueprint's profile, the real encoder, t
         pytest -m native_e2e dimos/robot/unitree/g1/test_sonic_arm_sim_e2e.py -v -s
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 import json
@@ -43,7 +43,7 @@ import pytest
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import SONIC_ARM_PROFILE
-from dimos.robot.unitree.g1.imported_gestures import AUTHORED, RETAINED
+from dimos.robot.unitree.g1.imported_gestures import AUTHORED, RETAINED, WAIST_GESTURES
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     LEFT_ARM,
     MOTOR_NAMES,
@@ -97,6 +97,23 @@ BOTH_ARMS = LEFT_ARM + RIGHT_ARM
 TRACK_RAD = 0.25
 TRACK_OFFSET_S = 0.3
 COMMANDED_RAD = 0.01
+# Waist gestures (invite turns waist_yaw, thanks and bow bow waist_pitch): over motion, retreat and settling
+# to handback + SETTLE_S, no torso-side x pelvis/leg contact pair is new against the pre-arming
+# stance, and the waist returns like the arms. The waist's tracking is printed, not asserted.
+# Feet, pelvis drift and heading are printed only: the stand-in's feet slide and pivot in every
+# gesture, waist or not (6.9-16.7 mm, 2.8-9.4 deg), so foot placement is checked on the robots
+# (user, 2026-10-27).
+WAIST = (12, 13, 14)
+# invite's waist turn drags the shoulders off their targets (yaw up to 0.360, pitch up to 0.320 rad in
+# MuJoCo). The user accepted that (2026-10-27, option A2): on invite's keyframes that turn the waist,
+# every joint is printed, not asserted; the raise and the return to centre keep TRACK_RAD.
+LOOSE_TURNS = ("invite",)
+SETTLE_S = 0.5
+# Task 1's MuJoCo-measured real waist change from the start at the 0.40 rad command (invite yaw +
+# first, thanks raised-hands bow, bow hanging-arms bow): the stop-mid-waist trigger waits for STOP_WAIST_FRACTION of it.
+WAIST_PEAK_CHANGE = {"invite": (12, 0.153), "thanks": (14, 0.216), "bow": (14, 0.213)}
+STOP_WAIST_FRACTION = 0.5
+STOP_TRIGGER_TIMEOUT_S = 30.0
 
 CASES: list[tuple[str, str, dict[str, Any]]] = [
     *[(f"gesture-{name}", "perform_gesture", {"name": name}) for name in LEFT_ARM_GESTURES],
@@ -248,9 +265,16 @@ def stand_in(tmp: Path, hands_mounted: bool = False) -> Iterator[Sim]:
 
 
 def _run(
-    sim: Sim, mocker: Any, name: str, tool: str, kwargs: dict[str, Any], stop: bool = False
+    sim: Sim,
+    mocker: Any,
+    name: str,
+    tool: str,
+    kwargs: dict[str, Any],
+    stop: bool = False,
+    stop_when: Callable[[float], bool] | None = None,
 ) -> Window:
-    """Call the skill, optionally stop it STOP_FRACTION through its plan, and wait for its result."""
+    """Call the skill, optionally stop it STOP_FRACTION through its plan (or once stop_when(the
+    first chunk's observed_at) holds), and wait for its result."""
     skill, execution = sim.skill, sim.execution
     updates = mocker.spy(skill, "tool_update")
     submit = mocker.spy(execution, "submit_chunk")
@@ -278,7 +302,10 @@ def _run(
         )
         seconds = (len(kplan.poses) + 2 * pad) / RATE
         window.planned_end = plan_start + seconds
-        time.sleep(max(0.0, plan_start + STOP_FRACTION * seconds - time.monotonic()))
+        if stop_when is None:
+            time.sleep(max(0.0, plan_start + STOP_FRACTION * seconds - time.monotonic()))
+        else:
+            wait_until(lambda: stop_when(plan_start), timeout=STOP_TRIGGER_TIMEOUT_S, interval=0.01)
         window.stop_at = time.monotonic()
         window.extra["stop_reply"] = skill.stop_arm()
     wait_until(lambda: updates.call_count >= 1, timeout=RESULT_TIMEOUT_S)
@@ -387,13 +414,10 @@ def test_stop_arm_mid_gesture_retreats(
     assert not failures, failures
 
 
-def _tracking(sim: Sim, w: Window, name: str, plans: Any) -> list[str]:
-    """Print the worst commanded joint per keyframe and return the keyframes that missed TRACK_RAD.
-
-    The plan is rebuilt as _move builds it, from the base and hands _move measured (the arguments
-    of its keyframe_plan call, the one with split_every), and must equal the plan it streamed. Its
-    rows start at the first chunk's observed_at (journal), on the npz's monotonic clock.
-    """
+def _rebuilt_plan(name: str, plans: Any) -> tuple[list[Any], Any, int]:
+    """(keyframes, plan, pad): the plan rebuilt as _move builds it, from the base and hands _move
+    measured (the arguments of its keyframe_plan call, the one with split_every); it must equal the
+    plan it streamed. Plan row r runs pad + r rows after the first chunk's observed_at."""
     call = plans.call_args_list[-1]
     assert "split_every" in call.kwargs, plans.call_args_list
     base = np.asarray(call.args[0], np.float64)
@@ -410,10 +434,31 @@ def _tracking(sim: Sim, w: Window, name: str, plans: Any) -> list[str]:
         one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
     )
     assert np.array_equal(kplan.poses, plans.spy_return.poses), "rebuilt plan != streamed plan"
+    return keyframes, kplan, pad
+
+
+def _plan_start(w: Window) -> float:
+    """The first chunk's observed_at (journal), on the npz's monotonic clock."""
     journal = Path(w.result["metadata"]["journal_path"]).read_text().splitlines()
     first = next(e for e in map(json.loads, journal) if e["event"] == "chunk_accepted")
     assert first["sequence"] == 0, first
-    plan_start = float(first["observed_at"])
+    return float(first["observed_at"])
+
+
+def _tracking(
+    sim: Sim,
+    w: Window,
+    name: str,
+    plans: Any,
+    skip: tuple[int, ...] = (),
+    loose_turns: bool = False,
+) -> list[str]:
+    """Print the worst commanded joint per keyframe and return the keyframes that missed TRACK_RAD.
+    Joints in `skip`, and with `loose_turns` every joint of a keyframe that commands the waist, are
+    printed, not asserted. The plan is _rebuilt_plan's; its rows start at _plan_start."""
+    keyframes, kplan, pad = _rebuilt_plan(name, plans)
+    base = kplan.base
+    plan_start = _plan_start(w)
     log = np.load(sim.log)
     t, q = log["t"], log["q"]
     print(
@@ -431,17 +476,80 @@ def _tracking(sim: Sim, w: Window, name: str, plans: Any) -> list[str]:
         )
         rows = (t >= lo) & (t <= hi)
         joints = np.flatnonzero(np.abs(key.target - base) > COMMANDED_RAD)
+        turn = loose_turns and np.isin(joints, WAIST).any()
+        checked = ~np.isin(joints, joints if turn else skip)
         assert rows.any() and len(joints), (k, lo - plan_start, hi - plan_start, joints)
         error = np.abs(q[rows][:, joints] - key.target[joints]).min(axis=0)
-        worst = int(np.argmax(error))
+        worst = int(np.argmax(np.where(checked | turn, error, -1.0)))
         joint, err = MOTOR_NAMES[joints[worst]], float(error[worst])
-        print(
-            f"{w.name:<26}{k:>3}{lo - plan_start:>8.2f}{hi - plan_start:>8.2f}{len(joints):>5}  "
-            f"{joint:<24}{err:>7.3f}{'' if err <= TRACK_RAD else '  MISSED'}"
+        missed = checked.any() and err > TRACK_RAD
+        loose = ", ".join(
+            f"{MOTOR_NAMES[j]} {e:.3f}"
+            for j, e in zip(joints[~checked], error[~checked], strict=True)
         )
-        if err > TRACK_RAD:
+        print(
+            f"{w.name:<26}{k:>3}{lo - plan_start:>8.2f}{hi - plan_start:>8.2f}{checked.sum():>5}  "
+            f"{joint:<24}{err:>7.3f}{'  MISSED' if missed else ''}"
+            + (f"  (printed only: {loose})" if loose else "")
+        )
+        if missed:
             failures.append(f"keyframe {k}: {joint} off by {err:.3f} rad")
     return failures
+
+
+def _wrap_deg(a: Any) -> Any:
+    return (np.asarray(a) + 180.0) % 360.0 - 180.0
+
+
+def _body(sim: Sim, w: Window, asserted: bool) -> list[str]:
+    """Print the feet, pelvis, waist, legs and new torso-side x pelvis/leg contacts over the motion,
+    any retreat and the settling (window start to end + SETTLE_S), all from the window start.
+    Return the contact and waist-return failures when `asserted`; otherwise only print them.
+    The contact baseline is every pair seen before the first armed sample (the pre-arming stance).
+    """
+    log = np.load(sim.log)
+    t, q = log["t"], log["q"]
+    assert t[-1] >= w.end + SETTLE_S, f"the log ends {t[-1] - w.end:.2f} s after handback"
+    rows = np.flatnonzero((t >= w.start) & (t <= w.end + SETTLE_S))
+    end = rows[t[rows] <= w.end][-1]  # handback, where _physics measures the arms' return
+    feet = log["feet_xy_yaw"][rows].reshape(len(rows), 2, 3)  # left, right: x, y, yaw (rad)
+    foot_move = np.linalg.norm(feet[:, :, :2] - feet[0, :, :2], axis=2).max(axis=0)
+    foot_turn = np.abs(_wrap_deg(np.degrees(feet[:, :, 2] - feet[0, :, 2]))).max(axis=0)
+    pelvis = log["pelvis_xy"][rows]
+    drift = float(np.linalg.norm(pelvis - pelvis[0], axis=1).max())
+    heading = float(np.abs(_wrap_deg(log["heading_deg"][rows] - log["heading_deg"][rows[0]])).max())
+    q0, waist = q[rows[0]], list(WAIST)
+    change = q[rows][:, waist] - q0[waist]
+    waist_back = np.abs(q[end, waist] - q0[waist])
+    legs = np.abs(q[rows][:, :12] - q0[:12]).max(axis=0)
+    hip_yaw = float(legs[[2, 8]].max())
+    leg = int(np.argmax(np.where(np.isin(np.arange(12), [2, 8]), -1.0, legs)))
+    armed = np.flatnonzero(log["armed"])
+    stance = log["self_contacts"][: armed[0]] if len(armed) else log["self_contacts"][:0]
+    baseline = {tuple(p) for s in stance for p in json.loads(s)}
+    new: dict[tuple[str, ...], int] = {}
+    for s in log["self_contacts"][rows]:
+        for p in map(tuple, json.loads(s)):
+            if p not in baseline:
+                new[p] = new.get(p, 0) + 1
+    print(
+        f"{w.name}: feet move L {foot_move[0] * 1000:.1f} R {foot_move[1] * 1000:.1f} mm, turn "
+        f"L {foot_turn[0]:.2f} R {foot_turn[1]:.2f} deg, pelvis drift {drift * 1000:.1f} mm, "
+        f"heading {heading:.2f} deg (printed only); legs peak {legs[leg]:.3f} "
+        f"({MOTOR_NAMES[leg]}), hip yaw {hip_yaw:.3f}; contacts baseline {sorted(baseline)}, "
+        f"new {new}\n{w.name}: waist "
+        + ", ".join(
+            f"{MOTOR_NAMES[j]} abs {q[rows, j].min():+.3f}..{q[rows, j].max():+.3f} change "
+            f"{change[:, i].min():+.3f}/{change[:, i].max():+.3f} end {waist_back[i]:.3f}"
+            for i, j in enumerate(WAIST)
+        )
+        + f" rad ({'asserted' if asserted else 'printed only'})"
+    )
+    checks = {
+        f"new torso contacts {new}": not new,
+        f"waist end {waist_back.max():.3f} rad from the start": waist_back.max() <= ARM_RETURN_RAD,
+    }
+    return [k for k, ok in checks.items() if not ok] if asserted else []
 
 
 @pytest.mark.parametrize("name", RETAINED + AUTHORED)
@@ -451,12 +559,20 @@ def test_imported_gesture_tracks_and_hands_back(
     plans = mocker.spy(sonic_arm_skill, "keyframe_plan")
     with stand_in(tmp_path) as sim:
         window = _run(sim, mocker, f"gesture-{name}", "perform_gesture", {"name": name})
+        time.sleep(SETTLE_S + 0.3)  # the log covers settling to handback + SETTLE_S
     message = window.result["message"]
     # A refusal sends nothing, so there is no motion to check: report the refusal itself.
     assert "nothing sent" not in message, message
     failures = _physics(sim, window, BOTH_ARMS)
-    # Tracking first, so it is printed even when a standard assert below fails.
-    tracking = _tracking(sim, window, name, plans) if "metadata" in window.result else ["no report"]
+    waist = name in WAIST_GESTURES
+    # Tracking and the body first, so they are printed even when a standard assert below fails.
+    # The waist's tracking (also printed by _body) and LOOSE_TURNS are printed, not asserted.
+    tracking = (
+        _tracking(sim, window, name, plans, WAIST if waist else (), name in LOOSE_TURNS)
+        if "metadata" in window.result
+        else ["no report"]
+    )
+    body = _body(sim, window, asserted=waist)
     reached = window.result.get("metadata", {}).get("reached_fraction")
     print(f"{window.name}: reached {reached} (recorded, not asserted)")
     assert "stopped early" not in message and "failed" not in message, message
@@ -464,6 +580,90 @@ def test_imported_gesture_tracks_and_hands_back(
     assert message.endswith(HANDBACK), message
     assert not failures, failures
     assert not tracking, tracking
+    assert not body, body
+
+
+@pytest.mark.parametrize("gesture", WAIST_GESTURES)
+def test_stop_mid_waist_retreats_home(
+    tmp_path: Path, tool_transport: Any, mocker: Any, gesture: str
+) -> None:
+    """stop_arm mid-turn (invite) or mid-bow (thanks, bow) must bring the waist home with the arms.
+
+    The stop is triggered from live feedback, not plan timing: once the plan clock is inside the
+    waist segment and the live waist joint has moved STOP_WAIST_FRACTION of Task 1's measured real
+    change in the commanded direction. The waist segment runs from the start of the motion to the
+    first keyframe that moves the waist joint (its target sets the direction) until the plan
+    commands the joint back to its start: the motion, any hold, and, since SONIC's waist lags its
+    reference, the way back to the start side (invite: the swing to the other side). The npz
+    confirms the stop afterwards.
+    """
+    plans = mocker.spy(sonic_arm_skill, "keyframe_plan")
+    joint, peak = WAIST_PEAK_CHANGE[gesture]
+    seg: dict[str, Any] = {}
+
+    def locate() -> None:
+        _, kplan, pad = _rebuilt_plan(gesture, plans)
+        start = kplan.base[joint]
+        first = next(
+            s
+            for s in kplan.segments
+            if s.dst >= 0 and abs(kplan.targets[s.dst, joint] - start) > COMMANDED_RAD
+        )
+        sign = np.sign(kplan.targets[first.dst, joint] - start)
+        side = sign * (kplan.poses[first.start :, joint] - start)  # commanded displacement
+        top = int(np.argmax(side))
+        hi = first.start + top + int(np.argmax(side[top:] <= 0))
+        seg.update(base=start, pad=pad, lo=first.start, hi=hi, sign=sign, segments=kplan.segments)
+
+    def ready(plan_start: float) -> bool:
+        if not seg:
+            locate()
+        row = (time.monotonic() - plan_start) * RATE - seg["pad"]
+        assert row < seg["hi"], f"the waist segment ended before {STOP_WAIST_FRACTION:.0%} of it"
+        feedback = sim.execution.get_feedback()
+        return (
+            feedback is not None
+            and row >= seg["lo"]
+            and seg["sign"] * (feedback.body_q[joint] - seg["base"]) >= STOP_WAIST_FRACTION * peak
+        )
+
+    with stand_in(tmp_path) as sim:
+        window = _run(
+            sim,
+            mocker,
+            f"stop-mid-{gesture}",
+            "perform_gesture",
+            {"name": gesture},
+            stop=True,
+            stop_when=ready,
+        )
+        time.sleep(SETTLE_S + 0.3)  # the log covers settling to handback + SETTLE_S
+    failures = _physics(sim, window, BOTH_ARMS, before_planned_end=False)
+    body = _body(sim, window, asserted=True)
+    assert window.stop_at is not None
+    log = np.load(sim.log)
+    t, q = log["t"], log["q"]
+    # The feedback the trigger read is the sample at or just after the stop's last logged tick.
+    i = int(np.searchsorted(t, window.stop_at, side="right"))
+    row = (t[i - 1] - _plan_start(window)) * RATE - seg["pad"]
+    moved = float(seg["sign"] * (q[i - 1 : i + 1, joint] - seg["base"]).max())
+    inside = next(k for k, s in enumerate(seg["segments"]) if row < s.end)
+    print(
+        f"{window.name}: stop at plan row {row:.0f}, plan segment {inside} "
+        f"({(row - seg['lo']) / RATE:.2f} s into the waist segment, rows {seg['lo']}-{seg['hi']}), "
+        f"{MOTOR_NAMES[joint]} moved {moved:+.3f} rad ({moved / peak:.0%} of Task 1's {peak})"
+    )
+    assert seg["lo"] <= row < seg["hi"], (row, seg)
+    assert moved >= STOP_WAIST_FRACTION * peak, (moved, peak)
+    assert window.extra["stop_reply"].startswith("Stopping"), window.extra["stop_reply"]
+    message = window.result["message"]
+    assert "stopped early: stop requested" in message and message.endswith(HANDBACK), message
+    journal = Path(window.result["metadata"]["journal_path"]).read_text().splitlines()
+    chunks = [e for e in map(json.loads, journal) if e["event"] == "chunk_accepted"]
+    retreats = [e for e in chunks if e["sequence"] >= 1 and e["monotonic"] >= window.stop_at]
+    assert len(retreats) == 1, [(e["sequence"], e["monotonic"]) for e in chunks]
+    assert not failures, failures
+    assert not body, body
 
 
 def test_finger_check_without_hands_reports_did_not_follow(

@@ -30,7 +30,8 @@
         "right_shoulder_pitch": -0.8,
         "right_shoulder_roll": -0.85,
         "right_shoulder_yaw": -0.6,
-        "right_wrist_roll": -0.5
+        "right_wrist_roll": -0.5,
+        "waist_yaw": 0.4
       },
       "t": 4.5
     },
@@ -45,7 +46,8 @@
         "right_shoulder_pitch": -0.8,
         "right_shoulder_roll": -1.15,
         "right_shoulder_yaw": -0.6,
-        "right_wrist_roll": -0.5
+        "right_wrist_roll": -0.5,
+        "waist_yaw": -0.4
       },
       "t": 6.0
     },
