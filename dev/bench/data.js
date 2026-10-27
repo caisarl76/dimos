@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793082684638,
+  "lastUpdate": 1793084116232,
   "repoUrl": "https://github.com/caisarl76/dimos",
   "entries": {
     "go2 replay realtime (arm64)": [
@@ -5020,6 +5020,60 @@ window.BENCHMARK_DATA = {
             "value": 114.937,
             "unit": "G",
             "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 853/855; perf counted 100.0%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "caisarl76@gmail.com",
+            "name": "Jihun Kim(김지훈)",
+            "username": "caisarl76"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2adb8ddc0acab333074ec7b2af656188b06b9c09",
+          "message": "Merge PR #4: Linux 3.12 as the fork's PR target, a nightly full matrix, apt cache\n\nci: Linux 3.12 as the fork's PR target, a nightly full matrix, apt cache",
+          "timestamp": "2026-10-27T15:52:22+09:00",
+          "tree_id": "18d6b22ea871dde55b9181ea51d2164ff633b803",
+          "url": "https://github.com/caisarl76/dimos/commit/2adb8ddc0acab333074ec7b2af656188b06b9c09"
+        },
+        "date": 1793084115241,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "peak memory",
+            "value": 1585.145,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1117/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "peak threads",
+            "value": 359,
+            "unit": "threads",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1117/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "network (transport)",
+            "value": 2722.044,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1117/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "disk write",
+            "value": 1.477,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1117/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "instructions",
+            "value": 115.1,
+            "unit": "G",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1117/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
           }
         ]
       }
