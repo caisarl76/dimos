@@ -71,6 +71,7 @@ from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
 from dimos.robot.unitree.g1.sonic_test_support import (
     ARM_PROFILE,
     FAKE_GAIN,
+    LEASE_STALL_RERUN,
     PEER_TOKEN,
     WAIT_S,
     FakeEncoder,
@@ -89,6 +90,8 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     wait_until,
 )
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_DUAL_ARM_SYSTEM_PROMPT
+
+pytestmark = LEASE_STALL_RERUN
 
 
 class AbsoluteEncoder(FakeEncoder):

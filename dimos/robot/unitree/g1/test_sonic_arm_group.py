@@ -45,6 +45,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
 )
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_test_support import (
+    LEASE_STALL_RERUN,
     PEER_TOKEN,
     FakeEncoder,
     fast_keyframe_plan,
@@ -57,6 +58,8 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     unheld,
     wait_until,
 )
+
+pytestmark = LEASE_STALL_RERUN
 
 
 @pytest.fixture
