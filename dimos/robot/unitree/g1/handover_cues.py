@@ -17,12 +17,12 @@
 Follows the VoLoAgent loop's evidence events on 222 over ssh and calls perform_gesture on 223's MCP
 server (unitree-g1-sonic-arm, on this workstation):
 
-    trial_start                            -> invite + 06_invite
     trial_end "handover complete"          -> take_<side> + 07_take (222 holds the bottle out)
-    taken_confirmed                        -> entrance_<side> + 08_entrance, then thanks + 09_thanks
+    taken_confirmed                        -> entrance_<side> + 10_entrance ("... have a great time")
     trial_end otherwise, a freeze, the end -> nothing more this round
 
-One gesture runs at a time and is never cut short; one cue waits, and a newer cue replaces it. A refused
+Rounds take about 27 s, so only these two (about 15 s each) fit. One gesture runs at a time and is never
+cut short; one cue waits, and a newer cue replaces it, so a late take gives way to the entrance. A refused
 or failed gesture is logged and dropped. Events written while ssh is down are skipped. It never calls
 stop_arm and never touches the controller. Run it after 223's blueprint is up:
 
@@ -54,9 +54,8 @@ TOOL = "perform_gesture"
 HANDOVER = "handover complete"  # 222's trial_end reason when the bottle is held out
 DROP = frozenset({"stop_key", "loop_freeze", "native_freeze", "session_end"})
 RECONNECT_S = 3.0
-GESTURE_TIMEOUT_S = (
-    60.0  # no stop notice by then: assume it ended (perform_gesture plans are <=45 s)
-)
+# No stop notice by then: assume it ended (perform_gesture plans are <=45 s).
+GESTURE_TIMEOUT_S = 60.0
 
 Side = Literal["left", "right"]
 Cue = list[tuple[str, str]]
@@ -89,12 +88,10 @@ while True:
 def cue_of(event: dict[str, Any], take_side: Side, entrance_side: Side) -> Cue | None:
     """The gestures an event cues ([] clears the waiting cue), or None when it is not a cue."""
     kind = event.get("kind")
-    if kind == "trial_start":
-        return [("invite", "06_invite")]
     if kind == "trial_end":
         return [(f"take_{take_side}", "07_take")] if event.get("reason") == HANDOVER else []
     if kind == "taken_confirmed":
-        return [(f"entrance_{entrance_side}", "08_entrance"), ("thanks", "09_thanks")]
+        return [(f"entrance_{entrance_side}", "10_entrance")]
     if kind in DROP:
         return []
     return None

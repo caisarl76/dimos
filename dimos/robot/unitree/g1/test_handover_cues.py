@@ -22,16 +22,15 @@ from dimos.robot.unitree.g1.handover_cues import _FOLLOW, HANDOVER, Cuer, cue_of
 
 
 def test_cue_of() -> None:
-    assert cue_of({"kind": "trial_start"}, "right", "left") == [("invite", "06_invite")]
     assert cue_of({"kind": "trial_end", "reason": HANDOVER}, "left", "right") == [
         ("take_left", "07_take")
     ]
     assert cue_of({"kind": "trial_end", "reason": "watchdog"}, "right", "right") == []
     assert cue_of({"kind": "taken_confirmed"}, "right", "left") == [
-        ("entrance_left", "08_entrance"),
-        ("thanks", "09_thanks"),
+        ("entrance_left", "10_entrance")
     ]
     assert cue_of({"kind": "loop_freeze"}, "right", "right") == []
+    assert cue_of({"kind": "trial_start"}, "right", "right") is None
     assert cue_of({"kind": "rearm_decision"}, "right", "right") is None
 
 
@@ -44,45 +43,43 @@ def test_one_runs_and_the_newest_cue_waits() -> None:
         return accept
 
     cuer = Cuer(start, "right", "right", timeout_s=60)
+    handover = {"kind": "trial_end", "reason": HANDOVER}
 
-    cuer.on_event({"kind": "trial_start"})
+    cuer.on_event(handover)
     cuer.tick(0)
-    assert sent == ["invite"]
-    cuer.on_event({"kind": "trial_end", "reason": HANDOVER})
-    cuer.on_event({"kind": "rearm_decision"})  # not a cue: the take keeps waiting
+    assert sent == ["take_right"]
+    cuer.on_event({"kind": "taken_confirmed"})
+    cuer.on_event({"kind": "trial_start"})  # the next round does not drop the waiting entrance
     cuer.tick(1)
-    assert sent == ["invite"]  # never cut short
-
+    assert sent == ["take_right"]  # never cut short
     cuer.on_stopped()
     cuer.tick(2)
-    assert sent == ["invite", "take_right"]
+    assert sent == ["take_right", "entrance_right"]
 
-    cuer.on_stopped()
+    cuer.on_event(handover)  # 223 is behind: the late take gives way to the entrance
     cuer.on_event({"kind": "taken_confirmed"})
+    cuer.on_stopped()
     cuer.tick(3)
-    # The next round outruns entrance: invite replaces thanks.
-    cuer.on_event({"kind": "trial_start"})
+    assert sent == ["take_right", "entrance_right", "entrance_right"]
+
+    cuer.on_event(handover)
+    cuer.on_event({"kind": "loop_freeze"})  # a freeze drops the waiting take
     cuer.on_stopped()
     cuer.tick(4)
-    assert sent == ["invite", "take_right", "entrance_right", "invite"]
-
-    cuer.on_event({"kind": "trial_end", "reason": "30 s cap"})  # no bottle held out: nothing more
-    cuer.on_stopped()
-    cuer.tick(5)
-    assert sent[-1] == "invite" and not cuer.waiting
+    assert sent[-1] == "entrance_right" and not cuer.waiting
 
     accept = False  # refused: dropped, not retried
-    cuer.on_event({"kind": "trial_start"})
+    cuer.on_event(handover)
+    cuer.tick(5)
     cuer.tick(6)
-    cuer.tick(7)
-    assert sent.count("invite") == 3 and cuer.busy_until is None
+    assert sent.count("take_right") == 2 and cuer.busy_until is None
 
     accept = True  # a lost stop notice frees 223 after the timeout
-    cuer.on_event({"kind": "trial_start"})
+    cuer.on_event(handover)
     cuer.tick(10)
     cuer.on_event({"kind": "taken_confirmed"})
     cuer.tick(69)
-    assert sent[-1] == "invite"
+    assert sent[-1] == "take_right"
     cuer.tick(70)
     assert sent[-1] == "entrance_right"
 
