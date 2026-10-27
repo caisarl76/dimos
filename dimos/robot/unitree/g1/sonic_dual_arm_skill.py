@@ -258,8 +258,9 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         turn left and right, about 17 s),
         "take_left"/"take_right" (that arm points down and out, palm forward, about 15 s),
         "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
-        about 15 s), "thanks" (hands held together at the chest with a short bow, about 17 s) and
-        "bow" (arms hanging in front, a bow forward from the waist, about 15 s). Each robot
+        about 15 s), "thanks" (hands held together in front of the belly with a short bow,
+        about 17 s) and "bow" (arms hanging in front, a bow forward from the waist, about 15 s).
+        Each robot
         plans from its own measured pose and hands, so with "both" an imported gesture's timing may
         differ a little between the robots. Slow (peak 0.75 rad/s, fingers too). Requires the SONIC controller
         running in confirmed planner idle; it never starts or stops the controller. Stops early and

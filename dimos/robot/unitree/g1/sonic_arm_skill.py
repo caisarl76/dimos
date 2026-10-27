@@ -1720,8 +1720,8 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         "take_left"/"take_right" (that arm points down and out, palm forward, about 15 s),
         "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
         about 15 s),
-        "thanks" (hands held together at the chest with a short bow, about 17 s) and "bow" (arms
-        hanging in front, a bow forward from the waist, about 15 s).
+        "thanks" (hands held together in front of the belly with a short bow, about 17 s) and
+        "bow" (arms hanging in front, a bow forward from the waist, about 15 s).
         Slow (peak 0.75 rad/s, fingers too). Requires the SONIC
         controller running in confirmed planner idle; it never starts or stops the controller. Stops
         early and returns control to the planner if the legs or waist stray, or an arm strays far
