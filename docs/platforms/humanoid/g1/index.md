@@ -55,6 +55,14 @@ For DDS dependencies, follow the [DDS setup guide](/docs/usage/transports/dds.md
 export CYCLONEDDS_HOME="$HOME/cyclonedds/install"
 ```
 
+#### Containers
+
+The 223 greeter stack (the `unitree-g1-sonic-arm` blueprint, its SSH tunnel to the
+robot PC and `greeter.py`) also ships as a CPU-only Docker Compose project in
+[`docker/g1-demo/`](/docker/g1-demo/compose.yaml) for a workstation that only
+runs the demo; `compose.demo.yaml` there adds VoLoAgent's VLM and policy servers
+as one project. Prerequisites, runbook and shutdown order are in the file headers.
+
 ## 3. Get the G1 in Sport Mode
 
 **WARNING**: You *need* to have the G1 in a good physical position before running this.
