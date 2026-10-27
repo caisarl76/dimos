@@ -85,6 +85,12 @@ MAX_TILT_DEG = 3.0
 # 2.75-3.0 deg over 7 fresh runs (one at 3.003). Every other case keeps 3 deg.
 CASE_MAX_TILT_DEG = {"point_at(0, 0)": 3.5}
 MIN_CONTACTS = 7
+# User, 2026-10-27: entrance_right's right-arm sweep turns the stand-in about 2.5 deg right, and
+# for 20-160 ms near 5.7 s after arming the idle left wrist touches left_hip_roll_link while the
+# left heel lifts two of its four corners (tilt under 0.7 deg). That gives 6 contacts in every quiet
+# run since the gesture landed, and 7 only under CPU contention. entrance_left keeps all 8. The
+# gesture runs in 223's demo loop, so its left heel is checked on the robot.
+CASE_MIN_CONTACTS = {"gesture-entrance_right": 6}
 ARM_RETURN_RAD = 0.05
 RESULT_TIMEOUT_S = 120.0
 STOP_FRACTION = 0.6
@@ -132,6 +138,7 @@ CASES: list[tuple[str, str, dict[str, Any]]] = [
     ),
 ]
 assert set(CASE_MAX_TILT_DEG) <= {name for name, _, _ in CASES}
+assert set(CASE_MIN_CONTACTS) <= {f"gesture-{name}" for name in RETAINED + AUTHORED}
 
 # point_at_object with a fake vision model: 40x40 px boxes centred at these head-camera pixels.
 OBJECT_CENTRES = {"centre": (320, 240), "right-edge": (620, 240)}
@@ -350,7 +357,7 @@ def _physics(
     )
     checks = {
         f"tilt {tilt:.2f} deg": tilt <= CASE_MAX_TILT_DEG.get(w.name, MAX_TILT_DEG),
-        f"floor contacts {contacts}": contacts >= MIN_CONTACTS,
+        f"floor contacts {contacts}": contacts >= CASE_MIN_CONTACTS.get(w.name, MIN_CONTACTS),
         f"peak dq {peak:.2f} rad/s": peak <= MAX_DQ,
         f"{'left arm' if arms == LEFT_ARM else 'arms'} end {arm[-1]:.3f} rad from the start": arm[
             -1
