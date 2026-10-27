@@ -355,9 +355,8 @@ def test_a_wrist_resting_just_outside_reach_may_come_a_little_closer():
         return pose
 
     def hip_gap(pose):
-        return min(d for (_, o), d in ruler._near(pose).items() if o == hip)
+        return ruler.gaps(pose)["left_hip_roll_link"]
 
-    hip = next(o for _, o in ruler._near(ROBOT_IDLE) if ruler._body[o] == "left_hip_roll_link")
     rest, nudged, swung = at(0.01), at(0.007), at(-0.008)
     assert 0.020 < hip_gap(rest) < 0.0215 and hip_gap(nudged) < 0.020
     assert hip_gap(rest) - hip_gap(nudged) < 0.002
@@ -444,8 +443,8 @@ def test_the_measured_start_pose_has_no_false_contacts_with_both_arms():
     (about 2 cm) is near, exactly as with the left arm alone."""
     both = ArmCollisionChecker(SCENE, arms=BOTH_ARMS)
     left = ArmCollisionChecker(SCENE, arms=("left",))
-    assert both._near(ROBOT_IDLE) == left._near(ROBOT_IDLE)
-    assert {left._body[other] for _, other in left._near(ROBOT_IDLE)} == {"left_hip_roll_link"}
+    assert both.gaps(ROBOT_IDLE) == left.gaps(ROBOT_IDLE)
+    assert set(left.gaps(ROBOT_IDLE)) == {"left_hip_roll_link"}
     forward = both_arms(ROBOT_IDLE[15:19] - [0.4, 0, 0, 0], ROBOT_IDLE[22:26] - [0.4, 0, 0, 0])
     assert both.first_contact(stroke_plan(ROBOT_IDLE, forward - ROBOT_IDLE)) is None
 

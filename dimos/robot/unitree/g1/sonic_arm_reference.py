@@ -529,6 +529,15 @@ class ArmCollisionChecker:
                 near[(arm, other)] = min(float(c.dist), near.get((arm, other), np.inf))
         return near
 
+    def gaps(self, q: NDArray[Any]) -> dict[str, float]:
+        """Distance (m) from the checked arms to each body within 2 * margin + closer at pose q, by
+        body name ("<link> (other arm)" for the right arm near the left)."""
+        gaps: dict[str, float] = {}
+        for (_, other), dist in self._near(q).items():
+            name = str(self._body[other]) + (" (other arm)" if other in self._side else "")
+            gaps[name] = min(dist, gaps.get(name, np.inf))
+        return gaps
+
     def first_contact(
         self, poses: NDArray[Any], every: int = 5, start: NDArray[Any] | None = None
     ) -> str | None:
