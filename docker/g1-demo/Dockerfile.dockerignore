@@ -1,0 +1,18 @@
+# Context for docker/g1-demo/Dockerfile (BuildKit prefers <Dockerfile>.dockerignore):
+# the Python package, its build inputs and web/ (setup.py copies the relay sources).
+*
+!pyproject.toml
+!uv.lock
+!.python-version
+!setup.py
+!MANIFEST.in
+!README.md
+!dimos
+!web
+**/__pycache__
+**/node_modules
+**/.venv
+**/target
+**/test_data
+**/.env
+**/.env.*

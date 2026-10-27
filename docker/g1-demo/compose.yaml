@@ -1,0 +1,89 @@
+# 223's greeter on a workstation: the unitree-g1-sonic-arm blueprint, its SSH tunnel to pc2 and
+# the greeter loop (docs/platforms/humanoid/g1). From a checkout:
+#   docker compose -f docker/g1-demo/compose.yaml up -d --build     # tunnel + blueprint
+#   docker compose -f docker/g1-demo/compose.yaml run --rm greeter  # the show; Ctrl-C ends it
+#   docker compose -f docker/g1-demo/compose.yaml exec dimos dimos log -f
+#   docker compose -f docker/g1-demo/compose.yaml exec dimos dimos mcp call stop_arm
+#   docker compose -f docker/g1-demo/compose.yaml down
+# Host prerequisites: `ssh pc2` works without a password (alias, key and known_hosts in ~/.ssh;
+# PC2_SSH_HOST overrides the alias), the SONIC v1.1 encoder (the HF cache file; a symlink is fine)
+# and gear_sonic's g1 model_data directory at the paths below (override SONIC_ENCODER /
+# GEAR_SONIC_G1_DIR in a .env next to this file). On pc2 the operator starts the controller and idle planner, as before; the
+# blueprint waits for them. Voice lines play on pc2 through ~/g1_audio.py as before.
+x-image: &image
+  image: dimos-g1-demo
+  build:
+    context: ../..
+    dockerfile: docker/g1-demo/Dockerfile
+  network_mode: host
+  volumes:
+    - ${HOME}/.ssh:/home/dimos/.ssh:ro
+
+services:
+  tunnel:
+    <<: *image
+    command:
+      - ssh
+      - -N
+      - -o
+      - BatchMode=yes
+      - -o
+      - ExitOnForwardFailure=yes
+      - -o
+      - ServerAliveInterval=5
+      - -o
+      - ServerAliveCountMax=2
+      - -R
+      - 5556:127.0.0.1:5556
+      - -L
+      - 5557:127.0.0.1:5557
+      - ${PC2_SSH_HOST:-pc2}
+    restart: unless-stopped
+
+  dimos:
+    <<: *image
+    depends_on:
+      - tunnel
+    volumes:
+      - ${HOME}/.ssh:/home/dimos/.ssh:ro
+      - ${SONIC_ENCODER:-${HOME}/.cache/huggingface/hub/models--nvidia--GEAR-SONIC/snapshots/9c0ff22b4ffec27c5392e8e284eb2f2df7a5b4e2/sonic_v1_1/model_encoder.onnx}:/models/model_encoder.onnx:ro
+      - ${GEAR_SONIC_G1_DIR:-${HOME}/work/GR00T-WholeBodyControl-hand-tracking-watchdog/gear_sonic/data/robot_model/model_data/g1}:/models/g1:ro
+      - dimos-state:/home/dimos/.local/state
+    command:
+      - dimos
+      - --viewer
+      - none
+      - run
+      - unitree-g1-sonic-arm
+      - --disable
+      - camera-module
+      - --disable
+      - observe-skill
+      - --sonicarmskillcontainer.encoder-path=/models/model_encoder.onnx
+      - --sonicarmskillcontainer.collision-model-path=/models/g1/scene_43dof.xml
+      - --sonicarmskillcontainer.max-dq=2.0
+      - --sonicarmskillcontainer.voice-host=${PC2_SSH_HOST:-pc2}
+      - --sonicarmskillcontainer.voice-command=~/miniconda3/envs/unitree/bin/python ~/g1_audio.py
+      - --sonicarmskillcontainer.voice-volume=100
+    tty: true
+    # Zenoh's shared-memory pool (the system configurator otherwise prompts for it and blocks).
+    ulimits:
+      memlock: 67108864
+    # Shutdown retreats a running motion before the controller takes the arm back.
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  greeter:
+    <<: *image
+    profiles:
+      - greeter
+    depends_on:
+      - dimos
+    # entrypoint, so `run --rm greeter --pause-s 3 --take-side left` passes greeter.py's flags.
+    entrypoint:
+      - python
+      - -m
+      - dimos.robot.unitree.g1.greeter
+
+volumes:
+  dimos-state:
