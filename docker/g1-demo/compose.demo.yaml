@@ -1,0 +1,17 @@
+# The demo's whole workstation side as one project: 223's greeter stack (compose.yaml here) and
+# VoLoAgent's VLM + policy servers for 222's handover loop (deploy/g1-loop/compose.yaml in the
+# VoLoAgent checkout, found through VOLO_DIR, default: a checkout beside this one; its own .env
+# applies to it: copy its whole env.example to .env; the build-source variables only need to be
+# set). Images first: build dimos-g1-demo here (`-f docker/g1-demo/compose.yaml build`) and
+# `docker load` VoLo's volo-g1-workstation archive (built online elsewhere, see its README). Then:
+#   docker compose -f docker/g1-demo/compose.demo.yaml --profile workstation up -d --no-build
+#   docker compose -f docker/g1-demo/compose.demo.yaml logs -f policy      # "ready on port 5571"
+#   docker compose -f docker/g1-demo/compose.demo.yaml run --rm greeter    # Ctrl-C ends it
+#   docker compose -f docker/g1-demo/compose.demo.yaml --profile workstation down
+# Stays on the robots: 223's controller + idle planner (operator), 222's native deploy + harness and
+# the loop runner (`--profile pc2 run --rm runner loop …` from VoLo's compose, on PC2). Shutdown
+# order and host prerequisites: the headers of the two included files.
+name: g1-demo
+include:
+  - compose.yaml
+  - ${VOLO_DIR:-../../../VoLoAgent}/deploy/g1-loop/compose.yaml
