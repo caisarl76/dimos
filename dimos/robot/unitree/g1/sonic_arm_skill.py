@@ -175,6 +175,10 @@ GESTURE_LEG_MARGINS: dict[str, tuple[float, tuple[int, ...]]] = {
     "thanks": (0.23, WIDE_LEG_JOINTS),
     "bow": (0.19, WIDE_LEG_JOINTS),
 }
+# Gestures whose legs (the same joints; WIDE_LEG_JOINTS for the rest) take a robot's
+# wide_leg_margin when it sets one: the waist gestures, and raise_hand, which tripped pc2_222's left
+# knee at +0.152 against body_margin (2026-10-22) while pc2_223 peaked at 0.104.
+WIDE_LEG_GESTURES = (*GESTURE_LEG_MARGINS, "raise_hand")
 # The operator's Dex3 finger-order check, command order (thumb_0, thumb_1, thumb_2, middle_0,
 # middle_1, index_0, index_1), left then right: a swapped index/middle shows by eye.
 FINGER_CHECK = "check_dex3_finger_order"
@@ -491,12 +495,15 @@ def gesture_move(config: SonicArmSkillConfig, name: str) -> ArmMove:
             )
         return keyframes
 
+    leg_margin = spec.leg_margin
+    if name in WIDE_LEG_GESTURES and config.wide_leg_margin is not None:
+        leg_margin = config.wide_leg_margin
     allowed = gesture_margins(
         spec.envelope,
         config.body_margin,
         config.pose_arm_margin,
         config.other_arm_margin,
-        spec.leg_margin,
+        leg_margin,
         spec.leg_joints,
     )
     return ArmMove(
@@ -532,6 +539,21 @@ _GROUPS = {  # Reporting groups, matching the envelope groups.
 
 def _peak(peak: tuple[float, int]) -> dict[str, Any]:
     return {"rad_s": round(peak[0], 3), "joint": _JOINTS[peak[1]] if peak[0] > 0 else None}
+
+
+def _closest_leg(
+    deviation: NDArray[np.float64], allowed: NDArray[np.float64], moved: NDArray[np.intp]
+) -> dict[str, Any] | None:
+    """The leg joint, outside the motion, that came closest to its envelope."""
+    legs = [j for j in _GROUPS["legs"] if j not in moved]
+    if not legs:
+        return None
+    j = min(legs, key=lambda j: allowed[j] - deviation[j])
+    return {
+        "joint": _JOINTS[j],
+        "rad": round(float(deviation[j]), 3),
+        "margin_rad": round(float(allowed[j]), 3),
+    }
 
 
 class SonicArmExecutionSpec(Spec, Protocol):
@@ -576,6 +598,11 @@ class SonicArmSkillConfig(ModuleConfig):
     # Dex3 hands installed (pc2_222). Only this says the hand readings mean anything; without it a
     # hand-only motion reports its hand feedback as unavailable and the finger check refuses.
     hands_mounted: bool = False
+    # This robot's leg margin in WIDE_LEG_GESTURES, rad; None keeps GESTURE_LEG_MARGINS (and
+    # body_margin for raise_hand). On stands pc2_222's legs ran 0.04-0.06 rad above the MuJoCo-sized
+    # table (bow tripped at 0.193 against 0.19) with sound motion, so 222 runs at the ceiling (user,
+    # 2026-10-27).
+    wide_leg_margin: float | None = Field(default=None, gt=0, le=LEG_MARGIN_CEILING)
     # How long a status or feedback read from the execution worker may take, s; the task calls
     # (start, submit with up to a 1000-row chunk, finish, cancel) get twice as long. A dead or
     # wedged worker then fails within about a second instead of the transport's 120 s default, so
@@ -1024,6 +1051,7 @@ class SonicArm:
                 g: round(float(max([watch.deviation[j] for j in i if j not in moved] or [0.0])), 3)
                 for g, i in _GROUPS.items()
             },
+            "closest_leg": _closest_leg(watch.deviation, watch.allowed, moved),
             "stream_peak_dq": _peak(watch.stream_dq),
             "return_peak_dq": _peak(watch.return_dq),
             "keyframes": prepared.keyframes,

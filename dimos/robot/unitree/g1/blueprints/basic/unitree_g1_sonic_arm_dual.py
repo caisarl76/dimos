@@ -78,6 +78,12 @@ Operator finger check (an RPC, not an agent skill), with a running blueprint and
    stop_arm stops it. On failure the "Hand result" log line and the result's hand_base,
    hand_target and hand_held tell the cases apart.
 
+The leg margin of the wide-leg gestures (invite, thanks, bow, raise_hand) is per robot too:
+wide_leg_margin_222 is 0.25 here (the ceiling; its legs ran 0.04-0.06 rad above MuJoCo's on
+stands), 223 keeps the gesture table's 0.23 / 0.23 / 0.19 (invite / thanks / bow) and body_margin
+0.15 for raise_hand. Hip yaw stays 0.15 in all but invite. Every result names its closest_leg: the leg joint with the least room left
+to its envelope, its deviation and its margin.
+
 Voice lines (perform_gesture's `line`) play <voice-dir>/<line>.wav (16 kHz mono) on a robot's
 speaker over ssh, through its g1_audio.py. A robot speaks only with its own voice host set (the
 single-robot voice-host is refused here); voice-command, voice-dir and voice-volume are shared, so
@@ -153,7 +159,8 @@ unitree_g1_sonic_arm_dual = autoconnect(
         journal_dir=STATE_DIR / "sonic-arm" / "223",
         profile=_PROFILE,
     ),
-    DualSonicArmSkillContainer.blueprint(),
+    # 222's legs need the ceiling in the wide-leg gestures (wide_leg_margin); 223 keeps the table.
+    DualSonicArmSkillContainer.blueprint(wide_leg_margin_222=0.25),
     McpServer.blueprint(),
 ).remappings(
     [

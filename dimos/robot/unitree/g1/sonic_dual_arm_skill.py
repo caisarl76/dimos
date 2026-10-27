@@ -17,8 +17,9 @@
 The same skills as SonicArmSkillContainer, each taking `robot` ("222", "223" or "both"). One robot
 is a single-arm move; "both" starts both arms together and retreats both if either stops (run_arms).
 One motion runs at a time across both robots. Each robot plans from its own measured body and Dex3
-hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223), and so is
-where its voice lines play (voice_host_222/_223).
+hands; whether its hand readings mean anything is per robot (hands_mounted_222/_223), and so are
+where its voice lines play (voice_host_222/_223) and its wide-leg gestures' leg margin
+(wide_leg_margin_222/_223).
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from functools import partial
 import sys
 from typing import Any, Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from dimos.agents.annotation import skill
 from dimos.agents.capabilities import CAP_MOVEMENT
@@ -40,6 +41,7 @@ from dimos.robot.unitree.g1.sonic_arm_reference import ArmCollisionChecker, Soni
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     _NO_PATH_CHECK,
     FINGER_CHECK,
+    LEG_MARGIN_CEILING,
     ArmLauncher,
     ArmMove,
     GestureName,
@@ -79,6 +81,11 @@ class DualSonicArmSkillConfig(SonicArmSkillConfig):
     # so it is refused here.
     voice_host_222: str | None = None
     voice_host_223: str | None = None
+    # Leg margin of the wide-leg gestures per robot (wide_leg_margin); the blueprint gives 222 the
+    # ceiling.
+    # The single-robot wide_leg_margin would widen both, so it is refused here.
+    wide_leg_margin_222: float | None = Field(default=None, gt=0, le=LEG_MARGIN_CEILING)
+    wide_leg_margin_223: float | None = Field(default=None, gt=0, le=LEG_MARGIN_CEILING)
 
     @model_validator(mode="after")
     def _per_robot(self) -> Self:
@@ -89,6 +96,11 @@ class DualSonicArmSkillConfig(SonicArmSkillConfig):
         if self.voice_host is not None:
             raise ValueError(
                 "the dual container sets the voice host per robot: use voice_host_222 / voice_host_223"
+            )
+        if self.wide_leg_margin is not None:
+            raise ValueError(
+                "the dual container sets the wide leg margin per robot: use wide_leg_margin_222 / "
+                "wide_leg_margin_223"
             )
         return self
 
@@ -126,11 +138,16 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         executions = {"222": self._execution_222, "223": self._execution_223}
         hands = {"222": self.config.hands_mounted_222, "223": self.config.hands_mounted_223}
         voices = {"222": self.config.voice_host_222, "223": self.config.voice_host_223}
+        legs = {"222": self.config.wide_leg_margin_222, "223": self.config.wide_leg_margin_223}
         self._by_robot = {
             name: SonicArm(
                 name,
                 self.config.model_copy(
-                    update={"hands_mounted": hands[name], "voice_host": voices[name]}
+                    update={
+                        "hands_mounted": hands[name],
+                        "voice_host": voices[name],
+                        "wide_leg_margin": legs[name],
+                    }
                 ),
                 execution,
                 encoder,

@@ -59,6 +59,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
     GESTURES,
     IMPORTED_MOVE_S,
     gesture_keyframes,
+    gesture_move,
     gesture_plan_inputs,
 )
 from dimos.robot.unitree.g1.sonic_dual_arm_skill import (
@@ -742,6 +743,23 @@ def test_hands_are_configured_per_robot(real_launch_skill):
     assert module._by_robot["222"].config.hands_mounted is True
     assert module._by_robot["223"].config.hands_mounted is False
     assert module.config.hands_mounted is False
+
+
+@pytest.mark.parametrize("real_launch_skill", [{"wide_leg_margin_222": 0.25}], indirect=True)
+def test_wide_leg_margin_is_configured_per_robot(real_launch_skill):
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
+        ["--dualsonicarmskillcontainer.encoder-path=unused.onnx"], environ={}
+    )
+    config = DualSonicArmSkillConfig(**parsed.module_kwargs("dualsonicarmskillcontainer"))
+    assert (config.wide_leg_margin_222, config.wide_leg_margin_223) == (0.25, None)
+    with pytest.raises(ValueError, match="wide_leg_margin_222 / wide_leg_margin_223"):
+        DualSonicArmSkillConfig(encoder_path="unused.onnx", wide_leg_margin=0.25)
+    module, _ = real_launch_skill
+    arms = module._by_robot
+    assert gesture_move(arms["222"].config, "bow").allowed[0] == 0.25
+    assert gesture_move(arms["223"].config, "bow").allowed[0] == 0.19
+    assert gesture_move(arms["222"].config, "raise_hand").allowed[3] == 0.25
+    assert gesture_move(arms["223"].config, "raise_hand").allowed[3] == 0.15
 
 
 def test_finger_check_runs_on_its_robot_only_and_delivers_the_hand_diagnostics(
