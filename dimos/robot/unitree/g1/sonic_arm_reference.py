@@ -469,14 +469,14 @@ def pixel_ray(u: float, v: float) -> NDArray[np.float64]:
 class ArmCollisionChecker:
     """Kinematic check that a planned arm path keeps clear of the body.
 
-    Uses the G1 SONIC MuJoCo model (gear_sonic scene_43dof.xml). Every geom gets `margin` of extra
-    reach and MuJoCo adds the two, so a contact means the left upper arm, elbow or wrist links come
-    within 2 * margin of the torso, pelvis, legs or right arm. With `arms=("left", "right")` the
+    Uses the G1 SONIC MuJoCo model (gear_sonic scene_43dof.xml). A contact means the left upper
+    arm, elbow or wrist links come within 2 * margin of the torso, pelvis, legs or right arm. With `arms=("left", "right")` the
     right arm's links are checked the same way against the body, and the two arms against each
     other. Each arm ignores only its own shoulder pitch and roll links; the other arm's are body,
     reported by name like the torso. The Dex3 hand geoms are ignored (no hands are installed,
-    TODO(dex3)). Pairs already that close at the start pose (the robot's idle left wrist rests
-    about 2 cm from the hip) are allowed unless the path brings them `closer` nearer.
+    TODO(dex3)). A pair is a contact only if the path also brings it `closer` nearer than at the
+    start pose: an idle wrist rests about 2 cm from its hip, on either side of 2 * margin, and a
+    path that barely moves it must pass either way.
     Not thread-safe: every call reuses the instance's one MjData; the skill uses it only from its
     single motion thread.
     """
@@ -494,7 +494,10 @@ class ArmCollisionChecker:
 
         self._mujoco = mujoco
         self._m = mujoco.MjModel.from_xml_path(str(scene))
-        self._m.geom_margin[:] = margin
+        # Pairs within reach + closer are seen, so a start pose resting just outside reach is
+        # still a baseline: then only a path `closer` nearer than the start is a contact.
+        self._m.geom_margin[:] = margin + closer / 2
+        self._reach = 2 * margin
         self._d = mujoco.MjData(self._m)
         self._closer = closer
         body = [self._m.body(self._m.geom_bodyid[g]).name for g in range(self._m.ngeom)]
@@ -508,8 +511,8 @@ class ArmCollisionChecker:
         self._qadr = [self._m.jnt_qposadr[self._m.joint(n + "_joint").id] for n in MOTOR_NAMES]
 
     def _near(self, q: NDArray[Any]) -> dict[tuple[int, int], float]:
-        """(arm, other) geom pairs within the margin at pose q, with their distances: arm-to-body,
-        and left-arm-to-right-arm when both arms are checked."""
+        """(arm, other) geom pairs within 2 * margin + closer at pose q, with their distances:
+        arm-to-body, and left-arm-to-right-arm when both arms are checked."""
         self._mujoco.mj_resetData(self._m, self._d)  # type: ignore[attr-defined]
         self._d.qpos[2] = 0.79
         self._d.qpos[self._qadr] = q
@@ -535,7 +538,7 @@ class ArmCollisionChecker:
         baseline = self._near(poses[0] if start is None else start)
         for q in poses[::every]:
             for (arm, other), dist in self._near(q).items():
-                if (arm, other) not in baseline or dist < baseline[(arm, other)] - self._closer:
+                if dist < min(self._reach, baseline.get((arm, other), np.inf) - self._closer):
                     return str(self._body[other]) + (" (other arm)" if other in self._side else "")
         return None
 
