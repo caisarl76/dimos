@@ -45,6 +45,7 @@ import threading
 import time
 from typing import Any
 
+from demo_navigation_blockers import blocker_cases
 from demo_navigation_sim import PhysicsProof, native_command, native_env, yaw
 import numpy as np
 import psutil
@@ -494,6 +495,7 @@ def run_two_host(args: Any) -> None:
                 HERE / "demo_analyze_navigation.py",
                 HERE / "demo_navigation_sim_worker.py",
                 HERE / "demo_navigation_timing.py",
+                HERE / "demo_navigation_blockers.py",
             )
         },
         "dds_shim_sha256": {str(p.relative_to(HERE)): sha(p) for p in shim_files},
@@ -1610,64 +1612,7 @@ def run_two_host(args: Any) -> None:
                 obstacles=boxes["appears"],
             )
 
-            # A wall across the corridor when the goal is sent, lifted after `blocked_s`
-            # (session 2026-10-22-5: a transient blocker at goal time). The planner keeps
-            # the goal for 3 s, replanning, with the robot standing; after that it gives up
-            # and the robot must not walk off once the wall is gone.
-            def transient_wall(name: str, blocked_s: float, end_s: float | None) -> Any:
-                window: dict[str, float] = {}
-
-                def during(track: Any, start: tuple[float, float, float]) -> bool:
-                    if track is None:
-                        # Across the whole synthetic map: the corridor is open at both
-                        # ends, and a planner goes round a wall that ends at its walls.
-                        wall = rect(start, ahead=(1.0, 1.2), left=(-50.0, 50.0))
-                        peer.call("synthetic_obstacles", obstacles=[*corridor(start), wall])
-                        return False
-                    now = time.monotonic()
-                    window.setdefault("sent", now)  # first poll, 0.1 s after the goal
-                    if "lifted" not in window and now - window["sent"] >= blocked_s:
-                        window["lifted"] = now
-                        peer.call("synthetic_obstacles", obstacles=corridor(start))
-                    return end_s is not None and now - window["sent"] >= end_s
-
-                run = goal_run(name, 3.5, during)
-                commanded = [
-                    r["monotonic"] - window["sent"]
-                    for r in inputs_seen
-                    if r["scenario"] == name
-                    and r["monotonic"] >= window.get("sent", math.inf)
-                    and (r["vx"] != 0.0 or r["wz"] != 0.0)
-                ]
-                blocked = window.get("lifted", math.inf) - window.get("sent", 0.0)
-                return run, [t for t in commanded if t < blocked], commanded
-
-            # The planner keeps the goal for 3 s, replanning (GlobalPlanner retry window).
-            run, while_blocked, commanded = transient_wall("transient_blocker_waits", 2.0, None)
-            case(
-                "transient_blocker_waits_then_walks",
-                run["accepted"] is True
-                and not while_blocked
-                and bool(commanded)
-                and run["reached_s"] is not None,
-                commanded_while_blocked=len(while_blocked),
-                first_command_s=commanded[0] if commanded else None,
-                reached_s=run["reached_s"],
-                plans=run["plans"],
-            )
-            run, _, commanded = transient_wall("long_blocker_gives_up", 5.0, 9.0)
-            walked = max((math.dist(p, run["start"][:2]) for p in run["track"]), default=0.0)
-            case(
-                "long_blocker_gives_up_and_stays",
-                run["accepted"] is True
-                and not commanded
-                and walked < 0.05
-                and run["reached_s"] is None
-                and run["stopped_at_end"],
-                commanded=len(commanded),
-                walked_m=walked,
-                plans=run["plans"],
-            )
+            blocker_cases(goal_run, peer, corridor, rect, inputs_seen, case)
 
             # MovementManager cancels the goal on any teleop message (DimOS semantics):
             # the operator's input wins and the robot does not walk off again by itself.
