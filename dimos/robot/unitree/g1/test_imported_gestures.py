@@ -18,8 +18,8 @@ from typing import Any
 import numpy as np
 import pytest
 
-from dimos.robot.unitree.g1 import imported_gestures as gestures
-from dimos.robot.unitree.g1.sonic_arm_reference import MOTOR_NAMES
+from dimos.robot.unitree.g1 import imported_gestures as gestures, tool_ardy_clip
+from dimos.robot.unitree.g1.sonic_arm_reference import MOTOR_NAMES, RATE
 from dimos.robot.unitree.g1.sonic_reference import encode_token_reference
 
 DATA = gestures.DATA_DIR
@@ -235,6 +235,7 @@ def test_source_md_complete() -> None:
     assert "2026-10-23" in text
     assert "Dropped" in text
     assert "Hand-authored" in text and all(f"`{n}`" in text for n in gestures.AUTHORED)
+    assert "ARDY clips" in text and all(n in text for n in gestures.CLIP_GESTURES)
 
 
 def _named(name: str, frame: dict[str, Any]) -> dict[str, Any]:
@@ -288,3 +289,66 @@ def test_waist_delta_is_refused_for_invite() -> None:
 @pytest.mark.parametrize("name", ["invite", "thanks", "synthetic"])
 def test_zero_waist_delta_is_still_allowed(name: str) -> None:
     gestures.parse_gesture(_named(name, {"t": 1.0, "delta": {"waist_yaw": 0.0}}))
+
+
+def test_convert_resamples_slows_and_picks_the_arm_columns() -> None:
+    t = np.arange(150) / 25
+    qpos = np.zeros((150, 36))
+    # a smooth bump (sin^2 window) so the spline does not ring at kinks
+    window = np.sin(np.pi / 2 * np.clip(np.minimum(t - 1, 3 - t) / 0.1, 0, 1)) ** 2
+    qpos[:, 7 + 15] = 0.6 * window * np.sin(2 * np.pi * (t - 1))
+    qpos[:, 7 + 0] = 1.0  # a leg column: never copied
+    arms = tool_ardy_clip.convert(qpos, 0.5)
+    assert arms.shape[1] == 14 and np.all(arms[:, 1:] == 0)
+    moving_s = np.count_nonzero(np.abs(np.diff(arms[:, 0])) * RATE > 0.05) / RATE
+    assert moving_s == pytest.approx(4.0, abs=0.1)  # 2 s of motion at 0.5x
+    assert len(arms) / RATE == pytest.approx(
+        4.0 + 2 * tool_ardy_clip.SETTLE_S + tool_ardy_clip.EASE_S, abs=0.1
+    )  # trimmed, plus the ease
+
+
+def test_convert_eases_in_and_out_to_rest() -> None:
+    t = np.arange(76) / 25
+    qpos = np.zeros((76, 36))
+    qpos[:, 7 + 15] = t  # 1 rad/s for 3 s
+    arms = tool_ardy_clip.convert(qpos, 1.0)
+    steps = np.abs(np.diff(arms[:, 0])) * RATE
+    assert steps[0] < 0.05 and steps[-1] < 0.05
+    assert np.all(steps[25:-25] == pytest.approx(1.0, abs=0.02))
+    assert arms[0, 0] == pytest.approx(0.0, abs=1e-6)
+    assert arms[-1, 0] == pytest.approx(2.98, abs=1e-6)  # the last 50 Hz row inside the source
+
+
+def test_every_clip_gesture_loads_at_50_hz_within_limits() -> None:
+    clips = gestures.load_clips()
+    assert set(clips) == set(gestures.CLIP_GESTURES)
+    for name, rows in clips.items():
+        assert rows.shape[1] == 14 and len(rows) > RATE, name
+        for j, joint in enumerate(gestures.CLIP_COLUMNS):
+            low, high = gestures.UB_LIMITS[joint]
+            assert low <= rows[:, j].min() and rows[:, j].max() <= high, (name, joint)
+
+
+@pytest.mark.parametrize(
+    "bad, match",
+    [("header", "columns"), ("limit", "left_elbow"), ("nan", "finite"), ("short", "rows")],
+)
+def test_clip_refusals(bad: str, match: str) -> None:
+    header = ",".join(gestures.CLIP_COLUMNS)
+    row = ",".join("0" for _ in gestures.CLIP_COLUMNS)
+    cols = list(gestures.CLIP_COLUMNS)
+    lines = [header, row, row, row]
+    if bad == "header":
+        lines[0] = ",".join(reversed(cols))
+    elif bad == "limit":
+        vals = ["0"] * 14
+        vals[cols.index("left_elbow")] = "5.0"
+        lines[2] = ",".join(vals)
+    elif bad == "nan":
+        vals = ["0"] * 14
+        vals[3] = "nan"
+        lines[2] = ",".join(vals)
+    else:
+        lines = lines[:2]
+    with pytest.raises(ValueError, match=match):
+        gestures.parse_clip("\n".join(lines) + "\n", "synthetic")

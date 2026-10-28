@@ -21,13 +21,16 @@ Calls perform_gesture on 223's MCP server (unitree-g1-sonic-arm, on this worksta
     entrance_<side> + 10_entrance   show the way to the entrance
     wave + 11_wave                  wave: thanks for coming
 
+With --natural the ARDY clip versions play instead, the same lines (right-side take and entrance only):
+invite_natural, take_right_natural, entrance_right_natural, wave_natural.
+
 Each cycle plays all four once in a fresh random order, and the same act never plays twice in a row.
 Each act waits for 223's stop notice from the MCP tool stream, then a pause. A refused or failed act is
 logged and skipped; while the stream is down nothing is sent. Ctrl-C or SIGTERM ends the loop and leaves a
 running gesture to finish: `dimos mcp call stop_arm` stops it. It never touches the controller. Run it
 after 223's blueprint is up:
 
-    python -m dimos.robot.unitree.g1.greeter
+    python -m dimos.robot.unitree.g1.greeter [--natural]
 """
 
 from __future__ import annotations
@@ -69,7 +72,16 @@ Side = Literal["left", "right"]
 Act = tuple[str, str]  # gesture, line
 
 
-def acts(take_side: Side, entrance_side: Side) -> list[Act]:
+def acts(take_side: Side, entrance_side: Side, natural: bool = False) -> list[Act]:
+    if natural:
+        if (take_side, entrance_side) != ("right", "right"):
+            raise ValueError("--natural has right-side take and entrance only")
+        return [
+            ("invite_natural", "06_invite"),
+            ("take_right_natural", "07_take"),
+            ("entrance_right_natural", "10_entrance"),
+            ("wave_natural", "11_wave"),
+        ]
     return [
         ("invite", "06_invite"),
         (f"take_{take_side}", "07_take"),
@@ -200,6 +212,7 @@ def main() -> None:
         "--take-side", choices=["left", "right"], default="right", help="222, from 223"
     )
     parser.add_argument("--entrance-side", choices=["left", "right"], default="right")
+    parser.add_argument("--natural", action="store_true", help="play the ARDY clip gestures")
     parser.add_argument("--pause-s", type=float, default=3.0, help="rest between acts")
     args = parser.parse_args()
 
@@ -217,10 +230,13 @@ def main() -> None:
         )
         return started
 
+    try:
+        plays = shuffled(acts(args.take_side, args.entrance_side, args.natural), random.Random())
+    except ValueError as exc:
+        parser.error(str(exc))
     stream = GestureStream(args.mcp_url)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # so a SIGTERM also ends the stream
     stream.start()
-    plays = shuffled(acts(args.take_side, args.entrance_side), random.Random())
     try:
         run(plays, start, stream, args.pause_s)
     except KeyboardInterrupt:

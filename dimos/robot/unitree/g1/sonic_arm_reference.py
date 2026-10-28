@@ -225,6 +225,9 @@ class Keyframe:
     hold_s: float = 0.0
     hands: NDArray[np.float64] | None = None  # [14]; None keeps the previous hand target
     min_s: float = 0.0  # minimum duration of the segment arriving here
+    # [M,29] rows played verbatim at RATE as the segment arriving here, instead of a min-jerk
+    # move: path[0] is the previous target, path[-1] this target; hands hold, move_s/min_s unused.
+    path: NDArray[np.float64] | None = None
 
 
 @dataclass(frozen=True)
@@ -233,6 +236,7 @@ class Segment:
     end: int
     src: int
     dst: int
+    clip: bool = False  # a verbatim Keyframe.path; a stop inside it plays on to the plan's end
 
 
 @dataclass(frozen=True)
@@ -273,6 +277,7 @@ def keyframe_plan(
     *,
     base_hands: NDArray[Any] | None = None,
     lead_s: float = 1.0,
+    lead_in_s: float | None = None,
     move_s: float = 2.0,
     peak_speed: float = PEAK_SPEED,
     split_every: int | None = None,
@@ -284,28 +289,46 @@ def keyframe_plan(
     The Dex3 hands (base_hands, default zeros) move with the joints on the same rows.
     split_every bounds the rows between split points. A plan with no still row at all is sent as
     one chunk, so one_chunk (the session chunk less both token blends) bounds its total length:
-    a longer one gets a split hold at its last keyframe.
+    a longer one gets a split hold at its last keyframe. lead_in_s (default lead_s) is the hold
+    before the first move only; the lead-out keeps lead_s.
     """
     base = np.asarray(base, np.float64)
     targets = np.asarray([keyframe.target for keyframe in keyframes], np.float64).reshape(-1, 29)
     home = np.zeros(HAND_JOINTS) if base_hands is None else np.asarray(base_hands, np.float64)
     hand, hand_targets = home, []
-    for keyframe in keyframes:
+    for k, keyframe in enumerate(keyframes):
+        if keyframe.path is not None:
+            if k == 0:
+                raise ValueError("a clip needs an approach keyframe before it")
+            if keyframe.hands is not None:
+                raise ValueError(
+                    "a clip keyframe holds the hands; set hands on the keyframe before it"
+                )
         if keyframe.hands is not None:
             hand = np.asarray(keyframe.hands, np.float64)
         hand_targets.append(hand)
     full = np.hstack([targets, np.reshape(hand_targets, (-1, HAND_JOINTS))])
     full_base = np.concatenate([base, home])
     lead = np.tile(full_base, (round(lead_s * RATE), 1))
-    parts = [lead]
+    lead_in = lead if lead_in_s is None else np.tile(full_base, (round(lead_in_s * RATE), 1))
+    parts = [lead_in]
     segments: list[Segment] = []
-    row = len(lead)
+    row = len(lead_in)
     last_still = max(0, row - _SPLIT_POSE_ROWS + 1)
     has_still = last_still > 0
     src = full_base
     for k, dst in enumerate([*full, full_base]):
         min_s = keyframes[k].min_s if k < len(targets) else return_min_s
-        move = _segment_poses(src, dst, move_s, peak_speed, min_s)
+        path = keyframes[k].path if k < len(targets) else None
+        if path is None:
+            move = _segment_poses(src, dst, move_s, peak_speed, min_s)
+        else:
+            path = np.asarray(path, np.float64)
+            if path.ndim != 2 or path.shape[1] != 29:
+                raise ValueError("clip path must be [M, 29]")
+            if not (np.array_equal(path[0], src[:29]) and np.array_equal(path[-1], dst[:29])):
+                raise ValueError("clip path must start at the previous target and end at its own")
+            move = np.hstack([path, np.tile(src[29:], (len(path), 1))])
         if split_every is not None and len(move) > split_every:
             raise ValueError("segment longer than a session chunk")
         if k:
@@ -325,7 +348,9 @@ def keyframe_plan(
             parts.append(np.tile(src, (hold, 1)))
             row += hold
         parts.append(move)
-        segments.append(Segment(row, row + len(move), k - 1, k if k < len(targets) else -1))
+        segments.append(
+            Segment(row, row + len(move), k - 1, k if k < len(targets) else -1, path is not None)
+        )
         row += len(move)
         src = dst
     parts.append(lead)
@@ -347,7 +372,7 @@ def _retreat_rows(plan: KeyframePlan, segment: int) -> NDArray[np.float64]:
     the plan's lead-out. The direct way home gets the plan's return_min_s."""
     rows = np.hstack([plan.poses, plan.hands])
     seg = plan.segments[segment]
-    if seg.dst == -1:
+    if seg.dst == -1 or seg.clip:
         return rows[seg.start :]
     parts = [rows[seg.start : seg.end][::-1]]
     if seg.src >= 0:
@@ -380,9 +405,11 @@ def retreat_route(plan: KeyframePlan, row: int) -> tuple[int, int] | None:
         return None
     for s, seg in enumerate(plan.segments):
         if row < seg.start:
+            if seg.clip:  # never start the fast clip: reverse the approach from its end
+                return s - 1, 0
             return s, 0 if seg.dst == -1 else seg.end - seg.start
         if row < seg.end:
-            return s, seg.end - 1 - row
+            return s, row - seg.start if seg.clip else seg.end - 1 - row
     return None
 
 
@@ -410,17 +437,20 @@ def blend(a: NDArray[Any], b: NDArray[Any], seconds: float) -> NDArray[np.float6
 
 
 def token_schedule(
-    captured: NDArray[Any], motion_tokens: NDArray[Any], blend_s: float = 2.0
+    captured: NDArray[Any],
+    motion_tokens: NDArray[Any],
+    blend_s: float = 2.0,
+    blend_in_s: float | None = None,
 ) -> NDArray[np.float64]:
     """Planner token -> blend -> motion tokens -> blend -> planner token, at 50 Hz.
 
     The 2 s blends follow the lerobot finding that an instant switch from the planner token
-    unloaded a foot.
+    unloaded a foot. blend_in_s (default blend_s) is the first blend only.
     """
     captured = np.asarray(captured, np.float64)
     return np.vstack(
         [
-            blend(captured, motion_tokens[0], blend_s),
+            blend(captured, motion_tokens[0], blend_s if blend_in_s is None else blend_in_s),
             motion_tokens,
             blend(motion_tokens[-1], captured, blend_s),
         ]

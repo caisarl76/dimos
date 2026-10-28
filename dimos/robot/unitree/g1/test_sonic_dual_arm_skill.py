@@ -45,7 +45,7 @@ from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_dual_agentic
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm_dual import (
     unitree_g1_sonic_arm_dual,
 )
-from dimos.robot.unitree.g1.imported_gestures import HAND_DEFAULT
+from dimos.robot.unitree.g1.imported_gestures import CLIP_GESTURES, HAND_DEFAULT
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     RATE,
@@ -191,7 +191,7 @@ def test_dual_prompt_names_only_dual_skills():
 
 
 def test_dual_prompt_names_every_gesture():
-    for name in get_args(sonic_arm_skill.GestureName):
+    for name in set(get_args(sonic_arm_skill.GestureName)) - set(CLIP_GESTURES):
         assert f"`{name}`" in G1_SONIC_DUAL_ARM_SYSTEM_PROMPT, name
 
 
@@ -230,6 +230,15 @@ def test_gesture_both_through_the_container(inline):
         result = module.perform_gesture("both", "wave")
     assert "222: wave reached" in result.message and "; 223: wave reached" in result.message
     assert result.metadata["start_skew_s"] < 0.5, result.metadata
+
+
+@pytest.mark.parametrize("robot", ["222", "223", "both"])
+@pytest.mark.parametrize("name", CLIP_GESTURES)
+def test_clip_gestures_are_refused_on_the_dual_container(inline, name, robot):
+    module, executions = inline
+    with pytest.raises(ValueError, match="single-robot"):
+        module.perform_gesture(robot, name)
+    assert all(no_pose(peer) for _, peer in executions)
 
 
 def test_stop_arm_with_nothing_running_says_so(real_launch_skill):

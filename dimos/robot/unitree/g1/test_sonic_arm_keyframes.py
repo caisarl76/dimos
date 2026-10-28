@@ -46,9 +46,11 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
     retreat_poses,
     retreat_route,
     stroke_plan,
+    token_schedule,
     two_arm_margins,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import (
+    CLIP_DQ_CEILING,
     GESTURE_MAX_S,
     GESTURES,
     LEFT_ARM_GESTURES,
@@ -521,7 +523,13 @@ def test_each_gesture_plans_within_the_limits(name):
     assert len(plan.poses) / RATE <= GESTURE_MAX_S
     assert all(len(retreat_poses(plan, s)) + 100 <= 1000 for s in range(len(plan.segments)))
     rows = np.hstack([plan.poses, plan.hands])  # fingers share the joints' peak speed
-    assert np.abs(np.diff(rows, axis=0)).max() * RATE <= PEAK_SPEED + 1e-9
+    speed = np.abs(np.diff(rows, axis=0)).max(axis=1) * RATE
+    fast = np.zeros(len(speed), bool)  # a clip plays at human speed; everything else is slow
+    for seg in plan.segments:
+        if seg.clip:
+            fast[seg.start - 1 : seg.end] = True
+    assert speed[~fast].max() <= PEAK_SPEED + 1e-9
+    assert speed[fast].max(initial=0.0) <= CLIP_DQ_CEILING + 1e-9
     assert set(GESTURES) == set(get_args(GestureName))
 
 
@@ -811,3 +819,98 @@ def test_waist_gestures_pass_the_path_check(name):
     )
     checker = ArmCollisionChecker(SCENE, arms=("left", "right"))
     assert checker.first_contact(plan.poses, start=ROBOT_IDLE) is None
+
+
+def _clip_plan():
+    base = np.zeros(29)
+    base[15] = 0.3  # the start differs from the clip's first row
+    path = np.zeros((100, 29))
+    path[:, 17] = 0.4 * np.sin(np.linspace(0, 4 * np.pi, 100))
+    path[:, 16] = np.linspace(0, 0.5, 100)  # path[0] != path[-1]
+    keyframes = [Keyframe(path[0], hold_s=1.0), Keyframe(path[-1], path=path)]
+    return path, keyframe_plan(base, keyframes, move_s=1.0, return_min_s=1.0)
+
+
+def test_clip_plan_approaches_plays_verbatim_and_returns():
+    path, plan = _clip_plan()
+    approach, clip, home = plan.segments
+    assert not approach.clip and clip.clip and not home.clip
+    assert np.array_equal(plan.poses[clip.start : clip.end], path)
+    for seg in (approach, home):  # the slow strokes keep the peak speed
+        assert np.abs(np.diff(plan.poses[seg.start : seg.end], axis=0)).max() * RATE <= (
+            PEAK_SPEED + 1e-6
+        )
+
+
+def test_clip_lead_in_hold_can_be_dropped_without_touching_the_lead_out():
+    base = np.zeros(29)
+    path = np.zeros((100, 29))
+    path[:, 17] = np.linspace(0, 0.4, 100)
+    keyframes = [Keyframe(path[0], hold_s=1.0), Keyframe(path[-1], path=path)]
+    kwargs = {"move_s": 1.0, "return_min_s": 1.0}
+    default = keyframe_plan(base, keyframes, **kwargs)
+    assert default.segments[0].start == RATE  # lead_in_s=None keeps the 1 s lead-in
+    assert np.array_equal(
+        default.poses, keyframe_plan(base, keyframes, lead_in_s=1.0, **kwargs).poses
+    )
+    plan = keyframe_plan(base, keyframes, lead_in_s=0.0, **kwargs)
+    assert plan.segments[0].start == 0 and np.array_equal(plan.poses[0], base)
+    assert len(plan.poses) == len(default.poses) - RATE  # the lead-out keeps lead_s
+    assert np.array_equal(
+        plan.poses[plan.segments[-1].end :], default.poses[default.segments[-1].end :]
+    )
+
+
+def test_token_schedule_blend_in_is_the_first_blend_only():
+    schedule = token_schedule(np.zeros(64), np.ones((10, 64)), blend_in_s=1.0)
+    assert len(schedule) == 50 + 10 + 100
+    assert np.array_equal(schedule[50:60], np.ones((10, 64)))
+    assert len(token_schedule(np.zeros(64), np.ones((10, 64)))) == 100 + 10 + 100
+
+
+def test_a_stop_inside_a_clip_continues_the_plan_tail():
+    _, plan = _clip_plan()
+    clip = plan.segments[1]
+    assert retreat_route(plan, clip.start + 30) == (1, 30)
+    assert np.array_equal(retreat_poses(plan, 1), plan.poses[clip.start :])
+
+
+def test_a_stop_in_the_approach_still_reverses_it():
+    _, plan = _clip_plan()
+    approach = plan.segments[0]
+    row = approach.start + 10
+    assert retreat_route(plan, row) == (0, approach.end - 1 - row)
+
+
+def test_a_clip_path_must_join_its_neighbours():
+    path, _ = _clip_plan()
+    base = np.zeros(29)
+    base[15] = 0.3
+    with pytest.raises(ValueError, match="clip path must start"):
+        keyframe_plan(base, [Keyframe(base + 0.1), Keyframe(path[-1], path=path)])
+
+
+def test_a_stop_in_a_hold_before_the_clip_goes_home_without_jumping():
+    _, plan = _clip_plan()
+    approach, clip, _ = plan.segments
+    row = approach.end + 10
+    assert row < clip.start
+    assert retreat_route(plan, row) == (0, 0)
+    unit = retreat_poses(plan, 0)
+    assert np.abs(unit[0] - plan.poses[row]).max() <= 1e-9
+    assert np.array_equal(unit[-1], plan.poses[-1])
+
+
+def test_clip_keyframe_misuse_is_rejected():
+    path, _ = _clip_plan()
+    base = np.zeros(29)
+    base[15] = 0.3
+    with pytest.raises(ValueError, match="needs an approach keyframe"):
+        keyframe_plan(base, [Keyframe(path[-1], path=path)])
+    with pytest.raises(ValueError, match="holds the hands"):
+        keyframe_plan(
+            base,
+            [Keyframe(path[0]), Keyframe(path[-1], path=path, hands=np.ones(14))],
+        )
+    with pytest.raises(ValueError, match=r"must be \[M, 29\]"):
+        keyframe_plan(base, [Keyframe(path[0]), Keyframe(path[-1], path=path[:, :28])])
