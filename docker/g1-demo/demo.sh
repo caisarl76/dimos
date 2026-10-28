@@ -3,7 +3,7 @@
 # (compose.demo.yaml: 223's tunnel + blueprint, VoLo's VLM on GPU 0 and policy on GPU 1) and opens
 # tmux session "g1-demo": a window per robot, a titled pane per terminal of the runbooks. Each
 # pane has its command typed but NOT run: press Enter in the order of the pane titles.
-#   window 223   ctrl     pc2: guarded SONIC controller
+#   window 223   ctrl     pc2: jetson_clocks (needed after each boot), then guarded SONIC controller
 #                planner  pc2: idle planner (preview, then start)
 #                log      dimos log -f (tool updates, voice)      [running]
 #                test     one gesture + line over MCP
@@ -49,7 +49,7 @@ case ${1:-up} in
     tmux kill-session -t "$S" 2>/dev/null || true
     tmux new-session -d -s "$S" -n ws -c "$PWD" -x 220 -y 60
     tmux send-keys -t "$S:ws" "$DC logs -f policy vlm" Enter
-    pane 223 ctrl "ssh -t $P223 'cd /home/unitree/dimos-sonic-guard-pc2-223-20261014 && bash launch-guarded.sh --run'"
+    pane 223 ctrl "ssh -t $P223 'sudo jetson_clocks && cd /home/unitree/dimos-sonic-guard-pc2-223-20261014 && bash launch-guarded.sh --run'"
     pane 223 planner "ssh -t $P223 'cd /home/unitree/dimos-sonic-guard-pc2-223-20261014 && /home/unitree/dimos/.venv/bin/python start-idle-planner.py && /home/unitree/dimos/.venv/bin/python start-idle-planner.py --start-idle-planner'"
     pane 223 log "$DC exec dimos dimos log -f" run
     pane 223 test "$DC exec dimos dimos mcp call perform_gesture --arg name=invite --arg line=06_invite"
