@@ -27,8 +27,11 @@
 # `demo.sh down` closes the session and the stack; stop_arm first (see compose.yaml's header).
 # `up` refuses while the session exists (killing it would kill the controllers in its panes).
 # Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222), e.g. user@ip when there
-# is no ~/.ssh/config; from the environment or the .env next to this script, resolved by compose
-# itself (so the panes and the containers agree). The 222 paths are the runbook's folders on PC2.
+# is no ~/.ssh/config; WORKSTATION_IP (this machine as PC2 sees it, default 192.168.0.62): T2 writes
+# it into the loop profile's policy_host and T3 takes the VLM from it, so a demo from another
+# workstation needs only that line. From the environment or the .env next to this script, resolved
+# by compose itself (so the panes and the containers agree). The 222 paths are the runbook's
+# folders on PC2.
 set -euo pipefail
 cd "$(dirname "$0")"
 S=g1-demo
@@ -42,6 +45,7 @@ var() {  # var <KEY> <default>: like ${KEY:-default} in a compose file
 }
 P223=$(var PC2_SSH_HOST pc2)
 P222=$(var PC2_222_SSH_HOST pc2_222)
+WS=$(var WORKSTATION_IP 192.168.0.62)
 LOOP='~/GR00T-WholeBodyControl-loop-20261026'
 PY='~/GR00T-WholeBodyControl-harness-20261022/venv/bin/python'
 CLI="PYTHONPATH=\$PWD $PY -m vlm_orchestrator.harness.g1.cli --profile session-profile.yaml --endpoint ipc:///tmp/volo-g1-harness.sock"
@@ -77,11 +81,11 @@ case ${1:-up} in
     pane 223 greeter "$DC run --rm greeter --natural --pause-s 3"
     pane 222 T0 "ssh -t $P222 'cd ~/GR00T-WholeBodyControl && .venv_camera/bin/python -u -m gear_sonic.camera.composed_camera --ego-view-camera realsense --realsense-enable-depth --port 5555'"
     pane 222 T1 "ssh -t $P222 'cd ~/GR00T-WholeBodyControl-deploy-20261027/gear_sonic_deploy && just run g1_deploy_onnx_ref enP8p1s0 policy/sonic_v1_1/model_decoder.onnx reference/example/ --obs-config policy/sonic_v1_1/observation_config.yaml --encoder-file policy/sonic_v1_1/model_encoder.onnx --planner-file planner/target_vel/V2/planner_sonic.onnx --input-type zmq_manager --output-type all --zmq-host localhost --harness-planner-hold'"
-    pane 222 T2 "ssh -t $P222 'cd $LOOP && PYTHONPATH=\$PWD $PY -u -m gear_sonic.scripts.run_vla_inference --harness-endpoint ipc:///tmp/volo-g1-harness.sock --harness-profile session-profile.yaml 2>&1 | tee harness-\$(date +%H%M%S).log'"
+    pane 222 T2 "ssh -t $P222 'cd $LOOP && sed -i \"s/^policy_host: .*/policy_host: $WS/\" session-profile.yaml && grep policy_host: session-profile.yaml && PYTHONPATH=\$PWD $PY -u -m gear_sonic.scripts.run_vla_inference --harness-endpoint ipc:///tmp/volo-g1-harness.sock --harness-profile session-profile.yaml 2>&1 | tee harness-\$(date +%H%M%S).log'"
     # XPUB: publish k only once T2's key subscriber (created late in its init) is attached; a plain PUB drops it.
     pane 222 k "ssh -t $P222 'cd $LOOP && $PY -c \"import zmq,sys,time; s=zmq.Context().socket(zmq.XPUB); s.bind(\\\"tcp://127.0.0.1:5580\\\"); print(\\\"waiting for T2 to subscribe to the key port...\\\", flush=True); sys.exit(\\\"no key subscriber in 120 s: is T2 running?\\\") if not s.poll(120000) else s.recv(); s.send_string(\\\"k\\\"); time.sleep(0.5); print(\\\"k sent\\\")\" && sleep 3 && $CLI status'"
     pane 222 rec "ssh -t $P222 'cd $LOOP && PYTHONPATH=\$PWD $PY -u g1_record_telemetry.py telemetry-$NAME.npz --seconds 1800 2>&1 | tee recorder-$NAME.log'"
-    pane 222 T3 "ssh -t $P222 'cd $LOOP && $CLI loop --session-dir sessions/$NAME --trials 10 --vlm-base-url http://192.168.0.62:8301/v1 --vlm-model qwen3-vl-4b'"
+    pane 222 T3 "ssh -t $P222 'cd $LOOP && $CLI loop --session-dir sessions/$NAME --trials 10 --vlm-base-url http://$WS:8301/v1 --vlm-model qwen3-vl-4b'"
     pane 222 T4 "ssh -t $P222 'cd $LOOP && $CLI verdict --session-dir sessions/$NAME'"
     tmux select-window -t "$S:223"
     [[ -n ${TMUX:-} ]] && tmux switch-client -t "$S" || tmux attach -t "$S"
