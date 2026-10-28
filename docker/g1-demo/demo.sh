@@ -26,10 +26,12 @@
 #   window ws    compose logs: policy must say "ready on port 5571" (~4 min; ~15 min from a cold HDD)
 # `demo.sh down` closes the session and the stack; stop_arm first (see compose.yaml's header).
 # `up` refuses while the session exists (killing it would kill the controllers in its panes).
-# Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222). VOLO_DIR as in
-# compose.demo.yaml (put it in docker/g1-demo/.env). The 222 paths are the runbook's folders on PC2.
+# Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222), e.g. user@ip when there
+# is no ~/.ssh/config; VOLO_DIR as in compose.demo.yaml. All three can sit in the .env next to this
+# script (the one compose reads). The 222 paths are the runbook's folders on PC2.
 set -euo pipefail
 cd "$(dirname "$0")"
+[[ -f .env ]] && { set -a; . ./.env; set +a; }
 S=g1-demo
 DC="docker compose -f compose.demo.yaml"
 P223=${PC2_SSH_HOST:-pc2}
