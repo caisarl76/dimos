@@ -29,8 +29,20 @@ import pytest
 import zmq
 
 from dimos.msgs.sensor_msgs.Image import Image
-from dimos.robot.unitree.g1.sonic_arm_reference import PEAK_SPEED, RATE, Keyframe, keyframe_plan
-from dimos.robot.unitree.g1.sonic_arm_skill import _FINISH_HOLD_ROWS
+from dimos.robot.unitree.g1.sonic_arm_reference import (
+    PEAK_SPEED,
+    RATE,
+    Keyframe,
+    keyframe_plan,
+    token_schedule,
+)
+from dimos.robot.unitree.g1.sonic_arm_skill import (
+    _CHUNK_OVERLAP,
+    _FINISH_HOLD_ROWS,
+    _MAX_CHUNK_ROWS,
+    CLIP_BLEND_IN_S,
+    CLIP_LEAD_IN_S,
+)
 from dimos.robot.unitree.g1.sonic_delivery_observation import (
     SonicCameraDelivery,
     SonicJointDelivery,
@@ -330,6 +342,30 @@ def fast_keyframe_plan(
     fast: dict[str, Any] = dict(lead_s=0.1, move_s=0.3, peak_speed=100.0)
     fast["return_min_s"] = min(kwargs.get("return_min_s", 0.0), 0.1)
     return keyframe_plan(base, capped, **(kwargs | fast))
+
+
+def plan_as_prepared(
+    base: Any, base_hands: Any, keyframes: list[Any], move_s: float, return_min_s: float
+) -> tuple[Any, int, int]:
+    """(plan, pad_in, pad_out) as SonicArm.prepare builds them: a clip gesture starts with no
+    lead-in and a CLIP_BLEND_IN_S blend."""
+    clip = any(k.path is not None for k in keyframes)
+    blend_in_s = CLIP_BLEND_IN_S if clip else None
+    pad_out = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+    pad_in = (
+        len(token_schedule(np.zeros(64), np.zeros((1, 64)), blend_in_s=blend_in_s)) - 1 - pad_out
+    )
+    kplan = keyframe_plan(
+        base,
+        keyframes,
+        base_hands=base_hands,
+        move_s=move_s,
+        return_min_s=return_min_s,
+        lead_in_s=CLIP_LEAD_IN_S if clip else None,
+        split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - max(pad_in, pad_out),
+        one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - pad_in - pad_out,
+    )
+    return kplan, pad_in, pad_out
 
 
 def wait_until(condition: Callable[[], Any], timeout: float = WAIT_S) -> None:

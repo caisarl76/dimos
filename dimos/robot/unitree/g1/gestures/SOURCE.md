@@ -89,3 +89,31 @@ Waist (invite, thanks, bow; 2026-10-26/27, measured in the MuJoCo stand-in). Sig
   arm tracking rather than asserting it; the raise and the return to centre are still asserted.
 - Foot placement is checked on the robots, not in MuJoCo: the stand-in's feet slide and pivot in
   every gesture, waist or not (6.9-16.7 mm, 2.8-9.4 deg), so the e2e prints the feet only.
+
+## ARDY clips
+
+`clips/*.csv` are arm trajectories (header = the 14 arm joint names, `CLIP_COLUMNS`; 50 Hz rows in
+rad) generated with ARDY (nv-tlabs/ardy @ `8163bbf`), model `ARDY-G1-RP-25FPS-Horizon52`, 6.0 s,
+`--num_samples 4 --seed 0`. `tool_ardy_clip.py` takes ARDY's 25 fps MuJoCo qpos CSV, keeps the arm
+columns, resamples with a cubic spline at the speed factor, trims to the motion plus 0.5 s each side, then
+eases the playback speed 0 -> speed -> 0 over 0.4 s at both ends (the raw samples start and end mid-motion),
+so each clip starts and ends at rest and is 0.4 s longer than the trimmed motion.
+
+| gesture | sample | prompt | speed |
+|---|---|---|---|
+| `wave_natural` | wave_01 | A person stands in place and waves hello with the left hand. | 0.7x |
+| `invite_natural` | invite_03 | A person stands in place and opens both arms in a warm welcoming gesture, inviting people to come closer. | 0.8x |
+| `entrance_right_natural` | entrance_right_01 | A person stands in place and extends the right arm out to the right side with an open palm, showing the way to the entrance. | 0.8x |
+| `take_right_natural` | take_constrained_01 | A person stands in place and reaches the right arm out to the front right with an open palm, presenting an object on a table as if saying please take one. | 0.8x |
+
+`take_right_natural` is constrained with `raw/take_right_constraint.json`: right hand and hips pinned
+on frames 40/50/60/70 to `take_right.json`'s arm pose. The raw CSVs and generation scripts live in
+`~/work/g1-demo-gestures/ardy/` (not committed). Regenerate:
+
+```bash
+R=~/work/g1-demo-gestures/ardy/raw; C=dimos/robot/unitree/g1/gestures/clips
+python -m dimos.robot.unitree.g1.tool_ardy_clip $R/wave_01.csv 0.7 $C/wave_natural.csv
+python -m dimos.robot.unitree.g1.tool_ardy_clip $R/invite_03.csv 0.8 $C/invite_natural.csv
+python -m dimos.robot.unitree.g1.tool_ardy_clip $R/take_constrained_01.csv 0.8 $C/take_right_natural.csv
+python -m dimos.robot.unitree.g1.tool_ardy_clip $R/entrance_right_01.csv 0.8 $C/entrance_right_natural.csv
+```

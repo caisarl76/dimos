@@ -37,6 +37,7 @@ from dimos.agents.skill_result import SkillResult
 from dimos.core.core import rpc
 from dimos.core.module import Module
 from dimos.core.stream import In
+from dimos.robot.unitree.g1.imported_gestures import CLIP_GESTURES
 from dimos.robot.unitree.g1.sonic_arm_reference import ArmCollisionChecker, SonicEncoder
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     _NO_PATH_CHECK,
@@ -276,6 +277,8 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
         "entrance_left"/"entrance_right" (that arm points level out to the side, palm forward,
         about 15 s), "thanks" (hands held together in front of the belly with a short bow,
         about 17 s) and "bow" (arms hanging in front, a bow forward from the waist, about 15 s).
+        The ARDY clip gestures (wave_natural, invite_natural, take_right_natural,
+        entrance_right_natural) are 223 single-robot gestures and are refused here.
         Each robot
         plans from its own measured pose and hands, so with "both" an imported gesture's timing may
         differ a little between the robots. Slow (peak 0.75 rad/s, fingers too). Requires the SONIC controller
@@ -289,6 +292,11 @@ class DualSonicArmSkillContainer(ArmLauncher, Module):
             line: Optional voice line (wav name, e.g. "01_intro") spoken as the motion starts, by
                 each selected robot that has a voice.
         """
+        if name in CLIP_GESTURES:
+            raise ValueError(
+                f"{name} is a 223 single-robot gesture (unitree-g1-sonic-arm); "
+                "not available on the dual container"
+            )
         return self._launch_move(
             "perform_gesture", robot, lambda config: gesture_move(config, name), line
         )

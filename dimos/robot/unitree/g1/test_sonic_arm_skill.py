@@ -44,7 +44,15 @@ from dimos.robot.unitree.g1 import sonic_arm_reference, sonic_arm_skill, sonic_t
 from dimos.robot.unitree.g1.blueprints.agentic.unitree_g1_sonic_arm_agentic import (
     unitree_g1_sonic_arm_agentic,
 )
-from dimos.robot.unitree.g1.imported_gestures import AUTHORED, HAND_LIMITS, HAND_ORDER, RETAINED
+from dimos.robot.unitree.g1.imported_gestures import (
+    AUTHORED,
+    CLIP_GESTURES,
+    HAND_LIMITS,
+    HAND_ORDER,
+    RETAINED,
+    UB_LIMITS,
+    load_clips,
+)
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     PEAK_SPEED,
     RATE,
@@ -59,6 +67,8 @@ from dimos.robot.unitree.g1.sonic_arm_reference import (
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import (
     ALL_LEG_JOINTS,
+    CLIP_DQ_CEILING,
+    CLIP_DQ_FACTOR,
     GESTURES,
     WIDE_LEG_JOINTS,
     SonicArmSkillConfig,
@@ -85,6 +95,7 @@ from dimos.robot.unitree.g1.sonic_test_support import (
     frames,
     gate_start,
     needs_scene,
+    plan_as_prepared,
     pose_values,
     real_hold_plan,
     stop_in_background,
@@ -97,6 +108,7 @@ from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
 pytestmark = LEASE_STALL_RERUN
 
 LEAD_IN_ROWS = 10  # The fixture's 0.2 s token blend at 50 Hz.
+CLIP_LEAD_IN_ROWS = 50  # A clip's first blend (CLIP_BLEND_IN_S), whatever the fixture's blend.
 
 
 @pytest.fixture
@@ -562,6 +574,7 @@ def stop_at_row(module, mocker, row, on_row=lambda: None):
     `on_row` on the stream thread and sets the returned event. Production computes the retreat row
     and the stream gets it unchanged. Each stop is recorded as (the row the stream passed to
     retreat(), the row its clock implied there: int((now - plan_start) * RATE), the retreat built).
+    `row` may be a function of the stream's watch.
     """
     last = threading.local()  # Each thread's latest reading of the module's clock.
     stops = []
@@ -570,7 +583,11 @@ def stop_at_row(module, mocker, row, on_row=lambda: None):
     def monotonic():
         last.now = time.monotonic()
         start = getattr(last, "watch", None) and last.watch.plan_start  # The stream thread's.
-        if start is not None and not reached.is_set() and (last.now - start) * RATE >= row:
+        if (
+            start is not None
+            and not reached.is_set()
+            and (last.now - start) * RATE >= (row(last.watch) if callable(row) else row)
+        ):
             on_row()  # Seen by this very loop pass, which retreats from this reading.
             reached.set()
         return last.now
@@ -717,6 +734,21 @@ def test_stop_in_the_lead_in_blend_plays_the_blend_backwards(skill, mocker):
     assert np.array_equal(rows[-1], first[-1])  # The captured planner token (and hands).
     assert rows[-1][0] == pytest.approx(PEER_TOKEN)
     assert module._execution.get_status()["task"]["handback_confirmed"]
+
+
+def test_stop_in_a_clips_lead_in_blend_plays_it_backwards(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    spy = mocker.spy(module._execution, "submit_chunk")
+    _, stops = stop_at_row(module, mocker, 3, on_row=module._arm.stop.set)
+    with feeding_clip(module, lambda w, now: (np.zeros(29), now)):
+        result = module.perform_gesture("wave_natural")
+    assert "stopped early: stop requested" in result.message, result
+    [(row, implied, _)] = stops
+    assert row == implied and 3 <= row < CLIP_LEAD_IN_ROWS, stops
+    first, rows = unheld(spy.call_args_list[0].args[3]), unheld(spy.call_args_list[1].args[3])
+    assert len(rows) == row + 2 and np.array_equal(rows[:-1], first[row::-1])
+    assert rows[-1][0] == pytest.approx(PEER_TOKEN)
 
 
 def test_stop_during_arming_sends_no_chunk(real_launch_skill, mocker):
@@ -1288,6 +1320,33 @@ def test_invite_widens_hip_yaw_too():
     assert thanks[2] == thanks[8] == 0.15 and thanks[0] == 0.23
 
 
+def test_entrance_right_natural_widens_waist_yaw_only():
+    config = SonicArmSkillConfig(encoder_path="unused.onnx")
+    entrance = gesture_move(config, "entrance_right_natural").allowed
+    other = gesture_move(config, "wave_natural").allowed
+    deltas = np.abs(
+        np.asarray(
+            [
+                k.target
+                for k in GESTURES["entrance_right_natural"].keyframes_of(np.zeros(29), np.zeros(14))
+            ]
+        )
+    ).max(axis=0)
+    assert deltas[12] == 0.0  # the waist does not move in the plan
+    assert entrance[12] == 0.20
+    assert entrance[13] == entrance[14] == config.body_margin  # waist roll and pitch
+    assert other[12] == config.body_margin
+
+
+def test_waist_margin_is_checked(mocker):
+    mocker.patch.object(sonic_arm_skill, "GESTURE_WAIST_MARGINS", {"wave": 0.26})
+    with pytest.raises(ValueError, match="over"):
+        sonic_arm_skill._gesture_table()
+    mocker.patch.object(sonic_arm_skill, "GESTURE_WAIST_MARGINS", {"nope": 0.2})
+    with pytest.raises(ValueError, match="not a gesture"):
+        sonic_arm_skill._gesture_table()
+
+
 def test_leg_margin_ceiling_is_enforced(mocker):
     mocker.patch.dict(sonic_arm_skill.GESTURE_LEG_MARGINS, {"invite": (0.26, ALL_LEG_JOINTS)})
     with pytest.raises(ValueError, match="over"):
@@ -1348,6 +1407,377 @@ def test_waist_envelope_includes_the_planned_waist(skill, mocker):
     allowed = watch.call_args.kwargs["allowed"]
     assert allowed[12] >= 0.40 + module.config.body_margin - 1e-9
     assert all(allowed[j] >= 0.23 for j in range(12))
+
+
+@pytest.fixture
+def clip_skill(skill, mocker):
+    """The skill with a profile long enough for an 8 s clip (the clip is not shortened).
+
+    The test plans the gesture with prepare and stops there: the scripted peer's session is not
+    sized for a real-length clip.
+    """
+    module, peer = skill
+    status = module._execution.get_status()
+    long = status | {
+        "profile": status["profile"] | {"max_observation_age": 25.0, "max_duration": 60.0}
+    }
+    mocker.patch.object(module._execution, "get_status", return_value=long)
+    # The fake encoder's gain would push a clip's summed swing out of the token bound.
+    mocker.patch.object(
+        module._arm._encoder, "encode", lambda poses: np.full((len(poses), 64), PEER_TOKEN)
+    )
+    return module, peer
+
+
+def prepare_gesture(module, name):
+    move = gesture_move(module.config, name)
+    with feeding(module):
+        return module._arm.prepare(
+            move.label,
+            move.keyframes_of,
+            move.allowed,
+            require_check=move.require_check,
+            move_s=move.move_s,
+            return_min_s=move.return_min_s,
+            arms=move.arms,
+        )
+
+
+@pytest.mark.parametrize("name", CLIP_GESTURES)
+def test_clip_gesture_plans_its_clip_with_a_raised_arm_limit(clip_skill, name):
+    module, _ = clip_skill
+    module._arm._both_checker = checker = FakeChecker()
+    watch = prepare_gesture(module, name).watch
+    clip = load_clips()[name]
+    peak = np.abs(np.diff(clip, axis=0)).max() * RATE
+    assert watch.fast_max_dq == pytest.approx(
+        max(module.config.max_dq, min(CLIP_DQ_CEILING, CLIP_DQ_FACTOR * peak))
+    )
+    assert watch.fast_rows[1] - watch.fast_rows[0] == len(clip)
+    # the envelope covers the clip's swing on every arm joint
+    path = GESTURES[name].keyframes_of(np.zeros(29), np.zeros(14))[1].path
+    assert np.all(watch.allowed[15:29] >= np.abs(path[:, 15:29]).max(axis=0) - 1e-9)
+    assert checker.calls  # the both-arm path check is required and run
+
+
+def test_clip_gesture_starts_after_a_one_second_blend_and_no_lead_in(clip_skill, mocker):
+    module, _ = clip_skill
+    mocker.patch.object(sonic_arm_skill, "token_schedule", token_schedule)  # real 2 s blends
+    module._arm._both_checker = FakeChecker()
+    plans = mocker.spy(sonic_arm_skill, "keyframe_plan")
+    prepared = prepare_gesture(module, "wave_natural")
+    clip_len = len(load_clips()["wave_natural"])
+    watch = prepared.watch
+    assert watch.motion_row == 50
+    assert watch.fast_rows[0] > 50 and watch.fast_rows[1] - watch.fast_rows[0] == clip_len
+    # 1 s blend in, then the approach and the clip (no lead-in hold), ..., the 2 s blend back.
+    assert len(prepared.plan) == 50 + len(plans.spy_return.poses) + 100
+
+
+@pytest.mark.parametrize("name", ["wave", "invite"])
+def test_non_clip_gesture_keeps_the_symmetric_blends_and_lead_in(clip_skill, mocker, name):
+    module, _ = clip_skill
+    mocker.patch.object(sonic_arm_skill, "token_schedule", token_schedule)
+    module._arm._both_checker = FakeChecker()
+    prepared = prepare_gesture(module, name)
+    # The fixture's fast plans lead in 0.1 s (5 rows): the 2 s blend (100 rows) is unchanged.
+    assert prepared.watch.motion_row == 100 + 5
+    assert prepared.watch.fast_rows is None
+
+
+class SamplingChecker(FakeChecker):
+    """Honours `every`: reports a contact only if sampling every Nth row reaches the bad row."""
+
+    def __init__(self, bad_row):
+        super().__init__()
+        self.bad_row, self.every_seen = bad_row, []
+
+    def first_contact(self, poses, every=5, start=None):
+        self.every_seen.append(every)
+        hit = self.bad_row < len(poses) and self.bad_row % every == 0
+        return "left_hip_roll_link" if hit else None
+
+
+def test_clip_gesture_path_checks_every_row(clip_skill):
+    module, _ = clip_skill
+    # Row 3 is not a multiple of 5: sampling every 5th row would miss it.
+    module._arm._both_checker = checker = SamplingChecker(bad_row=3)
+    with pytest.raises(RuntimeError, match=r"comes within 2 cm.*nothing sent"):
+        prepare_gesture(module, "wave_natural")
+    assert checker.every_seen[0] == 1
+
+
+def test_non_clip_gesture_keeps_the_sampled_path_check(clip_skill, mocker):
+    module, _ = clip_skill
+    mocker.patch.object(sonic_arm_skill, "token_schedule", token_schedule)
+    module._arm._checker = checker = SamplingChecker(bad_row=3)  # wave is left-arm only
+    prepare_gesture(module, "wave")
+    assert set(checker.every_seen) == {5}
+
+
+def test_a_clip_faster_than_the_ceiling_is_refused(clip_skill, mocker):
+    module, _ = clip_skill
+    module._arm._both_checker = FakeChecker()
+    clips = load_clips()
+    fast = clips["wave_natural"][::3]  # the same motion at triple speed
+    mocker.patch.object(sonic_arm_skill, "load_clips", return_value={**clips, "wave_natural": fast})
+    mocker.patch.dict(GESTURES, sonic_arm_skill._gesture_table())
+    with pytest.raises(RuntimeError, match="over the 7.5 rad/s ceiling; nothing sent"):
+        prepare_gesture(module, "wave_natural")
+
+
+def test_a_clip_rolled_past_a_shoulder_limit_is_refused_at_table_build(mocker):
+    clips = load_clips()
+    clip = clips["wave_natural"].copy()
+    clip[:, 1] = UB_LIMITS["left_shoulder_roll"][1] - 0.1  # column 1 = motor 16
+    mocker.patch.object(sonic_arm_skill, "load_clips", return_value={**clips, "wave_natural": clip})
+    with pytest.raises(
+        ValueError, match=r"wave_natural clip with CLIP_ROLL_OUT 0.2.*left_shoulder_roll"
+    ):
+        sonic_arm_skill._gesture_table()
+
+
+def test_a_clips_moved_at_registers_during_the_approach(clip_skill):
+    module, _ = clip_skill
+    module._arm._both_checker = FakeChecker()
+    watch = prepare_gesture(module, "wave_natural").watch
+    assert watch.onset_delta is not None and not np.allclose(watch.onset_delta, watch.delta)
+    module._arm._watch = watch
+    watch.send_at = 10.0
+    state = module._execution.get_feedback()
+
+    def feed(q, received):
+        sample = replace(state, body_q=tuple(watch.base + q), received_monotonic=received)
+        module._arm.handle_feedback(sample)
+
+    feed(np.zeros(29), 9.9)
+    feed(watch.onset_delta, 10.5)  # the approach's end, well short of the clip's farthest pose
+    assert watch.moved_at == 10.5
+
+
+def test_non_clip_gestures_have_no_separate_onset_vector(skill):
+    module, _ = skill
+    module._arm._both_checker = FakeChecker()
+    module._arm._checker = FakeChecker()
+    assert prepare_gesture(module, "wave").watch.onset_delta is None
+
+
+@pytest.mark.parametrize("name", ["wave", "invite"])
+def test_keyframe_gestures_keep_their_envelope_and_limit(skill, mocker, name):
+    module, _ = skill
+    module._arm._both_checker = FakeChecker()
+    module._arm._checker = FakeChecker()
+    watch = mocker.spy(sonic_arm_skill, "_Watch")
+    call_with_feed(module, lambda: module.perform_gesture(name), lambda t: np.zeros(29))
+    kw = watch.call_args.kwargs
+    spec = GESTURES[name]
+    config = module.config
+    deltas = np.abs(
+        np.asarray([k.target for k in spec.keyframes_of(np.zeros(29), np.zeros(14))])
+    ).max(axis=0)
+    leg = spec.leg_margin
+    expected = gesture_margins(
+        spec.envelope,
+        config.body_margin,
+        config.pose_arm_margin,
+        config.other_arm_margin,
+        leg,
+        spec.leg_joints,
+        spec.waist_margin,
+    )
+    assert kw["allowed"] == pytest.approx(expected + deltas)
+    assert kw.get("fast_rows") is None
+    assert kw.get("fast_max_dq", 0.0) == 0.0
+
+
+def short_clip_gesture(module, mocker):
+    """wave_natural becomes a 1 s clip on left_shoulder_yaw peaking at ~6.2 rad/s (limit ~7.4)."""
+    module._arm._both_checker = FakeChecker()
+    t = np.arange(RATE) / RATE
+    clip = np.zeros((len(t), 14))
+    clip[:, 2] = 0.2 * np.sin(2 * np.pi * 5 * t)  # column 2 = motor 17
+    keyframes_of = partial(sonic_arm_skill._clip_keyframes, clip)
+    spec = replace(GESTURES["wave_natural"], keyframes_of=keyframes_of)
+    mocker.patch.dict(GESTURES, {"wave_natural": spec})
+
+
+def speed(joint, value):
+    dq = np.zeros(29)
+    dq[joint] = value
+    return dq
+
+
+def inside(window, now):
+    return window is not None and window[0] <= now <= window[1]
+
+
+@contextmanager
+def feeding_clip(module, sample, body=lambda watch, now, q: q):
+    """A feeder stamps each sample as received now; `sample(watch, now)` gives (body_dq, received).
+
+    Inside the clip window the body is at the plan's farthest pose, then `body(watch, now, q)` may
+    change it. Yields a dict that holds the motion's watch and the clip window it first had.
+    """
+    stopped, seen = threading.Event(), {}
+
+    def feed():
+        while not stopped.is_set():
+            state, watch = module._execution.get_feedback(), module._arm._watch
+            if state is not None and watch is not None:
+                seen["watch"] = watch
+                if watch.fast_window is not None:
+                    seen.setdefault("window", watch.fast_window)
+                now = time.monotonic()
+                q = watch.delta if inside(watch.fast_window, now) else np.zeros(29)
+                q = body(watch, now, q.copy())
+                dq, received = sample(watch, now)
+                module.handle_feedback(
+                    replace(state, body_q=tuple(q), body_dq=tuple(dq), received_monotonic=received)
+                )
+            time.sleep(0.01)
+
+    feeder = threading.Thread(target=feed, daemon=True)
+    feeder.start()
+    try:
+        wait_until(lambda: module._execution.get_status()["ready"])
+        yield seen
+    finally:
+        stopped.set()
+        feeder.join(2)
+
+
+def test_arm_speed_inside_the_clip_window_is_allowed_up_to_the_clip_limit(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    with feeding_clip(
+        module, lambda w, now: (speed(17, 5.0 if inside(w.fast_window, now) else 0.0), now)
+    ) as seen:
+        result = module.perform_gesture("wave_natural")
+    assert 5.0 < seen["watch"].fast_max_dq < CLIP_DQ_CEILING
+    assert "returned" in result.message, result
+    assert result.metadata["stream_peak_dq"] == {"rad_s": 5.0, "joint": "left_shoulder_yaw"}
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
+
+
+@pytest.mark.parametrize(
+    ("joint", "value", "name"),
+    [(17, 9.0, "left_shoulder_yaw"), (3, None, "left_knee")],  # None: just above config.max_dq
+)
+def test_speed_over_the_phase_limit_mid_clip_cancels_at_once(skill, mocker, joint, value, name):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    value = module.config.max_dq + 0.1 if value is None else value
+    submit = mocker.spy(module._execution, "submit_chunk")
+    route = mocker.spy(sonic_arm_skill, "retreat_route")
+
+    def sample(w, now):
+        mid = w.fast_window is not None and w.fast_window[0] + 0.1 <= now <= w.fast_window[1]
+        return speed(joint, value if mid else 0.0), now
+
+    with feeding_clip(module, sample):
+        result = module.perform_gesture("wave_natural")
+    assert f"stopped early: {name} speed {value:.2f} rad/s >" in result.message, result
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "cancelled" and status["handback_confirmed"], status
+    assert not route.called  # no retreat was built, let alone sent
+    assert all(c.args[1] < result.metadata["chunks"] for c in submit.call_args_list)
+
+
+def test_arm_speed_over_max_dq_outside_the_clip_still_trips(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    over = module.config.max_dq + 0.5
+    submit = mocker.spy(module._execution, "submit_chunk")
+
+    def sample(w, now):  # once, well before the clip
+        early = w.fast_window is not None and now < w.fast_window[0] - 0.2 and w.abort is None
+        return speed(17, over if early else 0.0), now
+
+    with feeding_clip(module, sample) as seen:
+        result = module.perform_gesture("wave_natural")
+    assert f"stopped early: left_shoulder_yaw speed {over:.2f} rad/s >" in result.message, result
+    assert seen["watch"].fast_window is None  # the clip never plays
+    assert submit.call_args_list[-1].args[1] == result.metadata["chunks"]  # the smooth way back
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
+
+
+def test_stop_mid_clip_finishes_the_clip_then_returns(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    submit = mocker.spy(module._execution, "submit_chunk")
+    cancel = mocker.spy(module._execution, "cancel_task")
+    hushed, hush = [], module._arm.hush
+    mocker.patch.object(
+        module._arm, "hush", side_effect=lambda: (hushed.append(time.monotonic()), hush())
+    )
+    _, stops = stop_at_row(
+        module, mocker, lambda w: w.fast_rows[0] + 10, on_row=module._arm.stop.set
+    )
+    with feeding_clip(module, lambda w, now: (np.zeros(29), now)) as seen:
+        result = module.perform_gesture("wave_natural")
+    assert (
+        "wave_natural stopped early: stop requested (finished the clip, then returned)"
+        in result.message
+    ), result
+    [(row, _, built)] = stops
+    watch = seen["watch"]
+    assert watch.fast_rows[0] <= row < watch.fast_rows[1]
+    # The retreat is the plan's own tail from the stop row: the clip plays on, then the way home.
+    first, rows = unheld(submit.call_args_list[0].args[3]), unheld(submit.call_args_list[1].args[3])
+    assert len(rows) == len(first) - row and np.array_equal(rows, first[row:])
+    assert watch.fast_window == seen["window"]  # the clip limit still applies
+    assert hushed[0] < seen["window"][1] - sonic_arm_skill.CLIP_DQ_TAIL_S  # cut at the stop
+    assert not cancel.called
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
+
+
+def test_stop_in_the_approach_reverses_without_the_clip_limit(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    over = module.config.max_dq + 0.5
+    _, stops = stop_at_row(module, mocker, CLIP_LEAD_IN_ROWS + 8, on_row=module._arm.stop.set)
+    window = {}
+
+    def sample(w, now):
+        if w.fast_window is not None:
+            window.setdefault("clip", w.fast_window)
+        if w.abort is None or w.fast_window is not None or "clip" not in window:
+            return np.zeros(29), now
+        # On the way back: a sample stamped inside the clip's window, under the clip limit.
+        return speed(17, over), window["clip"][0] + 0.05
+
+    with feeding_clip(module, sample) as seen:
+        result = module.perform_gesture("wave_natural")
+    [(row, _, built)] = stops
+    assert row < seen["watch"].fast_rows[0] and built is not None
+    assert seen["watch"].fast_window is None
+    assert "stopped early: stop requested" in result.message, result
+    assert "finished the clip" not in result.message
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "cancelled" and status["handback_confirmed"], status
+
+
+def test_stop_after_the_clip_goes_home_as_today(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    submit = mocker.spy(module._execution, "submit_chunk")
+    finish = mocker.spy(module._execution, "finish_task")
+    cancel = mocker.spy(module._execution, "cancel_task")
+    _, stops = stop_at_row(
+        module, mocker, lambda w: w.fast_rows[1] + 3, on_row=module._arm.stop.set
+    )
+    with feeding_clip(module, lambda w, now: (np.zeros(29), now)):
+        result = module.perform_gesture("wave_natural")
+    [(row, _, built)] = stops
+    assert built is None  # already on the way home
+    assert "stopped early: stop requested" in result.message, result
+    assert finish.call_count == 1 and not cancel.called
+    assert submit.call_count == result.metadata["chunks"]
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
 
 
 def test_gesture_checks_the_path_when_configured_and_runs_without(skill):
@@ -1997,9 +2427,11 @@ def padded(rows, pad=LEAD_IN_ROWS):
 def test_gesture_names_match_the_gesture_table():
     names = set(sonic_arm_skill.GestureName.__args__)
     assert names == set(GESTURES)
-    assert len(names) == len(sonic_arm_skill.LEFT_ARM_GESTURES) + len(RETAINED) + len(AUTHORED)
+    assert len(names) == len(sonic_arm_skill.LEFT_ARM_GESTURES) + len(RETAINED) + len(
+        AUTHORED
+    ) + len(CLIP_GESTURES)
     assert set(RETAINED + AUTHORED) <= names
-    for name in names:
+    for name in names - set(CLIP_GESTURES):  # the prompt names the clips in Task 5
         assert f"`{name}`" in G1_SONIC_ARM_SYSTEM_PROMPT, name
     _, move_s, return_min_s, arms, envelope = sonic_arm_skill.gesture_plan_inputs(
         "wave", np.zeros(29), PEER_HANDS
@@ -2027,29 +2459,30 @@ def test_every_gesture_from_the_robot_idle_splits_into_session_chunks(name):
     """_move's plan, real 2 s token blends and split mask: every chunk fits a session chunk, and
     each split row has still tokens, poses and hands. beckon (802 pose rows, no hold) once had no
     still row and did not fit one chunk with both blends (1002 rows)."""
-    pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
-    assert pad == 100
     keyframes, move_s, return_min_s, _, _ = sonic_arm_skill.gesture_plan_inputs(
         name, ROBOT_IDLE, np.zeros(14)
     )
-    kplan = keyframe_plan(
-        ROBOT_IDLE,
-        keyframes,
-        base_hands=np.zeros(14),
-        move_s=move_s,
-        return_min_s=return_min_s,
-        split_every=sonic_arm_skill._MAX_CHUNK_ROWS - sonic_arm_skill._CHUNK_OVERLAP - pad,
-        one_chunk=sonic_arm_skill._MAX_CHUNK_ROWS - sonic_arm_skill._FINISH_HOLD_ROWS - 2 * pad,
+    kplan, pad_in, pad_out = plan_as_prepared(
+        ROBOT_IDLE, np.zeros(14), keyframes, move_s, return_min_s
     )
-    tokens = token_schedule(np.full(64, PEER_TOKEN), FakeEncoder("unused").encode(kplan.poses))
+    blend_in_s = (
+        sonic_arm_skill.CLIP_BLEND_IN_S if any(k.path is not None for k in keyframes) else None
+    )
+    tokens = token_schedule(
+        np.full(64, PEER_TOKEN), FakeEncoder("unused").encode(kplan.poses), blend_in_s=blend_in_s
+    )
     token_still = sonic_arm_skill.token_still(tokens)
-    plan_still = np.r_[np.zeros(pad, bool), kplan.still, np.zeros(pad, bool)]
+    plan_still = np.r_[np.zeros(pad_in, bool), kplan.still, np.zeros(pad_out, bool)]
     chunks = sonic_arm_skill.chunk_rows(len(tokens), token_still & plan_still)
     assert all(end - start <= sonic_arm_skill._MAX_CHUNK_ROWS for start, end in chunks), chunks
     assert chunks[-1][1] - chunks[-1][0] <= sonic_arm_skill._MAX_CHUNK_ROWS - 25  # Room to hold.
     assert chunks[-1][1] == len(tokens)
     hands = np.vstack(
-        [np.repeat(kplan.hands[:1], pad, 0), kplan.hands, np.repeat(kplan.hands[-1:], pad, 0)]
+        [
+            np.repeat(kplan.hands[:1], pad_in, 0),
+            kplan.hands,
+            np.repeat(kplan.hands[-1:], pad_out, 0),
+        ]
     )
     for start, _ in chunks[1:]:
         assert token_still[start] and plan_still[start], (name, start)
@@ -2395,3 +2828,73 @@ def test_finger_check_through_the_worker_returns_at_once_and_stop_arm_retreats(w
     assert "stopped early: stop requested" in result, result
     task = execution.get_status()["task"]
     assert task["last_chunk_sequence"] == 1 and task["handback_confirmed"], task  # The retreat.
+
+
+def knee_out(watch, q):
+    q[3] = watch.allowed[3] + 0.05
+    return q
+
+
+def test_leg_breach_mid_clip_finishes_the_clip_then_returns(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    submit = mocker.spy(module._execution, "submit_chunk")
+    cancel = mocker.spy(module._execution, "cancel_task")
+    _, stops = stop_at_row(module, mocker, 0)  # only records the row the stream retreats from
+
+    def body(w, now, q):  # the knee leaves its envelope once, inside the window
+        return knee_out(w, q) if inside(w.fast_window, now) else q
+
+    with feeding_clip(module, lambda w, now: (np.zeros(29), now), body) as seen:
+        result = module.perform_gesture("wave_natural")
+    assert "stopped early: left_knee left its envelope" in result.message, result
+    assert "(finished the clip, then returned)" in result.message, result
+    [(row, _, built)] = stops
+    watch = seen["watch"]
+    assert watch.fast_rows[0] <= row < watch.fast_rows[1]
+    first, rows = unheld(submit.call_args_list[0].args[3]), unheld(submit.call_args_list[1].args[3])
+    assert len(rows) == len(first) - row and np.array_equal(rows, first[row:])
+    assert watch.fast_window == seen["window"]  # the clip limit still applies
+    assert not cancel.called
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status
+
+
+def test_overspeed_after_a_mid_clip_breach_cancels(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    cancel = mocker.spy(module._execution, "cancel_task")
+
+    def body(w, now, q):
+        return knee_out(w, q) if inside(w.fast_window, now) else q
+
+    def sample(w, now):  # an arm overspeed once the breach has set the abort, still in the window
+        late = w.abort is not None and inside(w.fast_window, now)
+        return speed(17, w.fast_max_dq + 1.0 if late else 0.0), now
+
+    with feeding_clip(module, sample, body):
+        result = module.perform_gesture("wave_natural")
+    assert "stopped early: left_knee left its envelope" in result.message, result
+    assert cancel.called
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "cancelled" and status["handback_confirmed"], status
+
+
+def test_a_breach_after_a_mid_clip_stop_never_cancels(skill, mocker):
+    module, _ = skill
+    short_clip_gesture(module, mocker)
+    cancel = mocker.spy(module._execution, "cancel_task")
+    stop_at_row(module, mocker, lambda w: w.fast_rows[0] + 10, on_row=module._arm.stop.set)
+
+    def sample(w, now):
+        return np.zeros(29), now
+
+    def body(w, now, q):
+        return q if w.abort is None else knee_out(w, q)
+
+    with feeding_clip(module, sample, body):
+        result = module.perform_gesture("wave_natural")
+    assert "stop requested (finished the clip, then returned)" in result.message, result
+    assert not cancel.called
+    status = module._execution.get_status()["task"]
+    assert status["outcome"] == "finished" and status["handback_confirmed"], status

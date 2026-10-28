@@ -56,18 +56,28 @@ from dimos.core.stream import In
 from dimos.models.vl.base import VlModel
 from dimos.models.vl.openai import OpenAIVlModel
 from dimos.msgs.sensor_msgs.Image import Image
-from dimos.robot.unitree.g1.imported_gestures import HAND_ORDER, load_gestures, resolve
+from dimos.robot.unitree.g1.imported_gestures import (
+    HAND_ORDER,
+    UB_LIMITS,
+    _check_limit,
+    load_clips,
+    load_gestures,
+    resolve,
+)
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     _SPLIT_STILL_ROWS,
     ARM_JOINTS,
     HAND_JOINTS,
     HEAD_CAMERA_SIZE,
     JOINT_BOUNDS,
+    LEFT_ARM,
     LEFT_SHOULDER_PITCH,
     LOOSE_JOINTS,
+    MOTOR_NAMES,
     POINT_AZIMUTH_DEG,
     POINT_ELEVATION_DEG,
     RATE,
+    RIGHT_ARM,
     ArmCollisionChecker,
     ArmKinematics,
     Keyframe,
@@ -139,6 +149,10 @@ GestureName = Literal[
     "entrance_right",
     "thanks",
     "bow",
+    "wave_natural",
+    "invite_natural",
+    "take_right_natural",
+    "entrance_right_natural",
 ]
 _WAVE_RAISE = (-0.3, 1.3, 0.0, 0.0)
 # Left-arm gestures as absolute (shoulder pitch, roll, yaw, elbow) rad and the hold at each, s; the
@@ -163,6 +177,24 @@ GESTURE_MAX_S = 45.0  # longest plan a gesture may take, lead-in and way home in
 # Imported motions (gestures/): segments last at least their source dt, 0.5 s and the peak-speed
 # time (fingers included); the way home at least the motion's return_s.
 IMPORTED_MOVE_S = 0.5
+# Clip gestures (ARDY human motion, both arms, played verbatim): the approach and the return take at
+# least CLIP_MOVE_S; the arm-speed limit during the clip is CLIP_DQ_FACTOR x its planned peak, up to
+# CLIP_DQ_CEILING rad/s, and outlasts the clip by CLIP_DQ_TAIL_S for tracking lag.
+CLIP_MOVE_S = 1.0
+CLIP_DQ_FACTOR = 1.2
+CLIP_DQ_CEILING = 7.5
+CLIP_DQ_TAIL_S = 0.5
+# A clip starts moving sooner than other gestures (user 2026-10-28 asked for motion 0.5-1 s after
+# arming): no lead-in hold, and 1 s of the 2 s blend from the planner token (the 2 s blend is the
+# lerobot finding that an instant switch unloaded a foot). The lead-out and the blend back stay.
+# voice_lead_s (1.4 s) exceeds the clip's 1.0 s to motion, so the voice line starts with the first
+# chunk, about 1.0 s before the arm moves.
+CLIP_LEAD_IN_S = 0.0
+CLIP_BLEND_IN_S = 1.0
+# ARDY's G1 rest pose and some swings touch scene_43dof's hips/torso; this opens the arms ~11 deg
+# (shoulder roll, outward) so the both-arm path check passes from the measured idle.
+CLIP_ROLL_OUT = 0.2
+ARM_MOTORS = (*LEFT_ARM, *RIGHT_ARM)
 Envelope = Literal["pose", "two_arm"]
 # Leg joints (hip pitch/roll/yaw, knee, ankle pitch/roll, left then right) of a gesture whose
 # balance asks more of the legs get a wider margin than body_margin. Hip yaw is 2 and 8.
@@ -175,6 +207,10 @@ GESTURE_LEG_MARGINS: dict[str, tuple[float, tuple[int, ...]]] = {
     "thanks": (0.23, WIDE_LEG_JOINTS),
     "bow": (0.19, WIDE_LEG_JOINTS),
 }
+# MuJoCo: the right-arm sweep drags waist_yaw to -0.150 rad at ~2.4 s, past body_margin 0.15
+# (user 2026-10-27). Widens waist_yaw (motor 12) only.
+GESTURE_WAIST_MARGINS: dict[str, float] = {"entrance_right_natural": 0.20}
+WAIST_YAW = 12
 # Gestures whose legs take a robot's wide_leg_margin when it sets one (on GESTURE_LEG_MARGINS'
 # joints; WIDE_LEG_JOINTS for raise_hand): the waist gestures, and raise_hand, which tripped
 # pc2_222's left knee at +0.152 against body_margin (2026-10-22) while pc2_223 peaked at 0.104.
@@ -320,6 +356,24 @@ class GestureSpec:
     return_min_s: float
     leg_margin: float | None = None  # None keeps body_margin on the legs
     leg_joints: tuple[int, ...] = WIDE_LEG_JOINTS
+    waist_margin: float | None = None  # None keeps body_margin on waist_yaw
+
+
+def _clip_rows(clip: NDArray[np.float64], base: NDArray[np.float64]) -> NDArray[np.float64]:
+    """The clip's arm rows over ``base``, with the shoulders rolled out by CLIP_ROLL_OUT."""
+    rows = np.tile(base, (len(clip), 1))
+    rows[:, list(ARM_MOTORS)] = clip
+    rows[:, 16] += CLIP_ROLL_OUT  # left_shoulder_roll
+    rows[:, 23] -= CLIP_ROLL_OUT  # right_shoulder_roll
+    return rows
+
+
+def _clip_keyframes(
+    clip: NDArray[np.float64], base: NDArray[np.float64], base_hands: NDArray[np.float64]
+) -> list[Keyframe]:
+    """Approach the clip's first row, then play its arm rows verbatim over the measured body."""
+    rows = _clip_rows(clip, base)
+    return [Keyframe(rows[0]), Keyframe(rows[-1], path=rows)]
 
 
 def _gesture_table() -> dict[str, GestureSpec]:
@@ -336,6 +390,24 @@ def _gesture_table() -> dict[str, GestureSpec]:
             IMPORTED_MOVE_S,
             g.return_s,
         )
+    for name, clip in load_clips().items():
+        rolled = _clip_rows(clip, np.zeros(29))
+        for joint in (16, 23):  # parse_clip checked the CSV, not the CLIP_ROLL_OUT shift
+            for value in (rolled[:, joint].min(), rolled[:, joint].max()):
+                _check_limit(
+                    MOTOR_NAMES[joint],
+                    float(value),
+                    UB_LIMITS[MOTOR_NAMES[joint]],
+                    f"{name} clip with CLIP_ROLL_OUT {CLIP_ROLL_OUT:g}",
+                )
+        table[name] = GestureSpec(
+            name,
+            partial(_clip_keyframes, clip),
+            ("left", "right"),
+            "two_arm",
+            CLIP_MOVE_S,
+            CLIP_MOVE_S,
+        )
     for name, (margin, joints) in GESTURE_LEG_MARGINS.items():
         if name not in table:
             raise ValueError(f"GESTURE_LEG_MARGINS names {name!r}, which is not a gesture")
@@ -344,6 +416,12 @@ def _gesture_table() -> dict[str, GestureSpec]:
         if not set(joints) <= set(ALL_LEG_JOINTS):
             raise ValueError(f"{name} leg margin names joints {joints} outside the legs")
         table[name] = replace(table[name], leg_margin=margin, leg_joints=joints)
+    for name, margin in GESTURE_WAIST_MARGINS.items():
+        if name not in table:
+            raise ValueError(f"GESTURE_WAIST_MARGINS names {name!r}, which is not a gesture")
+        if margin > LEG_MARGIN_CEILING:
+            raise ValueError(f"{name} waist margin {margin:g} is over {LEG_MARGIN_CEILING:g} rad")
+        table[name] = replace(table[name], waist_margin=margin)
     if unknown := set(WIDE_LEG_GESTURES) - set(table):
         raise ValueError(f"WIDE_LEG_GESTURES names {sorted(unknown)}, which are not gestures")
     return table
@@ -376,16 +454,19 @@ def gesture_margins(
     other_arm: float,
     leg_margin: float | None = None,
     leg_joints: tuple[int, ...] = WIDE_LEG_JOINTS,
+    waist_margin: float | None = None,
 ) -> NDArray[np.float64]:
     """The envelope before the planned displacement is added: pose_margins for a left-arm gesture,
     two_arm_margins (both arms `pose_arm`) for an imported one; `leg_joints` get `leg_margin`
-    when it is given."""
+    when it is given, and waist_yaw gets `waist_margin`."""
     if envelope == "two_arm":
         margins = two_arm_margins(body, pose_arm)
     else:
         margins = pose_margins(body, pose_arm, other_arm)
     if leg_margin is not None:
         margins[list(leg_joints)] = leg_margin
+    if waist_margin is not None:
+        margins[WAIST_YAW] = waist_margin
     return margins
 
 
@@ -488,7 +569,12 @@ def gesture_move(config: SonicArmSkillConfig, name: str) -> ArmMove:
     def keyframes_of(base: NDArray[np.float64], base_hands: NDArray[np.float64]) -> list[Keyframe]:
         keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(name, base, base_hands)
         plan = keyframe_plan(
-            base, keyframes, base_hands=base_hands, move_s=move_s, return_min_s=return_min_s
+            base,
+            keyframes,
+            base_hands=base_hands,
+            move_s=move_s,
+            return_min_s=return_min_s,
+            lead_in_s=CLIP_LEAD_IN_S if any(k.path is not None for k in keyframes) else None,
         )
         seconds = len(plan.poses) / RATE
         if seconds > GESTURE_MAX_S:
@@ -507,6 +593,7 @@ def gesture_move(config: SonicArmSkillConfig, name: str) -> ArmMove:
         config.other_arm_margin,
         leg_margin,
         spec.leg_joints,
+        spec.waist_margin,
     )
     return ArmMove(
         name,
@@ -636,7 +723,10 @@ class _Watch:
     base: NDArray[np.float64]
     allowed: NDArray[np.float64]
     max_dq: float
-    delta: NDArray[np.float64]  # The planned displacement of every joint at the deepest keyframe.
+    delta: NDArray[np.float64]  # The planned displacement of every joint at the farthest pose.
+    # What the onset test measures along; a clip's farthest pose is mid-clip, so it uses the
+    # approach's end pose instead. None means delta.
+    onset_delta: NDArray[np.float64] | None = None
     returning: bool = False
     reached: float = 0.0  # Furthest progress along the planned displacement, as a fraction.
     reached_q: NDArray[np.float64] = field(default_factory=lambda: np.zeros(29))
@@ -644,8 +734,12 @@ class _Watch:
     stream_dq: tuple[float, int] = (0.0, -1)
     return_dq: tuple[float, int] = (0.0, -1)
     abort: str | None = None
-    overspeed_at: float = -1.0  # monotonic time of the last sample above max_dq
+    overspeed_at: float = -1.0  # monotonic time of the last sample above its joint's limit
     hold_rows: tuple[int, int] | None = None  # token-plan rows of the deepest keyframe's hold
+    fast_rows: tuple[int, int] | None = None  # token-plan rows of a clip (fast_max_dq applies)
+    fast_max_dq: float = 0.0  # the arm-speed limit inside fast_rows, rad/s
+    fast_window: tuple[float, float] | None = None  # monotonic span of fast_rows, set by _stream
+    stopped_in_clip: bool = False  # a stop or trip retreated inside fast_window: the clip plays on
     motion_row: int = 0  # token-plan row where the arm starts moving (after the lead-in and blend)
     plan_start: float | None = None  # monotonic time of the first chunk's row 0
     hold_q: list[NDArray[np.float64]] = field(default_factory=list)  # body_q inside the hold
@@ -765,15 +859,16 @@ class SonicArm:
                 return
             # Receipt time, not this handler's: samples queue before they get here.
             received = feedback.received_monotonic
+            onset = watch.delta if watch.onset_delta is None else watch.onset_delta
             if watch.send_at is None or received <= watch.send_at:
                 if received >= watch.onset_at:
                     watch.onset_q, watch.onset_at = body, received
             elif (
                 watch.onset_q is not None
-                and watch.delta.any()
+                and onset.any()
                 and (watch.moved_at is None or received < watch.moved_at)
             ):
-                moved = (body - watch.onset_q) @ watch.delta / (watch.delta @ watch.delta)
+                moved = (body - watch.onset_q) @ onset / (onset @ onset)
                 if moved >= _ONSET_PROGRESS:
                     watch.moved_at = received
             if watch.delta.any():  # A hand-only motion has no body progress.
@@ -782,15 +877,21 @@ class SonicArm:
                     watch.reached, watch.reached_q = progress, body
             watch.deviation = np.maximum(watch.deviation, np.abs(q))
             watch.stream_dq = max(watch.stream_dq, (float(dq[k]), k))
-            if dq[k] > watch.max_dq:
+            limit = np.full(29, watch.max_dq)
+            # While the clip plays its arm limit applies; legs and waist keep max_dq.
+            if (window := watch.fast_window) is not None and window[0] <= received <= window[1]:
+                limit[list(ARM_MOTORS)] = watch.fast_max_dq
+            fast = np.nonzero(dq > limit)[0]
+            if len(fast):
                 watch.overspeed_at = time.monotonic()
+            outside = np.nonzero(np.abs(q) > watch.allowed)[0]
             if watch.abort is None:
-                outside = np.nonzero(np.abs(q) > watch.allowed)[0]
                 if len(outside):
                     j = int(outside[0])
                     watch.abort = f"{_JOINTS[j]} left its envelope ({q[j]:+.3f} rad)"
-                elif dq[k] > watch.max_dq:
-                    watch.abort = f"{_JOINTS[k]} speed {dq[k]:.2f} rad/s > {watch.max_dq}"
+                elif len(fast):
+                    j = int(fast[dq[fast].argmax()])
+                    watch.abort = f"{_JOINTS[j]} speed {dq[j]:.2f} rad/s > {limit[j]:.2f}"
             # After the envelope check, so the sample that trips it is not collected. A peer's
             # abort reaches watch.abort through _stream, and stops collection on this arm too.
             if (
@@ -844,33 +945,59 @@ class SonicArm:
         hand_deltas = np.reshape(hand_targets, (-1, HAND_JOINTS)) - base_hands
         if not max(np.abs(deltas).max(), np.abs(hand_deltas).max()) > math.radians(1):
             raise ValueError("the arm is already there; nothing to move")
-        # Token-plan rows: token_schedule adds the same blend at each end of the poses.
-        pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+        # Token-plan rows: token_schedule adds a blend at each end of the poses (pad_in, pad_out);
+        # a clip's first blend and lead-in are shorter.
+        is_clip = any(k.path is not None for k in keyframes)
+        blend_in_s = CLIP_BLEND_IN_S if is_clip else None
+        pad_out = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
+        pad_in = (
+            len(token_schedule(np.zeros(64), np.zeros((1, 64)), blend_in_s=blend_in_s))
+            - 1
+            - pad_out
+        )
         kplan = keyframe_plan(
             base,
             keyframes,
             base_hands=base_hands,
             move_s=move_s,
             return_min_s=return_min_s,
-            split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
-            one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
+            lead_in_s=CLIP_LEAD_IN_S if is_clip else None,
+            split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - max(pad_in, pad_out),
+            one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - pad_in - pad_out,
         )
+        fast_rows, fast_max_dq = None, 0.0
+        if clip := next((s for s in kplan.segments if s.clip), None):
+            peak = (
+                np.abs(np.diff(kplan.poses[clip.start : clip.end, ARM_MOTORS], axis=0)).max() * RATE
+            )
+            if peak > CLIP_DQ_CEILING:
+                raise RuntimeError(
+                    f"{label} clip peaks at {peak:.1f} rad/s, over the {CLIP_DQ_CEILING:g} rad/s "
+                    "ceiling; nothing sent"
+                )
+            fast_rows = (pad_in + clip.start, pad_in + clip.end)
+            fast_max_dq = max(self.config.max_dq, min(CLIP_DQ_CEILING, CLIP_DQ_FACTOR * peak))
 
         def padded(hands: NDArray[np.float64]) -> NDArray[np.float64]:
             """Pose-row hands -> token rows: the blends at each end hold the end rows."""
-            return np.vstack([np.repeat(hands[:1], pad, 0), hands, np.repeat(hands[-1:], pad, 0)])
+            return np.vstack(
+                [np.repeat(hands[:1], pad_in, 0), hands, np.repeat(hands[-1:], pad_out, 0)]
+            )
 
         # Where a safety stop at each segment resumes. A unit that is the tail of the plan reuses
         # the plan's own tokens; every unit's hands come from retreat_hands, row for row.
         units = [retreat_poses(kplan, s) for s in range(len(kplan.segments))]
         unit_hands = [retreat_hands(kplan, s) for s in range(len(kplan.segments))]
         is_tail = [np.array_equal(u, kplan.poses[len(kplan.poses) - len(u) :]) for u in units]
-        if any(len(u) + pad + _FINISH_HOLD_ROWS > _MAX_CHUNK_ROWS for u in units):
+        if any(len(u) + pad_out + _FINISH_HOLD_ROWS > _MAX_CHUNK_ROWS for u in units):
             raise ValueError("a retreat is longer than one session chunk")
         extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
         if checker is not None:
+            # A clip moves up to ~6 rad/s: the default every-5th-row sampling (0.1 s) can step
+            # through a 2 cm margin, so a clip plan is checked row by row.
+            every = 1 if fast_rows is not None else 5
             for path in (kplan.poses, *extra.values()):
-                if contact := checker.first_contact(path, start=base):
+                if contact := checker.first_contact(path, every=every, start=base):
                     raise RuntimeError(
                         f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
                     )
@@ -884,10 +1011,10 @@ class SonicArm:
         if current is None or np.abs(np.asarray(current.body_q) - base).max() > _MOVED_LIMIT:
             raise RuntimeError("the body moved while the reference was encoded; nothing sent")
         captured = np.asarray(state.token_state)
-        tokens = token_schedule(captured, motion_tokens)
+        tokens = token_schedule(captured, motion_tokens, blend_in_s=blend_in_s)
         plan = np.hstack([tokens, padded(hand_rows(kplan))])
         # The tokens do not encode the hands: a split also needs the plan's poses and hands still.
-        plan_still = np.r_[np.zeros(pad, np.bool_), kplan.still, np.zeros(pad, np.bool_)]
+        plan_still = np.r_[np.zeros(pad_in, np.bool_), kplan.still, np.zeros(pad_out, np.bool_)]
         chunks = chunk_rows(len(plan), token_still(tokens) & plan_still)
 
         def retreat_rows(segment: int, offset: int) -> NDArray[np.float64]:
@@ -897,19 +1024,19 @@ class SonicArm:
                 if is_tail[segment]
                 else unit_tokens[unit.tobytes()]
             )
-            rows = token_schedule(captured, unit_rows)[pad + offset :]
-            return np.hstack([rows, padded(unit_hands[segment])[pad + offset :]])
+            rows = token_schedule(captured, unit_rows, blend_in_s=blend_in_s)[pad_in + offset :]
+            return np.hstack([rows, padded(unit_hands[segment])[pad_in + offset :]])
 
         def retreat(token_row: int) -> NDArray[np.float64] | None:
-            if token_row < pad:  # Still in the lead-in blend: play it backwards to the planner.
+            if token_row < pad_in:  # Still in the lead-in blend: play it backwards to the planner.
                 return np.vstack([plan[token_row::-1], plan[-1]])
-            route = retreat_route(kplan, token_row - pad)
+            route = retreat_route(kplan, token_row - pad_in)
             if route is None:
                 return None  # Already on the way home.
             return retreat_rows(*route)
 
         longest_chunk = max(end - start for start, end in chunks)
-        longest_retreat = max(len(u) + pad for u in units)
+        longest_retreat = max(len(u) + pad_out for u in units)
         if (
             profile["max_observation_age"]
             <= max(longest_chunk, longest_retreat) / RATE + _FINISH_HOLD_ROWS / RATE
@@ -920,10 +1047,14 @@ class SonicArm:
             )
         hand_only = not deltas.any()
         deepest = int(np.argmax(np.linalg.norm(hand_deltas if hand_only else deltas, axis=1)))
-        delta = deltas[deepest]
+        farthest = int(np.argmax(np.linalg.norm(kplan.poses - base, axis=1)))
+        delta = kplan.poses[farthest] - base
+        onset_delta = (
+            kplan.poses[kplan.segments[0].end - 1] - base if fast_rows is not None else None
+        )
         seg, nxt = kplan.segments[deepest], kplan.segments[deepest + 1]
-        hold = (pad + seg.end - 1 + 25, pad + nxt.start - 25)
-        allowed = allowed + np.abs(deltas).max(axis=0)
+        hold = (pad_in + seg.end - 1 + 25, pad_in + nxt.start - 25)
+        allowed = allowed + np.abs(kplan.poses - base).max(axis=0)
         token_bound = profile["token_bound"]
         # What the session would reject is refused with nothing sent: the rows as _stream sends
         # them, finish holds (hand columns included) and all.
@@ -948,8 +1079,11 @@ class SonicArm:
                 allowed=allowed,
                 max_dq=self.config.max_dq,
                 delta=delta,
+                onset_delta=onset_delta,
                 hold_rows=hold if hold[0] <= hold[1] else None,
-                motion_row=pad + kplan.segments[0].start,
+                fast_rows=fast_rows,
+                fast_max_dq=fast_max_dq,
+                motion_row=pad_in + kplan.segments[0].start,
             ),
             keyframes=len(keyframes),
             encode_s=encode_s,
@@ -1084,6 +1218,8 @@ class SonicArm:
             raise RuntimeError(f"{outcome}; control returned to the planner. Journal: {journal}")
         if outcome == "envelope":
             message = f"{label} stopped early: {watch.abort}"
+            if watch.stopped_in_clip and task["outcome"] == "finished":
+                message += " (finished the clip, then returned)"
             if task["outcome"] != "finished":
                 message += f"; session {task['outcome']}: {task.get('reason')}"
         elif prepared.hand_only:
@@ -1196,6 +1332,12 @@ class SonicArm:
         plan_start = next_check = time.monotonic()
         with self._lock:  # Once, here: past any joint-start barrier, never on a retreat.
             watch.send_at = watch.plan_start = plan_start
+            if watch.fast_rows is not None:  # The clip limit outlasts the clip by its tail.
+                first, last = watch.fast_rows
+                watch.fast_window = (
+                    plan_start + first / RATE,
+                    plan_start + last / RATE + CLIP_DQ_TAIL_S,
+                )
         start, end = chunks[0]
         task = self._execution.submit_chunk(task_id, 0, plan_start, rows_of(plan, start, end))
         watch.ack_at = time.monotonic()
@@ -1204,14 +1346,15 @@ class SonicArm:
         pending, sequence = chunks[1:], 0
         retreat_start: float | None = None  # set once a safety stop starts the smooth way back
         while True:
-            now = time.monotonic()
             with self._lock:
+                # Read under the lock: an overspeed_at already set is never later than `now`.
+                now = time.monotonic()
                 if self.stop.is_set() and watch.abort is None:
                     watch.abort = "stop requested"  # Retreats like a safety stop.
                 for name, peer in peers:  # A peer's stop or failure retreats this arm too.
                     if watch.abort is None and (peer_abort := peer.abort) is not None:
                         watch.abort = f"{name}: {peer_abort}"
-                abort, overspeed_at = watch.abort, watch.overspeed_at
+                abort, overspeed_at, window = watch.abort, watch.overspeed_at, watch.fast_window
             if abort is None:
                 # Starts the pending line once, voice_lead_s before the arm starts moving so it is
                 # heard as it moves, and only after the checks above: a stop, or this arm's or a
@@ -1219,6 +1362,18 @@ class SonicArm:
                 if self._voice_line is not None and now >= speak_at:
                     self._speak(watch)
             elif retreat_start is None:
+                in_clip = window is not None and window[0] <= now <= window[1]
+                if in_clip and window is not None and overspeed_at >= window[0]:
+                    # An overspeed mid-clip cancels: a smooth retreat would play the fast clip on.
+                    self._execution.cancel_task(task_id)
+                    self.hush()
+                    return "envelope"
+                if window is not None and now < window[0]:
+                    with self._lock:  # The clip never plays: max_dq for every joint.
+                        watch.fast_window = None
+                # A stop or envelope trip mid-clip retreats along the plan's own tail: the clip
+                # plays to its end.
+                watch.stopped_in_clip = in_clip
                 if (rows := retreat(int((now - plan_start) * RATE))) is not None:
                     pending = []  # The way back replaces the rest of the plan.
                     sequence += 1
@@ -1752,7 +1907,11 @@ class SonicArmSkillContainer(ArmLauncher, Module):
         about 15 s),
         "thanks" (hands held together in front of the belly with a short bow, about 17 s) and
         "bow" (arms hanging in front, a bow forward from the waist, about 15 s).
-        Slow (peak 0.75 rad/s, fingers too). Requires the SONIC
+        Natural motion, both arms, about 13-17 s each with the approach and return: the 223 demo's ARDY human-motion clips played at
+        human speed: "wave_natural" (a wave), "invite_natural" (an inviting sweep),
+        "take_right_natural" (the right arm points down and out) and "entrance_right_natural"
+        (the right arm shows the way in).
+        The others are slow (peak 0.75 rad/s, fingers too). Requires the SONIC
         controller running in confirmed planner idle; it never starts or stops the controller. Stops
         early and returns control to the planner if the legs or waist stray, or an arm strays far
         from the plan. Returns at once; a tool update reports the result.

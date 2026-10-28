@@ -43,20 +43,24 @@ import pytest
 from dimos.core.transport_factory import make_transport
 from dimos.robot.unitree.g1 import sonic_arm_skill
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import SONIC_ARM_PROFILE
-from dimos.robot.unitree.g1.imported_gestures import AUTHORED, RETAINED, WAIST_GESTURES
+from dimos.robot.unitree.g1.imported_gestures import (
+    AUTHORED,
+    CLIP_GESTURES,
+    RETAINED,
+    WAIST_GESTURES,
+)
 from dimos.robot.unitree.g1.sonic_arm_reference import (
     LEFT_ARM,
     MOTOR_NAMES,
     RATE,
     RIGHT_ARM,
     group_margins,
-    keyframe_plan,
     token_schedule,
 )
 from dimos.robot.unitree.g1.sonic_arm_skill import (
-    _CHUNK_OVERLAP,
-    _FINISH_HOLD_ROWS,
-    _MAX_CHUNK_ROWS,
+    ARM_MOTORS,
+    CLIP_DQ_CEILING,
+    CLIP_DQ_FACTOR,
     FINGER_CHECK,
     LEFT_ARM_GESTURES,
     SonicArmSkillContainer,
@@ -64,7 +68,7 @@ from dimos.robot.unitree.g1.sonic_arm_skill import (
 )
 from dimos.robot.unitree.g1.sonic_execution_module import SonicExecutionModule
 from dimos.robot.unitree.g1.sonic_feedback import SonicFeedback
-from dimos.robot.unitree.g1.sonic_test_support import FakeVl, IMAGE_640x480
+from dimos.robot.unitree.g1.sonic_test_support import FakeVl, IMAGE_640x480, plan_as_prepared
 from dimos.utils.testing.waiting import wait_until
 
 MODEL_DIR = Path(os.environ.get("GEAR_SONIC_MODEL_DIR", "/nonexistent"))
@@ -90,8 +94,19 @@ MIN_CONTACTS = 7
 # left heel lifts two of its four corners (tilt under 0.7 deg). That gives 6 contacts in every quiet
 # run since the gesture landed, and 7 only under CPU contention. entrance_left keeps all 8. The
 # gesture runs in 223's demo loop, so its left heel is checked on the robot.
-CASE_MIN_CONTACTS = {"gesture-entrance_right": 6}
+# User, 2026-10-28: entrance_right_natural's turn (waist_yaw to -0.17, right hip yaw 0.143) lifts
+# two corners of one sole for ~2.2 s from ~5.3 s after arming (tilt under 1 deg, no body contact),
+# in both MuJoCo runs. Its feet and hip yaw are checked on 223.
+CASE_MIN_CONTACTS = {"gesture-entrance_right": 6, "gesture-entrance_right_natural": 6}
 ARM_RETURN_RAD = 0.05
+# After the wave hands back, SONIC's planner moves the right forearm off its start in MuJoCo (the
+# plan itself returns it): wrist roll 0.36-0.40, pitch 0.14-0.16, yaw 0.08, elbow 0.06 rad over two
+# runs. User accepted 2026-10-27: they ignore 223's right-wrist drift. Motor -> rad.
+WAVE_FOREARM_RETURN_RAD = {25: 0.10, 26: 0.45, 27: 0.20, 28: 0.12}
+CASE_ARM_RETURN_RAD = {
+    "gesture-wave_natural": WAVE_FOREARM_RETURN_RAD,
+    "stop-mid-wave_natural": WAVE_FOREARM_RETURN_RAD,
+}
 RESULT_TIMEOUT_S = 120.0
 STOP_FRACTION = 0.6
 HANDBACK = "control returned to SONIC's planner"
@@ -120,6 +135,7 @@ SETTLE_S = 0.5
 WAIST_PEAK_CHANGE = {"invite": (12, 0.153), "thanks": (14, 0.216), "bow": (14, 0.213)}
 STOP_WAIST_FRACTION = 0.5
 STOP_TRIGGER_TIMEOUT_S = 30.0
+CLIP_MAX_LAG_S = 1.0  # the lag search: measured shifted 0..CLIP_MAX_LAG_S s against the plan
 
 CASES: list[tuple[str, str, dict[str, Any]]] = [
     *[(f"gesture-{name}", "perform_gesture", {"name": name}) for name in LEFT_ARM_GESTURES],
@@ -138,7 +154,9 @@ CASES: list[tuple[str, str, dict[str, Any]]] = [
     ),
 ]
 assert set(CASE_MAX_TILT_DEG) <= {name for name, _, _ in CASES}
-assert set(CASE_MIN_CONTACTS) <= {f"gesture-{name}" for name in RETAINED + AUTHORED}
+assert set(CASE_MIN_CONTACTS) <= {
+    f"gesture-{name}" for name in (*RETAINED, *AUTHORED, *CLIP_GESTURES)
+}
 
 # point_at_object with a fake vision model: 40x40 px boxes centred at these head-camera pixels.
 OBJECT_CENTRES = {"centre": (320, 240), "right-edge": (620, 240)}
@@ -294,20 +312,11 @@ def _run(
     if stop:
         wait_until(lambda: submit.call_count >= 1, timeout=60)
         plan_start = submit.call_args_list[0].args[2]
-        pad = 100  # token_schedule's 2 s blend at each end
         keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(
             kwargs["name"], base, base_hands
         )
-        kplan = keyframe_plan(
-            base,
-            keyframes,
-            base_hands=base_hands,
-            move_s=move_s,
-            return_min_s=return_min_s,
-            split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
-            one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
-        )
-        seconds = (len(kplan.poses) + 2 * pad) / RATE
+        kplan, pad_in, pad_out = plan_as_prepared(base, base_hands, keyframes, move_s, return_min_s)
+        seconds = (len(kplan.poses) + pad_in + pad_out) / RATE
         window.planned_end = plan_start + seconds
         if stop_when is None:
             time.sleep(max(0.0, plan_start + STOP_FRACTION * seconds - time.monotonic()))
@@ -337,7 +346,13 @@ def _physics(
     t, q, dq = log["t"], log["q"], np.abs(log["dq"])
     rows = np.flatnonzero((t >= w.start) & (t <= w.end))
     assert len(rows) > 10, w.name
-    arm = np.abs(q[rows][:, arms] - q[rows[0], arms]).max(axis=1)
+    away_rad = np.abs(q[rows][:, arms] - q[rows[0], arms])
+    arm = away_rad.max(axis=1)
+    tolerance = np.full(len(arms), ARM_RETURN_RAD)
+    for motor, rad in CASE_ARM_RETURN_RAD.get(w.name, {}).items():
+        if motor in arms:
+            tolerance[arms.index(motor)] = rad
+    off = (away_rad > tolerance).any(axis=1)  # a joint past its own return tolerance
     meta = w.result.get("metadata", {})
     message = w.result["message"]
     outcome = (
@@ -359,14 +374,13 @@ def _physics(
         f"tilt {tilt:.2f} deg": tilt <= CASE_MAX_TILT_DEG.get(w.name, MAX_TILT_DEG),
         f"floor contacts {contacts}": contacts >= CASE_MIN_CONTACTS.get(w.name, MIN_CONTACTS),
         f"peak dq {peak:.2f} rad/s": peak <= MAX_DQ,
-        f"{'left arm' if arms == LEFT_ARM else 'arms'} end {arm[-1]:.3f} rad from the start": arm[
+        f"{'left arm' if arms == LEFT_ARM else 'arms'} end {arm[-1]:.3f} rad from the start": not off[
             -1
-        ]
-        <= ARM_RETURN_RAD,
+        ],
     }
     if w.stop_at is not None:
         assert w.planned_end is not None
-        away = np.flatnonzero(arm > ARM_RETURN_RAD)
+        away = np.flatnonzero(off)
         back = t[rows[away[-1] + 1]] if len(away) and away[-1] + 1 < len(rows) else t[rows[0]]
         print(f"{w.name}: arms back {back - w.planned_end:+.1f} s from the planned end")
         if before_planned_end:
@@ -424,22 +438,14 @@ def test_stop_arm_mid_gesture_retreats(
 def _rebuilt_plan(name: str, plans: Any) -> tuple[list[Any], Any, int]:
     """(keyframes, plan, pad): the plan rebuilt as _move builds it, from the base and hands _move
     measured (the arguments of its keyframe_plan call, the one with split_every); it must equal the
-    plan it streamed. Plan row r runs pad + r rows after the first chunk's observed_at."""
+    plan it streamed. Plan row r runs pad (the first blend) + r rows after the first chunk's
+    observed_at."""
     call = plans.call_args_list[-1]
     assert "split_every" in call.kwargs, plans.call_args_list
     base = np.asarray(call.args[0], np.float64)
     base_hands = np.asarray(call.kwargs["base_hands"], np.float64)
     keyframes, move_s, return_min_s, _, _ = gesture_plan_inputs(name, base, base_hands)
-    pad = (len(token_schedule(np.zeros(64), np.zeros((1, 64)))) - 1) // 2
-    kplan = keyframe_plan(
-        base,
-        keyframes,
-        base_hands=base_hands,
-        move_s=move_s,
-        return_min_s=return_min_s,
-        split_every=_MAX_CHUNK_ROWS - _CHUNK_OVERLAP - pad,
-        one_chunk=_MAX_CHUNK_ROWS - _FINISH_HOLD_ROWS - 2 * pad,
-    )
+    kplan, pad, _ = plan_as_prepared(base, base_hands, keyframes, move_s, return_min_s)
     assert np.array_equal(kplan.poses, plans.spy_return.poses), "rebuilt plan != streamed plan"
     return keyframes, kplan, pad
 
@@ -681,6 +687,100 @@ def test_stop_mid_waist_retreats_home(
     chunks = [e for e in map(json.loads, journal) if e["event"] == "chunk_accepted"]
     retreats = [e for e in chunks if e["sequence"] >= 1 and e["monotonic"] >= window.stop_at]
     assert len(retreats) == 1, [(e["sequence"], e["monotonic"]) for e in chunks]
+    assert not failures, failures
+    assert not body, body
+
+
+def _clip_tracking(sim: Sim, w: Window, name: str, plans: Any) -> float:
+    """Print how SONIC played the clip and return its arm speed limit (fast_max_dq): the busiest
+    arm joint's measured over planned peak-to-peak, the arm lag from the best cross-correlation
+    shift, stream_peak_dq against the limit and the legs. Printed, not asserted."""
+    _, kplan, pad = _rebuilt_plan(name, plans)
+    clip = next(s for s in kplan.segments if s.clip)
+    planned = kplan.poses[clip.start : clip.end]
+    peak = np.abs(np.diff(planned[:, ARM_MOTORS], axis=0)).max() * RATE
+    fast_max_dq = max(MAX_DQ, min(CLIP_DQ_CEILING, CLIP_DQ_FACTOR * peak))
+    j = ARM_MOTORS[int(np.argmax(np.ptp(planned[:, ARM_MOTORS], axis=0)))]
+    when = _plan_start(w) + (pad + np.arange(clip.start, clip.end)) / RATE
+    log = np.load(sim.log)
+    t, q = log["t"], log["q"]
+    ref = planned[:, j] - planned[:, j].mean()
+
+    def score(shift: float) -> float:
+        got = np.interp(when + shift, t, q[:, j])
+        got = got - got.mean()
+        return float(ref @ got / (np.linalg.norm(ref) * np.linalg.norm(got) + 1e-12))
+
+    shifts = np.arange(0.0, CLIP_MAX_LAG_S + 1e-9, 1 / RATE)
+    lag = float(shifts[int(np.argmax([score(float(s)) for s in shifts]))])
+    measured = np.interp(when + lag, t, q[:, j])
+    ratio = float(np.ptp(measured) / np.ptp(planned[:, j]))
+    meta = w.result.get("metadata", {})
+    print(
+        f"{w.name}: clip {(clip.end - clip.start) / RATE:.2f} s, busiest {MOTOR_NAMES[j]} planned "
+        f"p-p {np.ptp(planned[:, j]):.3f} rad, measured {np.ptp(measured):.3f} (amplitude ratio "
+        f"{ratio:.2f}), lag {lag * 1000:.0f} ms (corr {score(lag):.3f}); planned arm peak "
+        f"{peak:.2f} rad/s, stream_peak_dq {meta.get('stream_peak_dq')} vs fast_max_dq "
+        f"{fast_max_dq:.2f}; legs {meta.get('max_deviation_rad', {}).get('legs')}, closest leg "
+        f"{meta.get('closest_leg')} (printed only)"
+    )
+    return float(fast_max_dq)
+
+
+def _clip_speed(sim: Sim, w: Window, fast_max_dq: float, failures: list[str]) -> list[str]:
+    """_physics' failures with its all-joint MAX_DQ check swapped for the clip's: legs and waist at
+    MAX_DQ, arms at fast_max_dq (the skill's own watch applies it only inside the clip window)."""
+    log = np.load(sim.log)
+    rows = (log["t"] >= w.start) & (log["t"] <= w.end)
+    dq = np.abs(log["dq"][rows])
+    body, arms = float(dq[:, :15].max()), float(dq[:, ARM_MOTORS].max())
+    print(f"{w.name}: npz peak dq legs+waist {body:.2f} (<= {MAX_DQ}), arms {arms:.2f} rad/s")
+    checks = {
+        f"legs/waist peak dq {body:.2f} rad/s": body <= MAX_DQ,
+        f"arm peak dq {arms:.2f} rad/s over {fast_max_dq:.2f}": arms <= fast_max_dq,
+    }
+    return [f for f in failures if not f.startswith("peak dq")] + [
+        k for k, ok in checks.items() if not ok
+    ]
+
+
+@pytest.mark.parametrize("name", CLIP_GESTURES)
+def test_clip_gesture_tracks_and_hands_back(
+    tmp_path: Path, tool_transport: Any, mocker: Any, name: str
+) -> None:
+    plans = mocker.spy(sonic_arm_skill, "keyframe_plan")
+    with stand_in(tmp_path) as sim:
+        window = _run(sim, mocker, f"gesture-{name}", "perform_gesture", {"name": name})
+        _settle(sim, window)
+    message = window.result["message"]
+    assert "nothing sent" not in message, message
+    failures = _physics(sim, window, BOTH_ARMS)
+    fast_max_dq = _clip_tracking(sim, window, name, plans) if "metadata" in window.result else 0.0
+    failures = _clip_speed(sim, window, fast_max_dq, failures)
+    body = _body(sim, window, asserted=True)
+    assert "stopped early" not in message and "failed" not in message, message
+    assert f"of the planned pose and returned; {HANDBACK}" in message, message
+    assert not failures, failures
+    assert not body, body
+
+
+def test_stop_mid_clip_finishes_then_returns_in_sim(
+    tmp_path: Path, tool_transport: Any, mocker: Any
+) -> None:
+    """stop_arm STOP_FRACTION through the wave's plan lands inside the clip: the clip plays to its
+    end, then the plan's own way home, and the arms are back."""
+    with stand_in(tmp_path) as sim:
+        window = _run(
+            sim, mocker, "stop-mid-wave_natural", "perform_gesture", {"name": "wave_natural"}, True
+        )
+        _settle(sim, window)
+    failures = _physics(sim, window, BOTH_ARMS, before_planned_end=False)
+    failures = [f for f in failures if not f.startswith("peak dq")]  # the clip's own speed
+    body = _body(sim, window, asserted=True)
+    assert window.extra["stop_reply"].startswith("Stopping"), window.extra["stop_reply"]
+    message = window.result["message"]
+    assert "stopped early: stop requested (finished the clip, then returned)" in message, message
+    assert message.endswith(HANDBACK), message
     assert not failures, failures
     assert not body, body
 

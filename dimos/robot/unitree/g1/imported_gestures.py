@@ -46,6 +46,15 @@ RETAINED: tuple[str, ...] = (
     "support_person",
     "two_hand_hearts",
 )
+# ARDY-generated arm clips (gestures/SOURCE.md, "ARDY clips"): 50 Hz rows of CLIP_COLUMNS in clips/.
+CLIP_GESTURES: tuple[str, ...] = (
+    "wave_natural",
+    "invite_natural",
+    "take_right_natural",
+    "entrance_right_natural",
+)
+CLIP_DIR = DATA_DIR / "clips"
+CLIP_COLUMNS = MOTOR_NAMES[15:29]
 # Hand-authored for the G1 223 demo (gestures/SOURCE.md, "Hand-authored"), same format and checks.
 AUTHORED: tuple[str, ...] = (
     "invite",
@@ -227,6 +236,29 @@ def load_gestures() -> dict[str, ImportedGesture]:
             raise ValueError(f"{name}.json names itself {gesture.name!r}")
         out[name] = gesture
     return out
+
+
+def parse_clip(text: str, source: str = "") -> NDArray[np.float64]:
+    """Validate one clip CSV (header = CLIP_COLUMNS, >= 2 finite rows inside UB_LIMITS) -> ``[M, 14]``."""
+    header, *lines = text.strip().splitlines()
+    if header.split(",") != list(CLIP_COLUMNS):
+        raise ValueError(f"{source}: columns must be {list(CLIP_COLUMNS)}")
+    rows = np.array([[float(v) for v in line.split(",")] for line in lines], np.float64)
+    if rows.ndim != 2 or rows.shape[1] != len(CLIP_COLUMNS):
+        raise ValueError(f"{source}: every row needs {len(CLIP_COLUMNS)} values")
+    if not np.isfinite(rows).all():
+        raise ValueError(f"{source}: values must be finite")
+    if len(rows) < 2:
+        raise ValueError(f"{source}: needs at least 2 rows, got {len(rows)}")
+    for j, name in enumerate(CLIP_COLUMNS):
+        for value in (rows[:, j].min(), rows[:, j].max()):
+            _check_limit(name, float(value), UB_LIMITS[name], source)
+    return rows
+
+
+def load_clips() -> dict[str, NDArray[np.float64]]:
+    """The CLIP_GESTURES, read from the CSV files in ``clips/``."""
+    return {n: parse_clip((CLIP_DIR / f"{n}.csv").read_text(), n) for n in CLIP_GESTURES}
 
 
 def resolve(g: ImportedGesture, base: NDArray[Any], base_hands: NDArray[Any]) -> list[Keyframe]:

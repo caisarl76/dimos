@@ -20,7 +20,9 @@ import threading
 import time
 from typing import Any
 
-from dimos.robot.unitree.g1.greeter import GestureStream, acts, run, shuffled
+import pytest
+
+from dimos.robot.unitree.g1.greeter import GestureStream, Side, acts, run, shuffled
 
 
 def test_shuffled_plays_each_act_once_per_cycle_and_never_twice_in_a_row() -> None:
@@ -32,6 +34,22 @@ def test_shuffled_plays_each_act_once_per_cycle_and_never_twice_in_a_row() -> No
         assert sorted(seen[i : i + 4]) == sorted(items)
     assert all(a != b for a, b in itertools.pairwise(seen))
     assert len({tuple(seen[i : i + 4]) for i in range(0, len(seen), 4)}) > 10  # orders do vary
+
+
+def test_natural_acts_pair_the_clip_gestures_with_the_same_lines() -> None:
+    assert acts("right", "right", natural=True) == [
+        ("invite_natural", "06_invite"),
+        ("take_right_natural", "07_take"),
+        ("entrance_right_natural", "10_entrance"),
+        ("wave_natural", "11_wave"),
+    ]
+    assert acts("right", "right")[0] == ("invite", "06_invite")
+
+
+@pytest.mark.parametrize("sides", [("left", "right"), ("right", "left")])
+def test_natural_refuses_left_sides(sides: tuple[Side, Side]) -> None:
+    with pytest.raises(ValueError, match="right-side take and entrance only"):
+        acts(*sides, natural=True)
 
 
 def test_run_waits_for_each_act_to_end() -> None:
