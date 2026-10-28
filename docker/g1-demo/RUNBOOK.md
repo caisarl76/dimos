@@ -87,6 +87,14 @@ docker compose -f compose.demo.yaml exec dimos python -c "from dimos.porcelain.d
 `subscriptions_ready` false or `feedback_fresh` false: tunnel or controller. Both true with
 `planner_confirmed` false or `armed` true: redo the planner pane (step 7's note).
 
+"stream did not arm (tick deadline missed); control returned to the planner": the blueprint's own
+streaming loop (in the dimos container) stalled for more than 100 ms while arming, and the session
+aborted itself; pc2 stays in planner idle. Every journal event is fsynced from that loop, and the
+journal lives in the `dimos-state` volume: a Docker data root on an HDD that the policy server is
+loading from at the same time, or CPU starvation while the GPU servers start, both do it. Wait for
+`ready on port 5571` and a quiet box, then press Enter on the test pane again. If it recurs on an
+idle box: `docker info --format '{{.DockerRootDir}}'`, `cat /proc/loadavg`, `docker stats --no-stream`.
+
 ## 6. Window 222, pane order
 
 - `T0`: RealSense camera server on :5555. Leave it running.
@@ -96,7 +104,12 @@ docker compose -f compose.demo.yaml exec dimos python -c "from dimos.porcelain.d
   `policy_ready: true`. Never twice; `k` is a toggle.
 - `rec`: telemetry recorder.
 - `T3`: the loop. "Policy prewarm unavailable": the harness has no policy (wrong `policy_host`,
-  policy server not ready) or no camera frames (T0).
+  policy server not ready) or no camera frames (T0). "upright_check: APIConnectionError": the loop
+  cannot reach the VLM at its `--vlm-base-url`: a pane opened before `WORKSTATION_IP` was set still
+  carries the old address; the vlm container is not serving yet (`curl -s http://127.0.0.1:8301/v1/models`
+  on the workstation lists `qwen3-vl-4b` when it is); or the workstation's firewall blocks 8301 and
+  5571 from the robot network (`curl -s --max-time 5 http://<WORKSTATION_IP>:8301/v1/models` from 222;
+  `sudo ufw allow from 192.168.0.0/24 to any port 8301 proto tcp`, same for 5571).
 - `T4`: verdict console; silent until a trial ends.
 
 A policy server restart invalidates the harness: restart T2, then `k` once.
