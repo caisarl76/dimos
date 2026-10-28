@@ -1,0 +1,768 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 35909.833732585,
+      "pc2_monotonic": 25909.833888287
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.4270423199996003,
+      "peer_status": {
+        "monotonic": 25916.154083331,
+        "ready": true,
+        "fault": null,
+        "request_id": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5137275109991606
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.15952585632259755,
+      "yaw_change_rad": -0.015612454205569492,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.06376263899801415,
+        "p95_s": 0.06372683444606082
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.046152307000739
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.2324028596082726,
+      "yaw_change_rad": 0.0051084933281889885,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.05566095900212531,
+        "p95_s": 0.055183578300420776
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 3.6173976579993905
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": -0.021285427897004303,
+      "yaw_change_rad": 0.39382378249177746,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.04364147399610374,
+        "p95_s": 0.043468760196083166
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 2.587950256001932
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": 0.0069041240452703935,
+      "yaw_change_rad": -0.29235176656363615,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.035847244998876704,
+        "p95_s": 0.035605976350234415
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 2.8012267510021047
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.3411437599970668
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 2.041818648998742
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true,
+      "phase": "stopping"
+    },
+    {
+      "name": "source_outage_settled",
+      "passed": true,
+      "elapsed": 1.3179513110007974
+    },
+    {
+      "name": "link_delay_20ms_rtt_moving",
+      "passed": true,
+      "command_age": {
+        "samples": 19,
+        "max_s": 0.1225044229940977,
+        "p95_s": 0.12225916040042648
+      }
+    },
+    {
+      "name": "link_delay_150ms_rtt_stops_motion",
+      "passed": true,
+      "elapsed": 0.06667441000172403,
+      "phase": "active",
+      "fault": null
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 2.6169501389995276
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 1.2745901640009833
+    },
+    {
+      "name": "link_hold_300ms_idle_without_latch",
+      "passed": true,
+      "elapsed": 0.1589868379996915
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 2.0003089029996772
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 1.3398508460013545
+    },
+    {
+      "name": "link_hold_2500ms_ends",
+      "passed": true,
+      "phase": "fault"
+    },
+    {
+      "name": "link_hold_2500ms_settled",
+      "passed": true,
+      "elapsed": 1.276191952998488
+    },
+    {
+      "name": "freeze_lidar_raw_stops_motion",
+      "passed": true,
+      "elapsed": 0.32974872900012997,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_lidar_raw_closes_admission",
+      "passed": true,
+      "elapsed": 1.9952081699993869,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lidar_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.326000421002391
+    },
+    {
+      "name": "freeze_lidar_raw_settled",
+      "passed": true,
+      "elapsed": 1.1295602509999298
+    },
+    {
+      "name": "freeze_imu_raw_stops_motion",
+      "passed": true,
+      "elapsed": 0.22048773099959362,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_imu_raw_closes_admission",
+      "passed": true,
+      "elapsed": 2.01065445399945,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_imu_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.232221122998453
+    },
+    {
+      "name": "freeze_imu_raw_settled",
+      "passed": true,
+      "elapsed": 1.0743891149977571
+    },
+    {
+      "name": "freeze_waist_tf_stops_motion",
+      "passed": true,
+      "elapsed": 0.49292740899909404,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_waist_tf_closes_admission",
+      "passed": true,
+      "elapsed": 2.0202610769993044,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_waist_tf_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.514828880001005
+    },
+    {
+      "name": "freeze_waist_tf_settled",
+      "passed": true,
+      "elapsed": 1.0443501260015182
+    },
+    {
+      "name": "freeze_lio_stops_motion",
+      "passed": true,
+      "elapsed": 0.33092183099870454,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_lio_closes_admission",
+      "passed": true,
+      "elapsed": 2.0076053619995946,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lio_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.340652240000054
+    },
+    {
+      "name": "freeze_lio_settled",
+      "passed": true,
+      "elapsed": 1.4040671520015167
+    },
+    {
+      "name": "freeze_map_stops_motion",
+      "passed": true,
+      "elapsed": 0.9564579800025967,
+      "bound": 1.6,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_map_closes_admission",
+      "passed": true,
+      "elapsed": 2.0160374250008317,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_map_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.9736412380007096
+    },
+    {
+      "name": "freeze_map_settled",
+      "passed": true,
+      "elapsed": 1.3636443150026025
+    },
+    {
+      "name": "freeze_costmap_worker_stops_motion",
+      "passed": true,
+      "elapsed": 0.9990920500022185,
+      "bound": 1.6,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_costmap_worker_closes_admission",
+      "passed": true,
+      "elapsed": 1.9995273420026933,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": [
+        [
+          "CostMapper"
+        ]
+      ]
+    },
+    {
+      "name": "freeze_costmap_worker_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 3.0009700679984235
+    },
+    {
+      "name": "freeze_costmap_worker_settled",
+      "passed": true,
+      "elapsed": 1.3821004689998517
+    },
+    {
+      "name": "unknown_goal_rejected_retains_cells",
+      "passed": true,
+      "goal": [
+        0.599999925121665,
+        0.799999950453639
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 4,
+        "plan": 0
+      },
+      "goal_cell_after": -1,
+      "startup_disk_before": {
+        "radius_m": 1.2,
+        "cells": 1810,
+        "unknown": 1361,
+        "free": 373,
+        "occupied": 66
+      },
+      "startup_disk_after": {
+        "radius_m": 1.2,
+        "cells": 1810,
+        "unknown": 1361,
+        "free": 373,
+        "occupied": 66
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "unknown_goal_settled",
+      "passed": true,
+      "elapsed": 1.3025585239993234
+    },
+    {
+      "name": "occupied_goal_rejected_retains_cells",
+      "passed": true,
+      "goal": [
+        -0.250000087544322,
+        0.9999999534338713
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 4,
+        "plan": 0
+      },
+      "goal_cell_after": 100,
+      "startup_disk_before": {
+        "radius_m": 1.2,
+        "cells": 1810,
+        "unknown": 1361,
+        "free": 373,
+        "occupied": 66
+      },
+      "startup_disk_after": {
+        "radius_m": 1.2,
+        "cells": 1810,
+        "unknown": 1361,
+        "free": 373,
+        "occupied": 66
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "occupied_goal_settled",
+      "passed": true,
+      "elapsed": 1.2746697479997238
+    },
+    {
+      "name": "clear_goal_on_recorded_map_rejected_from_unknown_start",
+      "passed": true,
+      "goal": [
+        1.2999999355524778,
+        -0.45000006817281246
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 4,
+        "plan": 0
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "clear_goal_settled",
+      "passed": true,
+      "elapsed": 1.3261924129983527
+    },
+    {
+      "name": "synthetic_clear_goal_followed_through_link",
+      "passed": true,
+      "goal_bearing_deg": 0.0,
+      "first_command": {
+        "vx": 0.2,
+        "wz": -0.11972272604780243
+      },
+      "elapsed_to_motion": 0.9747224149978138,
+      "gained": {
+        "cmd_vel": 16,
+        "plan": 1
+      },
+      "forward_displacement_m": 0.07530629163364166,
+      "command_age": {
+        "samples": 22,
+        "max_s": 0.045012960999883944,
+        "p95_s": 0.045004451295790206
+      },
+      "note": "sim-only synthetic all-free costmap replaces frozen CostMapper output"
+    },
+    {
+      "name": "goal_cancel_reaches_public_planner",
+      "passed": true,
+      "elapsed": 1.4459085579983366,
+      "since_request": 1.4480221049998363
+    },
+    {
+      "name": "synthetic_clear_goal_settled",
+      "passed": true,
+      "elapsed": 0.6903849430018454
+    },
+    {
+      "name": "stamp_rollback_latches_peer_until_fresh_instance",
+      "passed": true,
+      "fault": "source_stamp_rollback:global_costmap",
+      "latched_after_s": 2.4479995772708207e-06,
+      "begin_refused": "ValueError: fresh navigation readiness required"
+    },
+    {
+      "name": "fresh_peer_instance_recovers_readiness",
+      "passed": true,
+      "elapsed": 0.0006652789998042863
+    },
+    {
+      "name": "no_startup_disk_clearing",
+      "passed": true,
+      "startup_disk": {
+        "radius_m": 1.2,
+        "cells": 1810,
+        "unknown": 1361,
+        "free": 373,
+        "occupied": 66
+      }
+    },
+    {
+      "name": "cancel_stall_blocks_pose",
+      "passed": true,
+      "refusal": "RuntimeError: fresh guarded planner, cancellation/settling and command/planner/pose subscriptions required",
+      "stalled_worker_modules": [
+        [
+          "ReplanningAStarPlanner"
+        ]
+      ]
+    },
+    {
+      "name": "cancel_resolves_after_stall",
+      "passed": true,
+      "elapsed": 0.24612716499905218
+    },
+    {
+      "name": "cancel_stall_settled",
+      "passed": true,
+      "elapsed": 1.3388168509991374
+    },
+    {
+      "name": "native_watchdog_250ms",
+      "passed": true,
+      "elapsed": 0.28533901699847775
+    },
+    {
+      "name": "native_watchdog_settled",
+      "passed": true,
+      "elapsed": 1.1242908110034477
+    },
+    {
+      "name": "feedback_loss_200ms",
+      "passed": true,
+      "fault": "feedback_lost"
+    },
+    {
+      "name": "feedback_loss_settled",
+      "passed": true,
+      "elapsed": 1.2772388189987396
+    },
+    {
+      "name": "before_pose_settled",
+      "passed": true,
+      "elapsed": 1.4507275340001797
+    },
+    {
+      "name": "seeded_pose_suspends_planner_watchdog",
+      "passed": true,
+      "duration": 1.6095190060004825
+    },
+    {
+      "name": "pose_handback_settled",
+      "passed": true,
+      "elapsed": 1.6312638349991175
+    },
+    {
+      "name": "no_old_target_after_handback",
+      "passed": true,
+      "speed": 0.003395586726542903
+    },
+    {
+      "name": "pose_source_expiry_200ms",
+      "passed": true,
+      "elapsed": 0.22286719200201333,
+      "native_age_ms": 229.412814
+    },
+    {
+      "name": "pose_expiry_settled",
+      "passed": true,
+      "elapsed": 2.0706976590008708
+    },
+    {
+      "name": "peer_loss_ends_navigation",
+      "passed": true,
+      "idle_after_s": 0.08832817700022133,
+      "phase": "fault"
+    },
+    {
+      "name": "peer_loss_settled",
+      "passed": true,
+      "elapsed": 1.4007441030007612
+    },
+    {
+      "name": "restarted_peer_requires_explicit_begin",
+      "passed": true
+    },
+    {
+      "name": "forward_after_peer_restart",
+      "passed": true,
+      "forward_displacement_m": 0.177789339489048
+    },
+    {
+      "name": "after_peer_restart_settled",
+      "passed": true,
+      "elapsed": 2.3067673920013476
+    },
+    {
+      "name": "publisher_loss_settled",
+      "passed": true,
+      "elapsed": 1.6753269959990575
+    },
+    {
+      "name": "restarted_publisher_starts_disarmed",
+      "passed": true,
+      "phase": "disarmed",
+      "native_latched": true
+    },
+    {
+      "name": "restarted_relay_refuses_unknown_peer_request",
+      "passed": true,
+      "fault": "peer_request_changed"
+    },
+    {
+      "name": "no_old_target_after_publisher_restart",
+      "passed": true
+    },
+    {
+      "name": "obstacle_setup_settled",
+      "passed": true,
+      "elapsed": 1.255504529002792
+    },
+    {
+      "name": "corridor_detour_settled",
+      "passed": true,
+      "elapsed": 0.7810044459984056
+    },
+    {
+      "name": "corridor_detour",
+      "passed": true,
+      "reached_s": 22.91910666200056,
+      "clearance_m": 0.5087248181294849,
+      "plans": 2,
+      "obstacles": [
+        [
+          3.019288420397092,
+          0.7857584654825165,
+          2.75,
+          0.09999999999999998,
+          -0.25388509046884894
+        ],
+        [
+          2.3662557932589334,
+          -1.7308957395867917,
+          2.75,
+          0.09999999999999998,
+          -0.25388509046884894
+        ],
+        [
+          2.5753994823442743,
+          -1.123969947322388,
+          0.30000000000000004,
+          0.54,
+          -0.25388509046884894
+        ]
+      ]
+    },
+    {
+      "name": "obstacle_appears_settled",
+      "passed": true,
+      "elapsed": 1.20896412699949
+    },
+    {
+      "name": "obstacle_appears_replans_or_stops_clear",
+      "passed": true,
+      "outcome": "reached",
+      "reached_s": 28.598192436002137,
+      "clearance_m": 0.5332132031658059,
+      "plans": 3,
+      "obstacles": [
+        [
+          6.35857660322945,
+          -0.9779837123815872,
+          2.75,
+          0.09999999999999998,
+          -0.714787510909273
+        ],
+        [
+          4.654388525894808,
+          -2.941588305233838,
+          2.75,
+          0.09999999999999998,
+          -0.714787510909273
+        ],
+        [
+          5.125152997403692,
+          -2.4818186125759767,
+          0.30000000000000004,
+          0.54,
+          -0.714787510909273
+        ]
+      ]
+    },
+    {
+      "name": "transient_blocker_waits_settled",
+      "passed": true,
+      "elapsed": 0.5772233280004002
+    },
+    {
+      "name": "transient_blocker_waits_then_walks",
+      "passed": true,
+      "commanded_while_blocked": 0,
+      "first_command_s": 2.5439696880021074,
+      "reached_s": 23.88074034500096,
+      "plans": 1
+    },
+    {
+      "name": "long_blocker_gives_up_settled",
+      "passed": true,
+      "elapsed": 0.505875876002392
+    },
+    {
+      "name": "long_blocker_gives_up_and_stays",
+      "passed": true,
+      "commanded": 0,
+      "walked_m": 0.013991288556018283,
+      "plans": 0
+    },
+    {
+      "name": "teleop_preempts_goal_settled",
+      "passed": true,
+      "elapsed": 1.2193108279971057
+    },
+    {
+      "name": "teleop_preempts_and_cancels_goal",
+      "passed": true,
+      "relayed_during_teleop": 18,
+      "teleop_only": true,
+      "walking_after_teleop": false,
+      "stopped_at_end": true
+    },
+    {
+      "name": "agent_walk_to_needs_operator_begin",
+      "passed": true,
+      "reply": "Not walking: no active navigation session (phase disarmed). The operator must begin one first."
+    },
+    {
+      "name": "agent_walk_to_reaches_a_relative_target",
+      "passed": true,
+      "reply": "Walking to 2.00 m ahead, 0.00 m left.",
+      "reached_s": 11.834829227002047,
+      "status": "Navigation phase active, fault None; planner state following_path, fault None."
+    },
+    {
+      "name": "agent_walk_to_settled",
+      "passed": true,
+      "elapsed": 0.7479487659984443
+    },
+    {
+      "name": "agent_stop_walking_ends_navigation",
+      "passed": true,
+      "reply": "Stopping: navigation phase stopping.",
+      "phase": "disarmed"
+    },
+    {
+      "name": "agent_stop_walking_settled",
+      "passed": true,
+      "elapsed": 0.5275702990002173
+    },
+    {
+      "name": "final_settled",
+      "passed": true,
+      "elapsed": 1.3224289459976717
+    }
+  ],
+  "error": null,
+  "load": {
+    "vla_phase": {
+      "cpu_percent": {
+        "sim": 56.6,
+        "native": 14.5,
+        "peer_host": 171.0,
+        "pc2_host": 27.5
+      },
+      "native_loop": {
+        "lowstate_ms": {
+          "samples": 3,
+          "max": 2.938,
+          "p95": 2.9129,
+          "over_50ms": 0
+        },
+        "imu_ms": {
+          "samples": 3,
+          "max": 2.926,
+          "p95": 2.9033,
+          "over_50ms": 0
+        }
+      },
+      "sensor_relay_active": true
+    },
+    "physics_after_release": {
+      "max_scheduler_lateness_s": 0.0926711544925638,
+      "p99_scheduler_lateness_s": 0.003490688644887996,
+      "missed_step_deadlines": 426,
+      "automatic_resets": 0
+    }
+  },
+  "failed_cases": []
+}
