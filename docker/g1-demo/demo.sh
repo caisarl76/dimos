@@ -27,22 +27,21 @@
 # `demo.sh down` closes the session and the stack; stop_arm first (see compose.yaml's header).
 # `up` refuses while the session exists (killing it would kill the controllers in its panes).
 # Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222), e.g. user@ip when there
-# is no ~/.ssh/config; from the environment, else from the .env next to this script (the one compose
-# reads, which also holds VOLO_DIR, UID, ...). The 222 paths are the runbook's folders on PC2.
+# is no ~/.ssh/config; from the environment or the .env next to this script, resolved by compose
+# itself (so the panes and the containers agree). The 222 paths are the runbook's folders on PC2.
 set -euo pipefail
 cd "$(dirname "$0")"
 S=g1-demo
 DC="docker compose -f compose.demo.yaml"
 
-dotenv() {  # dotenv <KEY>: the last KEY=value line of .env, compose-style (optional export, quotes)
+COMPOSE_ENV=$($DC config --environment)  # compose's interpolation environment: .env + the environment
+var() {  # var <KEY> <default>: like ${KEY:-default} in a compose file
   local v
-  v=$(sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1=//p" .env 2>/dev/null | tail -n1)
-  v=${v%"${v##*[![:space:]]}"}
-  case $v in \"*\") v=${v#\"}; v=${v%\"} ;; \'*\') v=${v#\'}; v=${v%\'} ;; esac
-  printf '%s' "$v"
+  v=$(printf '%s\n' "$COMPOSE_ENV" | sed -n "s/^$1=//p")
+  printf '%s' "${v:-$2}"
 }
-P223=${PC2_SSH_HOST:-$(dotenv PC2_SSH_HOST)}; P223=${P223:-pc2}
-P222=${PC2_222_SSH_HOST:-$(dotenv PC2_222_SSH_HOST)}; P222=${P222:-pc2_222}
+P223=$(var PC2_SSH_HOST pc2)
+P222=$(var PC2_222_SSH_HOST pc2_222)
 LOOP='~/GR00T-WholeBodyControl-loop-20261026'
 PY='~/GR00T-WholeBodyControl-harness-20261022/venv/bin/python'
 CLI="PYTHONPATH=\$PWD $PY -m vlm_orchestrator.harness.g1.cli --profile session-profile.yaml --endpoint ipc:///tmp/volo-g1-harness.sock"
