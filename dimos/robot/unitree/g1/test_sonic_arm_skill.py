@@ -1485,15 +1485,34 @@ def test_non_clip_gesture_keeps_the_symmetric_blends_and_lead_in(clip_skill, moc
     assert prepared.watch.fast_rows is None
 
 
-def test_clip_gesture_path_checks_every_row(clip_skill, mocker):
+class SamplingChecker(FakeChecker):
+    """Honours `every`: reports a contact only if sampling every Nth row reaches the bad row."""
+
+    def __init__(self, bad_row):
+        super().__init__()
+        self.bad_row, self.every_seen = bad_row, []
+
+    def first_contact(self, poses, every=5, start=None):
+        self.every_seen.append(every)
+        hit = self.bad_row < len(poses) and self.bad_row % every == 0
+        return "left_hip_roll_link" if hit else None
+
+
+def test_clip_gesture_path_checks_every_row(clip_skill):
     module, _ = clip_skill
-    module._arm._both_checker = checker = FakeChecker()
-    seen = []
-    mocker.patch.object(
-        checker, "first_contact", side_effect=lambda poses, every=5, start=None: seen.append(poses)
-    )
-    prepare_gesture(module, "wave_natural")
-    assert len(seen[0]) >= len(load_clips()["wave_natural"])
+    # Row 3 is not a multiple of 5: sampling every 5th row would miss it.
+    module._arm._both_checker = checker = SamplingChecker(bad_row=3)
+    with pytest.raises(RuntimeError, match=r"comes within 2 cm.*nothing sent"):
+        prepare_gesture(module, "wave_natural")
+    assert checker.every_seen[0] == 1
+
+
+def test_non_clip_gesture_keeps_the_sampled_path_check(clip_skill, mocker):
+    module, _ = clip_skill
+    mocker.patch.object(sonic_arm_skill, "token_schedule", token_schedule)
+    module._arm._checker = checker = SamplingChecker(bad_row=3)  # wave is left-arm only
+    prepare_gesture(module, "wave")
+    assert set(checker.every_seen) == {5}
 
 
 def test_a_clip_faster_than_the_ceiling_is_refused(clip_skill, mocker):
@@ -1619,8 +1638,8 @@ def feeding_clip(module, sample, body=lambda watch, now, q: q):
 
     feeder = threading.Thread(target=feed, daemon=True)
     feeder.start()
-    wait_until(lambda: module._execution.get_status()["ready"])
     try:
+        wait_until(lambda: module._execution.get_status()["ready"])
         yield seen
     finally:
         stopped.set()

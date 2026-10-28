@@ -993,8 +993,11 @@ class SonicArm:
             raise ValueError("a retreat is longer than one session chunk")
         extra = {u.tobytes(): u for u, tail in zip(units, is_tail, strict=True) if not tail}
         if checker is not None:
+            # A clip moves up to ~6 rad/s: the default every-5th-row sampling (0.1 s) can step
+            # through a 2 cm margin, so a clip plan is checked row by row.
+            every = 1 if fast_rows is not None else 5
             for path in (kplan.poses, *extra.values()):
-                if contact := checker.first_contact(path, start=base):
+                if contact := checker.first_contact(path, every=every, start=base):
                     raise RuntimeError(
                         f"the planned arm path comes within 2 cm of the {contact}; nothing sent",
                     )

@@ -12,11 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import fnmatch
+from pathlib import Path
 import struct
+import sys
 from typing import Any
 
 import numpy as np
 import pytest
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from dimos.robot.unitree.g1 import imported_gestures as gestures, tool_ardy_clip
 from dimos.robot.unitree.g1.sonic_arm_reference import MOTOR_NAMES, RATE
@@ -352,3 +360,21 @@ def test_clip_refusals(bad: str, match: str) -> None:
         lines = lines[:2]
     with pytest.raises(ValueError, match=match):
         gestures.parse_clip("\n".join(lines) + "\n", "synthetic")
+
+
+def test_every_clip_csv_is_packaged():
+    """sonic_arm_skill loads the clips at import: a wheel or sdist without them breaks every arm skill."""
+    root = Path(__file__).parents[4]
+    package_data = tomllib.loads((root / "pyproject.toml").read_text())["tool"]["setuptools"][
+        "package-data"
+    ]["dimos"]
+    manifest = (root / "MANIFEST.in").read_text().splitlines()
+    for name in gestures.CLIP_GESTURES:
+        rel = (gestures.CLIP_DIR / f"{name}.csv").relative_to(root)
+        assert any(fnmatch.fnmatch(rel.relative_to("dimos").as_posix(), g) for g in package_data), (
+            name
+        )
+        assert any(
+            line.startswith("include ") and fnmatch.fnmatch(rel.as_posix(), line.split()[1])
+            for line in manifest
+        ), name

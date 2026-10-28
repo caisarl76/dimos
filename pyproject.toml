@@ -50,6 +50,8 @@ exclude = [
     "**/*.tcss",
     "**/*.pyi",
     "robot/galaxea/r1pro/vendor_setup.sh",
+    # sonic_arm_skill loads these gesture clips at import.
+    "robot/unitree/g1/gestures/clips/*.csv",
 ]
 
 [tool.setuptools.exclude-package-data]
