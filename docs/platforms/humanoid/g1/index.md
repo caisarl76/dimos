@@ -58,8 +58,8 @@ export CYCLONEDDS_HOME="$HOME/cyclonedds/install"
 #### Containers
 
 The 223 greeter stack (the `unitree-g1-sonic-arm` blueprint, its SSH tunnel to the
-robot PC and `greeter.py`) also ships as a CPU-only Docker Compose project in
-[`docker/g1-demo/`](/docker/g1-demo/compose.yaml) for a workstation that only
+robot PC and `greeter.py`) also ships as a CPU-only Docker Compose project,
+[`docker/g1-demo/compose.yaml`](/docker/g1-demo/compose.yaml), for a workstation that only
 runs the demo; `compose.demo.yaml` there adds VoLoAgent's VLM and policy servers
 as one project. Prerequisites, runbook and shutdown order are in the file headers.
 
