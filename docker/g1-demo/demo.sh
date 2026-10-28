@@ -26,14 +26,22 @@
 #   window ws    compose logs: policy must say "ready on port 5571" (~4 min; ~15 min from a cold HDD)
 # `demo.sh down` closes the session and the stack; stop_arm first (see compose.yaml's header).
 # `up` refuses while the session exists (killing it would kill the controllers in its panes).
-# Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222). VOLO_DIR as in
-# compose.demo.yaml (put it in docker/g1-demo/.env). The 222 paths are the runbook's folders on PC2.
+# Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222), e.g. user@ip when there
+# is no ~/.ssh/config; from the environment or the .env next to this script, resolved by compose
+# itself (so the panes and the containers agree). The 222 paths are the runbook's folders on PC2.
 set -euo pipefail
 cd "$(dirname "$0")"
 S=g1-demo
 DC="docker compose -f compose.demo.yaml"
-P223=${PC2_SSH_HOST:-pc2}
-P222=${PC2_222_SSH_HOST:-pc2_222}
+
+COMPOSE_ENV=$($DC config --environment)  # compose's interpolation environment: .env + the environment
+var() {  # var <KEY> <default>: like ${KEY:-default} in a compose file
+  local v
+  v=$(printf '%s\n' "$COMPOSE_ENV" | sed -n "s/^$1=//p")
+  printf '%s' "${v:-$2}"
+}
+P223=$(var PC2_SSH_HOST pc2)
+P222=$(var PC2_222_SSH_HOST pc2_222)
 LOOP='~/GR00T-WholeBodyControl-loop-20261026'
 PY='~/GR00T-WholeBodyControl-harness-20261022/venv/bin/python'
 CLI="PYTHONPATH=\$PWD $PY -m vlm_orchestrator.harness.g1.cli --profile session-profile.yaml --endpoint ipc:///tmp/volo-g1-harness.sock"
