@@ -8,8 +8,9 @@
 #   window 223   ctrl     pc2: sudo jetson_clocks (asks the password), clock check, guarded controller
 #                planner  pc2: idle planner (preview, then start); then tunnel + blueprint up
 #                log      dimos log -f (tool updates, voice)
-#                test     one gesture + line over MCP
-#                greeter  the 223 show (Ctrl-C ends it)
+#                test     one gesture + line over MCP (the natural ARDY clip version)
+#                greeter  the 223 show with the natural clips (Ctrl-C ends it; drop --natural for
+#                         the keyframe gestures)
 #   window 222   T0       pc2_222: RealSense ego camera server on :5555 (the harness needs its frames
 #                         before it can prewarm the policy; without it `loop` faults with
 #                         "Policy prewarm unavailable" and status shows observation_age_s null)
@@ -64,8 +65,8 @@ case ${1:-up} in
     pane 223 ctrl "ssh -t $P223 'sudo jetson_clocks && cd /home/unitree/dimos-sonic-guard-pc2-223-20261014 && bash launch-guarded.sh --check-clocks && bash launch-guarded.sh --run'"
     pane 223 planner "ssh -t $P223 'cd /home/unitree/dimos-sonic-guard-pc2-223-20261014 && /home/unitree/dimos/.venv/bin/python start-idle-planner.py && /home/unitree/dimos/.venv/bin/python start-idle-planner.py --start-idle-planner' && $DC up -d --no-build tunnel dimos"
     pane 223 log "$DC exec dimos dimos log -f"
-    pane 223 test "$DC exec dimos dimos mcp call perform_gesture --arg name=invite --arg line=06_invite"
-    pane 223 greeter "$DC run --rm greeter --pause-s 3"
+    pane 223 test "$DC exec dimos dimos mcp call perform_gesture --arg name=invite_natural --arg line=06_invite"
+    pane 223 greeter "$DC run --rm greeter --natural --pause-s 3"
     pane 222 T0 "ssh -t $P222 'cd ~/GR00T-WholeBodyControl && .venv_camera/bin/python -u -m gear_sonic.camera.composed_camera --ego-view-camera realsense --realsense-enable-depth --port 5555'"
     pane 222 T1 "ssh -t $P222 'cd ~/GR00T-WholeBodyControl-deploy-20261027/gear_sonic_deploy && just run g1_deploy_onnx_ref enP8p1s0 policy/sonic_v1_1/model_decoder.onnx reference/example/ --obs-config policy/sonic_v1_1/observation_config.yaml --encoder-file policy/sonic_v1_1/model_encoder.onnx --planner-file planner/target_vel/V2/planner_sonic.onnx --input-type zmq_manager --output-type all --zmq-host localhost --harness-planner-hold'"
     pane 222 T2 "ssh -t $P222 'cd $LOOP && PYTHONPATH=\$PWD $PY -u -m gear_sonic.scripts.run_vla_inference --harness-endpoint ipc:///tmp/volo-g1-harness.sock --harness-profile session-profile.yaml 2>&1 | tee harness-\$(date +%H%M%S).log'"
