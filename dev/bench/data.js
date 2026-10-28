@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793166063503,
+  "lastUpdate": 1793170322044,
   "repoUrl": "https://github.com/caisarl76/dimos",
   "entries": {
     "go2 replay realtime (arm64)": [
@@ -5614,6 +5614,60 @@ window.BENCHMARK_DATA = {
             "value": 115.008,
             "unit": "G",
             "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 855/855; perf counted 100.0%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "caisarl76@gmail.com",
+            "name": "Jihun Kim(김지훈)",
+            "username": "caisarl76"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ea05d0cef16f5f104c25d289dd62989d3c120a5e",
+          "message": "Merge pull request #23 from caisarl76/jihun/build/g1-demo-dotenv\n\nbuild(g1): demo.sh reads docker/g1-demo/.env",
+          "timestamp": "2026-10-28T15:49:09+09:00",
+          "tree_id": "42c110dd40994c49e2690159515d7b9d54ee12e8",
+          "url": "https://github.com/caisarl76/dimos/commit/ea05d0cef16f5f104c25d289dd62989d3c120a5e"
+        },
+        "date": 1793170321007,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "peak memory",
+            "value": 1623.352,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "peak threads",
+            "value": 358,
+            "unit": "threads",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "network (transport)",
+            "value": 2722.139,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "disk write",
+            "value": 1.477,
+            "unit": "MB",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
+          },
+          {
+            "name": "instructions",
+            "value": 115.007,
+            "unit": "G",
+            "extra": "cpu: Neoverse-N2; delivered: odom 1122/1122, lidar 461/461, color_image 852/855; perf counted 100.0%"
           }
         ]
       }
