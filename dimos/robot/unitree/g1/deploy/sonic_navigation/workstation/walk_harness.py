@@ -698,6 +698,8 @@ def run_session(args: Any) -> None:
         record["goal_xy"], record["start_xy"] = list(goal), [x, y]
         # A* commands reach cmd_vel only once teleop stops (MovementManager cooldown).
         peer.call("tele_stop")
+        # The peer may publish its plan before the goal's reply is back from pc2.
+        sent = time.monotonic()
         record["goal"] = agent.call("goal", x=goal[0], y=goal[1], yaw=goal_yaw)
         reached, events, goal_started = None, {}, time.monotonic()
         drop_pose: list[float] = []
@@ -710,7 +712,7 @@ def run_session(args: Any) -> None:
                 reached = now - goal_started
                 break
             if "planned" not in events and now - goal_started >= PLAN_WAIT_S:
-                if not planned_since(out / "peer-telemetry.jsonl", goal_started):
+                if not planned_since(out / "peer-telemetry.jsonl", sent):
                     events["no_plan"] = now - goal_started
                     record["error"] = "the planner found no path to the goal"
                     print("The planner found no path to the goal; ending the case.")
