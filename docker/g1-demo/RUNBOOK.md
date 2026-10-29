@@ -99,6 +99,14 @@ idle box: `docker info --format '{{.DockerRootDir}}'`, `cat /proc/loadavg`, `doc
 
 - `T0`: RealSense camera server on :5555. Leave it running.
 - `T1`: SONIC deploy with planner hold. Wait for `Init Done`.
+- Before `T2`, warm the policy server from 222 (the harness gives its first request 10 s, once;
+  a cold server misses that). Talks only to the server, nothing reaches the robot:
+
+  ```
+  ssh unitree@192.168.0.222 'cd ~/GR00T-WholeBodyControl-loop-20261026 && PYTHONPATH=$PWD ~/GR00T-WholeBodyControl-harness-20261022/venv/bin/python -c "import numpy as np, time; from gear_sonic.utils.inference.lerobot_sonic_policy import LeRobotSonicPolicyClient as C; c=C(\"<WORKSTATION_IP>\", 5571, 30000); t=time.monotonic(); a,m=c.get_action({\"lerobot\":{\"state\":np.zeros(28,np.float32),\"image\":np.zeros((480,640,3),np.uint8),\"task\":\"probe\"}}); print(\"warm\", round(time.monotonic()-t,2), \"s\", m)"'
+  ```
+
+  Prints `warm <seconds> {...}`; run it until the time is well under 10 s.
 - `T2`: prints `policy_host: <WORKSTATION_IP>`, then the harness.
 - `k`: waits for T2 to subscribe, sends `k` once, prints status: `controller_running: true`,
   `policy_ready: true`. Never twice; `k` is a toggle.
@@ -112,7 +120,23 @@ idle box: `docker info --format '{{.DockerRootDir}}'`, `cat /proc/loadavg`, `doc
   `sudo ufw allow from 192.168.0.0/24 to any port 8301 proto tcp`, same for 5571).
 - `T4`: verdict console; silent until a trial ends.
 
-A policy server restart invalidates the harness: restart T2, then `k` once.
+The harness prewarms the policy exactly once: at its first camera frame it sends one request with a
+10 s deadline, and `policy_ready` is whatever that request returned, for the life of that harness.
+So anything wrong at that moment (no T0, wrong `policy_host`, server still loading, cold server,
+firewall) leaves `policy_ready: false` even after the cause is fixed. Fix the cause, warm the server
+(above), restart T2, then `k` once. A policy server restart invalidates the harness the same way.
+
+## 8. Known issues (demo of 2026-10-29)
+
+- 223: gestures and voice were interrupted mid-execution. Both cross the network between the
+  workstation and pc2 on every gesture: the ticks go through the ssh tunnel (`-R 5556`), the
+  feedback comes back through it (`-L 5557`), pc2's guard releases to the planner when the
+  reference goes stale, and each voice line is an ssh command to pc2. A link that stalls for more
+  than about 100 ms cuts the motion; a stalled ssh cuts the line. Not fixed. Next time, measure
+  first (`ping -i 0.2 192.168.0.223` during a gesture; `ss -ti dst 192.168.0.223` for retransmits;
+  is the workstation on Wi-Fi?), then either put the workstation on the wired robot network or
+  move the tick source onto pc2 so the link carries commands only.
+- 222: unstable from the visual gap between the demo room and the training data. Out of scope here.
 
 ## 7. Shutdown
 
