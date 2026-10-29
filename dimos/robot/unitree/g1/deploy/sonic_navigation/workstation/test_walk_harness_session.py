@@ -110,6 +110,9 @@ class FakePeer:
             return {"op": op, "saved": True}
         if op == "refresh_map":
             return {"op": op, "region": {"x": w.pose[0], "y": w.pose[1], "radius": 2.5}}
+        if op == "record_lidar":
+            Path(fields["path"]).write_bytes(b"npz")
+            return {"op": op, "scans": 10 * fields["seconds"], "points": 0, "poses": 0}
         return {"op": op}
 
     def close(self, op: str) -> None:
@@ -258,3 +261,14 @@ def test_goal_detour_sees_the_box_in_the_corridor_and_passes_clear(tmp_path, mon
     # may: the plan still counts (it was missed when timed from the reply).
     assert record["passed"], record
     assert "planned" in record["events"] and record["clearance_m"] >= walk.MIN_CLEARANCE_M
+
+
+def test_record_lidar_records_a_window_without_moving_the_robot(tmp_path, monkeypatch) -> None:
+    results, world = run(
+        tmp_path, monkeypatch, ["record_lidar", "y", "stood 1 m ahead, then left", "quit"], prior=()
+    )
+    (record,) = results["cases"]
+    assert record["passed"] and record["scans"] == 10 * walk.CASES["record_lidar"].seconds
+    assert (tmp_path / "session" / record["recording"]).exists()
+    assert record["note"] == "stood 1 m ahead, then left"
+    assert "begin" not in world.ops and "goal" not in world.ops
