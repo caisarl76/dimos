@@ -1,0 +1,770 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "pc2_graph_validated_before_startup",
+      "passed": true,
+      "modules": [
+        "SonicExecutionModule",
+        "SonicNavigationRelayModule",
+        "SonicNavigationSensorSender"
+      ]
+    },
+    {
+      "name": "peer_graph_validated_in_separate_clock",
+      "passed": true,
+      "peer_monotonic": 96811.788951292,
+      "pc2_monotonic": 86811.789129695
+    },
+    {
+      "name": "relayed_chain_ready",
+      "passed": true,
+      "elapsed": 0.43363798399514053,
+      "peer_status": {
+        "monotonic": 86818.092763262,
+        "ready": true,
+        "fault": null,
+        "request_id": null
+      }
+    },
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5101199030032149
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "forward_displacement_m": 0.07186370508529645,
+      "yaw_change_rad": -0.06941854362784164,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.09860420500626788,
+        "p95_s": 0.09857546655475743
+      }
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.3212018400081433
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "forward_displacement_m": -0.21629067383210407,
+      "yaw_change_rad": 0.018643720291000677,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.09719875999144278,
+        "p95_s": 0.09715328729798785
+      }
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.903732876002323
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "forward_displacement_m": -0.0320938422923005,
+      "yaw_change_rad": 0.5887599362726701,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.09482399400440045,
+        "p95_s": 0.09453147284220904
+      }
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": false,
+      "elapsed": 7.854882593994262
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "forward_displacement_m": -0.005551783431695626,
+      "yaw_change_rad": -0.5154258843359427,
+      "command_age": {
+        "samples": 20,
+        "max_s": 0.09120028099277988,
+        "p95_s": 0.09079943515898777
+      }
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 2.899793778997264
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true,
+      "phase": "active"
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true,
+      "after_pause_s": 0.2720111579983495
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 1.9945294360077241
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true,
+      "phase": "stopping"
+    },
+    {
+      "name": "source_outage_settled",
+      "passed": true,
+      "elapsed": 1.1741961270017782
+    },
+    {
+      "name": "link_delay_20ms_rtt_moving",
+      "passed": true,
+      "command_age": {
+        "samples": 19,
+        "max_s": 0.09966237100888975,
+        "p95_s": 0.09881580939691048
+      }
+    },
+    {
+      "name": "link_delay_150ms_rtt_stops_motion",
+      "passed": true,
+      "elapsed": 0.08967418498650659,
+      "phase": "active",
+      "fault": null
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 2.3917067680013133
+    },
+    {
+      "name": "link_delay_settled",
+      "passed": true,
+      "elapsed": 1.2718577600026038
+    },
+    {
+      "name": "link_hold_300ms_idle_without_latch",
+      "passed": true,
+      "elapsed": 0.19611960899783298
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 2.2566198109998368
+    },
+    {
+      "name": "link_hold_settled",
+      "passed": true,
+      "elapsed": 0.5920854069991037
+    },
+    {
+      "name": "link_hold_2500ms_ends",
+      "passed": true,
+      "phase": "fault"
+    },
+    {
+      "name": "link_hold_2500ms_settled",
+      "passed": true,
+      "elapsed": 1.2768468220019713
+    },
+    {
+      "name": "freeze_lidar_raw_stops_motion",
+      "passed": true,
+      "elapsed": 0.3747926189971622,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_lidar_raw_closes_admission",
+      "passed": true,
+      "elapsed": 1.9890710550098447,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lidar_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.3647912229935173
+    },
+    {
+      "name": "freeze_lidar_raw_settled",
+      "passed": true,
+      "elapsed": 0.9847283999988576
+    },
+    {
+      "name": "freeze_imu_raw_stops_motion",
+      "passed": true,
+      "elapsed": 0.21893734400509857,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_imu_raw_closes_admission",
+      "passed": true,
+      "elapsed": 1.9978182279883185,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_imu_raw_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.218162832999951
+    },
+    {
+      "name": "freeze_imu_raw_settled",
+      "passed": true,
+      "elapsed": 1.216040332990815
+    },
+    {
+      "name": "freeze_waist_tf_stops_motion",
+      "passed": true,
+      "elapsed": 0.5723801069980254,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_waist_tf_closes_admission",
+      "passed": true,
+      "elapsed": 2.000524293005583,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_waist_tf_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.5739997060009046
+    },
+    {
+      "name": "freeze_waist_tf_settled",
+      "passed": true,
+      "elapsed": 1.1044766760023776
+    },
+    {
+      "name": "freeze_lio_stops_motion",
+      "passed": true,
+      "elapsed": 0.31254987500142306,
+      "bound": 1.0,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_lio_closes_admission",
+      "passed": true,
+      "elapsed": 1.987285922994488,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_lio_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.300983241002541
+    },
+    {
+      "name": "freeze_lio_settled",
+      "passed": true,
+      "elapsed": 1.189425531993038
+    },
+    {
+      "name": "freeze_map_stops_motion",
+      "passed": true,
+      "elapsed": 0.9807032620010432,
+      "bound": 1.6,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_map_closes_admission",
+      "passed": true,
+      "elapsed": 1.9762226720049512,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": []
+    },
+    {
+      "name": "freeze_map_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 2.959382396991714
+    },
+    {
+      "name": "freeze_map_settled",
+      "passed": true,
+      "elapsed": 1.358677837997675
+    },
+    {
+      "name": "freeze_costmap_worker_stops_motion",
+      "passed": true,
+      "elapsed": 1.0131696150056086,
+      "bound": 1.6,
+      "phase": "active"
+    },
+    {
+      "name": "freeze_costmap_worker_closes_admission",
+      "passed": true,
+      "elapsed": 1.9879768760001753,
+      "phase": "fault",
+      "fresh_teleop": true,
+      "co_located": [
+        [
+          "CostMapper"
+        ]
+      ]
+    },
+    {
+      "name": "freeze_costmap_worker_stays_closed_while_teleop_fresh",
+      "passed": true,
+      "after_s": 3.0025904919893946
+    },
+    {
+      "name": "freeze_costmap_worker_settled",
+      "passed": true,
+      "elapsed": 1.3833808310009772
+    },
+    {
+      "name": "unknown_goal_rejected_retains_cells",
+      "passed": true,
+      "goal": [
+        0.599999925121665,
+        0.799999950453639
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 4,
+        "plan": 0
+      },
+      "goal_cell_after": -1,
+      "startup_disk_before": {
+        "radius_m": 1.2,
+        "cells": 1811,
+        "unknown": 1358,
+        "free": 382,
+        "occupied": 66
+      },
+      "startup_disk_after": {
+        "radius_m": 1.2,
+        "cells": 1810,
+        "unknown": 1358,
+        "free": 381,
+        "occupied": 66
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "unknown_goal_settled",
+      "passed": true,
+      "elapsed": 1.5717310219915817
+    },
+    {
+      "name": "occupied_goal_rejected_retains_cells",
+      "passed": true,
+      "goal": [
+        -0.6500000935047865,
+        0.799999950453639
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 4,
+        "plan": 0
+      },
+      "goal_cell_after": 100,
+      "startup_disk_before": {
+        "radius_m": 1.2,
+        "cells": 1811,
+        "unknown": 1358,
+        "free": 382,
+        "occupied": 66
+      },
+      "startup_disk_after": {
+        "radius_m": 1.2,
+        "cells": 1811,
+        "unknown": 1358,
+        "free": 382,
+        "occupied": 66
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "occupied_goal_settled",
+      "passed": true,
+      "elapsed": 1.4401066059945151
+    },
+    {
+      "name": "clear_goal_on_recorded_map_rejected_from_unknown_start",
+      "passed": true,
+      "goal": [
+        1.2999999355524778,
+        -0.45000006817281246
+      ],
+      "accepted": true,
+      "gained": {
+        "cmd_vel": 4,
+        "plan": 0
+      },
+      "robot_cell": -1
+    },
+    {
+      "name": "clear_goal_settled",
+      "passed": true,
+      "elapsed": 1.4844341019925196
+    },
+    {
+      "name": "synthetic_clear_goal_followed_through_link",
+      "passed": true,
+      "goal_bearing_deg": 0.0,
+      "first_command": {
+        "vx": 0.2,
+        "wz": 0.1490695120845773
+      },
+      "elapsed_to_motion": 1.1133794539928203,
+      "gained": {
+        "cmd_vel": 17,
+        "plan": 1
+      },
+      "forward_displacement_m": 0.2898905626769854,
+      "command_age": {
+        "samples": 23,
+        "max_s": 0.09148611400451045,
+        "p95_s": 0.09047498660511337
+      },
+      "note": "sim-only synthetic all-free costmap replaces frozen CostMapper output"
+    },
+    {
+      "name": "goal_cancel_reaches_public_planner",
+      "passed": true,
+      "elapsed": 0.8591901309991954,
+      "since_request": 0.859958007989917
+    },
+    {
+      "name": "synthetic_clear_goal_settled",
+      "passed": true,
+      "elapsed": 1.375392699992517
+    },
+    {
+      "name": "stamp_rollback_latches_peer_until_fresh_instance",
+      "passed": true,
+      "fault": "source_stamp_rollback:global_costmap",
+      "latched_after_s": 1.8650025594979525e-06,
+      "begin_refused": "ValueError: fresh navigation readiness required"
+    },
+    {
+      "name": "fresh_peer_instance_recovers_readiness",
+      "passed": true,
+      "elapsed": 0.0005808199930470437
+    },
+    {
+      "name": "no_startup_disk_clearing",
+      "passed": true,
+      "startup_disk": {
+        "radius_m": 1.2,
+        "cells": 1811,
+        "unknown": 1358,
+        "free": 382,
+        "occupied": 66
+      }
+    },
+    {
+      "name": "cancel_stall_blocks_pose",
+      "passed": true,
+      "refusal": "RuntimeError: fresh guarded planner, cancellation/settling and command/planner/pose subscriptions required",
+      "stalled_worker_modules": [
+        [
+          "ReplanningAStarPlanner"
+        ]
+      ]
+    },
+    {
+      "name": "cancel_resolves_after_stall",
+      "passed": true,
+      "elapsed": 0.24356158600130584
+    },
+    {
+      "name": "cancel_stall_settled",
+      "passed": true,
+      "elapsed": 0.5082720520003932
+    },
+    {
+      "name": "native_watchdog_250ms",
+      "passed": true,
+      "elapsed": 0.26334007699915674
+    },
+    {
+      "name": "native_watchdog_settled",
+      "passed": true,
+      "elapsed": 1.106462053998257
+    },
+    {
+      "name": "feedback_loss_200ms",
+      "passed": true,
+      "fault": "feedback_lost"
+    },
+    {
+      "name": "feedback_loss_settled",
+      "passed": true,
+      "elapsed": 1.0732229330023983
+    },
+    {
+      "name": "before_pose_settled",
+      "passed": true,
+      "elapsed": 1.2950757759972475
+    },
+    {
+      "name": "seeded_pose_suspends_planner_watchdog",
+      "passed": true,
+      "duration": 1.6285647969925776
+    },
+    {
+      "name": "pose_handback_settled",
+      "passed": true,
+      "elapsed": 0.6591290780052077
+    },
+    {
+      "name": "no_old_target_after_handback",
+      "passed": true,
+      "speed": 0.003133868721012143
+    },
+    {
+      "name": "pose_source_expiry_200ms",
+      "passed": true,
+      "elapsed": 0.22006112399685662,
+      "native_age_ms": 220.6471
+    },
+    {
+      "name": "pose_expiry_settled",
+      "passed": true,
+      "elapsed": 2.0154823810007656
+    },
+    {
+      "name": "peer_loss_ends_navigation",
+      "passed": true,
+      "idle_after_s": 0.1562640750053106,
+      "phase": "fault"
+    },
+    {
+      "name": "peer_loss_settled",
+      "passed": true,
+      "elapsed": 1.2945166940044146
+    },
+    {
+      "name": "restarted_peer_requires_explicit_begin",
+      "passed": true
+    },
+    {
+      "name": "forward_after_peer_restart",
+      "passed": true,
+      "forward_displacement_m": 0.1885706242476191
+    },
+    {
+      "name": "after_peer_restart_settled",
+      "passed": true,
+      "elapsed": 2.2297186390060233
+    },
+    {
+      "name": "publisher_loss_settled",
+      "passed": true,
+      "elapsed": 2.2099998990015592
+    },
+    {
+      "name": "restarted_publisher_starts_disarmed",
+      "passed": true,
+      "phase": "disarmed",
+      "native_latched": true
+    },
+    {
+      "name": "restarted_relay_refuses_unknown_peer_request",
+      "passed": true,
+      "fault": "peer_request_changed"
+    },
+    {
+      "name": "no_old_target_after_publisher_restart",
+      "passed": true
+    },
+    {
+      "name": "obstacle_setup_settled",
+      "passed": true,
+      "elapsed": 1.2881084270047722
+    },
+    {
+      "name": "corridor_detour_settled",
+      "passed": true,
+      "elapsed": 1.339496610002243
+    },
+    {
+      "name": "corridor_detour",
+      "passed": true,
+      "reached_s": 21.404104303001077,
+      "clearance_m": 0.49890823598464445,
+      "plans": 2,
+      "obstacles": [
+        [
+          1.380003546324649,
+          2.519552299089913,
+          2.75,
+          0.09999999999999998,
+          0.8405618594268168
+        ],
+        [
+          3.3170504053320906,
+          0.7852370261336368,
+          2.75,
+          0.09999999999999998,
+          0.8405618594268168
+        ],
+        [
+          2.8735910875948028,
+          1.2493963021499404,
+          0.30000000000000004,
+          0.54,
+          0.8405618594268168
+        ]
+      ]
+    },
+    {
+      "name": "obstacle_appears_settled",
+      "passed": true,
+      "elapsed": 0.7085637069976656
+    },
+    {
+      "name": "obstacle_appears_replans_or_stops_clear",
+      "passed": true,
+      "outcome": "reached",
+      "reached_s": 28.896479481001734,
+      "clearance_m": 0.5100006804210296,
+      "plans": 3,
+      "obstacles": [
+        [
+          4.0180676170978185,
+          4.924584684861346,
+          2.75,
+          0.09999999999999998,
+          0.6261856590833885
+        ],
+        [
+          5.541819423929503,
+          2.8178857431097786,
+          2.75,
+          0.09999999999999998,
+          0.6261856590833885
+        ],
+        [
+          5.2280964138726596,
+          3.3648769584062137,
+          0.30000000000000004,
+          0.54,
+          0.6261856590833885
+        ]
+      ]
+    },
+    {
+      "name": "transient_blocker_waits_settled",
+      "passed": true,
+      "elapsed": 0.49573792099545244
+    },
+    {
+      "name": "transient_blocker_waits_then_walks",
+      "passed": true,
+      "commanded_while_blocked": 0,
+      "first_command_s": 2.57436910099932,
+      "reached_s": 21.191629934008233,
+      "plans": 1
+    },
+    {
+      "name": "long_blocker_gives_up_settled",
+      "passed": true,
+      "elapsed": 0.5273558649932966
+    },
+    {
+      "name": "long_blocker_gives_up_and_stays",
+      "passed": true,
+      "commanded": 0,
+      "walked_m": 0.010550755817053694,
+      "plans": 0
+    },
+    {
+      "name": "teleop_preempts_goal_settled",
+      "passed": true,
+      "elapsed": 0.90606370200112
+    },
+    {
+      "name": "teleop_preempts_and_cancels_goal",
+      "passed": true,
+      "relayed_during_teleop": 17,
+      "teleop_only": true,
+      "walking_after_teleop": false,
+      "stopped_at_end": true
+    },
+    {
+      "name": "agent_walk_to_needs_operator_begin",
+      "passed": true,
+      "reply": "Not walking: no active navigation session (phase disarmed). The operator must begin one first."
+    },
+    {
+      "name": "agent_walk_to_reaches_a_relative_target",
+      "passed": true,
+      "reply": "Walking to 2.00 m ahead, 0.00 m left.",
+      "reached_s": 10.337804112990852,
+      "status": "Navigation phase active, fault None; planner state following_path, fault None."
+    },
+    {
+      "name": "agent_walk_to_settled",
+      "passed": true,
+      "elapsed": 0.49303647299529985
+    },
+    {
+      "name": "agent_stop_walking_ends_navigation",
+      "passed": true,
+      "reply": "Stopping: navigation phase stopping.",
+      "phase": "disarmed"
+    },
+    {
+      "name": "agent_stop_walking_settled",
+      "passed": true,
+      "elapsed": 0.5010371899988968
+    },
+    {
+      "name": "final_settled",
+      "passed": true,
+      "elapsed": 1.0534426319936756
+    }
+  ],
+  "error": null,
+  "load": {
+    "vla_phase": {
+      "cpu_percent": {
+        "sim": 58.6,
+        "native": 15.0,
+        "peer_host": 182.7,
+        "pc2_host": 28.6
+      },
+      "native_loop": {
+        "lowstate_ms": {
+          "samples": 2,
+          "max": 5.502,
+          "p95": 5.493799999999999,
+          "over_50ms": 0
+        },
+        "imu_ms": {
+          "samples": 2,
+          "max": 5.486,
+          "p95": 5.4777,
+          "over_50ms": 0
+        }
+      },
+      "sensor_relay_active": true
+    },
+    "physics_after_release": {
+      "max_scheduler_lateness_s": 0.10946494792005979,
+      "p99_scheduler_lateness_s": 0.0031035055342363165,
+      "missed_step_deadlines": 468,
+      "automatic_resets": 0
+    }
+  },
+  "failed_cases": [
+    "left_turn_settled"
+  ]
+}
