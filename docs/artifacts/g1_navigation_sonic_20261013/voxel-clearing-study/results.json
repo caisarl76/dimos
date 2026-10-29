@@ -1,0 +1,649 @@
+{
+  "sensor_height_m": 1.26018,
+  "nearest_floor_seen_m": 0.9845605208112352,
+  "peer": {
+    "voxel_size": 0.05,
+    "max_range": 30.0,
+    "worker_threads": 2
+  },
+  "boxes": {
+    "box_40cm": [
+      2.0,
+      0.8,
+      0.2,
+      0.4
+    ],
+    "step_12cm": [
+      1.6,
+      -0.9,
+      0.25,
+      0.12
+    ]
+  },
+  "runs": {
+    "peer@0.6": {
+      "person_voxels_seen": 220,
+      "stale_after_10s": 91,
+      "stale_blocking_cells": 14,
+      "stale_on_flank": 75,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 65,
+        "1.0-2.0": 26
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.119,
+        "floor_1.0-2.0m": 0.898,
+        "floor_2.0-3.0m": 0.866,
+        "box_40cm": 0.847,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.996,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      }
+    },
+    "peer@0.8": {
+      "person_voxels_seen": 372,
+      "stale_after_10s": 183,
+      "stale_blocking_cells": 17,
+      "stale_on_flank": 153,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 134,
+        "1.0-2.0": 49
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.123,
+        "floor_1.0-2.0m": 0.924,
+        "floor_2.0-3.0m": 0.887,
+        "box_40cm": 0.889,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.996,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      }
+    },
+    "peer@1.0": {
+      "person_voxels_seen": 466,
+      "stale_after_10s": 284,
+      "stale_blocking_cells": 20,
+      "stale_on_flank": 217,
+      "stale_by_height_m": {
+        "0.0-0.1": 11,
+        "0.1-0.3": 64,
+        "0.3-1.0": 160,
+        "1.0-2.0": 49
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.938,
+        "floor_2.0-3.0m": 0.902,
+        "box_40cm": 0.889,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.996,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      }
+    },
+    "peer@1.5": {
+      "person_voxels_seen": 479,
+      "stale_after_10s": 233,
+      "stale_blocking_cells": 16,
+      "stale_on_flank": 210,
+      "stale_by_height_m": {
+        "0.0-0.1": 17,
+        "0.1-0.3": 48,
+        "0.3-1.0": 110,
+        "1.0-2.0": 58
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.149,
+        "floor_1.0-2.0m": 0.968,
+        "floor_2.0-3.0m": 0.921,
+        "box_40cm": 0.889,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.996,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      }
+    },
+    "grace_0.05@0.6": {
+      "person_voxels_seen": 213,
+      "stale_after_10s": 92,
+      "stale_blocking_cells": 14,
+      "stale_on_flank": 76,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 66,
+        "1.0-2.0": 26
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.101,
+        "floor_1.0-2.0m": 0.89,
+        "floor_2.0-3.0m": 0.865,
+        "box_40cm": 0.847,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.989,
+        "floor_2.0-3.0m": 0.963,
+        "box_40cm": 0.875,
+        "step_12cm": 0.98
+      }
+    },
+    "grace_0.05@0.8": {
+      "person_voxels_seen": 362,
+      "stale_after_10s": 177,
+      "stale_blocking_cells": 17,
+      "stale_on_flank": 149,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 128,
+        "1.0-2.0": 49
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.105,
+        "floor_1.0-2.0m": 0.917,
+        "floor_2.0-3.0m": 0.884,
+        "box_40cm": 0.889,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.989,
+        "floor_2.0-3.0m": 0.963,
+        "box_40cm": 0.875,
+        "step_12cm": 0.98
+      }
+    },
+    "grace_0.05@1.0": {
+      "person_voxels_seen": 446,
+      "stale_after_10s": 219,
+      "stale_blocking_cells": 16,
+      "stale_on_flank": 184,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 17,
+        "0.3-1.0": 154,
+        "1.0-2.0": 48
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.115,
+        "floor_1.0-2.0m": 0.93,
+        "floor_2.0-3.0m": 0.9,
+        "box_40cm": 0.889,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.989,
+        "floor_2.0-3.0m": 0.963,
+        "box_40cm": 0.875,
+        "step_12cm": 0.98
+      }
+    },
+    "grace_0.05@1.5": {
+      "person_voxels_seen": 440,
+      "stale_after_10s": 218,
+      "stale_blocking_cells": 16,
+      "stale_on_flank": 203,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 48,
+        "0.3-1.0": 112,
+        "1.0-2.0": 58
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.127,
+        "floor_1.0-2.0m": 0.962,
+        "floor_2.0-3.0m": 0.919,
+        "box_40cm": 0.889,
+        "step_12cm": 1.0
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.989,
+        "floor_2.0-3.0m": 0.963,
+        "box_40cm": 0.875,
+        "step_12cm": 0.98
+      }
+    },
+    "graze_0.5@0.6": {
+      "person_voxels_seen": 214,
+      "stale_after_10s": 46,
+      "stale_blocking_cells": 11,
+      "stale_on_flank": 44,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 32,
+        "1.0-2.0": 14
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.119,
+        "floor_1.0-2.0m": 0.897,
+        "floor_2.0-3.0m": 0.865,
+        "box_40cm": 0.847,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.98
+      }
+    },
+    "graze_0.5@0.8": {
+      "person_voxels_seen": 351,
+      "stale_after_10s": 70,
+      "stale_blocking_cells": 10,
+      "stale_on_flank": 69,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 69,
+        "1.0-2.0": 1
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.123,
+        "floor_1.0-2.0m": 0.923,
+        "floor_2.0-3.0m": 0.885,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.98
+      }
+    },
+    "graze_0.5@1.0": {
+      "person_voxels_seen": 443,
+      "stale_after_10s": 100,
+      "stale_blocking_cells": 14,
+      "stale_on_flank": 93,
+      "stale_by_height_m": {
+        "0.0-0.1": 11,
+        "0.1-0.3": 34,
+        "0.3-1.0": 52,
+        "1.0-2.0": 3
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.937,
+        "floor_2.0-3.0m": 0.9,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.98
+      }
+    },
+    "graze_0.5@1.5": {
+      "person_voxels_seen": 452,
+      "stale_after_10s": 77,
+      "stale_blocking_cells": 11,
+      "stale_on_flank": 70,
+      "stale_by_height_m": {
+        "0.0-0.1": 16,
+        "0.1-0.3": 25,
+        "0.3-1.0": 20,
+        "1.0-2.0": 16
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.149,
+        "floor_1.0-2.0m": 0.968,
+        "floor_2.0-3.0m": 0.919,
+        "box_40cm": 0.889,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.98
+      }
+    },
+    "graze_0.3@0.6": {
+      "person_voxels_seen": 196,
+      "stale_after_10s": 1,
+      "stale_blocking_cells": 1,
+      "stale_on_flank": 1,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 1,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.119,
+        "floor_1.0-2.0m": 0.897,
+        "floor_2.0-3.0m": 0.84,
+        "box_40cm": 0.819,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0.3@0.8": {
+      "person_voxels_seen": 322,
+      "stale_after_10s": 6,
+      "stale_blocking_cells": 3,
+      "stale_on_flank": 5,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 5,
+        "1.0-2.0": 1
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.123,
+        "floor_1.0-2.0m": 0.923,
+        "floor_2.0-3.0m": 0.86,
+        "box_40cm": 0.861,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0.3@1.0": {
+      "person_voxels_seen": 393,
+      "stale_after_10s": 18,
+      "stale_blocking_cells": 5,
+      "stale_on_flank": 14,
+      "stale_by_height_m": {
+        "0.0-0.1": 11,
+        "0.1-0.3": 3,
+        "0.3-1.0": 2,
+        "1.0-2.0": 2
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.937,
+        "floor_2.0-3.0m": 0.874,
+        "box_40cm": 0.861,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0.3@1.5": {
+      "person_voxels_seen": 429,
+      "stale_after_10s": 20,
+      "stale_blocking_cells": 4,
+      "stale_on_flank": 13,
+      "stale_by_height_m": {
+        "0.0-0.1": 15,
+        "0.1-0.3": 0,
+        "0.3-1.0": 2,
+        "1.0-2.0": 3
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.149,
+        "floor_1.0-2.0m": 0.967,
+        "floor_2.0-3.0m": 0.892,
+        "box_40cm": 0.861,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.889,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0@0.6": {
+      "person_voxels_seen": 180,
+      "stale_after_10s": 0,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 0,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.119,
+        "floor_1.0-2.0m": 0.897,
+        "floor_2.0-3.0m": 0.839,
+        "box_40cm": 0.792,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.861,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0@0.8": {
+      "person_voxels_seen": 308,
+      "stale_after_10s": 0,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 0,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.123,
+        "floor_1.0-2.0m": 0.923,
+        "floor_2.0-3.0m": 0.859,
+        "box_40cm": 0.833,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.861,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0@1.0": {
+      "person_voxels_seen": 390,
+      "stale_after_10s": 11,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 7,
+      "stale_by_height_m": {
+        "0.0-0.1": 11,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.134,
+        "floor_1.0-2.0m": 0.937,
+        "floor_2.0-3.0m": 0.874,
+        "box_40cm": 0.833,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.861,
+        "step_12cm": 0.96
+      }
+    },
+    "graze_0@1.5": {
+      "person_voxels_seen": 422,
+      "stale_after_10s": 15,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 8,
+      "stale_by_height_m": {
+        "0.0-0.1": 15,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.149,
+        "floor_1.0-2.0m": 0.967,
+        "floor_2.0-3.0m": 0.892,
+        "box_40cm": 0.833,
+        "step_12cm": 0.99
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.164,
+        "floor_1.0-2.0m": 0.995,
+        "floor_2.0-3.0m": 0.966,
+        "box_40cm": 0.861,
+        "step_12cm": 0.96
+      }
+    },
+    "grace_0.05_graze_0@0.6": {
+      "person_voxels_seen": 162,
+      "stale_after_10s": 0,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 0,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.101,
+        "floor_1.0-2.0m": 0.853,
+        "floor_2.0-3.0m": 0.717,
+        "box_40cm": 0.681,
+        "step_12cm": 0.96
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.133,
+        "floor_1.0-2.0m": 0.936,
+        "floor_2.0-3.0m": 0.814,
+        "box_40cm": 0.694,
+        "step_12cm": 0.88
+      }
+    },
+    "grace_0.05_graze_0@0.8": {
+      "person_voxels_seen": 278,
+      "stale_after_10s": 0,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 0,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.105,
+        "floor_1.0-2.0m": 0.878,
+        "floor_2.0-3.0m": 0.733,
+        "box_40cm": 0.708,
+        "step_12cm": 0.96
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.133,
+        "floor_1.0-2.0m": 0.936,
+        "floor_2.0-3.0m": 0.814,
+        "box_40cm": 0.694,
+        "step_12cm": 0.88
+      }
+    },
+    "grace_0.05_graze_0@1.0": {
+      "person_voxels_seen": 331,
+      "stale_after_10s": 0,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 0,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.115,
+        "floor_1.0-2.0m": 0.892,
+        "floor_2.0-3.0m": 0.747,
+        "box_40cm": 0.708,
+        "step_12cm": 0.96
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.133,
+        "floor_1.0-2.0m": 0.936,
+        "floor_2.0-3.0m": 0.813,
+        "box_40cm": 0.694,
+        "step_12cm": 0.88
+      }
+    },
+    "grace_0.05_graze_0@1.5": {
+      "person_voxels_seen": 354,
+      "stale_after_10s": 0,
+      "stale_blocking_cells": 0,
+      "stale_on_flank": 0,
+      "stale_by_height_m": {
+        "0.0-0.1": 0,
+        "0.1-0.3": 0,
+        "0.3-1.0": 0,
+        "1.0-2.0": 0
+      },
+      "surfaces_at_5s": {
+        "floor_0.5-1.0m": 0.127,
+        "floor_1.0-2.0m": 0.922,
+        "floor_2.0-3.0m": 0.764,
+        "box_40cm": 0.708,
+        "step_12cm": 0.96
+      },
+      "surfaces_at_15s": {
+        "floor_0.5-1.0m": 0.133,
+        "floor_1.0-2.0m": 0.936,
+        "floor_2.0-3.0m": 0.814,
+        "box_40cm": 0.694,
+        "step_12cm": 0.88
+      }
+    }
+  }
+}
