@@ -27,7 +27,7 @@
 # `demo.sh down` closes the session and the stack; stop_arm first (see compose.yaml's header).
 # `up` refuses while the session exists (killing it would kill the controllers in its panes).
 # Hosts: PC2_SSH_HOST (223, default pc2), PC2_222_SSH_HOST (default pc2_222), e.g. user@ip when there
-# is no ~/.ssh/config; WORKSTATION_IP (this machine as PC2 sees it, default 192.168.0.62): T2 writes
+# is no ~/.ssh/config; WORKSTATION_IP (this machine as PC2 sees it; required, no default): T2 writes
 # it into the loop profile's policy_host and T3 takes the VLM from it, so a demo from another
 # workstation needs only that line. From the environment or the .env next to this script, resolved
 # by compose itself (so the panes and the containers agree). The 222 paths are the runbook's
@@ -45,7 +45,8 @@ var() {  # var <KEY> <default>: like ${KEY:-default} in a compose file
 }
 P223=$(var PC2_SSH_HOST pc2)
 P222=$(var PC2_222_SSH_HOST pc2_222)
-WS=$(var WORKSTATION_IP 192.168.0.62)
+WS=$(var WORKSTATION_IP '')
+[[ -n $WS ]] || { echo "WORKSTATION_IP is not set: put WORKSTATION_IP=<this machine's address on the robot network> in .env" >&2; exit 1; }
 LOOP='~/GR00T-WholeBodyControl-loop-20261026'
 PY='~/GR00T-WholeBodyControl-harness-20261022/venv/bin/python'
 CLI="PYTHONPATH=\$PWD $PY -m vlm_orchestrator.harness.g1.cli --profile session-profile.yaml --endpoint ipc:///tmp/volo-g1-harness.sock"
