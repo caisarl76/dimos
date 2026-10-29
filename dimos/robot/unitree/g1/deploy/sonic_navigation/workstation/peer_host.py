@@ -74,6 +74,52 @@ SYNTHETIC_CELLS, SYNTHETIC_RESOLUTION = 200, 0.05  # a 10 m square around the ro
 REFRESH_RADIUS_M = 2.5
 REFRESH_FLOOR_MARGIN_M = 0.12  # one and a half 0.08 m voxels: both floor layers stay
 REFRESH_HEADROOM_M = 1.5  # above the base: past the sensor and anything mapped near it
+# A lidar recording holds every scan in memory: 60 s of MID360 is about 70 MB.
+RECORD_MAX_S = 60.0
+RECORD_MAP_RADIUS_M = 3.0
+
+
+class LidarRecording:
+    """PointLio's sensor-frame scans and sensor poses over a bounded window: what the ray
+    map registered, so it can be replayed offline to see why voxels a person left behind
+    were not cleared (sessions 2026-10-22-3..6)."""
+
+    def __init__(self, seconds: float, now: float) -> None:
+        if not 0 < seconds <= RECORD_MAX_S:
+            raise ValueError(f"recording window must be within (0, {RECORD_MAX_S}] s")
+        self.until = now + seconds
+        self.frame_id = ""
+        self.scans: list[tuple[float, Any]] = []
+        self.poses: list[list[float]] = []
+
+    def add_scan(self, now: float, ts: float, frame_id: str, points: Any) -> None:
+        if now <= self.until:
+            self.frame_id = frame_id
+            self.scans.append((ts, np.asarray(points, dtype=np.float32)))
+
+    def add_pose(self, now: float, pose: list[float]) -> None:
+        """Sensor pose in odom: x, y, z, qx, qy, qz, qw, stamp."""
+        if now <= self.until:
+            self.poses.append(pose)
+
+    def save(self, path: Path, map_before: Any, map_after: Any) -> dict[str, Any]:
+        sizes = [len(points) for _, points in self.scans]
+        np.savez_compressed(
+            path,
+            points=np.concatenate([p for _, p in self.scans]) if self.scans else np.zeros((0, 3)),
+            scan_offsets=np.concatenate([[0], np.cumsum(sizes)]).astype(np.int64),
+            scan_ts=np.array([ts for ts, _ in self.scans]),
+            frame_id=self.frame_id,
+            poses=np.array(self.poses).reshape(-1, 8),
+            map_before=map_before,
+            map_after=map_after,
+        )
+        return {
+            "scans": len(sizes),
+            "points": int(sum(sizes)),
+            "poses": len(self.poses),
+            "frame_id": self.frame_id,
+        }
 
 
 def truth_sensor_pose(row: dict[str, Any], mount: Transform) -> Transform:
@@ -291,6 +337,7 @@ def main() -> None:
     latest: dict[str, Any] = {}
     counts: dict[str, int] = {}
     tele: list[Twist | None] = [None]
+    recording: list[LidarRecording | None] = [None]
     telemetry = (args.output / "peer-telemetry.jsonl").open("a", buffering=1)
     subscriptions: list[Any] = []
     coordinator = None
@@ -324,6 +371,8 @@ def main() -> None:
                 }
                 if name == "odometry":
                     row["odom"] = [position.x, position.y, msg.yaw, msg.ts]
+                elif recording[0] is not None:
+                    recording[0].add_pose(now, row["lio"])
                 telemetry.write(json.dumps(row) + "\n")
             elif name == "path":
                 # An empty Path is the planner clearing after a rejected/cancelled goal.
@@ -395,6 +444,23 @@ def main() -> None:
         subscriptions.append(
             coordinator.transports[("lidar_raw", PointCloud2)].subscribe(publish_truth)
         )
+
+        def record_scan(scan: PointCloud2) -> None:
+            points = scan.points_f32()
+            with lock:  # never while the recording is being saved
+                if recording[0] is not None:
+                    recording[0].add_scan(time.monotonic(), scan.ts, scan.frame_id, points)
+
+        subscriptions.append(coordinator.transports[("lidar", PointCloud2)].subscribe(record_scan))
+
+        def map_near_robot() -> Any:
+            with lock:
+                cloud, odom = latest.get("global_map"), latest.get("odometry")
+            if cloud is None or odom is None:
+                return np.zeros((0, 3), dtype=np.float32)
+            points = cloud.points_f32()
+            distance = np.hypot(points[:, 0] - odom.position.x, points[:, 1] - odom.position.y)
+            return points[distance <= RECORD_MAP_RADIUS_M]
 
         def publish_teleop() -> None:
             while not stop.wait(0.1):
@@ -474,6 +540,21 @@ def main() -> None:
                         ),
                     )
                 reply(op=op, region=region)
+            elif op == "record_lidar":
+                # Read-only evidence, blocking for the window: PointLio scans and poses
+                # plus the map near the robot before and after (LidarRecording).
+                try:
+                    active = LidarRecording(command["seconds"], time.monotonic())
+                except ValueError as error:
+                    reply(op=op, error=str(error))
+                    continue
+                before = map_near_robot()
+                with lock:
+                    recording[0] = active
+                time.sleep(command["seconds"])
+                with lock:
+                    recording[0] = None
+                reply(op=op, **active.save(Path(command["path"]), before, map_near_robot()))
             elif op == "synthetic_costmap":
                 synthetic.set()
                 threading.Thread(target=publish_synthetic, daemon=True).start()

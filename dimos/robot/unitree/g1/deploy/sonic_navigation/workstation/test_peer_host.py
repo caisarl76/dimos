@@ -49,3 +49,30 @@ def test_refresh_region_refuses_without_a_mapped_floor() -> None:
     overhead = np.array([[2.5, -1.0, -0.3], [2.6, -1.0, 0.2]], dtype=np.float32)
 
     assert peer_host.refresh_region(overhead, *BASE) is None
+
+
+def test_lidar_recording_keeps_its_window_and_saves_replayable_scans(tmp_path) -> None:
+    recording = peer_host.LidarRecording(seconds=1.0, now=100.0)
+    first = np.zeros((4, 3), dtype=np.float32)
+    second = np.ones((2, 3), dtype=np.float32)
+    recording.add_scan(100.2, 50.0, "mid360_link", first)
+    recording.add_pose(100.25, [0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 1.0, 50.0])
+    recording.add_scan(100.9, 50.1, "mid360_link", second)
+    recording.add_scan(101.1, 50.2, "mid360_link", first)  # after the window: dropped
+    path = tmp_path / "lidar.npz"
+    saved = recording.save(path, map_before=first, map_after=second)
+
+    assert saved == {"scans": 2, "points": 6, "poses": 1, "frame_id": "mid360_link"}
+    with np.load(path) as data:
+        assert data["scan_offsets"].tolist() == [0, 4, 6]
+        assert data["scan_ts"].tolist() == pytest.approx([50.0, 50.1])
+        np.testing.assert_array_equal(data["points"][4:], second)
+        assert data["poses"].shape == (1, 8)
+        assert data["map_before"].shape == (4, 3) and data["map_after"].shape == (2, 3)
+
+
+def test_lidar_recording_window_is_bounded() -> None:
+    with pytest.raises(ValueError):
+        peer_host.LidarRecording(seconds=peer_host.RECORD_MAX_S + 1, now=0.0)
+    with pytest.raises(ValueError):
+        peer_host.LidarRecording(seconds=0.0, now=0.0)

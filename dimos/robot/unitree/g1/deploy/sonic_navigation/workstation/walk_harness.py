@@ -121,6 +121,9 @@ CASES = {
     # Clear the map above the floor around the robot, once the operator stepped away.
     # The goal cases do this themselves after the clearance confirmation.
     "refresh_map": Case("refresh"),
+    # Read-only evidence: PointLio scans and poses while the operator steps in front and
+    # leaves, to replay why the voxels they leave are not cleared (peer LidarRecording).
+    "record_lidar": Case("record", seconds=30.0),
     # One short physical goal (plan Task 11), only after the robot has walked both curves
     # so the near field is observed; no cell is ever cleared to admit it.
     "goal_1m": Case("goal", seconds=20.0, requires=("curve_left_020", "curve_right_020")),
@@ -637,6 +640,22 @@ def run_session(args: Any) -> None:
         print(json.dumps({"refresh": reply.get("region")}))
         return record
 
+    def lidar_record(name: str, case: Case) -> dict[str, Any]:
+        recording = out / f"lidar-{len(results['cases']) + 1:02d}.npz"
+        record: dict[str, Any] = {"name": name, "started_unix": time.time()}
+        record.update(
+            peer.call(
+                "record_lidar",
+                timeout=case.seconds + 30.0,
+                path=str(recording),
+                seconds=case.seconds,
+            )
+        )
+        record["recording"] = recording.name if recording.exists() else None
+        record["note"] = input("Operator: where did you stand, for how long, and when? ")
+        record["passed"] = record["measured_ok"] = bool(record.get("scans"))
+        return record
+
     def goal_record(name: str, case: Case) -> dict[str, Any]:
         """Clearance confirmation, a map refresh and pre-checks, then one goal
         `case.distance` along the case bearing through set_navigation_goal, with the
@@ -1013,6 +1032,18 @@ def run_session(args: Any) -> None:
                     print("refresh_map: not run")
                     continue
                 record = refresh_record(name)
+            elif CASES[name].kind == "record":
+                if (
+                    input(
+                        f"Recording {CASES[name].seconds:.0f} s of lidar from now. Step about"
+                        " 1 m in front of the robot, stay 5 s, then walk out of its view and"
+                        " stay clear. Start? [y/n] "
+                    ).strip()
+                    != "y"
+                ):
+                    print("record_lidar: not run")
+                    continue
+                record = lidar_record(name, CASES[name])
             elif CASES[name].kind == "goal":
                 record = goal_record(name, CASES[name])
             elif CASES[name].kind == "scan":

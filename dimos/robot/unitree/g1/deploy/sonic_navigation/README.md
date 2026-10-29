@@ -81,6 +81,10 @@ PYTHONPATH=$PWD .venv/bin/python dimos/robot/unitree/g1/deploy/sonic_navigation/
   is cleared, and live scans rebuild what is still visible within 2 s. The
   `refresh_map` case does the same on its own. A real object nearer than about 0.7 m
   is not seen again after a refresh.
+- `record_lidar` records 30 s of PointLio scans and sensor poses, plus the map within
+  3 m before and after, into `lidar-NN.npz` while the operator steps about 1 m in front
+  of the robot and leaves. The robot does not move. The recording can be replayed
+  through the ray map offline to see why those voxels are not cleared.
 - The planner keeps a goal with no path for 3 s, replanning every 0.5 s with the robot
   standing, before it gives up; the goal case ends 4.5 s after the goal without a plan.
 
