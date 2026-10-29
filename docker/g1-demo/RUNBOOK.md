@@ -21,7 +21,7 @@ SSH_DIR=<path>/ssh
 ```
 
 `WORKSTATION_IP` goes into 222's loop profile (`policy_host`) and the loop's VLM URL: the harness on
-222 finds the policy and VLM servers through it. `SSH_DIR` is needed when `id -u` is not 1000: the
+222 finds the policy and VLM servers through it; `demo.sh` refuses to start without it (no default). `SSH_DIR` is needed when `id -u` is not 1000: the
 containers run as uid 1000 and cannot read another user's `~/.ssh`, which shows up as the tunnel
 restarting with "Host key verification failed". Make the copy once:
 
