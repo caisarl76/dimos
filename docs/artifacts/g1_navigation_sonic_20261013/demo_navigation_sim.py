@@ -60,8 +60,8 @@ from dimos.robot.unitree.g1.sonic_reference import encode_command
 from dimos.robot.unitree.g1.sonic_session import SonicModelProfile
 
 if os.environ.get("SONIC_STUDY_FACING_CAP"):
-    # Simulation study only: override the commissioned 0.1 rad facing-lead cap in this
-    # process. Production NavigationLimits still rejects any cap above 0.1 rad.
+    # Simulation study only: override the commissioned 0.2 rad facing-lead cap in this
+    # process. Production NavigationLimits still rejects any cap above 0.2 rad.
     from dimos.robot.unitree.g1 import sonic_navigation_session
     from dimos.robot.unitree.g1.sonic_navigation import NavigationLimits
 
