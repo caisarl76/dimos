@@ -126,18 +126,6 @@ So anything wrong at that moment (no T0, wrong `policy_host`, server still loadi
 firewall) leaves `policy_ready: false` even after the cause is fixed. Fix the cause, warm the server
 (above), restart T2, then `k` once. A policy server restart invalidates the harness the same way.
 
-## 8. Known issues (demo of 2026-10-29)
-
-- 223: gestures and voice were interrupted mid-execution. Both cross the network between the
-  workstation and pc2 on every gesture: the ticks go through the ssh tunnel (`-R 5556`), the
-  feedback comes back through it (`-L 5557`), pc2's guard releases to the planner when the
-  reference goes stale, and each voice line is an ssh command to pc2. A link that stalls for more
-  than about 100 ms cuts the motion; a stalled ssh cuts the line. Not fixed. Next time, measure
-  first (`ping -i 0.2 192.168.0.223` during a gesture; `ss -ti dst 192.168.0.223` for retransmits;
-  is the workstation on Wi-Fi?), then either put the workstation on the wired robot network or
-  move the tick source onto pc2 so the link carries commands only.
-- 222: unstable from the visual gap between the demo room and the training data. Out of scope here.
-
 ## 7. Shutdown
 
 ```
@@ -151,3 +139,15 @@ Only the policy server: `docker compose -f compose.demo.yaml --profile workstati
 
 If anything on pc2 is restarted mid-demo, the planner script needs pc2's port 5556 free, which the
 tunnel holds: `docker compose -f compose.demo.yaml stop tunnel dimos`, then the planner pane again.
+
+## 8. Known issues (demo of 2026-10-29)
+
+- 223: gestures and voice were interrupted mid-execution. Both cross the network between the
+  workstation and pc2 on every gesture: the ticks go through the ssh tunnel (`-R 5556`), the
+  feedback comes back through it (`-L 5557`), pc2's guard releases to the planner when the
+  reference goes stale, and each voice line is an ssh command to pc2. A link that stalls for more
+  than about 100 ms cuts the motion; a stalled ssh cuts the line. Not fixed. Next time, measure
+  first (`ping -i 0.2 192.168.0.223` during a gesture; `ss -ti dst 192.168.0.223` for retransmits;
+  is the workstation on Wi-Fi?), then either put the workstation on the wired robot network or
+  move the tick source onto pc2 so the link carries commands only.
+- 222: unstable from the visual gap between the demo room and the training data. Out of scope here.
