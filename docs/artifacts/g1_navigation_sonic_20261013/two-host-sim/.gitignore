@@ -1,0 +1,9 @@
+# Raw run output stays local; only the summaries are committed.
+*
+!*/
+!.gitignore
+!*.md
+!results.json
+!manifest.json
+!raw-hashes.json
+!analysis.json
