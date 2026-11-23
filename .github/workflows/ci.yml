@@ -708,7 +708,7 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
-      APT_PACKAGES: libturbojpeg portaudio19-dev  # See rust.
+      APT_PACKAGES: libturbojpeg0-dev portaudio19-dev  # See rust.
     permissions:
       contents: read  # For checkout
 
@@ -916,7 +916,7 @@ jobs:
       RUST_LOG: "zenoh::net::runtime::orchestrator=debug"
       # Needed because runner's Python does not include sqlite extensions.
       UV_PYTHON_PREFERENCE: only-managed
-      APT_PACKAGES: portaudio19-dev libturbojpeg ffmpeg  # See rust.
+      APT_PACKAGES: portaudio19-dev libturbojpeg0-dev ffmpeg  # See rust.
       # Coverage on 3.12 only; fork-only: and only nightly or on a manual dispatch.
       COVERAGE: ${{ matrix.pyver == '3.12' && (github.repository == 'dimensionalOS/dimos' || contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)) }}
     permissions:
@@ -1382,7 +1382,7 @@ jobs:
     # The hosted runner that exposes a PMU, for the instruction counts.
     runs-on: ubuntu-24.04-arm
     env:
-      APT_PACKAGES: portaudio19-dev libturbojpeg  # See rust; perf's linux-tools are cached with them.
+      APT_PACKAGES: portaudio19-dev libturbojpeg0-dev  # See rust; perf's linux-tools are cached with them.
     permissions:  # Restricted to run untested code. Reporting in next job.
       contents: read  # For checkout
     steps:
