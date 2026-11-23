@@ -71,7 +71,7 @@ jobs:
     steps:
       - name: Checkout
         if: github.repository != 'dimensionalOS/dimos' && github.event_name == 'pull_request'
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -532,7 +532,7 @@ jobs:
           save-cache: ${{ github.ref == 'refs/heads/main' }}
       # Every apt step reuses these restore/install/save steps' YAML anchors (&apt-*).
       - name: Restore apt archives
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: &apt-path ~/.apt-archives/*.deb
           key: &apt-key apt-${{ runner.os }}-${{ runner.arch }}-${{ env.APT_PACKAGES }}-${{ github.run_id }}
@@ -557,7 +557,7 @@ jobs:
           if compgen -G "$dir/*.deb" > /dev/null; then echo "downloaded=true" >> "$GITHUB_OUTPUT"; fi
       - name: Save apt archives
         if: steps.apt.outputs.downloaded == 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -664,7 +664,7 @@ jobs:
           save-cache: ${{ github.ref == 'refs/heads/main' }}
       - name: Restore apt archives
         if: runner.os == 'Linux'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -676,7 +676,7 @@ jobs:
         run: *apt-install
       - name: Save apt archives
         if: steps.apt.outputs.downloaded == 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -718,7 +718,7 @@ jobs:
         run: git lfs pull --include="data/.lfs/go2_bigoffice.db.tar.gz,data/.lfs/unitree_go2_bigoffice_map.pickle.tar.gz" --exclude=""
       # Docs decode JPEG from SQLite via PyTurboJPEG; pyaudio needs portaudio.
       - name: Restore apt archives
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -729,7 +729,7 @@ jobs:
         run: *apt-install
       - name: Save apt archives
         if: steps.apt.outputs.downloaded == 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -946,7 +946,7 @@ jobs:
       # pyaudio needs portaudio; relay/audio tests need TurboJPEG and ffmpeg.
       - name: Restore apt archives
         if: startsWith(matrix.os, 'ubuntu')
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -958,7 +958,7 @@ jobs:
         run: *apt-install
       - name: Save apt archives
         if: steps.apt.outputs.downloaded == 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -1063,7 +1063,7 @@ jobs:
       # The fork uploads no coverage to Codecov, so keep each report with the run.
       - name: Keep the coverage report
         if: env.COVERAGE == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: coverage-${{ matrix.os }}-py${{ matrix.pyver }}-part${{ matrix.part }}
           path: coverage.xml
@@ -1402,7 +1402,7 @@ jobs:
           fi
       # pyaudio build needs portaudio; the recording's JPEG frames need turbojpeg.
       - name: Restore apt archives
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
@@ -1435,7 +1435,7 @@ jobs:
           sudo sysctl -w kernel.perf_event_paranoid=2
       - name: Save apt archives
         if: steps.apt.outputs.downloaded == 'true' || steps.perf.outputs.downloaded == 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: *apt-path
           key: *apt-key
