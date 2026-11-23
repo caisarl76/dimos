@@ -55,7 +55,7 @@ stand-in (`test_sonic_arm_sim_e2e.py`).
 
 - [ ] **Step 1: Write the failing tests** in `test_imported_gestures.py`
 
-```python
+```python skip
 def test_convert_resamples_slows_and_picks_the_arm_columns() -> None:
     t = np.arange(150) / 25
     qpos = np.zeros((150, 36))
@@ -124,7 +124,7 @@ Print each file's duration and planned arm peak `|diff| * RATE`; the wave's shou
 
 - [ ] **Step 1: Write the failing tests**
 
-```python
+```python skip
 def _clip_keyframes(base, path):  # approach to path[0], then the clip verbatim
     return [Keyframe(path[0]), Keyframe(path[-1], path=path)]
 
@@ -174,7 +174,7 @@ def test_a_clip_path_must_join_its_neighbours():
 
 - [ ] **Step 1: Write the failing tests** (use `skill`, `FakeChecker`, `call_with_feed` and `mocker.spy(sonic_arm_skill, "_Watch")` as `test_waist_envelope_includes_the_planned_waist` does)
 
-```python
+```python skip
 @pytest.mark.parametrize("name", CLIP_GESTURES)
 def test_clip_gesture_plans_its_clip_with_a_raised_arm_limit(skill, mocker, name):
     module, _ = skill
@@ -230,7 +230,7 @@ def test_keyframe_gestures_keep_their_envelope_and_limit(skill, mocker): ...  # 
 
 - [ ] **Step 1: Write the failing tests** (use the patterns of `test_overspeed_during_the_way_back_hands_back_at_once` and `test_stop_mid_motion_retreats_smoothly_and_hands_back`; feed `body_dq` through `handle_feedback`; shorten a clip with `mocker.patch.dict` on `GESTURES` if timing needs it)
 
-```python
+```python skip
 def test_arm_speed_inside_the_clip_window_is_allowed_up_to_the_clip_limit(skill, mocker): ...
     # left_shoulder_yaw dq 5.0 in the window: result "...returned", status outcome "finished"
 def test_arm_speed_over_the_clip_limit_mid_clip_cancels_at_once(skill, mocker): ...
