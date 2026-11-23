@@ -18,6 +18,9 @@ env:
 
 jobs:
   self-hosted-large-tests:
+    # Upstream only: forks of this repository have no self-hosted runners, so the job would
+    # queue until it expires there.
+    if: github.repository == 'dimensionalOS/dimos'
     # DimSim navigation e2e, the self_hosted e2e under dimos/e2e_tests and the
     # memory-hungry replay tests: everything marked self_hosted_large.
     env:
@@ -235,6 +238,9 @@ jobs:
           done
 
   browser-tests-macos:
+    # Upstream only: forks of this repository have no self-hosted runners, so the job would
+    # queue until it expires there.
+    if: github.repository == 'dimensionalOS/dimos'
     timeout-minutes: 45
     runs-on: [self-hosted, macOS, base]
     env:

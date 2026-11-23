@@ -1588,6 +1588,8 @@ jobs:
     needs:
     - changes
     - commit-messages
+    # No other job here depends on the ARM native build, so list it or its failure passes this gate.
+    - cachix-build-linux-arm
     - lint
     - rust
     - pyo3
@@ -1612,7 +1614,8 @@ jobs:
       with:
         # Fork-only: the path-gated jobs may skip there (a failure still fails this). tests is never
         # allowed to skip: a fork PR always runs at least its targeted leg.
-        allowed-skips: ${{ github.repository == 'dimensionalOS/dimos' && 'self-hosted-tests' || 'self-hosted-tests, rust, pyo3, md-babel, web, benchmark, benchmark-track' }}
+        # cachix-build-linux-arm skips whenever its publish condition is false.
+        allowed-skips: ${{ github.repository == 'dimensionalOS/dimos' && 'self-hosted-tests, cachix-build-linux-arm' || 'self-hosted-tests, cachix-build-linux-arm, rust, pyo3, md-babel, web, benchmark, benchmark-track' }}
         jobs: ${{ toJSON(needs) }}
     - name: Trigger Codecov notifications
       if: github.repository == 'dimensionalOS/dimos'
