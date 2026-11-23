@@ -27,6 +27,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Upstream only: the site publishes to dimensionalOS/docs with the dimos-docs-bot app, whose
+    # ID and key a fork does not have, so the token step would fail on every docs push there.
+    if: github.repository == 'dimensionalOS/dimos'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
