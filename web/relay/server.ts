@@ -11,7 +11,7 @@ import { CloudflareClient, type FetchFn, type RtcConfig } from "./cloudflare.ts"
 import { LATEST_STALE_MS } from "./forward.ts";
 import { Registry } from "./registry.ts";
 import { RtcHub } from "./rtc.ts";
-import { RobotSession, ViewerSession } from "./session.ts";
+import { collectResetStreams, RobotSession, ViewerSession } from "./session.ts";
 
 export interface RelayOptions {
   /**
@@ -40,12 +40,19 @@ export interface RelayOptions {
   cert?: string;
   key?: string;
   /**
-   * Parsed --auth-file (auth.ts): robot keys bound to robot ids and viewer
-   * tokens. Robots and viewers must present them in hello, /api/stats needs
-   * a bearer viewer token, and together with cert/key it lifts the
-   * loopback-only rule below.
+   * Parsed --auth-file (auth.ts): robot keys bound to robot ids, viewer
+   * tokens, and topic source keys. Robots, viewers and topic providers must
+   * present them in hello, /api/stats needs a bearer viewer token, and
+   * together with cert/key it lifts the loopback-only rule below.
    */
   auth?: Auth;
+  /**
+   * Admit topic providers and give every viewer read/write access to every
+   * connected topic source (--open-topics). Default: on without `auth`, where
+   * nothing else is protected either; off with it, which turns providers away
+   * (`topics_disabled`) and denies viewers every topic operation.
+   */
+  openTopics?: boolean;
   /**
    * Parsed --rtc-file (cloudflare.ts): enables video.webrtc.v1 channels
    * through the Cloudflare SFU. Does not lift the loopback-only rule below.
@@ -91,6 +98,7 @@ export const CERT_KEY_PAIR_ERROR = "--cert and --key must be given together";
 // it. Browsers and the SDK add an application ping on the control stream.
 export const MAX_IDLE_TIMEOUT_MS = 15_000;
 export const KEEP_ALIVE_INTERVAL_MS = 3_000;
+const EPHEMERAL_PORT_ATTEMPTS = 10;
 
 /** What the listeners serve: the ephemeral certificate or the operator's. */
 interface ServedCert {
@@ -245,7 +253,7 @@ export async function startRelay(options: RelayOptions = {}): Promise<RelayHandl
   const hub = options.rtc === undefined
     ? null
     : new RtcHub(new CloudflareClient(options.rtc, options.rtcFetch));
-  const registry = new Registry(Date.now, hub);
+  const registry = new Registry(Date.now, hub, options.openTopics ?? options.auth === undefined);
   // Awaited, and before either listener binds: a peer gets its ICE servers
   // right after welcome (and again at every refresh, through the registry),
   // and nothing answers while the relay is half started (handleHttp closes
@@ -257,34 +265,46 @@ export async function startRelay(options: RelayOptions = {}): Promise<RelayHandl
   // certificate QUIC shares its port (one "443 TCP + 443 UDP" rule pair, and
   // /api/info derives the WebTransport URL from the request host); otherwise
   // QUIC binds an ephemeral port that clients discover via the ready line or
-  // /api/info, so --port stays a single HTTP-facing knob. Nothing awaits
-  // between this bind and the consts handleHttp closes over.
-  // Each bind fails synchronously (AddrInUse, a bad PEM) and no shutdown
-  // handle exists yet, so the catch undoes whatever was set up before the
-  // failure, the hub's TURN refresh included.
+  // /api/info, so --port stays a single HTTP-facing knob. A port chosen for
+  // TCP can already be in use on UDP, so retry that collision for --port 0.
+  // Each bind fails synchronously (AddrInUse, a bad PEM). A retry closes its
+  // candidate HTTP server; a final failure also closes the QUIC endpoint and
+  // the hub's TURN refresh interval.
   let httpServer: Deno.HttpServer<Deno.NetAddr> | undefined;
-  let httpPort: number;
+  let httpPort: number | undefined;
   let endpoint: Deno.QuicEndpoint | undefined;
   let listener: Deno.QuicListener;
   try {
-    httpServer = Deno.serve(
-      {
-        hostname: host,
-        port: options.port ?? 7780,
-        onListen: () => {},
-        cert: options.cert,
-        key: options.key,
-      },
-      handleHttp,
-    );
-    httpPort = (httpServer.addr as Deno.NetAddr).port;
-    try {
-      endpoint = new Deno.QuicEndpoint({ hostname: host, port: tls ? httpPort : 0 });
-    } catch (e) {
-      throw new Error(
-        `QUIC cannot bind UDP port ${httpPort} (with --cert/--key it shares --port): ` +
-          ((e as Error)?.message ?? e),
+    for (let attempt = 0; attempt < EPHEMERAL_PORT_ATTEMPTS; attempt++) {
+      httpServer = Deno.serve(
+        {
+          hostname: host,
+          port: options.port ?? 7780,
+          onListen: () => {},
+          cert: options.cert,
+          key: options.key,
+        },
+        handleHttp,
       );
+      httpPort = (httpServer.addr as Deno.NetAddr).port;
+      try {
+        endpoint = new Deno.QuicEndpoint({ hostname: host, port: tls ? httpPort : 0 });
+        break;
+      } catch (e) {
+        await httpServer.shutdown();
+        httpServer = undefined;
+        if (
+          tls && options.port === 0 && e instanceof Deno.errors.AddrInUse &&
+          attempt < EPHEMERAL_PORT_ATTEMPTS - 1
+        ) continue;
+        throw new Error(
+          `QUIC cannot bind UDP port ${httpPort} (with --cert/--key it shares --port): ` +
+            ((e as Error)?.message ?? e),
+        );
+      }
+    }
+    if (httpServer === undefined || httpPort === undefined || endpoint === undefined) {
+      throw new Error("relay listeners were not initialized");
     }
     listener = endpoint.listen({
       cert: cert.certPem,
@@ -326,7 +346,7 @@ export async function startRelay(options: RelayOptions = {}): Promise<RelayHandl
   // only under --v8-flags=--expose-gc (relay_run_cmd passes it).
   const reapTimer = setInterval(() => {
     registry.reapAll(Date.now());
-    (globalThis as { gc?: () => void }).gc?.();
+    collectResetStreams();
   }, LATEST_STALE_MS);
   // A pending reap must not keep the Deno process alive after shutdown().
   Deno.unrefTimer(reapTimer);

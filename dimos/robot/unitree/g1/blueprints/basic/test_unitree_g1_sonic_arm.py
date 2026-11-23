@@ -18,7 +18,7 @@ import reactivex as rx
 
 from dimos.core.coordination.blueprint_config.errors import BlueprintConfigError
 from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
-from dimos.hardware.sensors.camera.module import CameraModule
+from dimos.hardware.sensors.camera.module import WebcamModule
 from dimos.hardware.sensors.camera.webcam import Webcam, WebcamConfig
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import (
     HEAD_CAMERA_DEVICE,
@@ -43,25 +43,25 @@ def test_an_empty_or_directory_model_path_fails_at_parse_time(field: str, value:
     if field != "encoder-path":
         cli.insert(0, "--sonicarmskillcontainer.encoder-path=unused.onnx")
     with pytest.raises(BlueprintConfigError, match=f"{field.replace('-', '_')} must be a file"):
-        BlueprintConfigParser(unitree_g1_sonic_arm).parse(cli, environ={})
+        BlueprintConfigParser(unitree_g1_sonic_arm.solidify()).parse(cli, environ={})
 
 
 def _started_head_camera(cli: list[str], environ: dict[str, str]) -> WebcamConfig:
-    """Parse the blueprint as `dimos run` does and start its CameraModule without a device."""
-    parsed = BlueprintConfigParser(unitree_g1_sonic_arm).parse(
+    """Parse the blueprint as `dimos run` does and start its WebcamModule without a device."""
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm.solidify()).parse(
         ["--sonicarmskillcontainer.encoder-path=unused.onnx", *cli], environ=environ
     )
-    module = CameraModule(**parsed.module_kwargs("cameramodule"))
+    module = WebcamModule(**parsed.module_kwargs("webcammodule"))
     try:
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(Webcam, "image_stream", lambda self: rx.empty())
             module.start()
-        assert isinstance(module.hardware, Webcam)
-        config = module.hardware.config
+        assert module._camera is not None
+        config = module._camera.config
     finally:
         module.stop()
     # Everything but the device is the blueprint factory's.
-    commissioned = _head_camera().config
+    commissioned = _head_camera()
     assert (config.width, config.height, config.fps) == (
         commissioned.width,
         commissioned.height,
@@ -79,8 +79,8 @@ def test_head_camera_defaults_to_the_commissioned_device() -> None:
 @pytest.mark.parametrize(
     ("cli", "environ", "expected"),
     [
-        (["--cameramodule.camera-device=/dev/video4"], {}, "/dev/video4"),
-        ([], {"CAMERAMODULE__CAMERA_DEVICE": "2"}, 2),
+        (["--webcammodule.hardware.camera-index=/dev/video4"], {}, "/dev/video4"),
+        ([], {"WEBCAMMODULE__HARDWARE__CAMERA_INDEX": "2"}, 2),
     ],
 )
 def test_head_camera_device_is_overridable(

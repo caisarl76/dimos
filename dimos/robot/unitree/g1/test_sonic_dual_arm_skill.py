@@ -158,9 +158,9 @@ def zero(s):
 
 
 def test_dual_blueprint_wires_each_robot_to_its_own_execution():
-    atoms = {a.name: a for a in unitree_g1_sonic_arm_dual.blueprints}
+    atoms = {a.name: a for a in unitree_g1_sonic_arm_dual.solidify().blueprints}
     assert atoms["g1_222"].module is atoms["g1_223"].module is SonicExecutionModule
-    remap = unitree_g1_sonic_arm_dual.remapping_map
+    remap = unitree_g1_sonic_arm_dual.solidify().remapping_map
     for robot in ("222", "223"):
         assert remap[f"g1_{robot}", "feedback"] == f"feedback_{robot}"
         assert remap[f"g1_{robot}", "execution_status"] == f"execution_status_{robot}"
@@ -176,7 +176,7 @@ def test_dual_blueprint_wires_each_robot_to_its_own_execution():
 
 
 def test_dual_blueprint_namespaced_keeps_each_robots_execution():
-    remap = unitree_g1_sonic_arm_dual.namespace("pair").remapping_map
+    remap = unitree_g1_sonic_arm_dual.namespace("pair").solidify().remapping_map
     container = f"pair/{DualSonicArmSkillContainer.name}"
     assert remap[container, "_execution_222"] == "pair/g1_222"
     assert remap[container, "_execution_223"] == "pair/g1_223"
@@ -465,7 +465,7 @@ def test_same_skill_retry_during_module_stop_keeps_the_hold_until_the_retreat_en
 
 def test_dual_blueprints_set_only_known_global_config_fields() -> None:
     for bp in (unitree_g1_sonic_arm_dual, unitree_g1_sonic_arm_dual_agentic):
-        assert set(bp.global_config_overrides) <= set(GlobalConfig.model_fields)
+        assert set(bp.solidify().global_config_overrides) <= set(GlobalConfig.model_fields)
 
 
 # Imported gestures, per-row Dex3 hands per robot, and the operator finger check.
@@ -718,7 +718,7 @@ def test_one_robots_fault_or_stop_retreats_both_with_their_hands(hands, mocker, 
 
 
 def test_both_execution_profiles_limit_hand_steps():
-    atoms = {a.name: a for a in unitree_g1_sonic_arm_dual.blueprints}
+    atoms = {a.name: a for a in unitree_g1_sonic_arm_dual.solidify().blueprints}
     for robot in ("222", "223"):
         profile = atoms[f"g1_{robot}"].kwargs["profile"]
         assert profile.hand_step_limit == pytest.approx(PEAK_SPEED / RATE), robot
@@ -733,11 +733,11 @@ def test_the_dual_container_refuses_an_empty_or_directory_model_path(field, valu
     if field != "encoder-path":
         cli.insert(0, "--dualsonicarmskillcontainer.encoder-path=unused.onnx")
     with pytest.raises(BlueprintConfigError, match=f"{field.replace('-', '_')} must be a file"):
-        BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(cli, environ={})
+        BlueprintConfigParser(unitree_g1_sonic_arm_dual.solidify()).parse(cli, environ={})
 
 
 def test_hands_are_configured_per_robot(real_launch_skill):
-    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual.solidify()).parse(
         [
             "--dualsonicarmskillcontainer.encoder-path=unused.onnx",
             "--dualsonicarmskillcontainer.hands-mounted-222=true",
@@ -756,7 +756,7 @@ def test_hands_are_configured_per_robot(real_launch_skill):
 
 @pytest.mark.parametrize("real_launch_skill", [{"wide_leg_margin_222": 0.25}], indirect=True)
 def test_wide_leg_margin_is_configured_per_robot(inline, mocker):
-    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual.solidify()).parse(
         ["--dualsonicarmskillcontainer.encoder-path=unused.onnx"], environ={}
     )
     config = DualSonicArmSkillConfig(**parsed.module_kwargs("dualsonicarmskillcontainer"))
@@ -1245,7 +1245,7 @@ def test_a_failed_line_is_reported_and_never_fails_the_motion(inline, mocker, co
 
 @pytest.mark.parametrize("real_launch_skill", [ONLY_223], indirect=True)
 def test_voice_hosts_are_configured_per_robot(real_launch_skill):
-    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual).parse(
+    parsed = BlueprintConfigParser(unitree_g1_sonic_arm_dual.solidify()).parse(
         [
             "--dualsonicarmskillcontainer.encoder-path=unused.onnx",
             "--dualsonicarmskillcontainer.voice-host-223=pc2",

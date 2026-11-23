@@ -18,12 +18,12 @@ Needs the model's API key (e.g. OPENAI_API_KEY) in the environment or .env. Talk
 `dimos agent-send "swing your left arm forward 17 degrees"`.
 """
 
-from dimos.agents.mcp.mcp_client import McpClient
+from dimos.agents.agent import Agent
 from dimos.core.coordination.blueprints import autoconnect
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm import unitree_g1_sonic_arm
 from dimos.robot.unitree.g1.system_prompt import G1_SONIC_ARM_SYSTEM_PROMPT
 
 unitree_g1_sonic_arm_agentic = autoconnect(
     unitree_g1_sonic_arm,
-    McpClient.blueprint(system_prompt=G1_SONIC_ARM_SYSTEM_PROMPT),
+    Agent.blueprint(system_prompt=G1_SONIC_ARM_SYSTEM_PROMPT),
 )

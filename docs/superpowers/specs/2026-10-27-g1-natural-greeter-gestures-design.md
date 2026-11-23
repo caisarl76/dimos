@@ -1,4 +1,4 @@
-# G1 223 natural greeter gestures (ARDY clips) — design
+# G1 223 natural greeter gestures (ARDY clips): design
 
 Date: 2026-10-27. Status: approved by the user 2026-10-27; two corrections from planning are marked
 in item 4 and item 5.

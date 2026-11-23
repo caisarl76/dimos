@@ -42,16 +42,16 @@ refuses ("no hands configured"), and a hand-only motion reports its hand feedbac
 
 The head camera is the G1's D435i colour stream, read through V4L2 (no depth). On another USB
 topology, select its device with
-`dimos run unitree-g1-sonic-arm --cameramodule.camera-device=/dev/videoN`
-(or CAMERAMODULE__CAMERA_DEVICE=/dev/videoN).
+`dimos run unitree-g1-sonic-arm --webcammodule.hardware.camera-index=/dev/videoN`
+(or WEBCAMMODULE__HARDWARE__CAMERA_INDEX=/dev/videoN).
 """
 
 from dimos.agents.mcp.mcp_server import McpServer
 from dimos.agents.skills.observe_skill import ObserveSkill
 from dimos.constants import STATE_DIR
 from dimos.core.coordination.blueprints import autoconnect
-from dimos.hardware.sensors.camera.module import CameraModule
-from dimos.hardware.sensors.camera.webcam import Webcam
+from dimos.hardware.sensors.camera.module import WebcamModule
+from dimos.hardware.sensors.camera.webcam import WebcamConfig
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
 from dimos.msgs.geometry_msgs.Transform import Transform
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
@@ -75,8 +75,8 @@ _FX, _FY, _CX, _CY = HEAD_CAMERA_K
 _WIDTH, _HEIGHT = HEAD_CAMERA_SIZE
 
 
-def _head_camera() -> Webcam:
-    return Webcam(
+def _head_camera() -> WebcamConfig:
+    return WebcamConfig(
         camera_index=HEAD_CAMERA_DEVICE,
         width=_WIDTH,
         height=_HEIGHT,
@@ -109,8 +109,8 @@ SONIC_ARM_PROFILE = SonicModelProfile(
 
 
 unitree_g1_sonic_arm = autoconnect(
-    CameraModule.blueprint(
-        hardware=_head_camera,
+    WebcamModule.blueprint(
+        hardware=_head_camera(),
         transform=Transform(
             translation=Vector3(*HEAD_CAMERA_XYZ),
             rotation=Quaternion(*HEAD_CAMERA_QUAT_XYZW),

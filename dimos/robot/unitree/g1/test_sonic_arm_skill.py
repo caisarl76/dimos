@@ -2342,7 +2342,7 @@ def test_point_at_object_rejects_bad_arguments_before_looking(
 
 
 def test_agentic_blueprint_global_config_is_valid():
-    validate_global_values(unitree_g1_sonic_arm_agentic.global_config_overrides)
+    validate_global_values(unitree_g1_sonic_arm_agentic.solidify().global_config_overrides)
 
 
 def one_joint_prepare(module, mocker=None):

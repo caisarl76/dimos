@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from rerun._baseclasses import Archetype
 
-    from dimos.msgs.geometry_msgs.PointStamped import PointStamped
+    from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
     from dimos.msgs.nav_msgs.Path import Path
     from dimos.visualization.rerun.bridge import VisualOverride
 
@@ -75,8 +75,8 @@ def goal_point(xyz: tuple[float, float, float]) -> Archetype:
     return rr.Points3D([xyz], colors=[GOAL_COLOR], radii=GOAL_RADIUS)
 
 
-def render_goal(msg: PointStamped) -> Archetype | None:
-    """The active goal. NaN is the movement manager's placeholder for none."""
+def render_goal(msg: PoseStamped) -> Archetype | None:
+    """The active goal, or nothing for a ``cancel_goal``."""
     if any(math.isnan(v) for v in (msg.x, msg.y, msg.z)):
         return None
     return goal_point((msg.x, msg.y, msg.z))
@@ -116,7 +116,7 @@ def nav_static(
 ) -> dict[str, Callable[[ModuleType], list[Archetype]]]:
     """Bridge static entities: the body box and clearance cylinder riding on base_link.
 
-    Module-level partials, since blueprint config is pickled out to the workers.
+    Module-level partials, since blueprint config is sent by reference to the workers.
     """
     return {
         "world/robot_body": partial(body_on_base_link, length=length, width=width, height=height),
@@ -131,16 +131,21 @@ def nav_visual_override(
     voxel_size: float,
     wall_clearance_m: float,
     clearance_clamp_m: float = 1.0,
+    static_regions: bool = True,
 ) -> dict[str, VisualOverride]:
     """Bridge overrides for the maps, path, goal and the planner's debug entities.
 
     Pass the same values given to ``MLSPlannerNative.blueprint(...)``.
+    static_regions False logs the map cells on the timeline, so a replay can scrub them.
     """
     voxels = partial(render_voxel_map, voxel_size=voxel_size, height_range=HEIGHT_RANGE)
     return {
         "world/global_map": voxels,
         MAP_REGIONS_ENTITY: partial(
-            render_map_region, voxel_size=voxel_size, height_range=HEIGHT_RANGE
+            render_map_region,
+            voxel_size=voxel_size,
+            height_range=HEIGHT_RANGE,
+            static=static_regions,
         ),
         # the seeded regions feed the planner, the map viz already shows them
         "world/seed_map": None,
@@ -148,5 +153,7 @@ def nav_visual_override(
         "world/local_map": voxels,
         "world/path": render_path,
         "world/goal": render_goal,
-        **planner_visual_override(viz_publish_hz, voxel_size, wall_clearance_m, clearance_clamp_m),
+        **planner_visual_override(
+            viz_publish_hz, voxel_size, wall_clearance_m, clearance_clamp_m, static_regions
+        ),
     }

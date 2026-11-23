@@ -18,7 +18,7 @@ Needs the model's API key (e.g. OPENAI_API_KEY) in the environment or .env. Talk
 `dimos agent-send "make both robots wave"`.
 """
 
-from dimos.agents.mcp.mcp_client import McpClient
+from dimos.agents.agent import Agent
 from dimos.core.coordination.blueprints import autoconnect
 from dimos.robot.unitree.g1.blueprints.basic.unitree_g1_sonic_arm_dual import (
     unitree_g1_sonic_arm_dual,
@@ -27,5 +27,5 @@ from dimos.robot.unitree.g1.system_prompt import G1_SONIC_DUAL_ARM_SYSTEM_PROMPT
 
 unitree_g1_sonic_arm_dual_agentic = autoconnect(
     unitree_g1_sonic_arm_dual,
-    McpClient.blueprint(system_prompt=G1_SONIC_DUAL_ARM_SYSTEM_PROMPT),
+    Agent.blueprint(system_prompt=G1_SONIC_DUAL_ARM_SYSTEM_PROMPT),
 )
