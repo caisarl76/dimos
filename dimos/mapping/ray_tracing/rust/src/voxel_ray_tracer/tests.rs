@@ -14,6 +14,9 @@
 
 use super::*;
 
+/// `insert_seed`'s flag: the seeded voxel comes from a loaded premap.
+const FROM_PREMAP: bool = true;
+
 /// A xorshift stream, for stable random test inputs.
 fn test_rng(mut state: u64) -> impl FnMut() -> u64 + Copy {
     move || {
@@ -30,12 +33,14 @@ fn basic_config() -> Config {
         fine_divisor: 0,
         emit_fine: false,
         max_range: 100.0,
+        pre_trace_subsample: 1,
         ray_subsample: 1,
         shadow_depth: 2.0,
         grace_depth: 0.0,
         min_health: 0,
         max_health: 1,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         support_min: 0,
         emit_every: 1,
         global_emit_every: 1,
@@ -58,7 +63,7 @@ fn seed_all(map: &mut VoxelMap, points: &[(f32, f32, f32)], cfg: &Config) -> AHa
     let part = partition_seed(points, cfg.voxel_size, (0.0, 0.0, 0.0), region_m);
     let mut created = AHashSet::new();
     for tile in part.tiles() {
-        created.extend(seed_tile(map, tile, cfg));
+        created.extend(seed_tile(map, tile, &part.non_premap, cfg));
     }
     created
 }
@@ -145,6 +150,8 @@ fn find_misses_along_ray_hits_correct_voxels() {
         shadow_depth,
         grace_depth: 0.0,
         graze_cos: 0.5,
+        map_frame: 0,
+        graze_recent_frames: u32::MAX,
         fine_divisor: None,
     };
     let mut walk = RayWalk::default();
@@ -348,12 +355,14 @@ fn ground_clipping_single_ray() {
         fine_divisor: 0,
         emit_fine: false,
         max_range: 50.0,
+        pre_trace_subsample: 1,
         ray_subsample: 1,
         shadow_depth: 0.2,
         grace_depth: 0.2,
         min_health: 0,
         max_health: 1,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         support_min: 0,
         emit_every: 1,
         global_emit_every: 1,
@@ -507,12 +516,14 @@ fn stair_clipping_ray_fan() {
         fine_divisor: 0,
         emit_fine: false,
         max_range: 50.0,
+        pre_trace_subsample: 1,
         ray_subsample: 1,
         shadow_depth: 0.2,
         grace_depth: 0.2,
         min_health: 0,
         max_health: 1,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         support_min: 0,
         emit_every: 1,
         global_emit_every: 1,
@@ -592,12 +603,14 @@ fn landing_floor_ray_fan() {
         fine_divisor: 0,
         emit_fine: false,
         max_range: 50.0,
+        pre_trace_subsample: 1,
         ray_subsample: 1,
         shadow_depth: 0.2,
         grace_depth: 0.2,
         min_health: 0,
         max_health: 1,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         support_min: 0,
         emit_every: 1,
         global_emit_every: 1,
@@ -665,12 +678,14 @@ fn landing_grazed_from_below() {
         fine_divisor: 0,
         emit_fine: false,
         max_range: 50.0,
+        pre_trace_subsample: 1,
         ray_subsample: 1,
         shadow_depth: 0.2,
         grace_depth: 0.2,
         min_health: 0,
         max_health: 1,
         graze_cos,
+        graze_recent_frames: u32::MAX,
         support_min: 0,
         emit_every: 1,
         global_emit_every: 1,
@@ -807,12 +822,14 @@ fn grazing_ray_spares_planar_floor() {
         fine_divisor: 0,
         emit_fine: false,
         max_range: 50.0,
+        pre_trace_subsample: 1,
         ray_subsample: 1,
         shadow_depth: 0.2,
         grace_depth: 0.2,
         min_health: 0,
         max_health: 1,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         support_min: 0,
         emit_every: 1,
         global_emit_every: 1,
@@ -832,6 +849,97 @@ fn grazing_ray_spares_planar_floor() {
     update_map(&mut map, origin, &ray, &cfg);
     let clipped = row.iter().filter(|k| !map.voxels.contains_key(k)).count();
     assert_eq!(clipped, 0, "a planar floor keeps its grazing spare");
+}
+
+/// Floor points, the grazing ray's origin, the ray's endpoints, and the config.
+type GrazedFloor = (
+    Vec<(f32, f32, f32)>,
+    (f32, f32, f32),
+    Vec<(f32, f32, f32)>,
+    Config,
+);
+
+/// The floor of `grazing_ray_spares_planar_floor`, a ray grazing it, and a config sparing only voxels hit in the last 3 frames.
+fn grazed_floor_with_recency() -> GrazedFloor {
+    let voxel_size = 0.1_f32;
+    let y_half = 0.3_f32;
+    let ds = voxel_size / 3.0;
+    let nx = (20.0 / ds).ceil() as i32;
+    let ny = (2.0 * y_half / ds).ceil() as i32;
+    let floor: Vec<(f32, f32, f32)> = (0..=nx)
+        .flat_map(|column| {
+            (0..=ny).map(move |row| {
+                (
+                    column as f32 * ds,
+                    -y_half + row as f32 * ds,
+                    voxel_size * 0.5,
+                )
+            })
+        })
+        .collect();
+    let cfg = Config {
+        voxel_size,
+        shadow_depth: 0.2,
+        grace_depth: 0.2,
+        min_health: 0,
+        max_health: 1,
+        graze_cos: 0.5,
+        graze_recent_frames: 3,
+        support_min: 0,
+        ..basic_config()
+    };
+    (floor, (0.0, 0.0, 0.35), vec![(8.0, 0.0, 0.0)], cfg)
+}
+
+#[test]
+fn grazing_ray_clears_a_layer_nothing_sees_any_more() {
+    let (floor, origin, ray, cfg) = grazed_floor_with_recency();
+    let (mut map, _) = build_surface(&floor, cfg.voxel_size, cfg.max_health);
+    let row: Vec<VoxelKey> = map
+        .voxels
+        .keys()
+        .filter(|key| key.1 == 0 && key.2 == 0)
+        .collect();
+    for _ in 0..cfg.graze_recent_frames {
+        update_map(&mut map, origin, &ray, &cfg);
+    }
+    assert!(
+        row.iter().all(|key| map.voxels.contains_key(key)),
+        "spared while recently hit"
+    );
+    update_map(&mut map, origin, &ray, &cfg);
+    let cleared = row
+        .iter()
+        .filter(|key| !map.voxels.contains_key(key))
+        .count();
+    assert!(
+        cleared > 0,
+        "a layer unhit for longer than graze_recent_frames clears under a grazing ray"
+    );
+}
+
+#[test]
+fn grazing_ray_spares_a_layer_still_being_seen() {
+    let (floor, origin, ray, cfg) = grazed_floor_with_recency();
+    let (mut map, _) = build_surface(&floor, cfg.voxel_size, cfg.max_health);
+    let row: Vec<VoxelKey> = map
+        .voxels
+        .keys()
+        .filter(|key| key.1 == 0 && key.2 == 0)
+        .collect();
+    let above = (10.0_f32, 0.0_f32, 2.0_f32);
+    for _ in 0..4 * cfg.graze_recent_frames {
+        update_map(&mut map, above, &floor, &cfg);
+        update_map(&mut map, origin, &ray, &cfg);
+    }
+    let clipped = row
+        .iter()
+        .filter(|key| !map.voxels.contains_key(key))
+        .count();
+    assert_eq!(
+        clipped, 0,
+        "a floor re-hit every other frame keeps its grazing spare"
+    );
 }
 
 #[test]
@@ -1254,6 +1362,7 @@ fn milestone_gated_normals_match_full_refit() {
         shadow_depth: 0.2,
         grace_depth: 0.2,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         ..basic_config()
     };
     let ds = voxel_size / 3.0;
@@ -1379,6 +1488,7 @@ fn new_voxel_is_fit_before_grazing_ray() {
         shadow_depth: 0.2,
         grace_depth: 0.2,
         graze_cos: 0.5,
+        graze_recent_frames: u32::MAX,
         ..basic_config()
     };
     let ds = voxel_size / 3.0;
@@ -1635,6 +1745,81 @@ fn seed_leaves_live_voxels_untouched() {
     assert_eq!(map.health((6, 0, 0)), Some(SEED_HEALTH));
 }
 
+/// Seeded voxels are premap until a live scan hits them; live voxels never are.
+#[test]
+fn premap_flag_clears_on_a_live_hit() {
+    let cfg = basic_config();
+    let mut map = VoxelMap::default();
+    update_map(&mut map, (0.0, 0.0, 0.0), &[(5.2, 0.2, 0.2)], &cfg);
+    seed_all(
+        &mut map,
+        &[(5.7, 0.7, 0.7), (6.5, 0.5, 0.5), (0.5, 6.5, 0.5)],
+        &cfg,
+    );
+
+    assert!(
+        !map.voxels[&(5, 0, 0)].is_premap(),
+        "a seed leaves a live voxel live"
+    );
+    assert!(map.voxels[&(6, 0, 0)].is_premap());
+    assert!(map.voxels[&(0, 6, 0)].is_premap());
+
+    update_map(&mut map, (0.0, 0.0, 0.0), &[(6.2, 0.2, 0.2)], &cfg);
+
+    assert!(
+        !map.voxels[&(6, 0, 0)].is_premap(),
+        "a live hit makes it live"
+    );
+    assert!(
+        map.voxels[&(0, 6, 0)].is_premap(),
+        "an unhit seed stays premap"
+    );
+}
+
+/// A non-premap seed point makes its voxel non-premap, new or already seeded.
+#[test]
+fn non_premap_seed_points_land_non_premap() {
+    let cfg = basic_config();
+    let mut map = VoxelMap::default();
+    seed_all(&mut map, &[(1.5, 0.5, 0.5), (2.5, 0.5, 0.5)], &cfg);
+
+    let points = [(2.5, 0.5, 0.5), (3.5, 0.5, 0.5), (4.5, 0.5, 0.5)];
+    let non_premap = non_premap_voxels(&points, &[false, false, true], cfg.voxel_size);
+    let region_m = CHUNK_EDGE as f32 * cfg.voxel_size;
+    for tile in partition_seed(&points, cfg.voxel_size, (0.0, 0.0, 0.0), region_m).tiles() {
+        seed_tile(&mut map, tile, &non_premap, &cfg);
+    }
+
+    assert!(
+        map.voxels[&(1, 0, 0)].is_premap(),
+        "untouched seed stays premap"
+    );
+    assert!(
+        !map.voxels[&(2, 0, 0)].is_premap(),
+        "non-premap point on a premap voxel"
+    );
+    assert!(!map.voxels[&(3, 0, 0)].is_premap(), "new non-premap voxel");
+    assert!(map.voxels[&(4, 0, 0)].is_premap(), "new premap voxel");
+
+    let quads = emit_points_ungated_flags(&map, cfg.voxel_size, &AHashSet::new());
+    let mut flags: Vec<(i32, u32)> = quads
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|q| (q[0].floor() as i32, q[3].to_bits()))
+        .collect();
+    flags.sort_by_key(|f| f.0);
+    assert_eq!(
+        flags,
+        vec![
+            (1, VoxelFlags::PREMAP),
+            (2, 0),
+            (3, 0),
+            (4, VoxelFlags::PREMAP)
+        ]
+    );
+}
+
 /// Seeding the same cloud twice creates nothing and adds no moments.
 #[test]
 fn second_seed_is_a_no_op() {
@@ -1838,7 +2023,7 @@ fn seed_tiles_interleaved_with_live_frames_keep_indexes_consistent() {
     let mut map = VoxelMap::default();
     let mut created_total = 0;
     for (i, tile) in tiles.iter().enumerate() {
-        created_total += seed_tile(&mut map, tile, &cfg).len();
+        created_total += seed_tile(&mut map, tile, &part.non_premap, &cfg).len();
         let frame: Vec<(f32, f32, f32)> = (0..200)
             .map(|_| (next_coord(), next_coord(), next_coord()))
             .collect();
@@ -1913,17 +2098,17 @@ fn a_support_crossing_marks_the_neighbors_chunk_only_with_a_gate() {
         let mut map = VoxelMap::with_support_min(support_min);
         // A healthy voxel at the low edge of chunk 1 with three healthy neighbors in chunk 0.
         let edge = (CHUNK_EDGE, 0, 0);
-        map.insert_seed(edge);
+        map.insert_seed(edge, FROM_PREMAP);
         for n in [
             (CHUNK_EDGE - 1, 0, 0),
             (CHUNK_EDGE - 1, 1, 0),
             (CHUNK_EDGE - 1, 0, 1),
         ] {
-            map.insert_seed(n);
+            map.insert_seed(n, FROM_PREMAP);
         }
         map.take_changed_chunks();
         // The fourth healthy neighbor, in chunk 0, lifts the edge voxel over the gate.
-        map.insert_seed((CHUNK_EDGE - 1, 1, 1));
+        map.insert_seed((CHUNK_EDGE - 1, 1, 1), FROM_PREMAP);
         let marked = map.take_changed_chunks();
         assert!(marked.contains(&chunk_of((CHUNK_EDGE - 1, 1, 1))));
         assert_eq!(
@@ -1946,7 +2131,7 @@ fn chunk_points_equal_emit_points_filtered_to_the_chunk() {
         (CHUNK_EDGE + 2, 1, 0),
     ];
     for key in keys {
-        map.insert_seed(key);
+        map.insert_seed(key, FROM_PREMAP);
     }
     let chunk = chunk_of((CHUNK_EDGE + 2, 0, 0));
     let mut from_chunk = chunk_points(&map, cfg.voxel_size, &[chunk]);

@@ -34,7 +34,7 @@ import time
 from typing import Any
 
 from dimos.constants import DIMOS_PROJECT_ROOT, STATE_DIR
-from dimos.evals.agents.base import Agent
+from dimos.evals.agents.base import EvalSubject
 from dimos.evals.constants import DENIED
 from dimos.evals.types import (
     EvalCase,
@@ -66,12 +66,19 @@ class RunSummary:
 
 
 def summarize(results: Sequence[EvalResult]) -> RunSummary:
+    """Score the cases that ran. ``n`` and ``errors`` still count the whole suite.
+
+    Preflight and other ``error`` rows are infrastructure, not a model judgment, so
+    they stay out of ``mean_score`` / ``pass_rate``. A run of only errors scores 0.
+    """
     n = len(results)
+    judged = [r for r in results if not r.error]
+    k = len(judged)
     return RunSummary(
         n=n,
-        mean_score=sum(r.score for r in results) / n if n else 0.0,
-        pass_rate=sum(r.passed for r in results) / n if n else 0.0,
-        errors=sum(1 for r in results if r.error),
+        mean_score=sum(r.score for r in judged) / k if k else 0.0,
+        pass_rate=sum(r.passed for r in judged) / k if k else 0.0,
+        errors=n - k,
         duration_s=sum(r.duration_s for r in results),
         cost_usd=total_cost(r.cost_usd for r in results),
     )
@@ -87,7 +94,7 @@ class EvalRunner(Configurable):
     def run(
         self,
         cases: Suite,
-        agent: Agent,
+        agent: EvalSubject,
         *,
         tags: frozenset[str] = frozenset(),
         limit: int = 0,
@@ -140,7 +147,7 @@ class EvalRunner(Configurable):
         self._write_artifacts(ordered)
         return ordered
 
-    def _preflight(self, case: EvalCase, agent: Agent) -> str:
+    def _preflight(self, case: EvalCase, agent: EvalSubject) -> str:
         """Both sides checked before anything starts: the failure text, or ``""``."""
         try:
             case.environment.preflight(agent)
@@ -152,7 +159,7 @@ class EvalRunner(Configurable):
             return f"preflight: {e}"
         return ""
 
-    def run_case(self, case: EvalCase, agent: Agent) -> EvalResult:
+    def run_case(self, case: EvalCase, agent: EvalSubject) -> EvalResult:
         t0 = time.monotonic()
         case_dir = self.run_dir / case.id
         case_dir.mkdir(parents=True, exist_ok=True)
@@ -161,7 +168,7 @@ class EvalRunner(Configurable):
         tools: list[str] = []
         try:
             try:
-                env = case.environment.start(agent.config.modules)
+                env = case.environment.start(agent.config.modules, requires_mcp=agent.requires_mcp)
                 tools = list(
                     dict.fromkeys(agent.available_tools(tuple(_tools_exposed(env.mcp_url))))
                 )

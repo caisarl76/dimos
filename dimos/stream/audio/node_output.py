@@ -14,28 +14,21 @@
 # limitations under the License.
 
 import threading
-from typing import Any
+from time import monotonic
 
 import numpy as np
 from reactivex import Observable
-import sounddevice as sd  # type: ignore[import-untyped]
 
-from dimos.stream.audio.base import (
-    AbstractAudioTransform,
-)
+from dimos.stream.audio.base import AbstractAudioConsumer, AudioEvent
+from dimos.stream.audio.sounddevice_loader import sounddevice as sd
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
+_DEVICE_RETRY_SECONDS = 1.0
 
 
-class SounddeviceAudioOutput(AbstractAudioTransform):
-    """
-    Audio output implementation using the sounddevice library.
-
-    This class implements AbstractAudioTransform so it can both play audio and
-    optionally pass audio events through to other components (for example, to
-    record audio while playing it, or to visualize the waveform while playing).
-    """
+class SounddeviceAudioOutput(AbstractAudioConsumer):
+    """Play audio events using the sounddevice library."""
 
     def __init__(
         self,
@@ -61,11 +54,11 @@ class SounddeviceAudioOutput(AbstractAudioTransform):
         self.block_size = block_size
         self.dtype = dtype
 
-        self._stream = None
+        self._stream: sd.OutputStream | None = None
+        self._retry_after = 0.0
         self._stream_lock = threading.Lock()
         self._running = threading.Event()
         self._subscription = None
-        self.audio_observable = None
 
     def consume_audio(self, audio_observable: Observable) -> "SounddeviceAudioOutput":  # type: ignore[type-arg]
         """
@@ -77,29 +70,8 @@ class SounddeviceAudioOutput(AbstractAudioTransform):
         Returns:
             Self for method chaining
         """
-        self.audio_observable = audio_observable  # type: ignore[assignment]
-
-        # Try to create and start the output stream. If no audio device is
-        # available (e.g. in CI / headless), log and continue — audio events
-        # will still be drained from the observable and silently dropped.
-        try:
-            self._stream = sd.OutputStream(
-                device=self.device_index,
-                samplerate=self.sample_rate,
-                channels=self.channels,
-                blocksize=self.block_size,
-                dtype=self.dtype,
-            )
-            self._stream.start()  # type: ignore[attr-defined]
-            self._running.set()
-
-        except Exception as e:
-            self._stream = None
-            logger.warning(
-                f"No audio output device available ({e}); audio events will be consumed and dropped"
-            )
-
-        # Subscribe to the observable
+        self._retry_after = 0.0
+        self._running.set()
         self._subscription = audio_observable.subscribe(  # type: ignore[assignment]
             on_next=self._play_audio_event,
             on_error=self._handle_error,
@@ -107,18 +79,6 @@ class SounddeviceAudioOutput(AbstractAudioTransform):
         )
 
         return self
-
-    def emit_audio(self) -> Observable:  # type: ignore[type-arg]
-        """
-        Pass through the audio observable to allow chaining with other components.
-
-        Returns:
-            The same Observable that was provided to consume_audio
-        """
-        if self.audio_observable is None:
-            raise ValueError("No audio source provided. Call consume_audio() first.")
-
-        return self.audio_observable
 
     def stop(self) -> None:
         """Stop audio output and clean up resources."""
@@ -134,11 +94,35 @@ class SounddeviceAudioOutput(AbstractAudioTransform):
                 self._stream.close()
                 self._stream = None
 
-    def _play_audio_event(self, audio_event) -> None:  # type: ignore[no-untyped-def]
-        """Play audio from an AudioEvent."""
-        if not self._running.is_set():
+    def _open_stream(self) -> None:
+        """Open on demand and limit device probes while the server is down."""
+        if monotonic() < self._retry_after:
             return
 
+        stream = None
+        try:
+            stream = sd.OutputStream(
+                device=self.device_index,
+                samplerate=self.sample_rate,
+                channels=self.channels,
+                blocksize=self.block_size,
+                dtype=self.dtype,
+            )
+            stream.start()
+        except Exception as e:
+            if stream is not None:
+                stream.close()
+            if not self._retry_after:
+                logger.warning(
+                    "Audio output unavailable, dropping audio until it recovers", error=str(e)
+                )
+            self._retry_after = monotonic() + _DEVICE_RETRY_SECONDS
+        else:
+            self._stream = stream
+            self._retry_after = 0.0
+
+    def _play_audio_event(self, audio_event: AudioEvent) -> None:
+        """Play audio from an AudioEvent."""
         try:
             # Ensure data type matches our stream
             if audio_event.dtype != self.dtype:
@@ -148,7 +132,11 @@ class SounddeviceAudioOutput(AbstractAudioTransform):
                     audio_event = audio_event.to_int16()
 
             with self._stream_lock:
-                if self._stream:
+                if not self._running.is_set():
+                    return
+                if self._stream is None:
+                    self._open_stream()
+                if self._stream is not None:
                     self._stream.write(audio_event.data)
         except Exception as e:
             logger.error(f"Error playing audio: {e}")
@@ -166,26 +154,3 @@ class SounddeviceAudioOutput(AbstractAudioTransform):
                 self._stream.stop()
                 self._stream.close()
                 self._stream = None
-
-    def get_available_devices(self) -> list[dict[str, Any]]:
-        """Get a list of available audio output devices."""
-        return sd.query_devices()  # type: ignore[no-any-return]
-
-
-if __name__ == "__main__":
-    from dimos.stream.audio.node_microphone import (
-        SounddeviceAudioSource,
-    )
-    from dimos.stream.audio.node_normalizer import AudioNormalizer
-    from dimos.stream.audio.utils import keepalive
-
-    # Create microphone source, normalizer and audio output
-    mic = SounddeviceAudioSource()
-    normalizer = AudioNormalizer()
-    speaker = SounddeviceAudioOutput()
-
-    # Connect the components in a pipeline
-    normalizer.consume_audio(mic.emit_audio())
-    speaker.consume_audio(normalizer.emit_audio())
-
-    keepalive()
