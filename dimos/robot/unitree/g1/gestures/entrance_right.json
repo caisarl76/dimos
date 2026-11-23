@@ -1,0 +1,34 @@
+{
+  "keyframes": [
+    {
+      "delta": {},
+      "t": 0.0
+    },
+    {
+      "absolute": {
+        "right_elbow": 1.35,
+        "right_shoulder_pitch": -0.655,
+        "right_shoulder_roll": -1.389,
+        "right_shoulder_yaw": 0.0,
+        "right_wrist_pitch": 0.0,
+        "right_wrist_roll": 0.85,
+        "right_wrist_yaw": 0.0
+      },
+      "t": 4.0
+    },
+    {
+      "absolute": {
+        "right_elbow": 1.35,
+        "right_shoulder_pitch": -0.655,
+        "right_shoulder_roll": -1.389,
+        "right_shoulder_yaw": 0.0,
+        "right_wrist_pitch": 0.0,
+        "right_wrist_roll": 0.85,
+        "right_wrist_yaw": 0.0
+      },
+      "t": 5.5
+    }
+  ],
+  "name": "entrance_right",
+  "return_s": 3.0
+}

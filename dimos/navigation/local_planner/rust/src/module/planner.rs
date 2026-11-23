@@ -14,7 +14,8 @@
 
 //! The SE(2) local planner as a robot-side module. Cloud from
 //! `local_map`, pose from tf (`world_frame -> base_frame`), goal a carrot `goal_lookahead_m`
-//! along `planner_path`. A refusal or a stale map publishes a one-pose hold stub.
+//! along `planner_path`, pulled back along it to where the body fits. A refusal or a stale
+//! map publishes a one-pose hold stub.
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -96,6 +97,8 @@ struct Shared {
     /// Arrival time, not `msg.ts`: the mapper's clock is not the robot's.
     cloud_at: Option<Instant>,
     global_xy: Option<Vec<[f64; 2]>>,
+    /// The route's goal heading, when its last pose carries one.
+    global_yaw: Option<f64>,
 }
 
 #[derive(Module)]
@@ -163,15 +166,21 @@ impl LocalPlanner {
             .iter()
             .map(|p| [p.pose.position.x, p.pose.position.y])
             .collect();
+        let yaw = msg::heading_of(&msg);
         let mut s = self.shared.lock().expect("shared mutex");
         s.global_xy = (!xy.is_empty()).then_some(xy);
+        s.global_yaw = yaw;
     }
 }
 
-/// `lookahead` metres of arc from the waypoint closest to the robot, clamped to
-/// the route's end.
-pub fn carrot_along(route: &[[f64; 2]], robot: (f64, f64), lookahead: f64) -> Option<(f64, f64)> {
-    let last = route.last()?;
+/// The route from the waypoint closest to the robot to the carrot, which is its last
+/// point, `lookahead` meters of arc on and clamped to the route's end.
+pub fn approach_along(
+    route: &[[f64; 2]],
+    robot: (f64, f64),
+    lookahead: f64,
+) -> Option<Vec<[f64; 2]>> {
+    route.last()?;
     // np.argmin keeps the first minimum on a tie
     let mut i = 0usize;
     let mut best = f64::INFINITY;
@@ -188,20 +197,32 @@ pub fn carrot_along(route: &[[f64; 2]], robot: (f64, f64), lookahead: f64) -> Op
         let seg = dx.hypot(dy);
         if seg >= remaining {
             let f = remaining / seg;
-            return Some((route[j][0] + f * dx, route[j][1] + f * dy));
+            let mut out = route[i..=j].to_vec();
+            out.push([route[j][0] + f * dx, route[j][1] + f * dy]);
+            return Some(out);
         }
         remaining -= seg;
     }
-    Some((last[0], last[1]))
+    Some(route[i..].to_vec())
+}
+
+/// The route's heading applies only once the carrot is the route's end.
+pub fn heading_at_carrot(
+    route: &[[f64; 2]],
+    approach: &[[f64; 2]],
+    heading: Option<f64>,
+) -> Option<f64> {
+    heading.filter(|_| approach.last() == route.last())
 }
 
 /// Has an input the plan depends on moved? The route enters only through the
-/// carrot, so that is what is compared.
+/// carrot and its heading, so that is what is compared.
 pub fn replan_due(
     gate: bool,
-    planned: Option<(u64, (f64, f64))>,
+    planned: Option<(u64, (f64, f64), Option<f64>)>,
     cloud_seq: u64,
     carrot: (f64, f64),
+    heading: Option<f64>,
     carrot_m: f64,
 ) -> bool {
     if !gate {
@@ -209,8 +230,10 @@ pub fn replan_due(
     }
     match planned {
         None => true,
-        Some((seq, was)) => {
-            seq != cloud_seq || (was.0 - carrot.0).hypot(was.1 - carrot.1) > carrot_m
+        Some((seq, was, had)) => {
+            seq != cloud_seq
+                || had != heading
+                || (was.0 - carrot.0).hypot(was.1 - carrot.1) > carrot_m
         }
     }
 }
@@ -277,7 +300,8 @@ pub fn plan_once(
     model: &dyn ObstacleModel,
     points: &[[f32; 3]],
     pose: (f64, f64, f64),
-    goal: (f64, f64),
+    approach: &[[f64; 2]],
+    heading: Option<f64>,
     ground: &Plane,
     incumbent: Option<&[[f64; 3]]>,
 ) -> Path {
@@ -297,13 +321,14 @@ pub fn plan_once(
         &cloud,
         &terrain,
         pose,
-        goal,
+        approach,
+        heading,
         emb,
         config.resolution,
         incumbent,
         COMMIT_MARGIN,
     ) {
-        Some(s) if !s.is_empty() => s,
+        Some((s, _)) if !s.is_empty() => s,
         _ => {
             debug!(
                 plan_ms = ms_since(started),
@@ -356,6 +381,7 @@ struct Snapshot {
     cloud_seq: u64,
     age_s: Option<f64>,
     route: Option<Vec<[f64; 2]>>,
+    heading: Option<f64>,
 }
 
 impl Worker {
@@ -368,8 +394,8 @@ impl Worker {
         let mut gate = StaleGate::default();
         let mut watch = PoseWatch::new(self.config.max_map_age_s);
         let mut points: Option<(u64, Arc<Vec<[f32; 3]>>)> = None;
-        // The (cloud, carrot) the published plan was made from.
-        let mut planned: Option<(u64, (f64, f64))> = None;
+        // The (cloud, carrot, heading) the published plan was made from.
+        let mut planned: Option<(u64, (f64, f64), Option<f64>)> = None;
         // The published plan; the search keeps it unless a fresh one earns the switch.
         let mut incumbent: Option<Vec<[f64; 3]>> = None;
         let mut published = false;
@@ -431,23 +457,29 @@ impl Worker {
                     }
                     let pose = pose.expect("Plan implies a pose");
                     let route = snap.route.expect("Plan implies a route");
-                    let Some(goal) =
-                        carrot_along(&route, (pose.0, pose.1), self.config.goal_lookahead_m)
+                    let Some(approach) =
+                        approach_along(&route, (pose.0, pose.1), self.config.goal_lookahead_m)
                     else {
                         continue; // an empty route is stored as None, so unreachable
                     };
+                    let end = approach[approach.len() - 1];
+                    let goal = (end[0], end[1]);
+                    let heading = heading_at_carrot(&route, &approach, snap.heading);
                     if !replan_due(
                         self.config.replan_on_change,
                         planned,
                         snap.cloud_seq,
                         goal,
+                        heading,
                         self.config.replan_carrot_m,
                     ) {
                         continue;
                     }
-                    // A carrot that jumped is a different task; the held route is the old one's.
-                    if planned.is_some_and(|(_, was)| {
-                        (was.0 - goal.0).hypot(was.1 - goal.1) > self.config.reset_carrot_m
+                    // A carrot that jumped or a heading that changed is a different task.
+                    // The held route is the old one's.
+                    if planned.is_some_and(|(_, was, had)| {
+                        had != heading
+                            || (was.0 - goal.0).hypot(was.1 - goal.1) > self.config.reset_carrot_m
                     }) {
                         incumbent = None;
                     }
@@ -464,7 +496,8 @@ impl Worker {
                             self.model.as_ref(),
                             &pts,
                             pose,
-                            goal,
+                            &approach,
+                            heading,
                             &ground.plane,
                             incumbent.as_deref(),
                         );
@@ -474,7 +507,7 @@ impl Worker {
                         let floor =
                             msg::build_cloud(&support, &self.config.world_frame, msg::now_secs());
                         msg::publish(&self.ground_support, &floor).await;
-                        planned = Some((snap.cloud_seq, goal));
+                        planned = Some((snap.cloud_seq, goal, heading));
                         incumbent = Some(msg::path_states(&produced));
                         published = true;
                         msg::publish(&self.path, &produced).await;
@@ -492,6 +525,7 @@ impl Worker {
             cloud_seq: s.cloud_seq,
             age_s: s.cloud_at.map(|t| now.duration_since(t).as_secs_f64()),
             route: s.global_xy.clone(),
+            heading: s.global_yaw,
         }
     }
 
@@ -531,10 +565,38 @@ fn ms_since(t: Instant) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::FRAC_PI_2;
+
     use super::*;
 
     fn route(points: &[(f64, f64)]) -> Vec<[f64; 2]> {
         points.iter().map(|&(x, y)| [x, y]).collect()
+    }
+
+    fn carrot_along(route: &[[f64; 2]], robot: (f64, f64), lookahead: f64) -> Option<(f64, f64)> {
+        let end = *approach_along(route, robot, lookahead)?.last()?;
+        Some((end[0], end[1]))
+    }
+
+    #[test]
+    fn approach_runs_from_the_closest_waypoint_to_the_carrot() {
+        let r = route(&[(0.0, 0.0), (2.0, 0.0), (2.0, 4.0)]);
+        assert_eq!(
+            approach_along(&r, (2.1, 0.5), 1.5),
+            Some(vec![[2.0, 0.0], [2.0, 1.5]])
+        );
+    }
+
+    #[test]
+    fn an_approach_past_the_route_end_is_the_rest_of_the_route() {
+        let r = route(&[(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)]);
+        assert_eq!(approach_along(&r, (0.9, 0.0), 5.0), Some(r[1..].to_vec()));
+    }
+
+    #[test]
+    fn an_approach_from_the_last_waypoint_is_that_waypoint() {
+        let r = route(&[(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)]);
+        assert_eq!(approach_along(&r, (2.5, 0.0), 1.0), Some(vec![[2.0, 0.0]]));
     }
 
     // carrot_along
@@ -687,7 +749,8 @@ mod tests {
             model(&cfg).as_ref(),
             &[],
             (0.0, 0.0, 0.0),
-            (3.0, 0.0),
+            &[[3.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -706,6 +769,51 @@ mod tests {
         let e = Emb::fixture();
         let params = emb::base_params(&e, [e.min_speed, e.max_speed]);
         assert!(stamps::decode_ceilings(&ts, &states, &params).is_some());
+    }
+
+    #[test]
+    fn a_honored_heading_ends_the_published_path() {
+        let cfg = config();
+        let produced = plan_once(
+            &cfg,
+            &fixture(),
+            model(&cfg).as_ref(),
+            &[],
+            (0.0, 0.0, 0.0),
+            &[[3.0, 0.0]],
+            Some(FRAC_PI_2),
+            &Plane::flat(0.0),
+            None,
+        );
+        assert!(produced.poses.len() > 1);
+        let yaw = msg::heading_of(&produced).expect("a heading");
+        assert!((yaw - FRAC_PI_2).abs() < 1e-9, "yaw={yaw}");
+    }
+
+    #[test]
+    fn a_heading_the_body_cannot_hold_publishes_the_position_plan() {
+        // a wall 0.4 m past the goal: the body fits beside it, not facing it
+        let mut wall = Vec::new();
+        let mut t = -2.0f32;
+        while t <= 2.0 {
+            wall.push([3.4, t, 0.3]);
+            t += 0.02;
+        }
+        let cfg = config();
+        let produced = plan_once(
+            &cfg,
+            &fixture(),
+            model(&cfg).as_ref(),
+            &wall,
+            (0.0, 0.0, 0.0),
+            &[[3.0, 0.0]],
+            Some(0.0),
+            &Plane::flat(0.0),
+            None,
+        );
+        assert!(produced.poses.len() > 1, "a plan, not a stub");
+        let yaw = msg::heading_of(&produced).expect("the plan's own end heading");
+        assert!(yaw.abs() > 0.5, "does not face the wall: yaw={yaw}");
     }
 
     #[test]
@@ -733,7 +841,8 @@ mod tests {
             m.as_ref(),
             &gap(1.4),
             (0.0, 0.0, 0.0),
-            (3.0, 0.0),
+            &[[3.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -743,7 +852,8 @@ mod tests {
             m.as_ref(),
             &gap(0.45),
             (0.0, 0.0, 0.0),
-            (3.0, 0.0),
+            &[[3.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -776,7 +886,8 @@ mod tests {
             model(&cfg).as_ref(),
             &walls,
             (0.0, 0.0, 0.0),
-            (4.0, 0.0),
+            &[[4.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -804,7 +915,8 @@ mod tests {
             model(&cfg).as_ref(),
             &lifted,
             (0.0, 0.0, 0.0),
-            (4.0, 0.0),
+            &[[4.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -848,7 +960,8 @@ mod tests {
             model(&cfg).as_ref(),
             &room,
             (0.0, 0.0, 0.0),
-            (4.0, 0.0),
+            &[[4.0, 0.0]],
+            None,
             &Plane::flat(-0.28),
             None,
         );
@@ -871,7 +984,8 @@ mod tests {
                 m,
                 &wall,
                 (0.0, 0.0, 0.0),
-                (3.0, 0.0),
+                &[[3.0, 0.0]],
+                None,
                 &Plane::flat(0.0),
                 None,
             );
@@ -927,7 +1041,8 @@ mod tests {
             model(&cfg).as_ref(),
             &slab,
             (0.0, 0.0, 0.0),
-            (4.0, 0.0),
+            &[[4.0, 0.0]],
+            None,
             &Plane::flat(-0.28),
             None,
         );
@@ -958,7 +1073,8 @@ mod tests {
             model(&cfg).as_ref(),
             &low_object((1.4, 1.64), (-0.12, 0.12)),
             (0.0, 0.0, 0.0),
-            (3.0, 0.0),
+            &[[3.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -991,7 +1107,8 @@ mod tests {
             model(&cfg).as_ref(),
             &world,
             (0.0, 0.0, 0.0),
-            (3.0, 0.0),
+            &[[3.0, 0.0]],
+            None,
             &Plane::flat(0.0),
             None,
         );
@@ -1042,7 +1159,8 @@ mod tests {
             model(&cfg).as_ref(),
             &cloud,
             (0.0, 0.0, 0.0),
-            (3.0, 0.0),
+            &[[3.0, 0.0]],
+            None,
             &ground.plane,
             None,
         );
@@ -1064,9 +1182,10 @@ mod tests {
     fn a_tick_with_nothing_new_does_not_replan() {
         assert!(!replan_due(
             true,
-            Some((7, (2.0, 0.0))),
+            Some((7, (2.0, 0.0), None)),
             7,
             (2.0, 0.0),
+            None,
             CARROT_M
         ));
     }
@@ -1075,16 +1194,18 @@ mod tests {
     fn a_new_map_or_a_moved_carrot_replans() {
         assert!(replan_due(
             true,
-            Some((7, (2.0, 0.0))),
+            Some((7, (2.0, 0.0), None)),
             8,
             (2.0, 0.0),
+            None,
             CARROT_M
         ));
         assert!(replan_due(
             true,
-            Some((7, (2.0, 0.0))),
+            Some((7, (2.0, 0.0), None)),
             7,
             (2.3, 0.0),
+            None,
             CARROT_M
         ));
     }
@@ -1093,25 +1214,59 @@ mod tests {
     fn a_republished_route_moves_the_carrot_by_nothing_and_is_not_a_replan() {
         assert!(!replan_due(
             true,
-            Some((7, (2.0, 0.0))),
+            Some((7, (2.0, 0.0), None)),
             7,
             (2.02, -0.01),
+            None,
             CARROT_M
         ));
     }
 
     #[test]
     fn the_first_tick_replans_because_nothing_was_planned_yet() {
-        assert!(replan_due(true, None, 0, (0.0, 0.0), CARROT_M));
+        assert!(replan_due(true, None, 0, (0.0, 0.0), None, CARROT_M));
+    }
+
+    #[test]
+    fn a_changed_heading_replans() {
+        let planned = Some((7, (2.0, 0.0), Some(1.0)));
+        assert!(!replan_due(
+            true,
+            planned,
+            7,
+            (2.0, 0.0),
+            Some(1.0),
+            CARROT_M
+        ));
+        assert!(replan_due(
+            true,
+            planned,
+            7,
+            (2.0, 0.0),
+            Some(1.5),
+            CARROT_M
+        ));
+        assert!(replan_due(true, planned, 7, (2.0, 0.0), None, CARROT_M));
+    }
+
+    #[test]
+    fn the_heading_applies_only_once_the_carrot_is_the_route_end() {
+        let r = route(&[(0.0, 0.0), (2.0, 0.0), (2.0, 4.0)]);
+        let short = approach_along(&r, (2.1, 0.5), 1.5).unwrap();
+        assert_eq!(heading_at_carrot(&r, &short, Some(1.0)), None);
+        let whole = approach_along(&r, (2.1, 0.5), 10.0).unwrap();
+        assert_eq!(heading_at_carrot(&r, &whole, Some(1.0)), Some(1.0));
+        assert_eq!(heading_at_carrot(&r, &whole, None), None);
     }
 
     #[test]
     fn an_ungated_planner_replans_on_every_tick() {
         assert!(replan_due(
             false,
-            Some((7, (2.0, 0.0))),
+            Some((7, (2.0, 0.0), None)),
             7,
             (2.0, 0.0),
+            None,
             CARROT_M
         ));
     }

@@ -22,6 +22,7 @@ import pytest
 import zmq
 
 from dimos.robot.unitree.g1.sonic_policy_client import SonicPolicyClient
+from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
 
 KEY = "observation.images.egocentric"
 INFO = {"image_keys": [KEY], "n_obs": 1, "shapes": {KEY: [3, 8, 12]}}
@@ -41,8 +42,8 @@ def request_args():
     )
 
 
-def test_real_wire_preserves_rgb_state_and_observation_identity(tmp_path, request_args):
-    endpoint = f"ipc://{tmp_path}/policy.sock"
+def test_real_wire_preserves_rgb_state_and_observation_identity(ipc_dir, request_args):
+    endpoint = f"ipc://{ipc_dir}/policy.sock"
     ready = Event()
     actions = np.arange(156, dtype=np.float32).reshape(2, 78) / 1000
 
@@ -51,10 +52,10 @@ def test_real_wire_preserves_rgb_state_and_observation_identity(tmp_path, reques
             sock.setsockopt(zmq.LINGER, 0)
             sock.bind(endpoint)
             ready.set()
-            assert sock.poll(2000)
+            assert sock.poll(int(WAIT_S * 1000))
             assert msgpack.unpackb(sock.recv(), raw=False) == {"op": "info"}
             sock.send(msgpack.packb(INFO, use_bin_type=True))
-            assert sock.poll(2000)
+            assert sock.poll(int(WAIT_S * 1000))
             request = msgpack.unpackb(sock.recv(), raw=False)
             sock.send(
                 msgpack.packb(
@@ -65,11 +66,11 @@ def test_real_wire_preserves_rgb_state_and_observation_identity(tmp_path, reques
 
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(serve)
-        assert ready.wait(2)
+        assert ready.wait(WAIT_S)
         client = SonicPolicyClient(endpoint, timeout_seconds=1)
         info = client.get_info()
         chunk = client.infer(info=info, **request_args)
-        request = future.result(timeout=2)
+        request = future.result(timeout=WAIT_S)
     assert (chunk.task_id, chunk.sequence, chunk.observed_at) == ("pick-1", 3, 10.25)
     np.testing.assert_array_equal(chunk.actions, actions)
     assert chunk.server_latency_seconds == 0.03
@@ -141,8 +142,8 @@ def test_bad_observations_are_rejected_before_network(mocker, request_args, chan
     ask.assert_not_called()
 
 
-def test_timeout_does_not_poison_next_request(tmp_path):
-    endpoint = f"ipc://{tmp_path}/missing.sock"
+def test_timeout_does_not_poison_next_request(ipc_dir):
+    endpoint = f"ipc://{ipc_dir}/missing.sock"
     client = SonicPolicyClient(endpoint, timeout_seconds=0.02)
     with pytest.raises(TimeoutError):
         client.get_info()

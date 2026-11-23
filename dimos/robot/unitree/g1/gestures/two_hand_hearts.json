@@ -1,0 +1,166 @@
+{
+  "keyframes": [
+    {
+      "delta": {},
+      "t": 0.0
+    },
+    {
+      "absolute": {
+        "left_elbow": -0.479,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.801,
+        "left_shoulder_yaw": -0.172,
+        "left_wrist_pitch": -0.073,
+        "left_wrist_roll": 0.103,
+        "left_wrist_yaw": 0.212,
+        "right_elbow": -0.479,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.801,
+        "right_shoulder_yaw": 0.172,
+        "right_wrist_pitch": -0.073,
+        "right_wrist_roll": -0.103,
+        "right_wrist_yaw": -0.212
+      },
+      "hands": {
+        "left": {
+          "index_0": -1.242,
+          "index_1": -0.985,
+          "middle_0": -0.495,
+          "middle_1": -0.72,
+          "thumb_0": 0.541,
+          "thumb_1": 0.146,
+          "thumb_2": 0.113
+        },
+        "right": {
+          "index_0": 1.242,
+          "index_1": 0.985,
+          "middle_0": 0.495,
+          "middle_1": 0.72,
+          "thumb_0": -0.541,
+          "thumb_1": -0.146,
+          "thumb_2": -0.113
+        }
+      },
+      "t": 5.0
+    },
+    {
+      "absolute": {
+        "left_elbow": -0.479,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.581,
+        "left_shoulder_yaw": -0.172,
+        "left_wrist_pitch": -0.073,
+        "left_wrist_roll": 0.103,
+        "left_wrist_yaw": 0.212,
+        "right_elbow": -0.479,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.581,
+        "right_shoulder_yaw": 0.172,
+        "right_wrist_pitch": -0.073,
+        "right_wrist_roll": -0.103,
+        "right_wrist_yaw": -0.212
+      },
+      "hands": {
+        "left": {
+          "index_0": -0.84,
+          "index_1": -0.646,
+          "middle_0": -0.434,
+          "middle_1": -0.676,
+          "thumb_0": 0.117,
+          "thumb_1": 0.437,
+          "thumb_2": 0.113
+        },
+        "right": {
+          "index_0": 0.84,
+          "index_1": 0.646,
+          "middle_0": 0.434,
+          "middle_1": 0.676,
+          "thumb_0": -0.117,
+          "thumb_1": -0.437,
+          "thumb_2": -0.113
+        }
+      },
+      "t": 7.5
+    },
+    {
+      "absolute": {
+        "left_elbow": -0.479,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.581,
+        "left_shoulder_yaw": -0.172,
+        "left_wrist_pitch": -0.073,
+        "left_wrist_roll": 0.103,
+        "left_wrist_yaw": 0.212,
+        "right_elbow": -0.479,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.581,
+        "right_shoulder_yaw": 0.172,
+        "right_wrist_pitch": -0.073,
+        "right_wrist_roll": -0.103,
+        "right_wrist_yaw": -0.212
+      },
+      "hands": {
+        "left": {
+          "index_0": -0.84,
+          "index_1": -0.646,
+          "middle_0": -0.434,
+          "middle_1": -0.676,
+          "thumb_0": 0.117,
+          "thumb_1": 0.437,
+          "thumb_2": 0.113
+        },
+        "right": {
+          "index_0": 0.84,
+          "index_1": 0.646,
+          "middle_0": 0.434,
+          "middle_1": 0.676,
+          "thumb_0": -0.117,
+          "thumb_1": -0.437,
+          "thumb_2": -0.113
+        }
+      },
+      "t": 17.5
+    },
+    {
+      "absolute": {
+        "left_elbow": -0.479,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.801,
+        "left_shoulder_yaw": -0.172,
+        "left_wrist_pitch": -0.073,
+        "left_wrist_roll": 0.103,
+        "left_wrist_yaw": 0.212,
+        "right_elbow": -0.479,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.801,
+        "right_shoulder_yaw": 0.172,
+        "right_wrist_pitch": -0.073,
+        "right_wrist_roll": -0.103,
+        "right_wrist_yaw": -0.212
+      },
+      "hands": {
+        "left": {
+          "index_0": -1.242,
+          "index_1": -0.985,
+          "middle_0": -0.495,
+          "middle_1": -0.72,
+          "thumb_0": 0.541,
+          "thumb_1": 0.146,
+          "thumb_2": 0.113
+        },
+        "right": {
+          "index_0": 1.242,
+          "index_1": 0.985,
+          "middle_0": 0.495,
+          "middle_1": 0.72,
+          "thumb_0": -0.541,
+          "thumb_1": -0.146,
+          "thumb_2": -0.113
+        }
+      },
+      "t": 20.0
+    }
+  ],
+  "name": "two_hand_hearts",
+  "return_s": 5.0
+}

@@ -14,11 +14,11 @@
 
 """Turn the standard robot messages into named values, and back.
 
-Robot drivers and the coordinator talk in standard messages (``Twist``,
-``JointState``, ``MotorCommandArray``, ``PoseStamped``, ``Imu``). Inside,
-both work with named values such as ``{"arm/joint1/position": 0.3}``. These
-functions convert between the two, and both sides use the same ones, so they
-always agree on what each field means.
+Connection modules and the coordinator talk in standard messages
+(``JointState``, ``MotorCommandArray``, ``Imu``).
+Inside, both work with named values such as ``{"arm/joint1/position": 0.3}``.
+These functions convert between the two, and both sides use the same ones, so
+they always agree on what each field means.
 
 Each pair is ``<message>_to_values`` and ``<message>_from_values``. Names:
 
@@ -34,17 +34,18 @@ Every ``_from_values`` needs each value its message carries, and raises
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
-import math
+from typing import TYPE_CHECKING
 
-from dimos.control.contract.description import ControlDescription, ResourceKind
 from dimos.control.contract.keys import SEPARATOR, Interface
-from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
+from dimos.control.contract.limits import PD_INTERFACES, movable_joints
 from dimos.msgs.geometry_msgs.Quaternion import Quaternion
-from dimos.msgs.geometry_msgs.Twist import Twist
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
 from dimos.msgs.sensor_msgs.Imu import Imu
 from dimos.msgs.sensor_msgs.JointState import JointState
 from dimos.msgs.sensor_msgs.MotorCommandArray import MotorCommandArray
+
+if TYPE_CHECKING:
+    from dimos.robot.assets.model import RobotModel
 
 #: The JointState fields, each named after the interface it carries.
 JOINT_STATE_FIELDS: tuple[Interface, ...] = (
@@ -52,19 +53,6 @@ JOINT_STATE_FIELDS: tuple[Interface, ...] = (
     Interface.VELOCITY,
     Interface.EFFORT,
 )
-#: What a MotorCommandArray carries for each joint, in its field order
-#: q, dq, tau, kp, kd.
-MOTOR_INTERFACES: tuple[Interface, ...] = (
-    Interface.POSITION,
-    Interface.VELOCITY,
-    Interface.EFFORT,
-    Interface.KP,
-    Interface.KD,
-)
-#: What a Twist carries for a base: forwards, leftwards, turning.
-TWIST_INTERFACES: tuple[Interface, ...] = (Interface.VX, Interface.VY, Interface.WZ)
-#: What a PoseStamped carries for a base: where it is and which way it faces.
-POSE_INTERFACES: tuple[Interface, ...] = (Interface.X, Interface.Y, Interface.YAW)
 #: What an Imu carries: orientation, turn rates, accelerations.
 IMU_INTERFACES: tuple[Interface, ...] = (
     Interface.QX,
@@ -80,48 +68,17 @@ IMU_INTERFACES: tuple[Interface, ...] = (
 )
 
 
-def motor_joints(descriptions: Sequence[ControlDescription]) -> list[str]:
-    """The joints a MotorCommandArray carries, in its order.
+def motor_joints(model: RobotModel, source: str) -> list[str]:
+    """The joints a MotorCommandArray carries, in its order: every joint of
+    the model that moves, named in full, e.g. "g1/left_knee".
 
-    Every joint that takes stiffness and damping (``kp`` and ``kd``), in the
-    order the descriptions list them. The message has no names, so the sender
-    and the driver must both build the order with this.
-
-    Args:
-        descriptions: The robots whose joints the message carries, in order.
+    The message has no names, so the sender and the connection module must
+    both build the order with this.
     """
     return [
-        f"{d.source}{SEPARATOR}{r.name}"
-        for d in descriptions
-        for r in d.resources
-        if r.kind is ResourceKind.JOINT
-        and {Interface.KP, Interface.KD} <= set(r.command_interfaces)
+        joint.name if SEPARATOR in joint.name else f"{source}{SEPARATOR}{joint.name}"
+        for joint in movable_joints(model)
     ]
-
-
-def twist_to_values(twist: Twist, base: str) -> dict[str, float]:
-    """A base's speeds from a Twist.
-
-    Only forwards (``linear.x``), leftwards (``linear.y``) and turning
-    (``angular.z``) are read; a base on the floor has no other axes.
-
-    Args:
-        twist: Speeds in m/s and rad/s, measured from the base itself.
-        base: The base's full name, e.g. "chassis/base".
-    """
-    vx, vy, wz = twist.linear.x, twist.linear.y, twist.angular.z
-    return {
-        _key(base, Interface.VX): vx,
-        _key(base, Interface.VY): vy,
-        _key(base, Interface.WZ): wz,
-    }
-
-
-def twist_from_values(values: Mapping[str, float], base: str) -> Twist:
-    """A Twist from a base's ``vx``, ``vy`` and ``wz`` (m/s, m/s, rad/s): a
-    speed to command, or one the base measured."""
-    vx, vy, wz = _take(values, base, TWIST_INTERFACES)
-    return Twist(linear=Vector3(vx, vy, 0.0), angular=Vector3(0.0, 0.0, wz))
 
 
 def joint_state_to_values(msg: JointState, fields: Collection[str]) -> dict[str, float]:
@@ -203,11 +160,12 @@ def motor_command_to_values(msg: MotorCommandArray, joints: Sequence[str]) -> di
     """
     if msg.num_joints != len(joints) or len(msg.q) != len(joints):
         raise ValueError(f"MotorCommandArray has {len(msg.q)} joints, expected {len(joints)}")
+    # The message's columns, in the order of PD_INTERFACES.
     columns = (msg.q, msg.dq, msg.tau, msg.kp, msg.kd)
     return {
         _key(joint, interface): float(column[i])
         for i, joint in enumerate(joints)
-        for interface, column in zip(MOTOR_INTERFACES, columns, strict=True)
+        for interface, column in zip(PD_INTERFACES, columns, strict=True)
     }
 
 
@@ -216,33 +174,9 @@ def motor_command_from_values(
 ) -> MotorCommandArray:
     """A MotorCommandArray from each joint's position, velocity, effort, kp
     and kd, in the order of ``joints`` (from ``motor_joints``)."""
-    _require(values, joints, MOTOR_INTERFACES)
-    q, dq, tau, kp, kd = ([values[_key(j, i)] for j in joints] for i in MOTOR_INTERFACES)
+    _require(values, joints, PD_INTERFACES)
+    q, dq, tau, kp, kd = ([values[_key(j, i)] for j in joints] for i in PD_INTERFACES)
     return MotorCommandArray(q=q, dq=dq, kp=kp, kd=kd, tau=tau, timestamp=ts)
-
-
-def pose_to_values(pose: PoseStamped, base: str) -> dict[str, float]:
-    """Where a base is (``x``, ``y`` in m) and which way it faces (``yaw`` in
-    rad, 0 along x, growing to the left), from a PoseStamped."""
-    q = pose.orientation
-    yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
-    return {
-        _key(base, Interface.X): pose.position.x,
-        _key(base, Interface.Y): pose.position.y,
-        _key(base, Interface.YAW): yaw,
-    }
-
-
-def pose_from_values(
-    values: Mapping[str, float], base: str, ts: float | None = None, frame_id: str = ""
-) -> PoseStamped:
-    """A PoseStamped from a base's ``x``, ``y`` (m) and ``yaw`` (rad), flat on
-    the floor."""
-    x, y, yaw = _take(values, base, POSE_INTERFACES)
-    orientation = Quaternion(0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0))
-    return PoseStamped(
-        ts=ts, frame_id=frame_id, position=Vector3(x, y, 0.0), orientation=orientation
-    )
 
 
 def imu_to_values(imu: Imu, sensor: str) -> dict[str, float]:

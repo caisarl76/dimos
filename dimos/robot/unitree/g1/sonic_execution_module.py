@@ -68,7 +68,8 @@ class SonicNavigationControlSpec(Spec, Protocol):
     def get_navigation_peer_status(self) -> dict[str, Any]: ...
 
 
-_NATIVE_TOPICS = {b"command", b"planner", b"pose"}
+_POSE_TOPICS = frozenset({b"command", b"pose"})
+_NATIVE_TOPICS = _POSE_TOPICS | {b"planner"}
 _NAVIGATION_METHODS = ("cancel_navigation", "set_navigation_goal", "get_navigation_peer_status")
 
 
@@ -147,7 +148,7 @@ class SonicExecutionModule(Module):
                 "reference_endpoint": self._reference_endpoint,
                 "feedback_endpoint": self.config.feedback_endpoint,
                 "profile": asdict(self.config.profile),
-                "subscriptions_ready": _NATIVE_TOPICS.issubset(self._subscriptions),
+                "subscriptions_ready": self._required_topics().issubset(self._subscriptions),
                 "navigation_enabled": self.config.navigation_enabled,
                 "navigation": {
                     **asdict(self._navigation.status),
@@ -453,6 +454,13 @@ class SonicExecutionModule(Module):
                 self._navigation_workers, self._navigation_control.cancel_navigation, request
             )
 
+    def _required_topics(self) -> frozenset[bytes]:
+        """Native subscriptions a task needs; the planner topic only with navigation enabled.
+
+        A pose-only runtime (the arm stacks) never subscribes to the planner topic.
+        """
+        return _NATIVE_TOPICS if self.config.navigation_enabled else _POSE_TOPICS
+
     def _send(self, packet: bytes) -> None:
         if self._publisher is None:
             raise RuntimeError("reference publisher is closed")
@@ -504,7 +512,7 @@ class SonicExecutionModule(Module):
         else:
             if self._subscriber.poll(0):
                 raise RuntimeError("feedback backlog exceeded receive budget")
-        if self._active() and not _NATIVE_TOPICS.issubset(self._subscriptions):
+        if self._active() and not self._required_topics().issubset(self._subscriptions):
             raise RuntimeError("native reference subscriptions lost")
 
     def _step(self) -> None:

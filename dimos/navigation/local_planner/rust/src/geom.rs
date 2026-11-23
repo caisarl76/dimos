@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Pursuit-law building blocks shared across `laws/`; each reproduces one
-//! statement of `laws/seed.py`. Parity is per operation: numpy's tie-breaks
-//! and `math.remainder` wrapping are preserved, so add functions, do not edit.
+//! Pursuit-law building blocks for the trajectory follower's law.
 
 /// The numbers a law reads: the body's tuning plus its plant, driving inside
 /// one band; `emb::base_params` builds it from an `Emb`.
@@ -42,7 +40,7 @@ pub fn ieee_remainder(x: f64, y: f64) -> f64 {
     x - (x / y).round_ties_even() * y
 }
 
-/// Shortest signed angle from `b` to `a`, the python `_angle_diff`.
+/// Shortest signed angle from `b` to `a`.
 #[inline]
 pub fn angle_diff(a: f64, b: f64) -> f64 {
     ieee_remainder(a - b, TAU)
@@ -59,25 +57,20 @@ pub fn arcs_of(path: &[[f64; 3]]) -> Vec<f64> {
     arcs
 }
 
-/// Closest waypoint, advanced through a fan by yaw progress (fan waypoints
-/// are coincident, so distance cannot separate them).
-pub fn progress_index(path: &[[f64; 3]], arcs: &[f64], px: f64, py: f64, pyaw: f64) -> usize {
-    let n = path.len();
+/// Meters one radian of heading counts as when matching a pose to a path.
+const YAW_M: f64 = 0.4;
+
+/// Closest waypoint, heading counted with position, so a spot the path turns
+/// on or passes twice is matched by the way the body faces.
+pub fn progress_index(path: &[[f64; 3]], px: f64, py: f64, pyaw: f64) -> usize {
     let mut i = 0usize;
     let mut best = f64::INFINITY;
     for (k, p) in path.iter().enumerate() {
-        // strict `<`: np.argmin keeps the first minimum on a tie
-        let d = ((p[0] - px) * (p[0] - px) + (p[1] - py) * (p[1] - py)).sqrt();
+        let d = (p[0] - px).hypot(p[1] - py) + YAW_M * angle_diff(p[2], pyaw).abs();
         if d < best {
             best = d;
             i = k;
         }
-    }
-    while i + 1 < n
-        && arcs[i + 1] - arcs[i] < 1e-6
-        && angle_diff(path[i + 1][2], pyaw).abs() < angle_diff(path[i][2], pyaw).abs()
-    {
-        i += 1;
     }
     i
 }
@@ -101,14 +94,6 @@ pub fn fan_target(
     } else {
         None
     }
-}
-
-/// First waypoint at or past `arcs[i] + look` (`searchsorted` side='left'), the seed's carrot.
-pub fn carrot_snap(path: &[[f64; 3]], arcs: &[f64], i: usize, look: f64) -> ([f64; 2], f64) {
-    let n = path.len();
-    let s = arcs[i] + look;
-    let k = arcs.partition_point(|&a| a < s).min(n - 1);
-    ([path[k][0], path[k][1]], path[k][2])
 }
 
 /// The point at exactly `arcs[i] + look`, interpolated within its segment;
@@ -148,7 +133,7 @@ pub fn clearance_governor(
         return None;
     }
     // not a contiguous slice: fan waypoints before `i` share its arc, so scan
-    // the whole array like the numpy mask does
+    // the whole array
     let hi = arcs[i] + cfg.speed_lookahead;
     let mut room: Option<f64> = None;
     for (k, &a) in arcs.iter().enumerate() {
@@ -156,7 +141,7 @@ pub fn clearance_governor(
             room = Some(clr[k]);
         }
     }
-    // never empty (arcs[i] passes its own mask); the fallback mirrors the python
+    // never empty since arcs[i] passes its own mask
     let room = room.unwrap_or(clr[i]);
     let frac = (room - cfg.speed_floor_clearance)
         / (cfg.speed_clearance - cfg.speed_floor_clearance).max(1e-6);

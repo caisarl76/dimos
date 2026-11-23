@@ -74,8 +74,6 @@ unitree_g1_sonic_navigation_peer = (
         [
             # PointLio pose is in the sensor frame; the receiver publishes base odometry.
             (PointLio, "odometry", "lio_odometry"),
-            # Merged-map input is disabled; only the monitored ray map feeds the costmap.
-            (CostMapper, "merged_map", "sonic_navigation_merged_map_disabled"),
         ]
     )
     .global_config(

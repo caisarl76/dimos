@@ -1,0 +1,22 @@
+[g1_223] standing: {'floor_contacts': 8, 'pelvis_z': 0.7874377046559918}
+[g1_223] armed epoch 1
+[g1_223] planner (handback)
+[g1_223] armed epoch 2
+[g1_223] planner (handback)
+[g1_223] armed epoch 3
+[g1_223] planner (handback)
+[g1_223] armed epoch 4
+[g1_223] planner (handback)
+[g1_223] armed epoch 5
+[g1_223] planner (handback)
+[g1_223] armed epoch 6
+[g1_223] planner (handback)
+[g1_223] armed epoch 7
+[g1_223] planner (handback)
+[g1_223] armed epoch 8
+[g1_223] planner (handback)
+[g1_223] armed epoch 9
+[g1_223] planner (handback)
+[g1_223] armed epoch 10
+[g1_223] planner (handback)
+[g1_223] wrote /home/jihun/work/dimos-dual-g1/docs/artifacts/g1_dual_arm_sim_20261021/run06/sim_223.npz

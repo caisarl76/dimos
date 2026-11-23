@@ -177,10 +177,11 @@ def test_graph_refuses_while_a_foreign_sonic_controller_runs(host, component, en
 
 def test_agentic_graph_config_is_the_pc2_graph_plus_an_explicit_mcp_server() -> None:
     from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_pc2_agentic import (
-        unitree_g1_sonic_navigation_pc2_agentic as blueprint,
+        unitree_g1_sonic_navigation_pc2_agentic,
     )
     from dimos.robot.unitree.g1.sonic_navigation_graph import validate_sonic_navigation_graph
 
+    blueprint = unitree_g1_sonic_navigation_pc2_agentic.solidify()
     config_dir = LAUNCH.parent / "package/config"
     plain = json.loads((config_dir / "pc2-graph.json").read_text())
     agentic = json.loads((config_dir / "pc2-graph-agentic.json").read_text())

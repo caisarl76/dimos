@@ -1,0 +1,51 @@
+{
+  "keyframes": [
+    {
+      "delta": {},
+      "t": 0.0
+    },
+    {
+      "absolute": {
+        "left_elbow": 1.2,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.25,
+        "left_shoulder_yaw": 0.0,
+        "right_elbow": 1.2,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.25,
+        "right_shoulder_yaw": 0.0
+      },
+      "t": 2.0
+    },
+    {
+      "absolute": {
+        "left_elbow": 1.2,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.25,
+        "left_shoulder_yaw": 0.0,
+        "right_elbow": 1.2,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.25,
+        "right_shoulder_yaw": 0.0,
+        "waist_pitch": 0.4
+      },
+      "t": 4.0
+    },
+    {
+      "absolute": {
+        "left_elbow": 1.2,
+        "left_shoulder_pitch": -0.4,
+        "left_shoulder_roll": 0.25,
+        "left_shoulder_yaw": 0.0,
+        "right_elbow": 1.2,
+        "right_shoulder_pitch": -0.4,
+        "right_shoulder_roll": -0.25,
+        "right_shoulder_yaw": 0.0,
+        "waist_pitch": 0.4
+      },
+      "t": 5.5
+    }
+  ],
+  "name": "bow",
+  "return_s": 3.0
+}

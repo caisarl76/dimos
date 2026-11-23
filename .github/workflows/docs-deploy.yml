@@ -9,6 +9,8 @@ on:
     paths:
       - "docs/**"
       - "mkdocs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
       - "misc/mkdocs/**"
       - "README.md"
       - "assets/readme/**"
@@ -25,9 +27,12 @@ concurrency:
 
 jobs:
   deploy:
+    # Upstream only: the site publishes to dimensionalOS/docs with the dimos-docs-bot app, whose
+    # ID and key a fork does not have, so the token step would fail on every docs push there.
+    if: github.repository == 'dimensionalOS/dimos'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       # The docs media is LFS-tracked, and without it the build copies 130 byte
       # pointer files where the images should be, with nothing failing to say
@@ -52,7 +57,7 @@ jobs:
       # comes from the dimos-docs-bot app: a token minted per run, scoped to
       # that one repository, expiring with the job.
       - name: Mint a token for the pages repo
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@v3.3.0
         id: pages-token
         with:
           app-id: ${{ vars.DOCS_BOT_APP_ID }}
@@ -61,7 +66,7 @@ jobs:
           repositories: docs
 
       - name: Check out the pages repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: dimensionalOS/docs
           path: pages

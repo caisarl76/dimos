@@ -1,0 +1,32 @@
+{
+  "keyframes": [
+    {
+      "delta": {},
+      "t": 0.0
+    },
+    {
+      "delta": {
+        "left_elbow": -0.5,
+        "left_shoulder_pitch": -0.9,
+        "left_shoulder_roll": 0.25,
+        "right_elbow": -0.5,
+        "right_shoulder_pitch": -0.9,
+        "right_shoulder_roll": -0.25
+      },
+      "t": 2.0
+    },
+    {
+      "delta": {
+        "left_elbow": -0.5,
+        "left_shoulder_pitch": -0.9,
+        "left_shoulder_roll": 0.25,
+        "right_elbow": -0.5,
+        "right_shoulder_pitch": -0.9,
+        "right_shoulder_roll": -0.25
+      },
+      "t": 8.0
+    }
+  ],
+  "name": "support_person",
+  "return_s": 2.0
+}

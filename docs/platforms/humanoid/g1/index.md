@@ -3,7 +3,7 @@
 ## Requirements
 
 - Unitree G1 EDU (need SDK/SSH access)
-- Laptop/Desktop with Ubuntu 22.04/24.04 with CUDA GPU (recommended), or macOS (experimental)
+- Laptop/Desktop with Ubuntu 22.04/24.04/26.04 with CUDA GPU (recommended), or macOS (experimental)
 
 ## 1. Get SSH Access
 
@@ -54,6 +54,14 @@ For DDS dependencies, follow the [DDS setup guide](/docs/usage/transports/dds.md
 ```bash
 export CYCLONEDDS_HOME="$HOME/cyclonedds/install"
 ```
+
+#### Containers
+
+The 223 greeter stack (the `unitree-g1-sonic-arm` blueprint, its SSH tunnel to the
+robot PC and `greeter.py`) also ships as a CPU-only Docker Compose project,
+[`docker/g1-demo/compose.yaml`](/docker/g1-demo/compose.yaml), for a workstation that only
+runs the demo; `compose.demo.yaml` there adds VoLoAgent's VLM and policy servers
+as one project. Prerequisites, runbook and shutdown order are in the file headers.
 
 ## 3. Get the G1 in Sport Mode
 
@@ -125,6 +133,10 @@ uv run dimos hardware g1 disable
 ```
 
 ## 5. Legacy navigation viewer example
+
+Rerun's gRPC listener binds to all interfaces even when the bridge's `host`
+is loopback. Restrict remote access with a host firewall as described in
+[Network exposure](/docs/usage/visualization.md#network-exposure).
 
 In the ssh terminal `ssh -L 3030:localhost:3030 unitree@192.168.123.164`
 

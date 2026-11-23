@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 import dataclasses
 import importlib
@@ -27,17 +27,21 @@ import time
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
+from dimos.constants import RUNTIME_MODULES_DIR
+from dimos.core.coordination.blueprint_config.fields import (
+    module_config_cls,
+    validate_module_config,
+)
 from dimos.core.coordination.blueprint_config.values import deep_merge, plain
-from dimos.core.coordination.blueprints import TransportSpec, transport_config_name
+from dimos.core.coordination.blueprints import MetaBlueprint, transport_config_name
 from dimos.core.coordination.coordinator_rpc import CoordinatorRPC
 from dimos.core.coordination.worker_manager import WorkerManager
 from dimos.core.coordination.worker_manager_python import WorkerManagerPython
 from dimos.core.global_config import GlobalConfig, global_config
 from dimos.core.introspection.module.info import StreamDescriptor
 from dimos.core.module import ModuleBase, ModuleSpec, is_module_type
-from dimos.core.o3dpickle import register_picklers
 from dimos.core.resource import Resource
-from dimos.core.stream import Transport
+from dimos.core.stream import Transport, TransportSpec
 from dimos.core.transport import (
     LCMTransport,
     PubSubTransport,
@@ -45,8 +49,14 @@ from dimos.core.transport import (
     pLCMTransport,
     pZenohTransport,
 )
-from dimos.core.transport_factory import make_transport
-from dimos.spec.utils import is_spec, spec_annotation_compliance, spec_structural_compliance
+from dimos.core.transport_factory import make_transport, zenoh_prefix
+from dimos.spec.utils import (
+    get_protocol_method_signatures,
+    is_spec,
+    spec_annotation_compliance,
+    spec_methods_without_rpc,
+    spec_structural_compliance,
+)
 from dimos.utils.generic import short_id
 from dimos.utils.logging_config import setup_logger
 from dimos.utils.safe_thread_map import safe_thread_map
@@ -65,9 +75,13 @@ class ModuleDescriptor(NamedTuple):
     class_name: str
     qualified_path: str
     rpc_names: list[str]
-    # RPC topic prefix. Usually the class/instance name; hosted modules may
-    # advertise a run- and Host-scoped address. Defaulted for wire compatibility.
+    # Wire address and human-readable deployed name, defaulted for older descriptors.
     rpc_name: str = ""
+    instance_name: str = ""
+
+    @property
+    def display_name(self) -> str:
+        return self.instance_name or self.rpc_name or self.class_name
 
 
 class ModuleCoordinator(Resource):
@@ -78,10 +92,17 @@ class ModuleCoordinator(Resource):
     def __init__(
         self,
         g: GlobalConfig = global_config,
+        *,
+        module_rpc_namespace: str | None = None,
     ) -> None:
         self._global_config = g
+        # The process config may later be updated by another embedded coordinator.
+        self._serve_coordinator_rpc = g.serve_coordinator_rpc
         manager_types: list[type[WorkerManager]] = [WorkerManagerPython]
-        self._managers = {cls.deployment_identifier: cls(g=g) for cls in manager_types}
+        self._managers = {
+            cls.deployment_identifier: cls(g=g, module_rpc_namespace=module_rpc_namespace)
+            for cls in manager_types
+        }
         self._deployed_modules = {}
         self._instance_classes: dict[str, type[ModuleBase]] = {}
         self._deployed_atoms: dict[str, BlueprintAtom] = {}
@@ -92,34 +113,31 @@ class ModuleCoordinator(Resource):
         self._module_transports: dict[str, dict[str, Transport[Any]]] = {}
         self._remote_module_ref_clients: list[RPCClient] = []
         self._started = False
+        self._stopped = False
         self._modules_lock = threading.RLock()
         self._rpc_lock = threading.RLock()
         self._coordinator_rpc: CoordinatorRPC | None = None
         self._shutdown_event = threading.Event()
 
     def start(self) -> None:
-        register_picklers()
+        # A worker gets the coordinator's sys.path when it starts, so add this first.
+        RUNTIME_MODULES_DIR.mkdir(parents=True, exist_ok=True)
+        if str(RUNTIME_MODULES_DIR) not in sys.path:
+            sys.path.append(str(RUNTIME_MODULES_DIR))
         for m in self._managers.values():
             m.start()
         self._started = True
 
     def stop(self) -> None:
+        with self._modules_lock:
+            if self._stopped:
+                return
+            self._stopped = True
+
         with self._rpc_lock:
             if self._coordinator_rpc is not None:
                 self._coordinator_rpc.stop()
                 self._coordinator_rpc = None
-
-        for name, module in reversed(self._deployed_modules.items()):
-            logger.info("Stopping module...", module=module.remote_name)
-            try:
-                module.stop()
-            except Exception:
-                logger.error("Error stopping module", module=name, exc_info=True)
-            logger.info("Module stopped.", module=module.remote_name)
-
-        for client in self._remote_module_ref_clients:
-            client.stop_rpc_client()
-        self._remote_module_ref_clients.clear()
 
         def _stop_manager(m: WorkerManager) -> None:
             try:
@@ -129,21 +147,34 @@ class ModuleCoordinator(Resource):
 
         safe_thread_map(tuple(self._managers.values()), _stop_manager)
 
+        # Workers own module.stop(). Sending fire-and-forget stop RPCs here
+        # races their cleanup and invokes module-specific teardown twice.
+        for name, module in self._deployed_modules.items():
+            try:
+                module.stop_rpc_client()
+            except Exception:
+                logger.error("Error closing module RPC client", module=name, exc_info=True)
+
+        for client in self._remote_module_ref_clients:
+            client.stop_rpc_client()
+        self._remote_module_ref_clients.clear()
+
     def start_rpc_service(self, *, name: str | None = None) -> None:
         """Expose the coordinator's API as RPC methods under an optional name."""
-        if not self._global_config.serve_coordinator_rpc:
-            # Deliberate: the name is bus-wide, and this stack shares the bus with
+        if name in (None, CoordinatorRPC.NAME) and not self._serve_coordinator_rpc:
+            # Deliberate: the default name is bus-wide, and this stack shares the bus with
             # one that owns it. Costs remote introspection of THIS stack, nothing else.
             logger.info("serve_coordinator_rpc is off; not claiming the Coordinator name")
             return
         with self._rpc_lock:
-            if self._coordinator_rpc is not None:
-                if name is not None and self._coordinator_rpc.name != name:
-                    raise RuntimeError(
-                        f"Coordinator RPC is already running as {self._coordinator_rpc.name!r}"
-                    )
-                return
-            self._coordinator_rpc = CoordinatorRPC.serve(self, name=name)
+            if self._coordinator_rpc is None:
+                self._coordinator_rpc = CoordinatorRPC.serve(self, name=name)
+            elif name is not None and self._coordinator_rpc.name != name:
+                raise RuntimeError(
+                    f"Coordinator RPC is already running as {self._coordinator_rpc.name!r}"
+                )
+            else:
+                self._coordinator_rpc.publish(self)
 
     @property
     def rpcs(self) -> dict[str, Callable[..., Any]]:
@@ -164,8 +195,16 @@ class ModuleCoordinator(Resource):
         """Used by clients to check if the coordinator is alive and responsive."""
         return "pong"
 
-    def shutdown(self) -> None:
-        """Unblock loop(), which then stops every module and returns."""
+    def shutdown(self, *, requesting_module: str | None = None) -> None:
+        """Unblock loop(). A module requesting shutdown must belong to this stack."""
+        if requesting_module is not None:
+            with self._modules_lock:
+                if not any(
+                    m.remote_name == requesting_module for m in self._deployed_modules.values()
+                ):
+                    raise ValueError(
+                        f"Module {requesting_module!r} belongs to a different coordinator"
+                    )
         self._shutdown_event.set()
 
     def list_modules(self) -> list[ModuleDescriptor]:
@@ -179,6 +218,7 @@ class ModuleCoordinator(Resource):
                         qualified_path=qualified,
                         rpc_names=list(cls.rpcs.keys()),
                         rpc_name=self._deployed_modules[name].remote_name,
+                        instance_name=self._deployed_modules[name].instance_name,
                     )
                 )
             return descriptors
@@ -189,7 +229,7 @@ class ModuleCoordinator(Resource):
             descriptors: list[StreamDescriptor] = []
             for module in self._deployed_modules.values():
                 descriptors.extend(
-                    descriptor._replace(module=module.remote_name)
+                    descriptor._replace(module=module.instance_name)
                     for descriptor in module.get_stream_descriptors()
                 )
             return descriptors
@@ -202,7 +242,7 @@ class ModuleCoordinator(Resource):
 
     def list_module_names(self) -> list[str]:
         with self._modules_lock:
-            return [module.remote_name for module in self._deployed_modules.values()]
+            return [module.instance_name for module in self._deployed_modules.values()]
 
     def health_check(self) -> bool:
         return all(m.health_check() for m in self._managers.values())
@@ -367,8 +407,10 @@ class ModuleCoordinator(Resource):
     def _send_on_system_modules(self) -> None:
         modules = list(self._deployed_modules.values())
         for module in modules:
-            if hasattr(module, "on_system_modules"):
-                module.on_system_modules(modules)
+            # Only an @rpc counts: a plain method would be fetched over the worker
+            # pipe as a bound method, which cannot cross it.
+            if "on_system_modules" in getattr(module, "rpcs", ()):
+                cast("Any", module).on_system_modules(modules)
 
     def _connect_streams(
         self, blueprint: Blueprint, transports: Mapping[tuple[str, type], Transport[Any]]
@@ -409,35 +451,48 @@ class ModuleCoordinator(Resource):
     @classmethod
     def build(
         cls,
-        blueprint: Blueprint,
+        blueprint: Blueprint | MetaBlueprint,
         parsed_config: ParsedBlueprintConfig | None = None,
         *,
-        remote_module_refs: Mapping[tuple[str, str], tuple[type[ModuleBase], str]] | None = None,
+        reserve_rpc_name: str | None = None,
+        module_rpc_namespace: str | None = None,
+        remote_module_refs: Mapping[tuple[str, str], tuple[type[ModuleBase] | frozenset[str], str]]
+        | None = None,
     ) -> ModuleCoordinator:
-        """Build a blueprint from its pinned values or an exact parsed config.
+        """Resolve an unresolved composition, then build its concrete blueprint.
 
         With ``parsed_config`` this resets the process-global ``global_config``
         singleton to the full parsed resolution (schema defaults plus all
         sources); :meth:`load_blueprint` instead applies only explicitly-set
-        fields.
+        fields. Passing ``reserve_rpc_name`` claims the Coordinator address before
+        deploying. The default address honors ``serve_coordinator_rpc``. Hosted
+        fragments pass the ``module_rpc_namespace`` assigned at compilation.
         """
+        if isinstance(blueprint, MetaBlueprint):
+            blueprint = blueprint.solidify()
+        check_module_dependencies(blueprint, parsed_config)
         logger.info("Building the blueprint")
         global_values, module_kwargs, transport_overrides = _resolve_blueprint_config(
             blueprint, parsed_config
         )
         _run_validators(blueprint, module_kwargs)
         global_config.update(**global_values)
-        transports = _materialize_transports(blueprint, transport_overrides)
-
+        coordinator = cls(g=global_config, module_rpc_namespace=module_rpc_namespace)
+        if parsed_config is None:
+            _validate_module_configs(blueprint, module_kwargs, global_config)
+        # The admission RPC itself needs the configured multicast route and OS limits.
         _run_configurators(blueprint)
         _check_requirements(blueprint)
-        _verify_no_name_conflicts(blueprint)
-
-        logger.info("Starting the modules")
-        coordinator = cls(g=global_config)
-        coordinator.start()
+        verify_no_name_conflicts(blueprint)
 
         try:
+            if reserve_rpc_name is not None and (
+                reserve_rpc_name != CoordinatorRPC.NAME or coordinator._serve_coordinator_rpc
+            ):
+                coordinator._coordinator_rpc = CoordinatorRPC.reserve(reserve_rpc_name)
+            transports = _materialize_transports(blueprint, transport_overrides)
+            logger.info("Starting the modules")
+            coordinator.start()
             t0 = time.perf_counter()
             remote_ref_proxies = coordinator._create_remote_module_ref_clients(
                 remote_module_refs or {}
@@ -450,7 +505,6 @@ class ModuleCoordinator(Resource):
                 coordinator,
                 remote_module_refs=remote_ref_proxies,
             )
-
             t2 = time.perf_counter()
             coordinator.build_all_modules()
             t3 = time.perf_counter()
@@ -478,20 +532,24 @@ class ModuleCoordinator(Resource):
 
     def _create_remote_module_ref_clients(
         self,
-        targets: Mapping[tuple[str, str], tuple[type[ModuleBase], str]],
+        targets: Mapping[tuple[str, str], tuple[type[ModuleBase] | frozenset[str], str]],
     ) -> dict[tuple[str, str], RPCClient]:
+        """A client per target: the provider's class, or just its rpc names to keep it unimported."""
         from dimos.core.rpc_client import RPCClient
 
         clients: dict[tuple[str, str], RPCClient] = {}
-        for key, (module_type, rpc_name) in targets.items():
-            client = RPCClient.remote(module_type, remote_name=rpc_name)
+        for key, (provider, rpc_name) in targets.items():
+            if isinstance(provider, type):
+                client = RPCClient.remote(provider, remote_name=rpc_name)
+            else:
+                client = RPCClient(None, None, rpc_name, provider)
             self._remote_module_ref_clients.append(client)
             clients[key] = client
         return clients
 
     def load_blueprint(
         self,
-        blueprint: Blueprint,
+        blueprint: Blueprint | MetaBlueprint,
         parsed_config: ParsedBlueprintConfig | None = None,
     ) -> None:
         """Load a blueprint into an already-running coordinator.
@@ -504,6 +562,8 @@ class ModuleCoordinator(Resource):
         if not self._started:
             raise RuntimeError("ModuleCoordinator not started; call start() first")
 
+        if isinstance(blueprint, MetaBlueprint):
+            blueprint = blueprint.solidify()
         with self._modules_lock:
             self._load_blueprint(blueprint, parsed_config)
 
@@ -512,11 +572,15 @@ class ModuleCoordinator(Resource):
         blueprint: Blueprint,
         parsed_config: ParsedBlueprintConfig | None = None,
     ) -> None:
+        check_module_dependencies(blueprint, parsed_config)
         global_values, module_kwargs, transport_overrides = _resolve_blueprint_config(
             blueprint, parsed_config, sparse_globals=True
         )
         _run_validators(blueprint, module_kwargs)
         self._global_config.update(**global_values)
+        if "serve_coordinator_rpc" in global_values:
+            self._serve_coordinator_rpc = self._global_config.serve_coordinator_rpc
+        _validate_module_configs(blueprint, module_kwargs, self._global_config)
         transports = _materialize_transports(blueprint, transport_overrides)
 
         # Scale worker pool.
@@ -529,7 +593,7 @@ class ModuleCoordinator(Resource):
 
         _run_configurators(blueprint)
         _check_requirements(blueprint)
-        _verify_no_name_conflicts(blueprint)
+        verify_no_name_conflicts(blueprint)
         _verify_no_conflicts_with_existing(blueprint, self._transport_registry)
 
         # Reject duplicate modules.
@@ -606,24 +670,17 @@ class ModuleCoordinator(Resource):
 
         proxy = self._deployed_modules[name]
 
-        try:
-            proxy.stop()
-        except Exception:
-            logger.error(
-                "Error stopping module during unload",
-                module=name,
-                exc_info=True,
-            )
-
+        # The worker owns module.stop() and undeploy waits for it. A fire-and-forget
+        # stop RPC here would race that stop, and a NativeModule short-circuits the
+        # second stop() call, so the worker would report the module gone while the
+        # old instance still answers on the RPC name its replacement is about to use.
         python_wm = cast("WorkerManagerPython", self._managers["python"])
+        # Propagate failures so restart cannot replace an instance that may still be running.
+        python_wm.undeploy(proxy)
         try:
-            python_wm.undeploy(proxy)
+            proxy.stop_rpc_client()
         except Exception:
-            logger.error(
-                "Error undeploying module from worker",
-                module=name,
-                exc_info=True,
-            )
+            logger.error("Error closing module RPC client", module=name, exc_info=True)
 
         del self._deployed_modules[name]
         del self._instance_classes[name]
@@ -771,8 +828,8 @@ class ModuleCoordinator(Resource):
         RPC) unblocks the wait; either way every module is stopped on the way
         out.
         """
-        self.start_rpc_service()
         try:
+            self.start_rpc_service()
             self._shutdown_event.wait()
         except KeyboardInterrupt:
             return
@@ -810,21 +867,29 @@ def _coerce_transport_to_backend(transport: Transport[Any]) -> Transport[Any]:
     out and left untouched.
     """
     want = global_config.transport
-    is_pickled = type(transport) in (pLCMTransport, pZenohTransport)
+    prefix = zenoh_prefix(global_config)
+    is_untyped = type(transport) in (pLCMTransport, pZenohTransport)
     is_lcm = type(transport) in (LCMTransport, pLCMTransport)
     is_zenoh = type(transport) in (ZenohTransport, pZenohTransport)
-    if not isinstance(transport, PubSubTransport) or not (
-        (want == "zenoh" and is_lcm) or (want == "lcm" and is_zenoh)
-    ):
+    if not isinstance(transport, PubSubTransport) or not (is_lcm or is_zenoh):
         return transport
-
-    if is_pickled:
+    if is_untyped:
         raw, msg_type = transport.topic, None
     else:
         raw, msg_type = transport.topic.topic, transport.topic.lcm_type
-    # Strip the Zenoh 'dimos/' namespace (if present) back to the logical name.
-    # The factory re-applies the right prefix for the target backend.
-    logical = raw[len("dimos/") :] if raw.startswith("dimos/") else raw
+    mismatched = (want == "zenoh" and is_lcm) or (want == "lcm" and is_zenoh)
+    # A run with a zenoh domain keeps every plain zenoh transport inside it.
+    outside = (
+        want == "zenoh"
+        and is_zenoh
+        and bool(global_config.zenoh_domain)
+        and not raw.startswith(prefix)
+    )
+    if not mismatched and not outside:
+        return transport
+
+    # Strip the zenoh namespace back to the logical name; the factory re-applies the right one.
+    logical = next((raw[len(p) :] for p in (prefix, "dimos/") if raw.startswith(p)), raw)
     return make_transport(logical, msg_type)
 
 
@@ -836,7 +901,7 @@ def _materialize_transports(
     WebRTC transports get a freshly constructed provider config from the
     resolved ``transports.<name>.*`` overrides; everything else builds from the
     spec as-is, then gets coerced to the active pubsub backend. Returns
-    ready-to-use instances pickled into module workers.
+    ready-to-use instances sent into module workers.
     """
     materialized: dict[tuple[str, type], Transport[Any]] = {}
     for key, spec in blueprint.transport_map.items():
@@ -902,7 +967,7 @@ def _resolve_blueprint_config(
     )
 
 
-def _verify_no_name_conflicts(blueprint: Blueprint) -> None:
+def verify_no_name_conflicts(blueprint: Blueprint) -> None:
     name_to_types: dict[Any, set[type]] = defaultdict(set)
     name_to_modules: dict[Any, list[tuple[type, type]]] = defaultdict(list)
 
@@ -992,6 +1057,17 @@ def _run_validators(blueprint: Blueprint, module_kwargs: Mapping[str, Mapping[st
         check(blueprint, resolved)
 
 
+def check_module_dependencies(
+    blueprint: Blueprint, parsed_config: ParsedBlueprintConfig | None = None
+) -> None:
+    """Check active modules' dependencies before allocating runtime resources."""
+    _, module_kwargs, _ = _resolve_blueprint_config(blueprint, parsed_config)
+    for atom in blueprint.active_blueprints:
+        kwargs = dict(atom.kwargs)
+        kwargs.update(module_kwargs.get(atom.name, {}))
+        atom.module.check_dependencies(**kwargs)
+
+
 def _check_requirements(blueprint: Blueprint) -> None:
     errors = []
     red = "\033[31m"
@@ -1006,6 +1082,18 @@ def _check_requirements(blueprint: Blueprint) -> None:
         for error in errors:
             print(f"{red}Error: {error}{reset}", file=sys.stderr)
         sys.exit(1)
+
+
+def _validate_module_configs(
+    blueprint: Blueprint,
+    module_kwargs: Mapping[str, Mapping[str, Any]],
+    g: GlobalConfig,
+) -> None:
+    for atom in blueprint.active_blueprints:
+        # Pinned kwargs may also hold constructor arguments that are not config fields.
+        config_fields = module_config_cls(atom).model_fields
+        pinned = {key: value for key, value in atom.kwargs.items() if key in config_fields}
+        validate_module_config(atom, {**pinned, **module_kwargs.get(atom.name, {})}, g)
 
 
 def _deploy_all_modules(
@@ -1056,6 +1144,29 @@ def _namespace_levels(consumer_namespace: str) -> list[str]:
     return levels
 
 
+def resolve_module_refs(blueprint: Blueprint) -> dict[tuple[str, str], str]:
+    """Each (consumer, ref) an active atom of ``blueprint`` provides, as the coordinator wires it."""
+    disabled = set(blueprint.disabled_modules_tuple)
+    resolved: dict[tuple[str, str], str] = {}
+    for consumer in blueprint.active_blueprints:
+        for reference in consumer.module_refs:
+            replacement = blueprint.remapping_map.get((consumer.name, reference.name))
+            if isinstance(replacement, str):
+                resolved[consumer.name, reference.name] = _resolve_named_ref(
+                    consumer.name, reference, replacement, blueprint.active_blueprints
+                )
+                continue
+            spec = (
+                replacement
+                if is_module_type(replacement) or is_spec(replacement)
+                else reference.spec
+            )
+            provider = _resolve_single_ref(consumer, reference, spec, blueprint, disabled)
+            if isinstance(provider, str):
+                resolved[consumer.name, reference.name] = provider
+    return resolved
+
+
 def _resolve_single_ref(
     bp: Any,
     module_ref: Any,
@@ -1088,6 +1199,19 @@ def _resolve_single_ref(
         return candidate.module if isinstance(candidate, BlueprintAtom) else candidate
 
     def result_of(candidate: Any) -> Any:
+        """The resolved provider, once a proxy can call every spec method on it."""
+        if not is_class_ref:
+            missing = spec_methods_without_rpc(module_of(candidate), spec)
+            if missing:
+                raise Exception(
+                    _ref_msg(
+                        m,
+                        module_ref,
+                        s,
+                        f"{module_of(candidate).__name__} has {', '.join(missing)} without @rpc, "
+                        "and a module reference can only call @rpc methods. Add @rpc to them.",
+                    )
+                )
         return candidate.name if isinstance(candidate, BlueprintAtom) else candidate
 
     def display(candidate: Any) -> str:
@@ -1184,6 +1308,56 @@ def _resolve_single_ref(
     )
 
 
+def _check_named_provider(
+    consumer: str, module_ref: Any, instance: str, provider: type[ModuleBase]
+) -> None:
+    """A provider bound by instance name must meet the ref's spec, as a searched one must."""
+    spec = module_ref.spec
+    where = (
+        f"{consumer}.{module_ref.name} is remapped to instance {instance!r} ({provider.__name__})"
+    )
+    if is_module_type(spec):
+        if not issubclass(provider, spec):
+            raise ValueError(f"{where}, which is not a {spec.__name__}.")
+        return
+    if not spec_structural_compliance(provider, spec):
+        missing = [
+            name for name in get_protocol_method_signatures(spec) if not hasattr(provider, name)
+        ]
+        raise ValueError(
+            f"{where}, which does not meet the {spec.__name__} spec; missing: {', '.join(missing)}."
+        )
+    if not spec_annotation_compliance(provider, spec):
+        logger.warning(
+            _ref_msg(
+                consumer,
+                module_ref,
+                spec.__name__,
+                f"{instance} met the spec structurally but had annotation mismatches.\n"
+                f"Please either change the {spec.__name__} spec or the {provider.__name__} module.",
+            )
+        )
+    if without_rpc := spec_methods_without_rpc(provider, spec):
+        raise ValueError(
+            f"{where}, which has {', '.join(without_rpc)} without @rpc, "
+            "and a module reference can only call @rpc methods. Add @rpc to them."
+        )
+
+
+def _resolve_named_ref(
+    consumer: str, module_ref: Any, instance: str, atoms: Iterable[BlueprintAtom]
+) -> str:
+    """The instance name a ref is remapped to, once that instance exists and meets the ref's spec."""
+    provider = next((atom.module for atom in atoms if atom.name == instance), None)
+    if provider is None:
+        raise ValueError(
+            f"{consumer}.{module_ref.name} is remapped to instance "
+            f"{instance!r}, but no module has that name."
+        )
+    _check_named_provider(consumer, module_ref, instance, provider)
+    return instance
+
+
 def _connect_module_refs(
     blueprint: Blueprint,
     module_coordinator: ModuleCoordinator,
@@ -1215,6 +1389,15 @@ def _connect_module_refs(
             declared_spec[ref_key] = module_ref.spec
             if ref_key in external_refs:
                 mod_and_mod_ref_to_proxy[ref_key] = external_refs.pop(ref_key)
+                continue
+            named_instance = blueprint.remapping_map.get(ref_key)
+            if isinstance(named_instance, str):
+                mod_and_mod_ref_to_proxy[ref_key] = _resolve_named_ref(
+                    bp.name,
+                    module_ref,
+                    named_instance,
+                    (*blueprint.active_blueprints, *existing_atoms),
+                )
                 continue
             spec = mod_and_mod_ref_to_proxy.get((bp.name, module_ref.name), module_ref.spec)
 

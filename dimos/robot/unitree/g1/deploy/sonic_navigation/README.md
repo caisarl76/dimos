@@ -119,7 +119,7 @@ Use it in place of `graph`.
 Once the walk harness has begun a request, start the agent on the workstation:
 
 ```bash
-MCPCLIENT__MCP_SERVER_URL=http://192.168.0.223:9990/mcp dimos run unitree-g1-sonic-navigation-agent
+AGENT__MCP_SERVER_URL=http://192.168.0.223:9990/mcp dimos run unitree-g1-sonic-navigation-agent
 ```
 
 ## Safety notes

@@ -44,7 +44,18 @@ BLUEPRINT_METHODS = {
     "configurators",
     "validators",
 }
-_EXCLUDED_MODULE_NAMES = {"Module", "ModuleBase", "StreamModule", "ConnectionModule"}
+_EXCLUDED_MODULE_NAMES = {
+    "AgentModule",
+    "BaseAgent",
+    "Module",
+    "ModuleBase",
+    "StreamModule",
+    "ConnectionModule",
+    "DamiaoConnection",
+    "FeetechConnection",
+    "SimWorld",
+    "CollectionModule",  # Requires profile-owned ports; compose with collect(profile=...).
+}
 
 
 def test_all_blueprints_is_current() -> None:
@@ -298,7 +309,7 @@ def _find_blueprints_in_file(
                 if var_name.startswith("_"):
                     continue
 
-                # Check if it's a blueprint (ModuleBlueprintSet instance)
+                # Check if it's a blueprint
                 if _is_autoconnect_call(node.value) or _ends_with_blueprint_method(node.value):
                     blueprint_vars.append(var_name)
 

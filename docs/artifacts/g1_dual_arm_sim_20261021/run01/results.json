@@ -1,0 +1,114 @@
+{
+  "checks": [
+    {
+      "tool": "move_left_arm_pose",
+      "args": {
+        "robot": "both",
+        "pose": "left_arm_side_horizontal"
+      },
+      "reply": "move_left_arm_pose started; a tool update reports the result. Call stop_arm to stop early.",
+      "t0": 1789860.988634879,
+      "t1": 1789888.116272428,
+      "result": "{\"message\": \"222: left_arm_side_horizontal reached 91% of the planned pose and returned; control returned to SONIC's planner; 223: left_arm_side_horizontal reached 92% of the planned pose and returned; control returned to SONIC's planner\", \"duration_ms\": 25652.3, \"metadata\": {\"222\": {\"task_id\": \"290bd971c24e4b8080ce8451aa8cd398\", \"motion\": \"left_arm_side_horizontal\", \"reached_fraction\": 0.91, \"planned_deg\": {\"left_shoulder_pitch\": 11.5, \"left_shoulder_roll\": 85.9, \"left_shoulder_yaw\": 0.0, \"left_elbow\": 68.8}, \"reached_deg\": {\"left_shoulder_pitch\": -7.2, \"left_shoulder_roll\": 85.1, \"left_shoulder_yaw\": -8.9, \"left_elbow\": 74.7}, \"max_deviation_rad\": {\"legs\": 0.083, \"waist\": 0.054, \"arms\": 0.109, \"wrists_shoulder_yaw\": 0.181}, \"stream_peak_dq\": {\"rad_s\": 0.845, \"joint\": \"left_shoulder_roll\"}, \"return_peak_dq\": {\"rad_s\": 0.047, \"joint\": \"left_wrist_pitch\"}, \"keyframes\": 1, \"chunks\": 1, \"encode_s\": 2.26, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/222/290bd971c24e4b8080ce8451aa8cd398.jsonl\", \"send_at\": 0.001, \"ack_at\": 0.005, \"moved_at\": 1.771}, \"223\": {\"task_id\": \"a0fe5f6d11b14cada461f28e5761b02f\", \"motion\": \"left_arm_side_horizontal\", \"reached_fraction\": 0.92, \"planned_deg\": {\"left_shoulder_pitch\": 11.5, \"left_shoulder_roll\": 85.9, \"left_shoulder_yaw\": 0.0, \"left_elbow\": 68.8}, \"reached_deg\": {\"left_shoulder_pitch\": -7.4, \"left_shoulder_roll\": 85.3, \"left_shoulder_yaw\": -9.1, \"left_elbow\": 74.9}, \"max_deviation_rad\": {\"legs\": 0.082, \"waist\": 0.055, \"arms\": 0.107, \"wrists_shoulder_yaw\": 0.185}, \"stream_peak_dq\": {\"rad_s\": 0.766, \"joint\": \"left_shoulder_roll\"}, \"return_peak_dq\": {\"rad_s\": 0.046, \"joint\": \"left_wrist_pitch\"}, \"keyframes\": 1, \"chunks\": 1, \"encode_s\": 2.27, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/223/a0fe5f6d11b14cada461f28e5761b02f.jsonl\", \"send_at\": 0.0, \"ack_at\": 0.006, \"moved_at\": 1.771}, \"submit_skew_s\": 0.001, \"start_skew_s\": 0.0}}",
+      "start_skew_s": 0.0,
+      "submit_skew_s": 0.001,
+      "arm_motion_rad": {
+        "222": 1.1887186303919661,
+        "223": 1.1916071455254464
+      }
+    },
+    {
+      "tool": "perform_gesture",
+      "args": {
+        "robot": "both",
+        "name": "wave"
+      },
+      "reply": "perform_gesture started; a tool update reports the result. Call stop_arm to stop early.",
+      "t0": 1789889.345976282,
+      "t1": 1789951.532285383,
+      "result": "{\"message\": \"222: wave reached 98% of the planned pose and returned; control returned to SONIC's planner; 223: wave reached 99% of the planned pose and returned; control returned to SONIC's planner\", \"duration_ms\": 60753.2, \"metadata\": {\"222\": {\"task_id\": \"6a7c68f5339d46b8b237150bbc08e37d\", \"motion\": \"wave\", \"reached_fraction\": 0.98, \"planned_deg\": {\"left_shoulder_pitch\": -17.2, \"left_shoulder_roll\": 74.5, \"left_shoulder_yaw\": 20.1, \"left_elbow\": 0.0}, \"reached_deg\": {\"left_shoulder_pitch\": -21.3, \"left_shoulder_roll\": 74.6, \"left_shoulder_yaw\": 15.8, \"left_elbow\": 0.3}, \"max_deviation_rad\": {\"legs\": 0.105, \"waist\": 0.037, \"arms\": 0.116, \"wrists_shoulder_yaw\": 0.115}, \"stream_peak_dq\": {\"rad_s\": 1.048, \"joint\": \"left_shoulder_roll\"}, \"return_peak_dq\": {\"rad_s\": 0.07, \"joint\": \"right_wrist_roll\"}, \"keyframes\": 8, \"chunks\": 2, \"encode_s\": 10.68, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/222/6a7c68f5339d46b8b237150bbc08e37d.jsonl\", \"send_at\": 0.0, \"ack_at\": 0.005, \"moved_at\": 1.487}, \"223\": {\"task_id\": \"b603ad8fb59d430ea9d5b51bad365645\", \"motion\": \"wave\", \"reached_fraction\": 0.99, \"planned_deg\": {\"left_shoulder_pitch\": -17.2, \"left_shoulder_roll\": 74.5, \"left_shoulder_yaw\": 20.1, \"left_elbow\": 0.0}, \"reached_deg\": {\"left_shoulder_pitch\": -21.2, \"left_shoulder_roll\": 75.0, \"left_shoulder_yaw\": 16.9, \"left_elbow\": -0.5}, \"max_deviation_rad\": {\"legs\": 0.103, \"waist\": 0.035, \"arms\": 0.072, \"wrists_shoulder_yaw\": 0.104}, \"stream_peak_dq\": {\"rad_s\": 0.982, \"joint\": \"left_shoulder_roll\"}, \"return_peak_dq\": {\"rad_s\": 0.048, \"joint\": \"left_elbow\"}, \"keyframes\": 8, \"chunks\": 2, \"encode_s\": 10.3, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/223/b603ad8fb59d430ea9d5b51bad365645.jsonl\", \"send_at\": 0.001, \"ack_at\": 0.006, \"moved_at\": 1.738}, \"submit_skew_s\": 0.001, \"start_skew_s\": 0.252}}",
+      "start_skew_s": 0.252,
+      "submit_skew_s": 0.001,
+      "arm_motion_rad": {
+        "222": 1.0074106773461924,
+        "223": 1.0147498301596984
+      }
+    },
+    {
+      "tool": "move_upper_body",
+      "args": {
+        "robot": "223",
+        "motion": "left_arm_forward",
+        "angle_deg": 20
+      },
+      "reply": "move_upper_body started; a tool update reports the result. Call stop_arm to stop early.",
+      "t0": 1789952.756936396,
+      "t1": 1789970.074935945,
+      "result": "{\"message\": \"left_arm_forward reached 16.7 deg and returned; control returned to SONIC's planner\", \"duration_ms\": 16535.6, \"metadata\": {\"task_id\": \"14b211d70a8c46de97b4073408668551\", \"motion\": \"left_arm_forward\", \"reached_fraction\": 0.83, \"planned_deg\": 20.0, \"reached_deg\": 16.7, \"max_deviation_rad\": {\"legs\": 0.076, \"waist\": 0.017, \"arms\": 0.16, \"wrists_shoulder_yaw\": 0.16}, \"stream_peak_dq\": {\"rad_s\": 0.673, \"joint\": \"left_elbow\"}, \"return_peak_dq\": {\"rad_s\": 0.094, \"joint\": \"right_wrist_roll\"}, \"keyframes\": 1, \"chunks\": 1, \"encode_s\": 1.27, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/223/14b211d70a8c46de97b4073408668551.jsonl\"}}",
+      "start_skew_s": null,
+      "submit_skew_s": null,
+      "arm_motion_rad": {
+        "222": 0.020955762188066163,
+        "223": 0.2905975433405493
+      }
+    },
+    {
+      "tool": "perform_gesture+stop_arm",
+      "reply": "perform_gesture started; a tool update reports the result. Call stop_arm to stop early.",
+      "stop_reply": "Stopping: the arm returns smoothly to its start pose; a tool update reports the result.",
+      "t0": 1789971.287328674,
+      "t1": 1789982.706809024,
+      "result": "perform_gesture failed: 222: stopped on request; nothing sent; nothing sent to any robot",
+      "arm_motion_rad": {
+        "222": 0.0019277671209078084,
+        "223": 0.023165765998035548
+      }
+    },
+    {
+      "tool": "agent-send: both robots wave",
+      "t0": 1789983.930085911,
+      "t1": 1790049.307063876,
+      "result": "{\"message\": \"222: wave reached 99% of the planned pose and returned; control returned to SONIC's planner; 223: wave reached 99% of the planned pose and returned; control returned to SONIC's planner\", \"duration_ms\": 60349.6, \"metadata\": {\"222\": {\"task_id\": \"4bd6b8a25f9842929e504e049d4d417a\", \"motion\": \"wave\", \"reached_fraction\": 0.99, \"planned_deg\": {\"left_shoulder_pitch\": -17.2, \"left_shoulder_roll\": 74.5, \"left_shoulder_yaw\": 20.1, \"left_elbow\": 0.0}, \"reached_deg\": {\"left_shoulder_pitch\": -21.4, \"left_shoulder_roll\": 75.3, \"left_shoulder_yaw\": 16.6, \"left_elbow\": -0.4}, \"max_deviation_rad\": {\"legs\": 0.103, \"waist\": 0.035, \"arms\": 0.067, \"wrists_shoulder_yaw\": 0.107}, \"stream_peak_dq\": {\"rad_s\": 1.027, \"joint\": \"left_shoulder_roll\"}, \"return_peak_dq\": {\"rad_s\": 0.041, \"joint\": \"left_wrist_pitch\"}, \"keyframes\": 8, \"chunks\": 2, \"encode_s\": 10.43, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/222/4bd6b8a25f9842929e504e049d4d417a.jsonl\", \"send_at\": 0.0, \"ack_at\": 0.004, \"moved_at\": 1.714}, \"223\": {\"task_id\": \"8d6db712901142d787b2eba56f119ae2\", \"motion\": \"wave\", \"reached_fraction\": 0.99, \"planned_deg\": {\"left_shoulder_pitch\": -17.2, \"left_shoulder_roll\": 74.5, \"left_shoulder_yaw\": 20.1, \"left_elbow\": 0.0}, \"reached_deg\": {\"left_shoulder_pitch\": -21.5, \"left_shoulder_roll\": 75.3, \"left_shoulder_yaw\": 16.5, \"left_elbow\": -0.4}, \"max_deviation_rad\": {\"legs\": 0.104, \"waist\": 0.035, \"arms\": 0.067, \"wrists_shoulder_yaw\": 0.107}, \"stream_peak_dq\": {\"rad_s\": 0.898, \"joint\": \"left_wrist_roll\"}, \"return_peak_dq\": {\"rad_s\": 0.041, \"joint\": \"left_elbow\"}, \"keyframes\": 8, \"chunks\": 2, \"encode_s\": 10.22, \"journal_path\": \"/home/jihun/.local/state/dimos/sonic-arm/223/8d6db712901142d787b2eba56f119ae2.jsonl\", \"send_at\": 0.0, \"ack_at\": 0.005, \"moved_at\": 1.729}, \"submit_skew_s\": 0.0, \"start_skew_s\": 0.015}}",
+      "start_skew_s": 0.015,
+      "arm_motion_rad": {
+        "222": 1.016558390313751,
+        "223": 1.0154449930068983
+      }
+    },
+    {
+      "tool": "move_left_arm_pose",
+      "args": {
+        "robot": "both",
+        "pose": "left_arm_side_horizontal"
+      },
+      "reply": "move_left_arm_pose started; a tool update reports the result. Call stop_arm to stop early.",
+      "t0": 1790051.05016957,
+      "t1": 1790058.072995588,
+      "result": "move_left_arm_pose failed: 223: SONIC is not in confirmed planner idle; nothing sent; nothing sent to any robot",
+      "start_skew_s": null,
+      "submit_skew_s": null,
+      "arm_motion_rad": {
+        "222": 0.008479410694669176,
+        "223": NaN
+      }
+    }
+  ],
+  "standins": {
+    "222": {
+      "samples": 10454,
+      "peak_left_arm_dq": 1.048061205420749,
+      "max_tilt_deg": 1.99406012246257,
+      "min_contacts": 8,
+      "tick_ms_p99": 17.134714550338682,
+      "tick_ms_max": 22.823944920673966
+    },
+    "223": {
+      "samples": 9848,
+      "peak_left_arm_dq": 0.98249485716247,
+      "max_tilt_deg": 1.9921184877808078,
+      "min_contacts": 8,
+      "tick_ms_p99": 17.12880572769793,
+      "tick_ms_max": 23.238420020788908
+    }
+  }
+}

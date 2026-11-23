@@ -1,0 +1,21 @@
+00:40:46.713 [inf][imos/cli/commands/lifecycle.py] Starting DimOS
+00:40:47.572 [inf][dination/module_coordinator.py] Building the blueprint
+00:40:47.576 [inf][dination/module_coordinator.py] Starting the modules
+00:40:47.614 [inf][ation/worker_manager_python.py] Worker pool started. n_workers=2
+00:40:48.322 [inf][/coordination/python_worker.py] Deployed module. module=SonicExecutionModule module_id=1 worker_id=1
+00:40:48.324 [inf][/coordination/python_worker.py] Deployed module. module=McpServer module_id=3 worker_id=1
+/home/jihun/work/dimos_dev/.venv/lib/python3.12/site-packages/langgraph/cache/base/__init__.py:8: LangChainPendingDeprecationWarning: The default value of `allowed_objects` will change in a future version. Pass an explicit value (e.g., allowed_objects='messages' or allowed_objects='core') to suppress this warning.
+  from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+00:40:48.815 [inf][/coordination/python_worker.py] Deployed module. module=McpClient module_id=4 worker_id=0
+00:40:48.815 [inf][/coordination/python_worker.py] Deployed module. module=DualSonicArmSkillContainer module_id=2 worker_id=0
+00:40:48.816 [inf][/coordination/python_worker.py] Deployed module. module=SonicExecutionModule module_id=0 worker_id=0
+00:40:50.289 [inf][dimos/agents/mcp/mcp_client.py] Discovered tools from MCP server. n_tools=8 tools=['move_left_arm_joints', 'move_left_arm_pose', 'move_upper_body', 'perform_gesture', 'stop_arm', 'agent_send', 'list_modules', 'server_status']
+00:40:51.637 [inf][dination/module_coordinator.py] Blueprint started build_s=0.002 deploy_s=1.203 slowest_starts={'dualsonicarmskillcontainer': 1.428, 'mcpclient': 0.002, 'mcpserver': 0.002, 'g1_223': 0.002, 'g1_222': 0.002} start_s=2.783 wire_s=0.021
+✓ All modules started (5 modules)
+✓ Health check passed
+✓ DimOS running in background
+
+  Run ID:    20261026-094047-2c00-unitree-g1-sonic-arm-dual-agentic
+  Log:       /home/jihun/work/dimos-dual-g1/logs/20261026-094047-2c00-unitree-g1-sonic-arm-dual-agentic
+  Stop:      dimos stop
+  Status:    dimos status

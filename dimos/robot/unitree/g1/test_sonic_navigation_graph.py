@@ -21,11 +21,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dimos.core.coordination.blueprints import Blueprint, autoconnect
+from dimos.core.coordination.blueprints import Blueprint, MetaBlueprint, autoconnect
 from dimos.core.coordination.module_coordinator import ModuleCoordinator
 from dimos.core.module import Module
 from dimos.core.stream import Out
-from dimos.hardware.sensors.lidar.fastlio2.module import FastLio2
 from dimos.hardware.sensors.lidar.pointlio.module import PointLio
 from dimos.mapping.costmapper import CostMapper
 from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
@@ -76,7 +75,11 @@ def resolved(blueprint: Blueprint, overrides: dict[str, dict[str, Any]]) -> dict
     }
 
 
-def check(blueprint: Blueprint, role: Any, overrides: dict[str, dict[str, Any]]) -> None:
+def check(
+    blueprint: Blueprint | MetaBlueprint, role: Any, overrides: dict[str, dict[str, Any]]
+) -> None:
+    if isinstance(blueprint, MetaBlueprint):
+        blueprint = blueprint.solidify()
     validate_sonic_navigation_graph(blueprint, resolved(blueprint, overrides), role=role)
 
 
@@ -140,8 +143,8 @@ def test_graphs_are_role_specific() -> None:
 
 @pytest.mark.parametrize(
     "extra",
-    [FastLio2, G1WholeBodyConnection, AlternateCloud, MovementManager],
-    ids=["fastlio2", "wholebody", "unknown-alternate-source", "second-cmd-vel-source"],
+    [G1WholeBodyConnection, AlternateCloud, MovementManager],
+    ids=["wholebody", "unknown-alternate-source", "second-cmd-vel-source"],
 )
 def test_peer_rejects_forbidden_or_duplicate_modules(extra: type[Module]) -> None:
     blueprint = autoconnect(unitree_g1_sonic_navigation_peer, extra.blueprint())
@@ -179,9 +182,8 @@ def test_pc2_rejects_second_execution_owner() -> None:
         (PointLio, "odometry", "odometry"),  # LIO pose bypasses base composition
         (MovementManager, "tele_cmd_vel", "cmd_vel"),  # cmd_vel gains a second consumer
         (SonicNavigationPeerModule, "cmd_vel", "nav_cmd_vel"),  # peer bypasses the manager
-        (CostMapper, "merged_map", "global_map"),  # merged-map input re-enabled
     ],
-    ids=["alternate-odometry", "second-consumer", "bypass-manager", "merged-map"],
+    ids=["alternate-odometry", "second-consumer", "bypass-manager"],
 )
 def test_remapping_cannot_bypass_peer_edges(remapping: Any) -> None:
     with pytest.raises(ValueError, match="connection"):
@@ -261,7 +263,7 @@ def test_build_rejects_before_configuration_sockets_or_workers(role: str, mocker
     deploy = mocker.patch("dimos.core.coordination.module_coordinator._deploy_all_modules")
 
     with pytest.raises(ValueError):
-        ModuleCoordinator.build(autoconnect(base, FastLio2.blueprint()))
+        ModuleCoordinator.build(autoconnect(base, AlternateCloud.blueprint()))
 
     for side_effect in (configure, materialize, start, deploy):
         side_effect.assert_not_called()

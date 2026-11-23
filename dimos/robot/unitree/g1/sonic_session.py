@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
-from enum import StrEnum
+from enum import Enum
 import hashlib
 import json
 import math
@@ -72,6 +72,7 @@ class SonicModelProfile:
     blend_seconds: float = 0.3
     token_bound: float = 1.25
     token_step_limit: float = 0.05
+    hand_step_limit: float | None = None
     observation_time_basis: ObservationTimeBasis = "acquisition"
 
     def __post_init__(self) -> None:
@@ -100,9 +101,14 @@ class SonicModelProfile:
                 raise ValueError(f"{name} must be positive")
         if not TICK_SECONDS <= self.max_tick_gap < 0.2:
             raise ValueError("max_tick_gap must be below the prototype's 200 ms lease")
+        if (
+            self.hand_step_limit is not None
+            and _finite(self.hand_step_limit, "hand_step_limit") <= 0
+        ):
+            raise ValueError("hand_step_limit must be positive")
 
 
-class SessionPhase(StrEnum):
+class SessionPhase(str, Enum):  # TODO(PY311): switch to enum.StrEnum
     IDLE = "idle"
     SEEDING = "seeding"
     ARMING = "arming"
@@ -141,6 +147,20 @@ class JsonlSessionJournal:
             file.write(line + "\n")
             file.flush()
             os.fsync(file.fileno())
+
+
+def validate_actions(values: NDArray[Any], token_bound: float) -> NDArray[np.float64]:
+    raw = np.asarray(values)
+    if raw.ndim != 2 or raw.shape[1] != 78 or not 1 <= len(raw) <= 1000:
+        raise ValueError("actions must have shape [1..1000, 78]")
+    if raw.dtype.kind not in "fiu":
+        raise ValueError("actions must be numeric, not boolean or strings")
+    actions = raw.astype(np.float64, copy=True)
+    if not np.all(np.isfinite(actions)) or np.max(np.abs(actions)) > np.finfo(np.float32).max:
+        raise ValueError("actions must contain finite float32 values")
+    if np.max(np.abs(actions[:, :64])) > token_bound:
+        raise ValueError("token bound exceeded")
+    return actions
 
 
 class SonicTaskSession:
@@ -243,17 +263,7 @@ class SonicTaskSession:
         return action
 
     def _actions(self, values: NDArray[Any]) -> NDArray[np.float64]:
-        raw = np.asarray(values)
-        if raw.ndim != 2 or raw.shape[1] != 78 or not 1 <= len(raw) <= 1000:
-            raise ValueError("actions must have shape [1..1000, 78]")
-        if raw.dtype.kind not in "fiu":
-            raise ValueError("actions must be numeric, not boolean or strings")
-        actions = raw.astype(np.float64, copy=True)
-        if not np.all(np.isfinite(actions)) or np.max(np.abs(actions)) > np.finfo(np.float32).max:
-            raise ValueError("actions must contain finite float32 values")
-        if np.max(np.abs(actions[:, :64])) > self.profile.token_bound:
-            raise ValueError("token bound exceeded")
-        return actions
+        return validate_actions(values, self.profile.token_bound)
 
     def start(self, state: SonicFeedback, *, now: float) -> None:
         if self.status.phase != SessionPhase.IDLE:
@@ -538,5 +548,11 @@ class SonicTaskSession:
                 -self.profile.token_step_limit,
                 self.profile.token_step_limit,
             )
+            if self.profile.hand_step_limit is not None:
+                action[64:] = self._last_action[64:] + np.clip(
+                    action[64:] - self._last_action[64:],
+                    -self.profile.hand_step_limit,
+                    self.profile.hand_step_limit,
+                )
         if now - self._last_emit + 1e-9 >= TICK_SECONDS:
             self._pose(action)

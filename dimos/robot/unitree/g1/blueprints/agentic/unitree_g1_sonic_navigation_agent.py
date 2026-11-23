@@ -17,10 +17,10 @@
 
 Point it at pc2's McpServer (unitree-g1-sonic-navigation-pc2-agentic):
 
-    MCPCLIENT__MCP_SERVER_URL=http://<pc2>:9990/mcp dimos run unitree-g1-sonic-navigation-agent
+    AGENT__MCP_SERVER_URL=http://<pc2>:9990/mcp dimos run unitree-g1-sonic-navigation-agent
 """
 
-from dimos.agents.mcp.mcp_client import McpClient
+from dimos.agents.agent import Agent
 
 G1_SONIC_NAVIGATION_PROMPT = """\
 You control the walking of a Unitree G1 humanoid through three tools.
@@ -38,4 +38,4 @@ prefer goals that are mostly ahead. Stop immediately if asked to stop or if anyt
 looks unsafe. The robot has no arms, camera or speech tools here.
 """
 
-unitree_g1_sonic_navigation_agent = McpClient.blueprint(system_prompt=G1_SONIC_NAVIGATION_PROMPT)
+unitree_g1_sonic_navigation_agent = Agent.blueprint(system_prompt=G1_SONIC_NAVIGATION_PROMPT)

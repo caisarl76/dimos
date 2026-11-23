@@ -45,6 +45,7 @@ from dimos.core.coordination.blueprint_config.fields import (
     nested_get,
     prepare_model_input,
     safe_field_default,
+    validate_module_config,
 )
 from dimos.core.coordination.blueprint_config.merging import (
     merge_cli,
@@ -80,11 +81,11 @@ from dimos.core.coordination.blueprint_config.values import (
 )
 from dimos.core.coordination.blueprints import (
     Blueprint,
-    TransportSpec,
     config_key,
     transport_config_name,
 )
 from dimos.core.global_config import GlobalConfig
+from dimos.core.stream import TransportSpec
 
 
 def split_run_arguments(tokens: Sequence[str]) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -164,6 +165,7 @@ class BlueprintConfigParser:
         """
         schema = self._get_schema()
         self._validate_structure(schema)
+        tokens = tuple(cli_tokens)
 
         module_values = {
             module.atom.name: {
@@ -180,17 +182,18 @@ class BlueprintConfigParser:
         global_values: dict[str, Any] = {}
         deep_merge(global_values, plain_mapping(self.blueprint.global_config_overrides))
         transport_values: dict[str, Any] = {}
+        # The file and CLI merged a second time, alone, is what a hosted run sends its Hosts.
+        file_cli_modules: dict[str, dict[str, Any]] = {m.atom.name: {} for m in schema.modules}
+        file_cli_globals: dict[str, Any] = {}
+        file_cli_transports: dict[str, Any] = {}
 
         if config_path is not None:
             config_values = read_config_file(Path(config_path))
-            merge_root_source(
-                module_values,
-                global_values,
-                transport_values,
-                config_values,
-                source="config file",
-                schema=schema,
-            )
+            for sections in (
+                (module_values, global_values, transport_values),
+                (file_cli_modules, file_cli_globals, file_cli_transports),
+            ):
+                merge_root_source(*sections, config_values, source="config file", schema=schema)
 
         merge_environment(
             module_values,
@@ -210,21 +213,29 @@ class BlueprintConfigParser:
                 schema=schema,
             )
 
-        merge_cli(
-            module_values,
-            global_values,
-            transport_values,
-            tuple(cli_tokens),
-            schema,
-        )
+        merge_cli(module_values, global_values, transport_values, tokens, schema)
+        merge_cli(file_cli_modules, file_cli_globals, file_cli_transports, tokens, schema)
+        file_and_cli = {
+            **file_cli_modules,
+            "g": file_cli_globals,
+            "transports": file_cli_transports,
+        }
 
         if global_overrides is not None:
             deep_merge(global_values, plain_mapping(global_overrides))
 
-        parsed_modules = self._validate_modules(module_values, schema)
         resolved_global = global_schema_defaults()
         deep_merge(resolved_global, global_values)
         parsed_global = validate_global_values(resolved_global)
+        # Hosted fragments resolve their own environment on each Host. Their
+        # complete configs are validated there, after compilation removes placements.
+        parsed_modules = (
+            plain_mapping(module_values)
+            if self.blueprint.hosted_placements
+            else self._validate_modules(
+                module_values, schema, GlobalConfig.model_validate(parsed_global)
+            )
+        )
         # Pick the validated values of the explicitly-set fields, translating
         # alias keys (e.g. DIMOS_TRANSPORT) to field names first.
         field_names = global_environment_names()
@@ -240,6 +251,7 @@ class BlueprintConfigParser:
             _global_explicit_values=snapshot_mapping(explicit_global),
             _transport_config_values=snapshot_mapping(parsed_transports),
             _blueprint=self.blueprint,
+            _file_and_cli_values=snapshot_mapping({k: v for k, v in file_and_cli.items() if v}),
         )
 
     def format_help(self, reserved_options: Collection[str] = ()) -> str:
@@ -420,20 +432,14 @@ class BlueprintConfigParser:
             )
 
     def _validate_modules(
-        self, module_values: Mapping[str, Mapping[str, Any]], schema: ParserSchema
+        self,
+        module_values: Mapping[str, Mapping[str, Any]],
+        schema: ParserSchema,
+        g: GlobalConfig,
     ) -> dict[str, Any]:
         parsed: dict[str, Any] = {}
         for module in schema.modules:
-            values = prepare_model_input(
-                module.config_cls,
-                module_values[module.atom.name],
-            )
-            try:
-                model = module.config_cls.model_validate(values)
-            except ValidationError as error:
-                raise BlueprintConfigError(
-                    format_validation_error(module.atom.name, error)
-                ) from error
+            model = validate_module_config(module.atom, module_values[module.atom.name], g)
             dumped = plain(model, exclude_unset=True)
             dumped.pop("g", None)
             dumped.pop("instance_name", None)
