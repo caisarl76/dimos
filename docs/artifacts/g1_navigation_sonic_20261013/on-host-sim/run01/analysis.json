@@ -1,0 +1,34 @@
+{
+  "passed": false,
+  "completed": [
+    "backward",
+    "backward_settled",
+    "forward",
+    "forward_settled",
+    "initial_idle_settled",
+    "left_turn",
+    "left_turn_settled",
+    "right_turn",
+    "right_turn_settled"
+  ],
+  "missing": [
+    "feedback_loss_200ms",
+    "native_watchdog_250ms",
+    "noisy_trace_replan_limit",
+    "pose_source_expiry_200ms",
+    "seeded_pose_suspends_planner_watchdog",
+    "source_expiry_idle_without_latch",
+    "source_outage_ends",
+    "source_pause_250ms",
+    "stopped_publisher_watchdog",
+    "subscriptions_loss"
+  ],
+  "failed": [],
+  "run_status": "motion_phase_passed_remaining_fault_and_pose_checks",
+  "run_error": null,
+  "wire_samples": {
+    "moving": 174,
+    "idle": 758,
+    "pose": 0
+  }
+}

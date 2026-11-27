@@ -1,0 +1,58 @@
+{
+  "status": "diagnostic_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5128893330693245,
+      "speed": 0.0033897463969478577,
+      "yaw_rate": -0.005269326020303526
+    },
+    {
+      "name": "forward_transition_0",
+      "passed": true,
+      "start": 1139207.655224348,
+      "end": 1139209.65282685,
+      "forward_displacement_m": 0.17676013685577704,
+      "yaw_change_rad": 0.027587218195158372
+    },
+    {
+      "name": "forward_transition_0_settled",
+      "passed": true,
+      "elapsed": 1.8576725479215384,
+      "speed": 0.00912617342389126,
+      "yaw_rate": -0.008533683490522718
+    },
+    {
+      "name": "forward_transition_1",
+      "passed": true,
+      "start": 1139216.533132526,
+      "end": 1139218.521189784,
+      "forward_displacement_m": 0.23928406992447698,
+      "yaw_change_rad": -0.0619344150826668
+    },
+    {
+      "name": "forward_transition_1_settled",
+      "passed": true,
+      "elapsed": 2.5168258999474347,
+      "speed": 0.003830672235338645,
+      "yaw_rate": -0.019939737338669505
+    },
+    {
+      "name": "forward_transition_2",
+      "passed": true,
+      "start": 1139226.057335771,
+      "end": 1139228.060570068,
+      "forward_displacement_m": 0.2381557797386193,
+      "yaw_change_rad": 0.01364908245645646
+    },
+    {
+      "name": "forward_transition_2_settled",
+      "passed": true,
+      "elapsed": 2.360924347070977,
+      "speed": 0.003905359317321975,
+      "yaw_rate": -0.02090276492754965
+    }
+  ],
+  "error": null
+}

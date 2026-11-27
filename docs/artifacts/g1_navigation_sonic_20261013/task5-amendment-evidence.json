@@ -1,0 +1,128 @@
+{
+  "recorded_at": "2026-10-13T15:00:00.622091+00:00",
+  "scope": "Approved host-only fixed-heading and live-body-heading proofs; production control semantics unchanged",
+  "amendment": "User confirmed proceed on2026-10-13",
+  "production_regressions": {
+    "sonic": {
+      "tests": 399,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_sha256": "9393e92ec649b33d8f16b6e90151941f49a9226c4c840c735a17da9979a63492"
+    },
+    "shared_lease": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_sha256": "2f04c3b866cf146590cbe4741e3d961fe6395427ecfbc2f62826890c101283a5"
+    }
+  },
+  "production_tested_source_sha256": {
+    "dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1",
+    "dimos/robot/unitree/g1/test_sonic_navigation.py": "8fe6fa36ddc6b55df6c9fce2aebddc0488aa991dd154e09385f8d713c3baa1e1",
+    "dimos/robot/unitree/g1/test_sonic_observation_module.py": "4dbdf8d35f7b1f2c10619ad6499d6cdb86e34a077ea5daf3f8a29bb90473a814",
+    "dimos/robot/unitree/g1/sonic_observation_module.py": "d0336492a2dd21a62a0733f34c12112e5e8255c91ff7eb3edab214d3cdd64e2e",
+    "dimos/robot/unitree/g1/sonic_feedback_module.py": "e723a74e38c7f0ed4e3e7a81b39bce11f5cd8ec021ef9ed9e544371b60534bdb",
+    "dimos/robot/unitree/g1/sonic_feedback.py": "9496e254e7f22e6848d7899bc290b638cb11b07e74646c269812cfa9d03f79c8",
+    "dimos/robot/unitree/g1/sonic_policy_client.py": "57b624ae6094cc44c668331b6a68972de5f52565d91655053231d90a0e470221",
+    "dimos/robot/unitree/g1/test_sonic_navigation_session.py": "9028391bc2a37fbd5c40a618c3a6e23e016cf9c1e7b1974ad5db7e1750ed92e8",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "884873648c2d48b15fc6cad965cca1e21517a35921f5d03fc7532bc2e8058062",
+    "dimos/robot/unitree/g1/sonic_observation_pairing.py": "cf43819e38072eb026ce6f4d997a792e70f179a1428a17214dd35748e14dc589",
+    "dimos/robot/unitree/g1/test_sonic_feedback.py": "e9d8e5d00ffa065ddae57366a6a3f5bac4c337456a71e9a75db25e28944279b7",
+    "dimos/robot/unitree/g1/sonic_observation.py": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+    "dimos/robot/unitree/g1/sonic_navigation_session.py": "539decddaea5d82136a25157645b1d5e5fb72e173368dba156fdd9538a5e68e7",
+    "dimos/robot/unitree/g1/sonic_session.py": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+    "dimos/robot/unitree/g1/sonic_navigation.py": "48411fc888ef2545f805d4014f4ea6a11c1bc439a465531487155dba864ac5da",
+    "dimos/robot/unitree/g1/test_sonic_session.py": "c416685dbe41c58ac0caabbe56a0363ef4a6b84b72511f78c2552906679307b3",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "14ff7f88fc79828c6db10901ad7c4ea95272720cb77fae6e5233985616028f98",
+    "dimos/robot/unitree/g1/test_sonic_observation_pairing.py": "66c8d2400485291c79d9f5cecde40b63badf3329dfe1aff1d52d9bd5ddaecbad",
+    "dimos/robot/unitree/g1/test_sonic_observation.py": "3b758e3c0daa850d9d34ee1ecefcdc7490c024ecd25bffff650378ec28cf2516",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "7306f7f3e26db0a0ab485337d574c80ee4763a72cff212d924d5e9e2149a18ca",
+    "dimos/robot/unitree/g1/test_sonic_reference.py": "41bc177786ec074aaa2c005a427262e78331156f43cb0280a31dde5eeee0677a",
+    "dimos/robot/unitree/g1/test_sonic_policy_client.py": "9461272e11166dccb33a722be7e0013c5264fe98b8b8efbe8c5c9d2afdb68322",
+    "dimos/robot/unitree/g1/test_sonic_execution_module.py": "1db806b4b187b63cfb864e2245181ddceec4e7ac55cece316b9899ee3feed9bf"
+  },
+  "artifact_tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "8",
+    "time": "0.093",
+    "timestamp": "2026-10-13T23:55:54.655768+09:00",
+    "hostname": "jihun-Z590-AORUS-ELITE"
+  },
+  "artifact_junit_sha256": "68625699b6d15f02a9ba5dca1a8e2caaff16221ad3fa9ef8cae29d076d03c202",
+  "source_sha256": {
+    "demo_analyze_navigation.py": "837a09d6bdf158d336ce6c7954027c1eb28422603467aec1ae161347cfb50a99",
+    "demo_navigation_noise.py": "b78963675465e5c873212d287e4229e388f63b041f2eb98e1f2f99d380f0c6bd",
+    "demo_navigation_sim.py": "74fd5379add83fb8933a76f3d264c070b755ede2e506fa25e24eda0892e870db",
+    "test_navigation_noise.py": "37efbd308383048686996b8f6cd023f72e5f1b754a75a5f9d86439c2b6a5bd08",
+    "stage-a-test-amendment.md": "ba65592d813d23ea44c753a34ef6356fe2ffc190402426221f0225143f5a1a3b"
+  },
+  "runs": {
+    "run10": {
+      "status": "diagnostic_only",
+      "full_matrix_passed": false,
+      "noise_proof_passed": true,
+      "native_state_replans": 1,
+      "forward_displacement_m": 0.11030674458448296,
+      "source_sequences": 48,
+      "planner_packets": 238,
+      "raw_manifest_sha256": "3a2d22042b0edf4a1c82ab67688d0de889265c43b2bab57a486e8c5fc4c6d257",
+      "analysis_sha256": "690a8cf45b6d79da5736ad7a5137d840e75c4a3b0931840dfd20e066efcc6ca8",
+      "results_sha256": "ea47172fed11ce6f98c15a89c55d8229c532e3eee815b1f75cc72a94bf64110c"
+    },
+    "run11": {
+      "status": "diagnostic_only",
+      "full_matrix_passed": false,
+      "noise_proof_passed": true,
+      "native_state_replans": 19,
+      "forward_displacement_m": 0.8143238977349962,
+      "source_sequences": 48,
+      "planner_packets": 239,
+      "raw_manifest_sha256": "a33b637857bc30d23d6ac24c9190db284de39c01f5dfdb1f5ff82108c191ea07",
+      "analysis_sha256": "5b19d139afa3e3b1449806d4444262cc653987b07b9e0463ccba708c4f38e9ef",
+      "results_sha256": "f712aa1b917ec12e696cd33afad5231b1cbe6cc040a5b86d1dc1252d817323f0"
+    },
+    "run12": {
+      "status": "passed",
+      "full_matrix_passed": true,
+      "noise_proof_passed": true,
+      "native_state_replans": 16,
+      "forward_displacement_m": 0.7571593048915715,
+      "source_sequences": 48,
+      "planner_packets": 238,
+      "raw_manifest_sha256": "8dfaca6c232fdeb1cee9b080bed329bc93e46fe8d0d3b135970311acdf4fb295",
+      "analysis_sha256": "5c2a70ad39fe110a2409c28343400fc62fb06b4bd5040abf88dbb22784835a85",
+      "results_sha256": "2fdc116507c10659a97151835ccf2719dffb6eec2ee04873c0336e3a465638c3"
+    }
+  },
+  "review_fixes": [
+    "duplicate native state-replans rejected, including periodic predecessor rows:RED->GREEN",
+    "explanatory send precedes native inference start;ACKmayarriveafter:RED->GREEN",
+    "expired intents and missing nativeACKrejected"
+  ],
+  "native_baseline_hashes_verified": 51,
+  "upstream_drift_at_next_task_boundary": {
+    "dimos/robot/unitree/g1/sonic_observation.py": {
+      "recorded": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+      "current": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b"
+    },
+    "dimos/robot/unitree/g1/sonic_service_module.py": {
+      "recorded": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
+      "current": "467e434341f3e8fc435e72b4da16669fac79b10bfcaf586a711e2ffeb4861861"
+    },
+    "dimos/robot/unitree/g1/sonic_session.py": {
+      "recorded": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+      "current": "c261b496e908bcfd1a5107bc8a25a357f991155e1a1fcfbfd214709d69427553"
+    },
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": {
+      "recorded": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+      "current": "42cf0431adb4684173a43084565ba9646a3dd29b9ced3409ed7edb2b5008428b"
+    }
+  },
+  "hardware_gate": "BLOCKED:retain run02 reverse anomaly,run08 settling failure andmissing exactFKfixture;no robotcontroller launched",
+  "host_gate": "StageA software proofs andfull26case matrix verified;reconcile newupstreambaselineand retestbeforeStageB"
+}

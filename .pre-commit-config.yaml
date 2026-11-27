@@ -1,6 +1,8 @@
 default_stages: [pre-commit]
 default_install_hook_types: [pre-commit, commit-msg]
-exclude: (dimos/models/.*)|(deprecated)
+# Kept byte-exact: copies of the harness that ran (their hashes are in the run records), and
+# the planner lease cases, a pc2 payload input pinned in pc2/manifest.json.
+exclude: (dimos/models/.*)|(deprecated)|(^docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/)|(^dimos/robot/unitree/g1/test_data/sonic_planner_lease_cases\.json$)
 repos:
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks
@@ -50,7 +52,7 @@ repos:
         args: [--fix=lf]
         exclude: *verbatim-files
       - id: check-json
-        exclude: ^misc/DimSim/public/sims/  # LFS-tracked
+        exclude: (^misc/DimSim/public/sims/|^docs/artifacts/g1_navigation_sonic_20261013/(native-patch-replay|native-baseline-snapshot|motion-resolution/horizon/coverage-all)\.json$)  # LFS-tracked
       - id: check-toml
       - id: check-yaml
         # mkdocs-material configures extensions with !!python/name: tags,
@@ -59,8 +61,8 @@ repos:
       - id: pretty-format-json
         name: format json
         args: [ --autofix, --no-sort-keys ]
-        # misc/DimSim/public/sims/ is LFS-tracked; web/ JSON is owned by `deno fmt`, dimos/agents/*.json by prettier
-        exclude: ^(misc/DimSim/public/sims/|web/|dimos/agents/[^/]+\.json$)|crate-hashes\.json$
+        # misc/DimSim/public/sims/ and three navigation artifacts are LFS-tracked; web/ JSON is owned by `deno fmt`, dimos/agents/*.json by prettier
+        exclude: ^(misc/DimSim/public/sims/|web/|dimos/agents/[^/]+\.json$)|crate-hashes\.json$|^docs/artifacts/g1_navigation_sonic_20261013/(native-patch-replay|native-baseline-snapshot|motion-resolution/horizon/coverage-all)\.json$
 
   - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
     rev: 3.4.1

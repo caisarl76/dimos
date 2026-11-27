@@ -1,0 +1,15 @@
+{
+  "source": "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/assets",
+  "private_copy": "/tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/assets",
+  "sha256": {
+    "policy_model_decoder.trt": "95493343b352ccac34ecf12b8c52aa079f179d247f4382424dedbb3bb8bad1f4",
+    "model_encoder.onnx": "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae",
+    "observation_config.yaml": "4a67713b310932e50aca81f19188c8d76013148e98b15c8b5bbea995f12e59f0",
+    "model_decoder.onnx": "34bae8570d4a4421a5391a5c2befd745d4a02d182ec539e5f9da44c091c67509",
+    "encoder_model_encoder.trt": "6d94a4075318a61724132431e4911ce8eadbde294b8eee89b00c58a5fa00f3b3",
+    "planner/target_vel/V2/planner_planner_sonic.trt": "761cc7bd4418142258c7a45c6c46bf7d4ae6ef9f61b883d84df229c8ad98b7b8",
+    "planner/target_vel/V2/planner_sonic.onnx": "39b553e197f62f077975ba38512bc04781a3fc37c2af7c6756e04629f760edea"
+  },
+  "gpu": "1",
+  "dds_isolation": "Domain 0 exclusively inside a fresh network namespace containing only lo; native SDK domain is fixed, no shared host DDS or robot NIC"
+}

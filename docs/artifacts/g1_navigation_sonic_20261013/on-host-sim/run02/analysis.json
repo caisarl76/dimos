@@ -1,0 +1,36 @@
+{
+  "passed": false,
+  "completed": [
+    "forward",
+    "initial_idle_settled"
+  ],
+  "missing": [
+    "backward",
+    "backward_settled",
+    "feedback_loss_200ms",
+    "forward_settled",
+    "left_turn",
+    "left_turn_settled",
+    "native_watchdog_250ms",
+    "noisy_trace_replan_limit",
+    "pose_source_expiry_200ms",
+    "right_turn",
+    "right_turn_settled",
+    "seeded_pose_suspends_planner_watchdog",
+    "source_expiry_idle_without_latch",
+    "source_outage_ends",
+    "source_pause_250ms",
+    "stopped_publisher_watchdog",
+    "subscriptions_loss"
+  ],
+  "failed": [
+    "forward"
+  ],
+  "run_status": "failed",
+  "run_error": "AssertionError: forward direction mismatch",
+  "wire_samples": {
+    "moving": 87,
+    "idle": 259,
+    "pose": 0
+  }
+}

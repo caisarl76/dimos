@@ -1,0 +1,45 @@
+{
+  "captured_at": "2026-10-14T05:49:11.690078+00:00",
+  "task": 7,
+  "scope": "Host-only private link/peer/relay; physical and two-host commissioning remain separate",
+  "files_sha256": {
+    "dimos/robot/unitree/g1/sonic_navigation_link.py": "2a34f89545de65d088ec88e359dea61a9d94c2a79bc0ac24e31e06987f29c83a",
+    "dimos/robot/unitree/g1/sonic_navigation_peer_module.py": "95c01d352ce076091555bd58ddd3f98d20168dede57164f4164a94bdba9e5395",
+    "dimos/robot/unitree/g1/sonic_navigation_relay_module.py": "c10f8e2818c6cb91f4c0e84be56d7be2565a5fecd2a582578417af00f751e764",
+    "dimos/robot/unitree/g1/sonic_navigation_session.py": "b0b609fd62265c672be34efc6eba97ac77d109cc2a73157325bca8419c6ba797",
+    "dimos/robot/unitree/g1/test_sonic_navigation_link.py": "bf88053b60d433ff75f0f4f8c3e5b93dcf1d1037c5cf26bdfc66861e6797ea2c",
+    "dimos/robot/unitree/g1/test_sonic_navigation_peer_module.py": "0d91134ec40ffd99e08ba027ba069ef32ebf8658aa7f042d90377a06fe63c560"
+  },
+  "checks": {
+    "g1-navigation-task7-final.xml": {
+      "sha256": "656919ae17366cf14811c126351c000881df6cb0b687246f98d22c4d24bb11d9",
+      "suite": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "126",
+        "time": "14.938",
+        "timestamp": "2026-10-14T14:15:57.344365+09:00",
+        "hostname": "jihun-Z590-AORUS-ELITE"
+      }
+    },
+    "g1-navigation-task7-broad.xml": {
+      "sha256": "d745f5525aaefc0ae93aea0561e157048deccbfe82e245c8dd7a9a445d70233f",
+      "suite": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "504",
+        "time": "31.572",
+        "timestamp": "2026-10-14T14:35:08.774542+09:00",
+        "hostname": "jihun-Z590-AORUS-ELITE"
+      }
+    }
+  },
+  "mypy": "4 affected production files PASS",
+  "ruff": "6 affected Python files PASS",
+  "review": "Initial4 defects and2 follow-up cancellation defects reproduced RED and corrected; final independent read-only review no remaining findings",
+  "original_workspace_modified": false
+}

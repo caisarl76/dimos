@@ -1,0 +1,369 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Supervised walk harness decisions: case gating, measured motion and native evidence."""
+
+from datetime import date
+import json
+import math
+
+import pytest
+
+from dimos.robot.unitree.g1.deploy.sonic_navigation.workstation import walk_harness as walk
+
+
+def passed(*names: str) -> list[dict]:
+    return [{"name": n, "passed": True} for n in names]
+
+
+def test_cases_unlock_only_after_their_measured_prerequisites() -> None:
+    assert walk.blocked("forward_010", []) == "requires idle, operator_stop"
+    assert walk.blocked("forward_010", passed("idle")) == "requires operator_stop"
+    assert walk.blocked("forward_010", passed("idle", "operator_stop")) is None
+    # Operator decision 2026-10-15: 0.10 m/s for 1 s applied but never stepped on pc2, so
+    # the first walking case is the simulation-verified 0.20 m/s for 2 s.
+    failed = [*passed("idle", "operator_stop"), {"name": "forward_010", "passed": False}]
+    assert walk.blocked("forward_020", failed) is None
+    for name in ("turn_left_020", "turn_right_020", "cancel", "source_pause"):
+        assert walk.blocked(name, failed) == "requires forward_020"
+        assert walk.blocked(name, [*failed, *passed("forward_020")]) is None
+    assert walk.blocked("goal", passed(*walk.CASES)) is not None  # never offered here
+    assert set(walk.CASES) >= {"idle", "operator_stop", "forward_010", "forward_020"}
+    assert max(abs(c.vx) for c in walk.CASES.values()) <= 0.20
+    assert max(abs(c.wz) for c in walk.CASES.values()) <= 0.20
+
+
+def test_operator_token_must_be_today() -> None:
+    walk.check_token(f"operator-ready-{date.today():%Y%m%d}")
+    with pytest.raises(SystemExit):
+        walk.check_token("operator-ready-20000101")
+
+
+def odom(t: float, x: float, y: float, yaw: float) -> dict:
+    return {"peer_monotonic": t, "odom": [x, y, yaw, t]}
+
+
+def test_motion_is_measured_in_the_start_heading_frame() -> None:
+    heading = math.radians(30)
+    # Already 2 cm along by the first sample inside the window: the start is the pose at t0.
+    early = (1.0 + 0.02 * math.cos(heading), 2.0 + 0.02 * math.sin(heading))
+    rows = [odom(0.0, 1.0, 2.0, heading), odom(0.5, *early, heading)]
+    end = (
+        1.0 + 0.10 * math.cos(heading) - 0.01 * math.sin(heading),
+        2.0 + 0.10 * math.sin(heading) + 0.01 * math.cos(heading),
+    )
+    rows.append(odom(2.0, *end, heading + 0.05))
+    rows.append(odom(9.0, 5.0, 5.0, 0.0))  # after the window
+    moved = walk.motion(rows, 0.4, 3.0)
+    assert abs(moved["forward_m"] - 0.10) < 1e-9 and abs(moved["lateral_m"] - 0.01) < 1e-9
+    assert abs(moved["yaw_rad"] - 0.05) < 1e-9
+    assert abs(moved["heading_offset_deg"] - math.degrees(math.atan2(0.01, 0.10))) < 1e-9
+    assert walk.motion(rows[:1], 0.4, 3.0) is None  # no sample inside the window
+
+
+def test_motion_verdict_needs_correct_sign_and_bounded_magnitude() -> None:
+    case = walk.CASES["forward_010"]
+    good = {"forward_m": 0.07, "lateral_m": 0.004, "yaw_rad": 0.01, "heading_offset_deg": 3.3}
+    assert walk.motion_ok(case, good)
+    assert not walk.motion_ok(case, {**good, "forward_m": 0.005})  # stayed in place
+    assert not walk.motion_ok(case, {**good, "forward_m": -0.05})
+    assert not walk.motion_ok(case, {**good, "forward_m": 0.25})  # > 2x commanded
+    turn = walk.CASES["turn_right_020"]
+    assert walk.motion_ok(turn, {**good, "forward_m": 0.0, "yaw_rad": -0.08})
+    assert not walk.motion_ok(turn, {**good, "forward_m": 0.0, "yaw_rad": 0.08})
+    assert not walk.motion_ok(case, None)
+
+
+def native(t: float, mode: int | None, *, latched: bool = False, seq: int = 0) -> dict:
+    return {
+        "monotonic": t,
+        "feedback": mode is not None,
+        "mode": mode,
+        "latched": latched if mode is not None else None,
+        "applied_sequence": seq if mode is not None else None,
+        "phase": "active",
+    }
+
+
+def test_native_summary_reports_walk_then_idle_without_latch() -> None:
+    rows = [
+        native(0.0, 0, seq=1),
+        native(0.5, 1, seq=5),
+        native(1.5, 1, seq=40),
+        native(2.0, 0, seq=41),
+    ]
+    summary = walk.native_summary(rows)
+    assert summary == {
+        "samples": 4,
+        "walked": True,
+        "ended_idle": True,
+        "latched": False,
+        "feedback_gaps": 0,
+        "applied_sequence_advance": 40,
+    }
+    latched = walk.native_summary([*rows[:-1], native(2.0, 0, latched=True, seq=41)])
+    assert latched["latched"] and latched["ended_idle"]
+    lost = walk.native_summary([*rows, native(2.5, None)])
+    assert lost["feedback_gaps"] == 1 and not lost["ended_idle"]
+
+
+def test_prior_session_counts_only_its_passed_cases_with_the_same_token(tmp_path) -> None:
+    # The native operator stop exits the controller, so later cases run in a new session.
+    token = f"operator-ready-{date.today():%Y%m%d}"
+    old = tmp_path / "s1"
+    old.mkdir()
+    cases = [*passed("idle", "operator_stop"), {"name": "forward_010", "passed": False}]
+    (old / "results.json").write_text(json.dumps({"operator_ready": token, "cases": cases}))
+    prior = walk.prior_passed([old], token)
+    assert [c["name"] for c in prior] == ["idle", "operator_stop"]
+    assert walk.blocked("forward_010", prior) is None
+    assert walk.blocked("turn_left_020", prior) == "requires forward_020"
+    with pytest.raises(SystemExit):
+        walk.prior_passed([old], "operator-ready-20000101")  # another day's readiness
+
+
+def test_idle_accepts_a_one_time_stance_settle_but_not_walking() -> None:
+    # pc2 session 2: a ~1.2 deg heading adjustment as IDLE began, then still (operator: y).
+    settle = {"forward_m": 0.0037, "lateral_m": -0.0065, "yaw_rad": 0.024}
+    assert walk.idle_ok({"walked": False}, settle)
+    assert not walk.idle_ok({"walked": True}, settle)
+    assert not walk.idle_ok({"walked": False}, {**settle, "forward_m": 0.025})
+    assert not walk.idle_ok({"walked": False}, {**settle, "yaw_rad": math.radians(3.5)})
+    assert not walk.idle_ok({"walked": False}, None)
+
+
+def test_turns_are_idle_facing_changes_and_forward_must_walk() -> None:
+    # A pure yaw command keeps the native in IDLE and leads its facing (by design), so a
+    # turn never enters walk mode; forward motion must.
+    idle_turn = {"walked": False, "ended_idle": True, "latched": False}
+    walked = {**idle_turn, "walked": True}
+    left = {"forward_m": 0.0, "lateral_m": 0.0, "yaw_rad": 0.08, "heading_offset_deg": 0.0}
+    assert walk.motion_case_ok(walk.CASES["turn_left_020"], idle_turn, left)
+    assert not walk.motion_case_ok(
+        walk.CASES["turn_left_020"], {**idle_turn, "latched": True}, left
+    )
+    assert not walk.motion_case_ok(walk.CASES["turn_right_020"], idle_turn, left)  # wrong sign
+    ahead = {**left, "forward_m": 0.07, "yaw_rad": 0.0}
+    assert walk.motion_case_ok(walk.CASES["forward_020"], walked, ahead)
+    assert not walk.motion_case_ok(walk.CASES["forward_020"], idle_turn, ahead)
+
+
+FLOODING_CHILD = """
+import json, sys
+for line in sys.stdin:
+    command = json.loads(line)
+    for i in range(4000):  # ~200 KB of log lines between replies, as DimOS logs to stdout
+        print("log line %05d %s" % (i, "x" * 40))
+    print(json.dumps({"op": command["op"]}), flush=True)
+"""
+
+
+def test_child_stdout_logging_cannot_block_replies(tmp_path) -> None:
+    # Session 2026-10-19-5: the peer host's logs filled the undrained stdout pipe and
+    # its next reply blocked; the harness timed out mid-case.
+    import sys
+
+    log = (tmp_path / "child.log").open("w")
+    child = walk.JsonLines(
+        [sys.executable, "-c", FLOODING_CHILD], log, stdout_log=tmp_path / "out.log"
+    )
+    try:
+        for op in ("tele", "tele", "tele"):
+            assert child.call(op, timeout=5.0)["op"] == op
+    finally:
+        child.close("stop")
+        log.close()
+    assert "log line 03999" in (tmp_path / "out.log").read_text()
+
+
+def test_curves_need_forward_progress_and_the_commanded_turn_direction() -> None:
+    left, right = walk.CASES["curve_left_020"], walk.CASES["curve_right_020"]
+    assert (left.vx, left.wz, left.seconds) == (0.2, 0.2, 4.0) and right.wz == -0.2
+    assert walk.blocked("curve_left_020", passed("idle", "operator_stop")) == "requires forward_020"
+    walked = {"walked": True, "ended_idle": True, "latched": False}
+    arc = {"forward_m": 0.45, "lateral_m": 0.15, "yaw_rad": 0.9, "heading_offset_deg": 18.0}
+    assert walk.motion_case_ok(left, walked, arc)
+    assert not walk.motion_case_ok(right, walked, arc)  # turned the wrong way
+    assert not walk.motion_case_ok(left, walked, {**arc, "yaw_rad": 0.01})  # did not turn
+    assert not walk.motion_case_ok(left, walked, {**arc, "forward_m": 0.0})  # did not walk
+
+
+def test_costmap_check_is_read_only_and_always_available() -> None:
+    case = walk.CASES["costmap_check"]
+    assert (case.vx, case.wz, case.requires) == (0.0, 0.0, ())
+    assert walk.blocked("costmap_check", []) is None
+
+
+def test_goal_needs_a_walked_robot_a_free_robot_cell_and_a_clear_corridor() -> None:
+    case = walk.CASES["goal_1m"]
+    assert case.requires == ("curve_left_020", "curve_right_020")
+    clear = {"robot_cell": 0, "values": [0, 0, 0, 0], "occupied_within_0.5m": 0}
+    assert walk.goal_admissible(clear) is None
+    assert walk.goal_admissible(None) == "no costmap yet"
+    assert "robot cell" in walk.goal_admissible({**clear, "robot_cell": -1})
+    assert "ahead" in walk.goal_admissible({**clear, "values": [0, -1, 0, 0]})
+    assert "ahead" in walk.goal_admissible({**clear, "values": [0, 0, 100, 0]})
+    assert "within 0.5 m" in walk.goal_admissible({**clear, "occupied_within_0.5m": 2})
+
+
+def test_left30_goal_is_one_metre_along_a_30_degree_bearing() -> None:
+    case = walk.CASES["goal_1m_left30"]
+    assert case.kind == "goal" and case.requires == walk.CASES["goal_1m"].requires
+    assert walk.CASES["goal_1m"].bearing == 0.0
+    (gx, gy), yaw = walk.goal_pose(1.0, 2.0, math.pi / 2, case.bearing)
+    # Facing +y, 30 deg left is toward -x.
+    assert (gx, gy) == pytest.approx((1.0 - 0.5, 2.0 + math.sqrt(3) / 2))
+    assert yaw == pytest.approx(math.pi / 2 + math.radians(30))
+
+
+def test_rear_occupancy_is_ignored_only_when_opted_in() -> None:
+    clear = {"robot_cell": 0, "values": [0, 0, 0, 0], "occupied_within_0.5m": 0}
+    crane = {**clear, "occupied_within_0.5m": 3, "occupied_within_0.5m_behind": 3}
+    assert "within 0.5 m" in walk.goal_admissible(crane)
+    assert walk.goal_admissible(crane, ignore_rear=True) is None
+    mixed = {**crane, "occupied_within_0.5m": 5}
+    assert "2 ahead" in walk.goal_admissible(mixed, ignore_rear=True)
+    # An old summary without the split never counts as clear behind.
+    assert "within 0.5 m" in walk.goal_admissible(
+        {**clear, "occupied_within_0.5m": 3}, ignore_rear=True
+    )
+
+
+def test_obstacle_cases_need_a_passed_goal_and_carry_their_event() -> None:
+    for name, event in (
+        ("goal_detour", "placed"),
+        ("goal_obstacle_appears", "drop"),
+        ("goal_teleop_cancel", "teleop"),
+    ):
+        case = walk.CASES[name]
+        assert (case.kind, case.event, case.requires) == ("goal", event, ("goal_1m",))
+        assert case.distance == 2.0
+    assert walk.CASES["goal_1m"].distance == walk.GOAL_M and walk.CASES["goal_1m"].event == ""
+    (gx, gy), _ = walk.goal_pose(0.0, 0.0, 0.0, 0.0, distance=2.0)
+    assert (gx, gy) == pytest.approx((2.0, 0.0))
+
+
+def test_placed_obstacle_corridor_sees_a_box_off_the_line() -> None:
+    import numpy as np
+
+    # Session 2026-10-22-6: box cells 0.21-0.4 m left at 0.9-1.3 m ahead, refused 3x
+    # by the single probe line. Sample like peer_host.costmap_summary (0.05 m grid).
+    res, (ox, oy) = 0.05, (-5.0, -5.0)
+    x, y, h = -1.52, 0.05, -2.95
+    grid = np.zeros((200, 200), dtype=np.int8)
+    rows, cols = np.indices(grid.shape)
+    dx, dy = ox + (cols + 0.5) * res - x, oy + (rows + 0.5) * res - y
+    ahead = dx * math.cos(h) + dy * math.sin(h)
+    left = -dx * math.sin(h) + dy * math.cos(h)
+    grid[(ahead > 0.9) & (ahead < 1.3) & (left > 0.21) & (left < 0.4)] = 100
+
+    def summary(probes: list[tuple[float, float]]) -> dict[str, object]:
+        points = walk.probe_points(x, y, h, [*probes, (2.0, 0.0)])
+        values = [int(grid[int((py - oy) // res), int((px - ox) // res)]) for px, py in points]
+        return {"robot_cell": 0, "occupied_within_0.5m": 0, "values": values}
+
+    line = [(a, 0.0) for a, l in walk.OBSTACLE_PROBES if l == 0.0]
+    assert "not seen" in walk.goal_admissible(summary(line), obstacle=True)
+    assert walk.goal_admissible(summary(walk.OBSTACLE_PROBES), obstacle=True) is None
+    # A box beyond the corridor is not the placed obstacle.
+    grid[:] = 0
+    grid[(ahead > 0.9) & (ahead < 1.3) & (left > 0.45) & (left < 0.6)] = 100
+    assert "not seen" in walk.goal_admissible(summary(walk.OBSTACLE_PROBES), obstacle=True)
+
+
+def test_placed_obstacle_must_be_seen_and_the_goal_cell_free() -> None:
+    clear = {"robot_cell": 0, "occupied_within_0.5m": 0}
+    seen = {**clear, "values": [0, 0, 100, 100, 0, 0]}  # probes, then the goal cell
+    assert walk.goal_admissible(seen, obstacle=True) is None
+    assert "not seen" in walk.goal_admissible(
+        {**clear, "values": [0, 0, 0, 0, 0, 0]}, obstacle=True
+    )
+    assert "goal cell" in walk.goal_admissible(
+        {**clear, "values": [0, 100, 0, 0, 0, -1]}, obstacle=True
+    )
+    # Without the obstacle flag an occupied probe still refuses, as before.
+    assert "ahead" in walk.goal_admissible(seen)
+
+
+def test_track_clearance_is_the_nearest_occupied_cell_ahead() -> None:
+    import numpy as np
+
+    grid = np.zeros((80, 80), dtype=np.int8)
+    grid[40, 70] = 100  # box cell centre (1.525, 0.025) for origin (-2, -2), 0.05 m
+    grid[40, 25] = 100  # crane cell centre (-0.725, 0.025), behind a start at the origin
+    cells = walk.occupied_ahead(grid, (-2.0, -2.0), 0.05, (0.0, 0.0, 0.0))
+    assert cells.ravel().tolist() == pytest.approx([1.525, 0.025])
+    # Facing -x, the crane cell is the one ahead.
+    behind = walk.occupied_ahead(grid, (-2.0, -2.0), 0.05, (0.0, 0.0, math.pi))
+    assert behind.ravel().tolist() == pytest.approx([-0.725, 0.025])
+    track = [(0.0, 0.5), (1.5, 0.5)]
+    assert walk.track_clearance(track, cells) == pytest.approx(math.hypot(0.025, 0.475))
+    assert walk.track_clearance(track, np.zeros((0, 2))) is None
+
+
+def test_begin_retries_once_after_a_transient_readiness_lapse() -> None:
+    lapse = {"op": "begin", "error": "ValueError: fresh navigation readiness required"}
+    ok = {"op": "begin", "result": {"phase": "rearming"}}
+    replies = iter([lapse, ok])
+    naps: list[float] = []
+    reply, retried = walk.begin_with_retry(lambda: next(replies), naps.append)
+    assert reply == ok and retried == lapse and naps == [walk.BEGIN_RETRY_S]
+    # Other refusals are real states, not lapses: no retry.
+    other = {
+        "op": "begin",
+        "error": "RuntimeError: navigation or unresolved cancellation is active",
+    }
+    calls = []
+    reply, retried = walk.begin_with_retry(lambda: calls.append(1) or other, naps.append)
+    assert reply == other and retried is None and len(calls) == 1
+
+
+def test_startup_scan_turns_left_right_and_back_after_the_operator_stop() -> None:
+    case = walk.CASES["startup_scan"]
+    assert (case.kind, case.requires) == ("scan", ("operator_stop",))
+    assert walk.SCAN_LEGS_DEG == (60.0, -60.0, 0.0) and case.wz == 0.2
+
+
+def test_unknown_by_bearing_reports_bands_around_the_robot() -> None:
+    import numpy as np
+
+    grid = np.zeros((100, 100), dtype=np.int8)  # 5 m square, origin (-2.5, -2.5)
+    grid[:, :50] = -1  # unknown for x < 0: behind a robot at the origin facing +x
+    out = walk.unknown_by_bearing(grid, (-2.5, -2.5), 0.05, (0.0, 0.0, 0.0))
+    near = out["0.5-1.0 m"]
+    assert len(near) == 12  # 30 deg bins from -180
+    assert near[0] == 100 and near[6] == 0  # behind unknown, ahead known
+    assert out["total"]["1.0-2.0 m"] == pytest.approx(50, abs=3)
+
+
+def test_a_goal_counts_as_planned_only_on_a_non_empty_path_after_it(tmp_path) -> None:
+    # Session 2026-10-22-5: the goal's own start clears the path (empty), then the
+    # planner either sends a plan or, finding none, clears it again and gives up.
+    telemetry = tmp_path / "peer-telemetry.jsonl"
+    rows = [
+        {"peer_monotonic": 5.0, "path_poses": 12},  # an earlier goal's plan
+        {"peer_monotonic": 10.0, "path_poses": 0},
+        {"peer_monotonic": 10.1, "path_poses": 0},
+        {"peer_monotonic": 10.2, "odom": [0.0, 0.0, 0.0, 0.0]},
+    ]
+    telemetry.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert walk.planned_since(telemetry, 9.9) is False
+    with telemetry.open("a") as stream:
+        stream.write(json.dumps({"peer_monotonic": 10.3, "path_poses": 9}) + "\n")
+    assert walk.planned_since(telemetry, 9.9) is True
+
+
+def test_the_map_refresh_is_a_case_available_from_the_start() -> None:
+    assert walk.CASES["refresh_map"].kind == "refresh"
+    assert walk.blocked("refresh_map", []) is None

@@ -60,6 +60,20 @@ class SonicReferenceGuard:
 
 
 @dataclass(frozen=True)
+class PlannerGuardStatus:
+    """Navigation guard state from one coherent native feedback packet."""
+
+    mode: int
+    high_water: int
+    applied_sequence: int
+    rearm_barrier: int
+    lease_armed: bool
+    latched: bool
+    idle_ack_sequence: int
+    fault: str | None
+
+
+@dataclass(frozen=True)
 class SonicFeedback:
     index: int
     source_timestamp: float | None
@@ -74,6 +88,10 @@ class SonicFeedback:
     reference_guard: SonicReferenceGuard | None = None
     # The controller's latent reference, not measured joints or a task-success signal.
     token_state: tuple[float, ...] | None = None
+    base_quat_measured: tuple[float, ...] | None = None
+    reference_heading_quat: tuple[float, ...] | None = None
+    planner_reference_active: bool | None = None
+    planner_guard: PlannerGuardStatus | None = None
 
     def joint_states(self) -> tuple[JointState, JointState, JointState]:
         """Return body/left/right positions and velocities, stamped at local receipt.
@@ -159,6 +177,55 @@ def _reference_guard(value: Any) -> SonicReferenceGuard:
     return guard
 
 
+def _quaternion(payload: dict[str, Any], name: str) -> tuple[float, ...]:
+    vector = _vector(payload, name, 4)
+    norm = math.hypot(*vector)
+    if norm == 0 or not math.isfinite(norm):
+        raise ValueError(f"{name} must have finite nonzero norm")
+    return tuple(value / norm for value in vector)
+
+
+def _planner_active(payload: dict[str, Any]) -> bool:
+    (active,) = _vector(payload, "planner_reference_active", 1)
+    if active not in (0, 1):
+        raise ValueError("planner_reference_active must be [0] or [1]")
+    return active == 1
+
+
+def _planner_guard(value: Any) -> PlannerGuardStatus:
+    if not isinstance(value, dict):
+        raise ValueError("planner_guard must be a map")
+    counters: dict[str, int] = {}
+    for name in ("mode", "high_water", "applied_sequence", "rearm_barrier", "idle_ack_sequence"):
+        counter = value.get(name)
+        if type(counter) is not int or counter < 0:
+            raise ValueError(f"planner_guard.{name} must be nonnegative integer")
+        counters[name] = counter
+    if counters["mode"] not in (0, 1):
+        raise ValueError("planner_guard.mode must be IDLE/SLOW_WALK")
+    if any(
+        counters[name] > counters["high_water"]
+        for name in ("applied_sequence", "rearm_barrier", "idle_ack_sequence")
+    ):
+        raise ValueError("planner_guard acknowledgment cannot exceed high_water")
+    armed, latched = value.get("lease_armed"), value.get("latched")
+    if type(armed) is not bool or type(latched) is not bool:
+        raise ValueError("planner_guard flags must be boolean")
+    fault = value.get("fault")
+    if fault is not None and (not isinstance(fault, str) or len(fault) > 256):
+        raise ValueError("planner_guard.fault must be a bounded string or null")
+    return PlannerGuardStatus(
+        mode=counters["mode"],
+        high_water=counters["high_water"],
+        applied_sequence=counters["applied_sequence"],
+        rearm_barrier=counters["rearm_barrier"],
+        lease_armed=armed,
+        latched=latched,
+        idle_ack_sequence=counters["idle_ack_sequence"],
+        fault=fault,
+    )
+
+
 def decode_feedback(
     packet: bytes, *, received_at: float, received_monotonic: float
 ) -> SonicFeedback:
@@ -194,6 +261,18 @@ def decode_feedback(
             _reference_guard(payload["reference_guard"]) if "reference_guard" in payload else None
         ),
         token_state=_vector(payload, "token_state", 64) if "token_state" in payload else None,
+        base_quat_measured=_quaternion(payload, "base_quat_measured")
+        if "base_quat_measured" in payload
+        else None,
+        reference_heading_quat=_quaternion(payload, "reference_heading_quat")
+        if "reference_heading_quat" in payload
+        else None,
+        planner_reference_active=_planner_active(payload)
+        if "planner_reference_active" in payload
+        else None,
+        planner_guard=_planner_guard(payload["planner_guard"])
+        if "planner_guard" in payload
+        else None,
     )
 
 

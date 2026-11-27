@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "clock": "shared host CLOCK_MONOTONIC seconds",
+  "cases": [
+    {
+      "name": "expired_pending_and_watchdog",
+      "steps": [
+        {"action":"rearm","sequence":10,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":10,"rearm_barrier":10,"lease_armed":false,"latched":false,"mode":0,"applied_sequence":0,"idle_ack_sequence":0}},
+        {"action":"idle","sequence":11,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":11,"applied_sequence":0,"idle_ack_sequence":0}},
+        {"action":"install","now":10.0,"accepted":true,"expect":{"lease_armed":true,"latched":false,"applied_sequence":11,"idle_ack_sequence":11,"mode":0}},
+        {"action":"walk","sequence":12,"deadline":10.01,"now":10.0,"accepted":true,"expect":{"high_water":12,"applied_sequence":11}},
+        {"action":"install","now":10.015,"accepted":false,"expect":{"mode":0,"lease_armed":true,"latched":false,"applied_sequence":11}},
+        {"action":"tick","now":10.251,"expect":{"mode":0,"lease_armed":false,"latched":true,"fault":"planner_watchdog"}}
+      ]
+    },
+    {
+      "name": "healthy_receipt_and_duplicate",
+      "steps": [
+        {"action":"rearm","sequence":10,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":10}},
+        {"action":"idle","sequence":11,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":11}},
+        {"action":"install","now":10.0,"accepted":true,"expect":{"lease_armed":true,"idle_ack_sequence":11}},
+        {"action":"walk","sequence":12,"deadline":10.01,"now":10.0,"accepted":true,"expect":{"high_water":12}},
+        {"action":"install","now":10.0,"accepted":true,"expect":{"mode":1,"applied_sequence":12}},
+        {"action":"tick","now":10.015,"expect":{"mode":0,"latched":false,"lease_armed":true}},
+        {"action":"idle","sequence":13,"deadline":10.4,"now":10.2,"accepted":true,"expect":{"high_water":13}},
+        {"action":"install","now":10.2,"accepted":true,"expect":{"idle_ack_sequence":13,"applied_sequence":13}},
+        {"action":"idle","sequence":13,"deadline":11.0,"now":10.4,"accepted":false,"expect":{"high_water":13,"lease_armed":true,"latched":false}},
+        {"action":"tick","now":10.451,"expect":{"mode":0,"lease_armed":false,"latched":true}}
+      ]
+    },
+    {
+      "name": "rearm_barrier_end_and_latch",
+      "steps": [
+        {"action":"rearm","sequence":10,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":10,"rearm_barrier":10}},
+        {"action":"walk","sequence":11,"deadline":10.2,"now":10.0,"accepted":false,"expect":{"high_water":10,"lease_armed":false}},
+        {"action":"idle","sequence":10,"deadline":10.2,"now":10.0,"accepted":false,"expect":{"high_water":10}},
+        {"action":"idle","sequence":11,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":11,"idle_ack_sequence":0}},
+        {"action":"install","now":10.0,"accepted":true,"expect":{"lease_armed":true,"idle_ack_sequence":11}},
+        {"action":"tick","now":10.251,"expect":{"latched":true,"lease_armed":false}},
+        {"action":"end","sequence":12,"deadline":10.5,"now":10.3,"accepted":true,"expect":{"high_water":12,"latched":true,"idle_ack_sequence":11}},
+        {"action":"ack_end","expect":{"applied_sequence":12,"idle_ack_sequence":12,"latched":true}},
+        {"action":"rearm","sequence":13,"deadline":10.5,"now":10.3,"accepted":true,"expect":{"high_water":13,"rearm_barrier":13,"latched":true}},
+        {"action":"idle","sequence":14,"deadline":10.5,"now":10.3,"accepted":true,"expect":{"high_water":14,"latched":true}},
+        {"action":"install","now":10.3,"accepted":true,"expect":{"lease_armed":true,"latched":false,"idle_ack_sequence":14,"fault":""}}
+      ]
+    },
+    {
+      "name": "pose_suspension_handback_and_legacy_rejection",
+      "steps": [
+        {"action":"rearm","sequence":10,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":10}},
+        {"action":"idle","sequence":11,"deadline":10.2,"now":10.0,"accepted":true,"expect":{"high_water":11}},
+        {"action":"install","now":10.0,"accepted":true,"expect":{"lease_armed":true}},
+        {"action":"pose","expect":{"lease_armed":false,"mode":0,"fault":"pose"}},
+        {"action":"tick","now":20.0,"expect":{"latched":false,"high_water":11}},
+        {"action":"rearm","sequence":12,"deadline":20.2,"now":20.0,"accepted":false,"expect":{"high_water":11}},
+        {"action":"handback","now":20.0,"expect":{"lease_armed":false,"latched":false,"high_water":11,"fault":"handback"}},
+        {"action":"walk","sequence":12,"deadline":20.2,"now":20.0,"accepted":false,"expect":{"high_water":11}},
+        {"action":"legacy","now":20.0,"accepted":false,"expect":{"high_water":11}},
+        {"action":"rearm","sequence":12,"deadline":100.0,"now":20.0,"accepted":true,"expect":{"high_water":12}},
+        {"action":"idle","sequence":13,"deadline":100.0,"now":20.251,"accepted":false,"expect":{"high_water":12,"latched":true,"lease_armed":false}}
+      ]
+    }
+  ]
+}

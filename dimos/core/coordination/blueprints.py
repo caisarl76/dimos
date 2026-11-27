@@ -228,6 +228,10 @@ class BlueprintProtocol(Protocol):
 
     def configurators(self, *checks: "SystemConfigurator") -> Self: ...
 
+    def validators(
+        self, *checks: Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None]
+    ) -> Self: ...
+
 
 @dataclass(frozen=True)
 class Blueprint(BlueprintProtocol):
@@ -245,6 +249,11 @@ class Blueprint(BlueprintProtocol):
 
     requirement_checks: tuple[Callable[[], str | None], ...] = field(default_factory=tuple)
     configurator_checks: "tuple[SystemConfigurator, ...]" = field(default_factory=tuple)
+    # Run on the final composed graph and resolved module kwargs before any
+    # system configuration, transport or worker startup. Raise to reject.
+    validator_checks: tuple[Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None], ...] = (
+        field(default_factory=tuple)
+    )
     hosted_placements: tuple[HostedPlacement, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
@@ -267,13 +276,13 @@ class Blueprint(BlueprintProtocol):
         return state
 
     @classmethod
-    def cbor_decode(cls, data: dict[str, Any]) -> "Blueprint":
+    def cbor_decode(cls, data: dict[str, Any]) -> Self:
         for name in _PROXY_FIELDS:
             data[name] = MappingProxyType(data[name])
         return cls(**data)
 
     @classmethod
-    def create(cls, module: type[ModuleBase], **kwargs: Any) -> "Blueprint":
+    def create(cls, module: type[ModuleBase], **kwargs: Any) -> Self:
         blueprint = BlueprintAtom.create(module, kwargs)
         return cls(blueprints=(blueprint,))
 
@@ -475,6 +484,11 @@ class Blueprint(BlueprintProtocol):
     def configurators(self, *checks: "SystemConfigurator") -> Self:
         return replace(self, configurator_checks=self.configurator_checks + tuple(checks))
 
+    def validators(
+        self, *checks: Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None]
+    ) -> Self:
+        return replace(self, validator_checks=self.validator_checks + tuple(checks))
+
     @cached_property
     def active_blueprints(self) -> tuple[BlueprintAtom, ...]:
         if not self.disabled_modules_tuple:
@@ -585,6 +599,11 @@ class MetaBlueprint(BlueprintProtocol):
     def configurators(self, *checks: "SystemConfigurator") -> Self:
         return self._defer(Blueprint.configurators, *checks)
 
+    def validators(
+        self, *checks: Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None]
+    ) -> Self:
+        return self._defer(Blueprint.validators, *checks)
+
     def solidify(self, *, choices: Mapping[str, str] | None = None) -> Blueprint:
         """Resolve selected alternatives and compose a concrete Blueprint.
 
@@ -660,6 +679,7 @@ def _merge_blueprints(*blueprints: Blueprint) -> Blueprint:
     )
     all_requirement_checks = tuple(check for bs in blueprints for check in bs.requirement_checks)
     all_configurator_checks = tuple(check for bs in blueprints for check in bs.configurator_checks)
+    all_validator_checks = tuple(check for bs in blueprints for check in bs.validator_checks)
     winning_blueprint_indexes = {
         atom.name: index
         for index, blueprint in enumerate(blueprints)
@@ -689,6 +709,7 @@ def _merge_blueprints(*blueprints: Blueprint) -> Blueprint:
         remapping_map=MappingProxyType(all_remappings),
         requirement_checks=all_requirement_checks,
         configurator_checks=all_configurator_checks,
+        validator_checks=all_validator_checks,
         hosted_placements=all_hosted_placements,
     )
 

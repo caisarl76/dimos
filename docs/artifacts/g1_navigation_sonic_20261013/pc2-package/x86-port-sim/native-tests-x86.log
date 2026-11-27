@@ -1,0 +1,185 @@
+[==========] Running 42 tests from 7 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from FK
+[ RUN      ] FK.TestFKAndGlobalVelocities
+Reading motion data from CSV files in: reference/bones_072925_test/
+Error reading directory: filesystem error: directory iterator cannot open directory: No such file or directory [reference/bones_072925_test/]
+unknown file: Failure
+C++ exception with description "Couldn't parse xml file g1/g1_29dof.xml" thrown in the test body.
+
+[  FAILED  ] FK.TestFKAndGlobalVelocities (0 ms)
+[----------] 1 test from FK (0 ms total)
+
+[----------] 6 tests from PlannerHorizon
+[ RUN      ] PlannerHorizon.RefreshesAt54ButNot55RemainingFrames
+[       OK ] PlannerHorizon.RefreshesAt54ButNot55RemainingFrames (0 ms)
+[ RUN      ] PlannerHorizon.UsesObservationWindowPeriodAndLookahead
+[       OK ] PlannerHorizon.UsesObservationWindowPeriodAndLookahead (0 ms)
+[ RUN      ] PlannerHorizon.LegacyIsDisabledByDefault
+[       OK ] PlannerHorizon.LegacyIsDisabledByDefault (0 ms)
+[ RUN      ] PlannerHorizon.NoFutureObservationWindowNeedsNoRefresh
+[       OK ] PlannerHorizon.NoFutureObservationWindowNeedsNoRefresh (0 ms)
+[ RUN      ] PlannerHorizon.ExcludesTurnIdleAndOtherLocomotionModes
+[       OK ] PlannerHorizon.ExcludesTurnIdleAndOtherLocomotionModes (0 ms)
+[ RUN      ] PlannerHorizon.RequiresActivePlayingPlannerMotion
+[       OK ] PlannerHorizon.RequiresActivePlayingPlannerMotion (0 ms)
+[----------] 6 tests from PlannerHorizon (0 ms total)
+
+[----------] 14 tests from PlannerLease
+[ RUN      ] PlannerLease.ExpiredPending
+[       OK ] PlannerLease.ExpiredPending (0 ms)
+[ RUN      ] PlannerLease.HealthyHeartbeatMotionExpiry
+[       OK ] PlannerLease.HealthyHeartbeatMotionExpiry (0 ms)
+[ RUN      ] PlannerLease.DuplicateDoesNotRenew
+[       OK ] PlannerLease.DuplicateDoesNotRenew (0 ms)
+[ RUN      ] PlannerLease.RearmBarrier
+[       OK ] PlannerLease.RearmBarrier (0 ms)
+[ RUN      ] PlannerLease.EndCannotClearLatch
+[       OK ] PlannerLease.EndCannotClearLatch (0 ms)
+[ RUN      ] PlannerLease.PoseSuspendsPlannerLease
+[       OK ] PlannerLease.PoseSuspendsPlannerLease (0 ms)
+[ RUN      ] PlannerLease.HandbackNeedsNewBegin
+[       OK ] PlannerLease.HandbackNeedsNewBegin (0 ms)
+[ RUN      ] PlannerLease.LegacyPlannerRejected
+[       OK ] PlannerLease.LegacyPlannerRejected (0 ms)
+[ RUN      ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath
+[       OK ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath (0 ms)
+[ RUN      ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow
+[       OK ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow (0 ms)
+[ RUN      ] PlannerLease.SharedDeadlineSequenceOracle
+[       OK ] PlannerLease.SharedDeadlineSequenceOracle (0 ms)
+[ RUN      ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload
+[       OK ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload (0 ms)
+[ RUN      ] PlannerLease.ControlParserCannotStartOrStopMotors
+[       OK ] PlannerLease.ControlParserCannotStartOrStopMotors (0 ms)
+[ RUN      ] PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd
+[ZMQEndpointInterface] Connected to 127.0.0.1:34699 topic='pose'
+[ZMQEndpointInterface] Press ENTER to toggle between loaded motions and ZMQ stream
+[ZMQManager] Initialized (default: PLANNER mode)
+  - Host: 127.0.0.1:34699
+  - Command topic: 'command' (start/stop/mode)
+    Format: { start: bool, stop: bool, planner: bool }
+  - Planner topic: 'planner' (movement)
+  - Pose topic: 'pose' (streamed motion)
+[       OK ] PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd (303 ms)
+[----------] 14 tests from PlannerLease (304 ms total)
+
+[----------] 3 tests from PlannerTerminalHold
+[ RUN      ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity (0 ms)
+[ RUN      ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions (0 ms)
+[ RUN      ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity (0 ms)
+[----------] 3 tests from PlannerTerminalHold (0 ms total)
+
+[----------] 5 tests from ReferenceLease
+[ RUN      ] ReferenceLease.RequiresArmAndNonnegativeIndex
+[       OK ] ReferenceLease.RequiresArmAndNonnegativeIndex (0 ms)
+[ RUN      ] ReferenceLease.ExpiresWithoutFirstFrameAtDeadline
+[       OK ] ReferenceLease.ExpiresWithoutFirstFrameAtDeadline (0 ms)
+[ RUN      ] ReferenceLease.DuplicateAndOlderFramesDoNotExtendDeadline
+[       OK ] ReferenceLease.DuplicateAndOlderFramesDoNotExtendDeadline (0 ms)
+[ RUN      ] ReferenceLease.NewFrameCannotReviveExpiredLeaseWithoutPolling
+[       OK ] ReferenceLease.NewFrameCannotReviveExpiredLeaseWithoutPolling (0 ms)
+[ RUN      ] ReferenceLease.IncreasingFramesExtendDeadlineAndRearmPreservesHighWater
+[       OK ] ReferenceLease.IncreasingFramesExtendDeadlineAndRearmPreservesHighWater (0 ms)
+[----------] 5 tests from ReferenceLease (0 ms total)
+
+[----------] 5 tests from ReferenceValidation
+[ RUN      ] ReferenceValidation.ValidatesWholeFrameBeforeReturningIndex
+[       OK ] ReferenceValidation.ValidatesWholeFrameBeforeReturningIndex (0 ms)
+[ RUN      ] ReferenceValidation.RejectsWrongLayoutAndTruncatedPayload
+[       OK ] ReferenceValidation.RejectsWrongLayoutAndTruncatedPayload (0 ms)
+[ RUN      ] ReferenceValidation.RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex
+[       OK ] ReferenceValidation.RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex (0 ms)
+[ RUN      ] ReferenceValidation.DecodesBigEndianIndexAndFloatValidation
+[       OK ] ReferenceValidation.DecodesBigEndianIndexAndFloatValidation (0 ms)
+[ RUN      ] ReferenceValidation.CommandRequiresThreeBooleanScalars
+[       OK ] ReferenceValidation.CommandRequiresThreeBooleanScalars (0 ms)
+[----------] 5 tests from ReferenceValidation (0 ms total)
+
+[----------] 8 tests from Pc2Wire/GuardTelemetry
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/0
+Initializing realtime debug socket
+Binding to port: 52175 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 52175
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/0 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/1
+Initializing realtime debug socket
+Binding to port: 48917 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 48917
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/1 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/2
+Initializing realtime debug socket
+Binding to port: 55377 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 55377
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/2 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/3
+Initializing realtime debug socket
+Binding to port: 33675 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 33675
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/3 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/4
+Initializing realtime debug socket
+Binding to port: 41229 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 41229
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/4 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/5
+Initializing realtime debug socket
+Binding to port: 50013 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 50013
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/5 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/6
+Initializing realtime debug socket
+Binding to port: 51319 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 51319
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/6 (100 ms)
+[ RUN      ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/7
+Initializing realtime debug socket
+Binding to port: 45753 and topic: guard_test
+[INFO] Realtime debug socket bound to port: 45753
+[ZMQ Output DEBUG] ZMQOutputHandler initialized with topics: 'guard_test' (combined state+viz), 'robot_config' (config)
+[ZMQ Output] Robot config cached (1 fields, 7 bytes)
+[       OK ] Pc2Wire/GuardTelemetry.CompleteMessagePreservesTorqueAndGuard/7 (100 ms)
+[----------] 8 tests from Pc2Wire/GuardTelemetry (806 ms total)
+
+[----------] Global test environment tear-down
+[==========] 42 tests from 7 test suites ran. (1111 ms total)
+[  PASSED  ] 41 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] FK.TestFKAndGlobalVelocities
+
+ 1 FAILED TEST

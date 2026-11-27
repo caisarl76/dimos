@@ -1,0 +1,26 @@
+{
+  "fixture_sha256": "7f20818a9d0453049bf7fad7512ce15b8d51182ccdaff37ce92fc20b1d51b46b",
+  "imu_samples": 2000,
+  "cloud_stamps": 100,
+  "saved_raw_clouds": 1,
+  "saved_cloud_points": 20064,
+  "adapter_checks_passed": true,
+  "counts": {
+    "tf": 96,
+    "odometry": 96,
+    "lidar": 96,
+    "global_map": 96,
+    "global_costmap": 83
+  },
+  "stamp_propagation_passed": true,
+  "idle_duplicate_imu_only_passed": true,
+  "network": "none; loopback Zenoh only",
+  "modules": [
+    "CostMapper",
+    "PointLio",
+    "RayTracingVoxelMap"
+  ],
+  "dds_writers": false,
+  "motor_controller": false,
+  "limits": "One saved raw cloud reused at recorded stamps; final IMUs extended to drain scans. No full spatial replay or base extrinsic proof."
+}

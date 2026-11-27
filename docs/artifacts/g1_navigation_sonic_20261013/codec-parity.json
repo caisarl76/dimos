@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "cases": 4,
+  "source": "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic/utils/teleop/zmq/zmq_planner_sender.py",
+  "source_sha256": "f33d7715d36cda8ae64b7ce48d4f5a4c74d73fb1eb9a6c17fe85b3456b023f63",
+  "checks": "Implemented codec exact byte parity against AST-extracted local sender: forward, backward, codec-only strafe and IDLE. No sockets or robot commands."
+}

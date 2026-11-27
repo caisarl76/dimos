@@ -1,0 +1,102 @@
+...FFFF                                                                  [100%]
+=================================== FAILURES ===================================
+__________ test_missing_target_trace_cannot_prove_full_window[start] ___________
+
+complete_trace = PosixPath('/tmp/pytest-of-jihun/pytest-480/test_missing_target_trace_cann0')
+missing = 'start'
+
+    @pytest.mark.parametrize("missing", ["start", "middle", "end"])
+    def test_missing_target_trace_cannot_prove_full_window(complete_trace, missing):
+        assert proof.analyze_run(complete_trace)["cases"][0]["coverage_passed"] is True
+        path = complete_trace / "target-motion.csv.frames.csv"
+        with path.open() as stream:
+            rows = list(csv.reader(stream))
+        keep = {
+            "start": lambda t: t >= 1.2,
+            "middle": lambda t: not 1.5 < t < 1.8,
+            "end": lambda t: t <= 1.4,
+        }[missing]
+        with path.open("w") as stream:
+            csv.writer(stream).writerows([rows[0], *(row for row in rows[1:] if keep(float(row[0])))])
+        case = proof.analyze_run(complete_trace)["cases"][0]
+>       assert case["coverage_passed"] is False
+E       assert True is False
+
+docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py:144: AssertionError
+__________ test_missing_target_trace_cannot_prove_full_window[middle] __________
+
+complete_trace = PosixPath('/tmp/pytest-of-jihun/pytest-480/test_missing_target_trace_cann1')
+missing = 'middle'
+
+    @pytest.mark.parametrize("missing", ["start", "middle", "end"])
+    def test_missing_target_trace_cannot_prove_full_window(complete_trace, missing):
+        assert proof.analyze_run(complete_trace)["cases"][0]["coverage_passed"] is True
+        path = complete_trace / "target-motion.csv.frames.csv"
+        with path.open() as stream:
+            rows = list(csv.reader(stream))
+        keep = {
+            "start": lambda t: t >= 1.2,
+            "middle": lambda t: not 1.5 < t < 1.8,
+            "end": lambda t: t <= 1.4,
+        }[missing]
+        with path.open("w") as stream:
+            csv.writer(stream).writerows([rows[0], *(row for row in rows[1:] if keep(float(row[0])))])
+        case = proof.analyze_run(complete_trace)["cases"][0]
+>       assert case["coverage_passed"] is False
+E       assert True is False
+
+docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py:144: AssertionError
+___________ test_missing_target_trace_cannot_prove_full_window[end] ____________
+
+complete_trace = PosixPath('/tmp/pytest-of-jihun/pytest-480/test_missing_target_trace_cann2')
+missing = 'end'
+
+    @pytest.mark.parametrize("missing", ["start", "middle", "end"])
+    def test_missing_target_trace_cannot_prove_full_window(complete_trace, missing):
+        assert proof.analyze_run(complete_trace)["cases"][0]["coverage_passed"] is True
+        path = complete_trace / "target-motion.csv.frames.csv"
+        with path.open() as stream:
+            rows = list(csv.reader(stream))
+        keep = {
+            "start": lambda t: t >= 1.2,
+            "middle": lambda t: not 1.5 < t < 1.8,
+            "end": lambda t: t <= 1.4,
+        }[missing]
+        with path.open("w") as stream:
+            csv.writer(stream).writerows([rows[0], *(row for row in rows[1:] if keep(float(row[0])))])
+        case = proof.analyze_run(complete_trace)["cases"][0]
+>       assert case["coverage_passed"] is False
+E       assert True is False
+
+docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py:144: AssertionError
+_______ test_large_initial_exclusion_cannot_hide_most_of_command_window ________
+
+complete_trace = PosixPath('/tmp/pytest-of-jihun/pytest-480/test_large_initial_exclusion_c0')
+
+    def test_large_initial_exclusion_cannot_hide_most_of_command_window(complete_trace):
+        blocks = proof.read_blocks(complete_trace / "planner-motion.csv")
+        path = complete_trace / "target-motion.csv.frames.csv"
+        with path.open() as stream:
+            header = next(csv.reader(stream))
+        with path.open("w") as stream:
+            writer = csv.writer(stream)
+            writer.writerow(header)
+            for tick in range(100):
+                block = int(tick >= 95)
+                frame = tick - 95 if block else tick
+                writer.writerow([1.0 + tick * 0.02, frame, *blocks[block][frame]])
+        (complete_trace / "planner-motion.csv.replans.csv").write_text(
+            "started_monotonic,finished_monotonic,mode,speed,mode_changed,periodic\n"
+            "2.85,2.86,1,0.2,1,0\n"
+        )
+        case = proof.analyze_run(complete_trace)["cases"][0]
+>       assert case["coverage_passed"] is False
+E       assert True is False
+
+docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py:165: AssertionError
+=========================== short test summary info ============================
+FAILED docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py::test_missing_target_trace_cannot_prove_full_window[start]
+FAILED docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py::test_missing_target_trace_cannot_prove_full_window[middle]
+FAILED docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py::test_missing_target_trace_cannot_prove_full_window[end]
+FAILED docs/artifacts/g1_navigation_sonic_20261013/test_navigation_horizon_proof.py::test_large_initial_exclusion_cannot_hide_most_of_command_window
+4 failed, 3 passed in 0.17s

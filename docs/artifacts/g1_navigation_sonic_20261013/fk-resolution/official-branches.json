@@ -1,0 +1,34 @@
+[
+  {
+    "name": "chenran-nvidia-patch-1",
+    "sha": "124d74a1d2e0a9f55db211f69a2f691e55456c19"
+  },
+  {
+    "name": "cl/update",
+    "sha": "c2c6ccac839e5d3305b6eea034e0f73ec911507f"
+  },
+  {
+    "name": "gear-sonic",
+    "sha": "bb0ce07241ebfe1da378cdb5927dfb6e0d225219"
+  },
+  {
+    "name": "main",
+    "sha": "45c03facbf848e0c743091b7d9c17952096ff908"
+  },
+  {
+    "name": "ry/fix_lang",
+    "sha": "65e4c6cf4a16f20788cbd7af87b693e7c9953293"
+  },
+  {
+    "name": "ry/hotfix_joint_safety",
+    "sha": "532c7644ee43f450feb9ff81bf0b347d7f1bd658"
+  },
+  {
+    "name": "wip",
+    "sha": "277b178f1af73b18680258b69d02f8219e144b7e"
+  },
+  {
+    "name": "zhengyi/sonic-control-fixes",
+    "sha": "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf"
+  }
+]

@@ -1,0 +1,26 @@
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/fullmatrix-trials/fullmatrix-1 coverage_passed= False
+forward {'eligible_samples': 90, 'terminal_windows_ge3': 12, 'max_terminal_slots': 4, 'max_clamped_slots': 4, 'unmatched_samples': 0, 'coverage_passed': False}
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-1 coverage_passed= True
+forward_transition_0 {'eligible_samples': 91, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+forward_transition_1 {'eligible_samples': 92, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+forward_transition_2 {'eligible_samples': 96, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-2 coverage_passed= True
+forward_transition_0 {'eligible_samples': 90, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+forward_transition_1 {'eligible_samples': 93, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+forward_transition_2 {'eligible_samples': 90, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-3 coverage_passed= True
+forward_transition_0 {'eligible_samples': 91, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+forward_transition_1 {'eligible_samples': 93, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+forward_transition_2 {'eligible_samples': 92, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/fullmatrix-1 coverage_passed= True
+forward {'eligible_samples': 95, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+backward {'eligible_samples': 89, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+noisy_trace_replan_limit {'eligible_samples': 247, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/fullmatrix-2 coverage_passed= True
+forward {'eligible_samples': 96, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+backward {'eligible_samples': 92, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+noisy_trace_replan_limit {'eligible_samples': 249, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/fullmatrix-3 coverage_passed= True
+forward {'eligible_samples': 94, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+backward {'eligible_samples': 94, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}
+noisy_trace_replan_limit {'eligible_samples': 248, 'terminal_windows_ge3': 0, 'max_terminal_slots': 0, 'max_clamped_slots': 0, 'unmatched_samples': 0, 'coverage_passed': True}

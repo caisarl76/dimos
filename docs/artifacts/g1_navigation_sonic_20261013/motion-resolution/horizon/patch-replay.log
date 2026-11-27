@@ -1,0 +1,4 @@
+patching file gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
+patching file gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
+patching file gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/planner_horizon.hpp
+patching file gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_horizon.cpp

@@ -1,0 +1,116 @@
+[
+  {
+    "name": "chenran-nvidia-patch-1",
+    "sha": "124d74a1d2e0a9f55db211f69a2f691e55456c19",
+    "local_object": true,
+    "resource_references": [
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:docs/source/references/motion_reference.md:209:A convenience script `reference/convert_motions.py` is included for converting **joblib pickle** (`.pkl`) files to this format. This is just one possible source \u2014 you can use any tool or pipeline that produces the correct CSV output.",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:docs/source/references/motion_reference.md:213:python reference/convert_motions.py <pkl_file> [output_dir]",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/reference/convert_motions.py:222:        print(\"Usage: python3 convert_motions.py <pkl_file> [output_base_dir]\")",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/reference/convert_motions.py:224:        print(\"  python3 convert_motions.py bones_072925_test.pkl\")",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/reference/convert_motions.py:225:        print(\"  python3 convert_motions.py bones_072925_test.pkl custom_output/\")",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3662:    std::cout << \"  motion_data_path: path to motion data directory (e.g., reference/bones_072925_test/)\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3700:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --planner-file policy/planner.onnx --obs-config policy/single_frame/observation_config.yaml --disable-crc-check\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3701:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/token/model.onnx reference/bones_072925_test/ --obs-config policy/token/observation_config.yaml --encoder-file policy/token/encoder.onnx\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3702:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad --planner-file policy/planner.onnx\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3703:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3704:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq --zmq-host 192.168.1.2 --zmq-port 5556 --zmq-topic pose --zmq-conflate\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3705:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3707:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type ros2 --planner-file policy/planner.onnx\" << std::endl;",
+      "124d74a1d2e0a9f55db211f69a2f691e55456c19:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_fk.cpp:13:    motion_reader.ReadFromCSV(\"reference/bones_072925_test/\");"
+    ],
+    "fixture_paths": []
+  },
+  {
+    "name": "cl/update",
+    "sha": "c2c6ccac839e5d3305b6eea034e0f73ec911507f",
+    "local_object": true,
+    "resource_references": [
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:docs/source/references/motion_reference.md:209:A convenience script `reference/convert_motions.py` is included for converting **joblib pickle** (`.pkl`) files to this format. This is just one possible source \u2014 you can use any tool or pipeline that produces the correct CSV output.",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:docs/source/references/motion_reference.md:213:python reference/convert_motions.py <pkl_file> [output_dir]",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/reference/convert_motions.py:222:        print(\"Usage: python3 convert_motions.py <pkl_file> [output_base_dir]\")",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/reference/convert_motions.py:224:        print(\"  python3 convert_motions.py bones_072925_test.pkl\")",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/reference/convert_motions.py:225:        print(\"  python3 convert_motions.py bones_072925_test.pkl custom_output/\")",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4100:    std::cout << \"  motion_data_path: path to motion data directory (e.g., reference/bones_072925_test/)\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4138:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --planner-file policy/planner.onnx --obs-config policy/single_frame/observation_config.yaml --disable-crc-check\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4139:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/token/model.onnx reference/bones_072925_test/ --obs-config policy/token/observation_config.yaml --encoder-file policy/token/encoder.onnx\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4140:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad --planner-file policy/planner.onnx\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4141:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4142:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq --zmq-host 192.168.1.2 --zmq-port 5556 --zmq-topic pose --zmq-conflate\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4143:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4145:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type ros2 --planner-file policy/planner.onnx\" << std::endl;",
+      "c2c6ccac839e5d3305b6eea034e0f73ec911507f:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_fk.cpp:13:    motion_reader.ReadFromCSV(\"reference/bones_072925_test/\");"
+    ],
+    "fixture_paths": []
+  },
+  {
+    "name": "gear-sonic",
+    "sha": "bb0ce07241ebfe1da378cdb5927dfb6e0d225219",
+    "local_object": true,
+    "resource_references": [
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:docs/source/references/motion_reference.md:209:A convenience script `reference/convert_motions.py` is included for converting **joblib pickle** (`.pkl`) files to this format. This is just one possible source \u2014 you can use any tool or pipeline that produces the correct CSV output.",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:docs/source/references/motion_reference.md:213:python reference/convert_motions.py <pkl_file> [output_dir]",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/reference/convert_motions.py:222:        print(\"Usage: python3 convert_motions.py <pkl_file> [output_base_dir]\")",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/reference/convert_motions.py:224:        print(\"  python3 convert_motions.py bones_072925_test.pkl\")",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/reference/convert_motions.py:225:        print(\"  python3 convert_motions.py bones_072925_test.pkl custom_output/\")",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3662:    std::cout << \"  motion_data_path: path to motion data directory (e.g., reference/bones_072925_test/)\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3700:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --planner-file policy/planner.onnx --obs-config policy/single_frame/observation_config.yaml --disable-crc-check\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3701:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/token/model.onnx reference/bones_072925_test/ --obs-config policy/token/observation_config.yaml --encoder-file policy/token/encoder.onnx\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3702:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad --planner-file policy/planner.onnx\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3703:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3704:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq --zmq-host 192.168.1.2 --zmq-port 5556 --zmq-topic pose --zmq-conflate\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3705:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:3707:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type ros2 --planner-file policy/planner.onnx\" << std::endl;",
+      "bb0ce07241ebfe1da378cdb5927dfb6e0d225219:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_fk.cpp:13:    motion_reader.ReadFromCSV(\"reference/bones_072925_test/\");"
+    ],
+    "fixture_paths": []
+  },
+  {
+    "name": "main",
+    "sha": "45c03facbf848e0c743091b7d9c17952096ff908",
+    "local_object": false
+  },
+  {
+    "name": "ry/fix_lang",
+    "sha": "65e4c6cf4a16f20788cbd7af87b693e7c9953293",
+    "local_object": true,
+    "resource_references": [],
+    "fixture_paths": []
+  },
+  {
+    "name": "ry/hotfix_joint_safety",
+    "sha": "532c7644ee43f450feb9ff81bf0b347d7f1bd658",
+    "local_object": true,
+    "resource_references": [],
+    "fixture_paths": []
+  },
+  {
+    "name": "wip",
+    "sha": "277b178f1af73b18680258b69d02f8219e144b7e",
+    "local_object": true,
+    "resource_references": [],
+    "fixture_paths": []
+  },
+  {
+    "name": "zhengyi/sonic-control-fixes",
+    "sha": "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf",
+    "local_object": true,
+    "resource_references": [
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:docs/source/references/motion_reference.md:209:A convenience script `reference/convert_motions.py` is included for converting **joblib pickle** (`.pkl`) files to this format. This is just one possible source \u2014 you can use any tool or pipeline that produces the correct CSV output.",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:docs/source/references/motion_reference.md:213:python reference/convert_motions.py <pkl_file> [output_dir]",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/reference/convert_motions.py:222:        print(\"Usage: python3 convert_motions.py <pkl_file> [output_base_dir]\")",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/reference/convert_motions.py:224:        print(\"  python3 convert_motions.py bones_072925_test.pkl\")",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/reference/convert_motions.py:225:        print(\"  python3 convert_motions.py bones_072925_test.pkl custom_output/\")",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4138:    std::cout << \"  motion_data_path: path to motion data directory (e.g., reference/bones_072925_test/)\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4178:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --planner-file policy/planner.onnx --obs-config policy/single_frame/observation_config.yaml --disable-crc-check\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4179:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/token/model.onnx reference/bones_072925_test/ --obs-config policy/token/observation_config.yaml --encoder-file policy/token/encoder.onnx\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4180:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad --planner-file policy/planner.onnx\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4181:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type gamepad_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4182:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq --zmq-host 192.168.1.2 --zmq-port 5556 --zmq-topic pose --zmq-conflate\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4183:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type zmq_manager --planner-file policy/planner.onnx --zmq-host localhost --zmq-port 5556\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp:4185:    std::cout << \"  \" << argv[0] << \" enp5s0 policy/single_frame/model.onnx reference/bones_072925_test/ --input-type ros2 --planner-file policy/planner.onnx\" << std::endl;",
+      "a9e433ddc674d1173cf15cb74ea4276c7bf8bcdf:gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_fk.cpp:13:    motion_reader.ReadFromCSV(\"reference/bones_072925_test/\");"
+    ],
+    "fixture_paths": []
+  }
+]

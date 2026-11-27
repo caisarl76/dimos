@@ -1,0 +1,74 @@
+{
+  "sim-ready": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "analysis.json": {
+    "sha256": "2a9546c319af8218ab59425c9d64393dad9460d7cab1c2dfc70c259f4934cf8f",
+    "bytes": 826
+  },
+  "target-motion.csv.frames.csv": {
+    "sha256": "7f3b28db8c4a6621c05c3f47dd1b661caa87f786df400689ea1779eb67663b20",
+    "bytes": 1447684
+  },
+  "planner-motion.csv.replans.csv": {
+    "sha256": "8ebf010c951f926efee1dca5fb62749667056cd0e052269aa580d4b8f9f67ff5",
+    "bytes": 28716
+  },
+  "results.json": {
+    "sha256": "e31e9a2fc3b5416ea4d8e0afe484ede09885439b0cda8e8c7f518f4cb60116e9",
+    "bytes": 508
+  },
+  "planner-motion.csv": {
+    "sha256": "1e6b133a37e3ea66f54658c0c1267e3b0c4c69205cf33166637ac59b613fa1aa",
+    "bytes": 199510
+  },
+  "references.jsonl": {
+    "sha256": "733e2311e81ccf5b621599e4c8c8678e4dd19a4dd3367bcea50983d2fddf390b",
+    "bytes": 1446088
+  },
+  "manifest.json": {
+    "sha256": "0edce27ffb0854df3624197b10006da76048c5560fb59f019e6bb0d7366f1c2c",
+    "bytes": 3410
+  },
+  "target-motion.csv": {
+    "sha256": "c10a4fbf60d7bcd655ba647ea2fe4f7d4a39402feb7f65ffe2dfbfad22fa360f",
+    "bytes": 378491
+  },
+  "telemetry.jsonl": {
+    "sha256": "5d5e7be2a6a053c5435fcdaeb2debc548937a6cced731efd8fb4860cfd5929e6",
+    "bytes": 11135364
+  },
+  "sim-config.json": {
+    "sha256": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+    "bytes": 10216
+  },
+  "physics-latest.json": {
+    "sha256": "2aa3af76214aaedb1f0d338569665f21927130ecb2bfeb8c9027264790956b1b",
+    "bytes": 3790
+  },
+  "sent.jsonl": {
+    "sha256": "fe2e89ea3edb698c818f2a75701ced8822385455398eac93ba95df85e8f899bd",
+    "bytes": 1453622
+  },
+  "deploy.log": {
+    "sha256": "13e897bf69d73592f2ec8177be0c0dceca519f14b219935d271a5c24eb04713b",
+    "bytes": 27638
+  },
+  "physics.jsonl": {
+    "sha256": "6bb52d574273222f4a808f8bb136eebf9159482199fbd40d97730446ddc4fb18",
+    "bytes": 8046327
+  },
+  "sim.log": {
+    "sha256": "cd13413fde34f558b853ab2af2443c9c2e9797c15b12ad381107f7beb9b71b00",
+    "bytes": 130
+  },
+  "sim-stop": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "release": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

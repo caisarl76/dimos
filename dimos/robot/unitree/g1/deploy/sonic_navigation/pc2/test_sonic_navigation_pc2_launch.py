@@ -1,0 +1,226 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Offline launcher gating with stubbed docker/pgrep/sha256sum and a fake sysfs."""
+
+from datetime import date
+import json
+import os
+from pathlib import Path
+import subprocess
+
+import pytest
+
+LAUNCH = Path(__file__).with_name("launch.sh")
+DOCKER = """#!/usr/bin/env bash
+echo "docker $*" >> "$STUB_LOG"
+if [[ "$1 $2" == "container inspect" ]]; then [[ "${STUB_CONTAINER:-0}" == 1 ]]; exit; fi
+if [[ "$*" == *readiness_probe.py* ]]; then
+    out=$(printf '%s\\n' "$@" | sed -n 's/^type=bind,source=\\(.*\\),target=\\/verification$/\\1/p')
+    printf '{"blocking": %s}\\n' "$STUB_BLOCKING" > "$out/readiness.json"
+fi
+"""
+
+
+@pytest.fixture
+def host(tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for name, body in {
+        "docker": DOCKER,
+        "pgrep": (
+            "#!/usr/bin/env bash\n"
+            'if [[ -n "${STUB_SONIC_PIDS:-}" ]]; then printf "%s\\n" $STUB_SONIC_PIDS; exit 0; fi\n'
+            '[[ "${STUB_SONIC:-0}" == 1 ]]\n'
+        ),
+        "sha256sum": (
+            '#!/usr/bin/env bash\necho "sha256sum $*" >> "$STUB_LOG"\n'
+            '[[ "$1" == --check ]] || echo "${STUB_HASH:-stub}  $1"\n'
+        ),
+    }.items():
+        (bin_dir / name).write_text(body)
+        (bin_dir / name).chmod(0o755)
+    sysfs = tmp_path / "sys"
+    for cpu in (0, 1):
+        freq = sysfs / f"devices/system/cpu/cpu{cpu}/cpufreq"
+        freq.mkdir(parents=True)
+        (freq / "scaling_min_freq").write_text("1728000\n")
+        (freq / "cpuinfo_max_freq").write_text("1728000\n")
+    gpu = sysfs / "class/devfreq/17000000.gpu"
+    gpu.mkdir(parents=True)
+    (gpu / "min_freq").write_text("918000000\n")
+    (gpu / "max_freq").write_text("918000000\n")
+    task = tmp_path / "task"
+    (task / "native/gear_sonic_deploy/target/release").mkdir(parents=True)
+    binary = task / "native/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    binary.write_text(f"#!/usr/bin/env bash\necho native-started > {tmp_path}/native-started\n")
+    binary.chmod(0o755)
+    (task / "package").mkdir()
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "SONIC_NAV_TASK_ROOT": str(task),
+        "SONIC_SYSFS_ROOT": str(sysfs),
+        "SONIC_PROC_ROOT": str(tmp_path / "proc"),
+        "STUB_LOG": str(tmp_path / "calls.log"),
+        "STUB_BLOCKING": "[]",
+    }
+    return tmp_path, env
+
+
+def run(env, *args, **extra):
+    return subprocess.run(
+        ["bash", str(LAUNCH), *args], env={**env, **extra}, capture_output=True, text=True
+    )
+
+
+def calls(root):
+    path = root / "calls.log"
+    return path.read_text() if path.exists() else ""
+
+
+TOKEN = f"operator-ready-{date.today():%Y%m%d}"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        (),
+        ("--commission",),
+        ("--commission", "operator-ready-20000101", "native"),
+        ("--commission", TOKEN, "both"),
+        ("--check-only", "extra"),
+        ("--run",),
+    ],
+)
+def test_refuses_without_exact_mode_token_and_component(host, args) -> None:
+    root, env = host
+    assert run(env, *args).returncode == 2
+    assert "docker" not in calls(root) and not (root / "native-started").exists()
+
+
+def test_check_only_runs_reader_probe_and_reports_blocking(host) -> None:
+    root, env = host
+    assert run(env, "--check-only").returncode == 0
+    probe = next(line for line in calls(root).splitlines() if "readiness" in line)
+    assert "--network host" in probe and "--pid host" in probe and "--cap-drop ALL" in probe
+    result = run(env, "--check-only", STUB_BLOCKING=json.dumps(["active_motor_commands"]))
+    assert result.returncode == 1 and "active_motor_commands" in result.stdout
+    assert not (root / "native-started").exists()
+
+
+def test_native_commission_tolerates_only_the_uncommissioned_extrinsic(host) -> None:
+    root, env = host
+    blocked = run(env, "--commission", TOKEN, "native", STUB_BLOCKING='["sonic_process_running"]')
+    assert blocked.returncode == 1 and not (root / "native-started").exists()
+    started = run(
+        env, "--commission", TOKEN, "native", STUB_BLOCKING='["extrinsic_uncommissioned"]'
+    )
+    assert started.returncode == 0 and (root / "native-started").exists()
+
+
+def test_native_commission_refuses_unpinned_clocks_or_a_running_controller(host) -> None:
+    root, env = host
+    (Path(env["SONIC_SYSFS_ROOT"]) / "devices/system/cpu/cpu1/cpufreq/scaling_min_freq").write_text(
+        "729600\n"
+    )
+    assert run(env, "--commission", TOKEN, "native").returncode == 1
+    (Path(env["SONIC_SYSFS_ROOT"]) / "devices/system/cpu/cpu1/cpufreq/scaling_min_freq").write_text(
+        "1728000\n"
+    )
+    assert run(env, "--commission", TOKEN, "native", STUB_SONIC="1").returncode == 1
+    assert not (root / "native-started").exists()
+
+
+def fake_process(root: Path, pid: int, exe: Path) -> None:
+    (root / "proc" / str(pid)).mkdir(parents=True)
+    (root / "proc" / str(pid) / "exe").symlink_to(exe)
+
+
+@pytest.mark.parametrize(
+    ("component", "entry"),
+    [
+        ("graph", "run-pc2-graph.sh\n"),
+        ("graph-agentic", "run-pc2-graph.sh agentic\n"),
+    ],
+)
+def test_graph_refuses_while_a_foreign_sonic_controller_runs(host, component, entry) -> None:
+    # The manipulation controller subscribes to 127.0.0.1:5556 by default, which the
+    # graph's execution owner binds: it must never feed a controller it does not own.
+    root, env = host
+    other = root / "other/target/release/g1_deploy_onnx_ref"
+    other.parent.mkdir(parents=True)
+    other.write_text("")
+    ours = (
+        Path(env["SONIC_NAV_TASK_ROOT"])
+        / "native/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    )
+    fake_process(root, 4242, other)
+    fake_process(root, 4343, ours)
+    refused = run(env, "--commission", TOKEN, component, STUB_SONIC_PIDS="4343 4242")
+    assert refused.returncode == 1 and "4242" in refused.stderr
+    assert "docker run" not in calls(root)
+    assert run(env, "--commission", TOKEN, component, STUB_SONIC_PIDS="4343").returncode == 0
+    assert "docker run" in calls(root) and calls(root).endswith(entry)
+
+
+def test_agentic_graph_config_is_the_pc2_graph_plus_an_explicit_mcp_server() -> None:
+    from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_pc2_agentic import (
+        unitree_g1_sonic_navigation_pc2_agentic,
+    )
+    from dimos.robot.unitree.g1.sonic_navigation_graph import validate_sonic_navigation_graph
+
+    blueprint = unitree_g1_sonic_navigation_pc2_agentic.solidify()
+    config_dir = LAUNCH.parent / "package/config"
+    plain = json.loads((config_dir / "pc2-graph.json").read_text())
+    agentic = json.loads((config_dir / "pc2-graph-agentic.json").read_text())
+    mcp = agentic.pop("mcpserver")
+    assert agentic == plain
+    pc2_address = plain["sonicnavigationsensorsender"]["cloud_bind"].split("//")[1].split(":")[0]
+    assert mcp["host"] == pc2_address
+    probe = json.loads((config_dir / "probe.json").read_text())
+    assert probe["local_ports"]["mcp_server"] == mcp["port"]  # check-only finds it free
+    module_kwargs = {
+        atom.name: {**atom.kwargs, **{**plain, "mcpserver": mcp}.get(atom.name, {})}
+        for atom in blueprint.active_blueprints
+    }
+    validate_sonic_navigation_graph(blueprint, module_kwargs, role="pc2")
+
+
+def test_start_sends_the_operator_start_only_to_this_tasks_idle_controller(host) -> None:
+    root, env = host
+    task = Path(env["SONIC_NAV_TASK_ROOT"])
+    ours = task / "native/gear_sonic_deploy/target/release/g1_deploy_onnx_ref"
+    (task / "provision").mkdir()
+    (task / "provision/controller.sha256").write_text(f"abc123  {ours}\n")
+    fake_process(root, 4343, ours)
+    started = "operator_start.py --start-idle-planner"
+    for refused in (
+        {"STUB_SONIC_PIDS": ""},  # no controller to start
+        {"STUB_SONIC_PIDS": "4343", "STUB_HASH": "abc123", "STUB_CONTAINER": "1"},  # graph up
+        {"STUB_SONIC_PIDS": "4343", "STUB_HASH": "different"},  # not the provisioned binary
+    ):
+        assert run(env, "--commission", TOKEN, "start", **refused).returncode == 1, refused
+        assert started not in calls(root)
+    other = root / "other/g1_deploy_onnx_ref"
+    other.parent.mkdir(parents=True)
+    other.write_text("")
+    fake_process(root, 4242, other)
+    foreign = run(
+        env, "--commission", TOKEN, "start", STUB_SONIC_PIDS="4343 4242", STUB_HASH="abc123"
+    )
+    assert foreign.returncode == 1 and started not in calls(root)
+    ok = run(env, "--commission", TOKEN, "start", STUB_SONIC_PIDS="4343", STUB_HASH="abc123")
+    assert ok.returncode == 0, ok.stderr
+    assert started in calls(root) and "--network host" in calls(root)

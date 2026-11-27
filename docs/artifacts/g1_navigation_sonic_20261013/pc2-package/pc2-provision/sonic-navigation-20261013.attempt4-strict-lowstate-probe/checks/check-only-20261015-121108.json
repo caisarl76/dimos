@@ -1,0 +1,83 @@
+{
+  "started_unix": 1792037468.605941,
+  "observation_seconds": 8.0,
+  "creates_writers_or_command_sockets": false,
+  "clocks": {
+    "pinned": true,
+    "checked": 9,
+    "issues": []
+  },
+  "sonic_processes": [],
+  "ports_in_use": [],
+  "streams": {
+    "lidar_raw": {
+      "samples": 79,
+      "rate_hz": 9.959106477500786,
+      "max_receipt_gap_s": 0.18586895200041909,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792037471.3653283,
+      "last_source_stamp": 1792037479.187735,
+      "budget_s": 0.35,
+      "ready": true
+    },
+    "imu_raw": {
+      "samples": 1596,
+      "rate_hz": 200.58904700352204,
+      "max_receipt_gap_s": 0.11627402199974313,
+      "rollbacks": 0,
+      "duplicates": 0,
+      "first_source_stamp": 1792037471.4059699,
+      "last_source_stamp": 1792037479.3802807,
+      "budget_s": 0.2,
+      "ready": true
+    },
+    "lowstate": {
+      "samples": 8303,
+      "rate_hz": 1040.1732253821017,
+      "max_receipt_gap_s": 0.10234225500062166,
+      "rollbacks": 0,
+      "duplicates": 334,
+      "first_source_stamp": 7834.752,
+      "last_source_stamp": 7842.723,
+      "budget_s": 0.2,
+      "ready": false
+    }
+  },
+  "lowstate": {
+    "samples": 8303,
+    "joints": 29,
+    "finite": true,
+    "tick_advancing": false,
+    "ready": false
+  },
+  "lowcmd_traffic_samples": 0,
+  "command_writers_discovered": [
+    {
+      "topic": "rt/arm_sdk",
+      "participant": "0110ddb0-2239-f4cd-a85e-d345000001c1"
+    },
+    {
+      "topic": "rt/lowcmd",
+      "participant": "01100c61-2f27-464a-f97c-064a000001c1"
+    }
+  ],
+  "conversion_errors": 0,
+  "extrinsic_commissioned": false,
+  "host_load": {
+    "loadavg": [
+      "1.20",
+      "1.09",
+      "0.59"
+    ],
+    "cpus": 8,
+    "mem_available_kb": 14027656,
+    "gpu_load_permille": 0
+  },
+  "blocking": [
+    "stream_unready:lowstate",
+    "lowstate_unready",
+    "extrinsic_uncommissioned"
+  ],
+  "ready": false
+}

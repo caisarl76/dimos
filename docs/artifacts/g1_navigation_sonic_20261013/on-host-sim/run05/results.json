@@ -1,0 +1,80 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5062632120680064,
+      "speed": 0.0036956798396631262,
+      "yaw_rate": -0.01059984192776948
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "start": 1057812.065881718,
+      "end": 1057814.066014387,
+      "forward_displacement_m": 0.10089034530457529,
+      "yaw_change_rad": -0.05264768850577489
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.1815130410250276,
+      "speed": 0.010631481393369746,
+      "yaw_rate": 0.0029652797874974795
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "start": 1057816.242264744,
+      "end": 1057818.241352669,
+      "forward_displacement_m": -0.27707001233120904,
+      "yaw_change_rad": -0.035040989858918264
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.174506086856127,
+      "speed": 0.00289366102908371,
+      "yaw_rate": -0.0009110245646345031
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "start": 1057820.42136035,
+      "end": 1057822.43127057,
+      "forward_displacement_m": 0.0020927015840883,
+      "yaw_change_rad": 0.05606924338973637
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 2.1583021990954876,
+      "speed": 0.013229981075178707,
+      "yaw_rate": -0.008761682009324557
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "start": 1057824.582854168,
+      "end": 1057826.576186322,
+      "forward_displacement_m": 0.00046154932013279794,
+      "yaw_change_rad": -0.1185922427040451
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 1.9634291641414165,
+      "speed": 0.00974906413826878,
+      "yaw_rate": -0.00878927150233974
+    },
+    {
+      "name": "before_noisy_trace_settled",
+      "passed": true,
+      "elapsed": 0.9758306629955769,
+      "speed": 0.0019744336082583693,
+      "yaw_rate": 0.012849678027198944
+    }
+  ],
+  "error": "AssertionError: fixed-target noisy trace triggered excess native replans"
+}

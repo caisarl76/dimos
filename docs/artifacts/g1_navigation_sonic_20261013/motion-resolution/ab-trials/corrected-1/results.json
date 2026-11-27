@@ -1,0 +1,21 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5081879661884159,
+      "speed": 0.0023587052464148404,
+      "yaw_rate": 0.0035246257208993445
+    },
+    {
+      "name": "forward_transition_0",
+      "passed": true,
+      "start": 1139073.892508598,
+      "end": 1139075.899711908,
+      "forward_displacement_m": 0.12002545118270964,
+      "yaw_change_rad": -0.08483727022049788
+    }
+  ],
+  "error": "TimeoutError: forward_transition_0 measured settling"
+}

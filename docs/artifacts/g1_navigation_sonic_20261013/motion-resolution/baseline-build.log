@@ -1,0 +1,7 @@
+[ 18%] Built target TRTInference
+[ 36%] Built target audio_thread
+[ 81%] Built target g1_deploy_shared
+Consolidate compiler generated dependencies of target g1_deploy_onnx_ref
+[ 90%] Building CXX object src/g1/g1_deploy_onnx_ref/CMakeFiles/g1_deploy_onnx_ref.dir/src/g1_deploy_onnx_ref.cpp.o
+[100%] Linking CXX executable /tmp/dimos-g1-sonic-navigation-20261013/build/sonic-navigation-runtime/source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref
+[100%] Built target g1_deploy_onnx_ref

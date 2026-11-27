@@ -1,0 +1,12 @@
+{
+  "initial_commit": "2a5e6a1b55d9d0205a96e757b86007ec020cf589",
+  "initial_test_sha256": "581dc7c4aaecb3200adfa861deff03669f93f1a17278fa08c8b9f84226fa51d7",
+  "initial_test_matches_private": true,
+  "local_git_is_shallow": "false",
+  "known_xml": "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/g1/g1_29dof.xml",
+  "xml_sha256": "439c1ec0806583d73b492da9484b0cb9e9eae215e0d9506e3c2fa69016733532",
+  "fixture_payload_retrieved": false,
+  "fixture_alias_created": false,
+  "source_modified": false,
+  "remedy_status": "Blocked: original recorded fixture/provenance unavailable in checked locations. No path-only correction proven."
+}

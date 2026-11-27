@@ -1,0 +1,136 @@
+[==========] Running 36 tests from 6 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from FK
+[ RUN      ] FK.TestFKAndGlobalVelocities
+Reading motion data from CSV files in: reference/bones_072925_test/
+Error reading directory: filesystem error: directory iterator cannot open directory: No such file or directory [reference/bones_072925_test/]
+unknown file: Failure
+C++ exception with description "Couldn't parse xml file g1/g1_29dof.xml" thrown in the test body.
+[  FAILED  ] FK.TestFKAndGlobalVelocities (0 ms)
+[----------] 1 test from FK (0 ms total)
+
+[----------] 14 tests from PlannerLease
+[ RUN      ] PlannerLease.ExpiredPending
+[       OK ] PlannerLease.ExpiredPending (0 ms)
+[ RUN      ] PlannerLease.HealthyHeartbeatMotionExpiry
+[       OK ] PlannerLease.HealthyHeartbeatMotionExpiry (0 ms)
+[ RUN      ] PlannerLease.DuplicateDoesNotRenew
+[       OK ] PlannerLease.DuplicateDoesNotRenew (0 ms)
+[ RUN      ] PlannerLease.RearmBarrier
+[       OK ] PlannerLease.RearmBarrier (0 ms)
+[ RUN      ] PlannerLease.EndCannotClearLatch
+[       OK ] PlannerLease.EndCannotClearLatch (0 ms)
+[ RUN      ] PlannerLease.PoseSuspendsPlannerLease
+[       OK ] PlannerLease.PoseSuspendsPlannerLease (0 ms)
+[ RUN      ] PlannerLease.HandbackNeedsNewBegin
+[       OK ] PlannerLease.HandbackNeedsNewBegin (0 ms)
+[ RUN      ] PlannerLease.LegacyPlannerRejected
+[       OK ] PlannerLease.LegacyPlannerRejected (0 ms)
+[ RUN      ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath
+[       OK ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath (0 ms)
+[ RUN      ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow
+[       OK ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow (0 ms)
+[ RUN      ] PlannerLease.SharedDeadlineSequenceOracle
+[       OK ] PlannerLease.SharedDeadlineSequenceOracle (0 ms)
+[ RUN      ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload
+[       OK ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload (0 ms)
+[ RUN      ] PlannerLease.ControlParserCannotStartOrStopMotors
+[       OK ] PlannerLease.ControlParserCannotStartOrStopMotors (0 ms)
+[ RUN      ] PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd
+[ZMQEndpointInterface] Connected to 127.0.0.1:33909 topic='pose'
+[ZMQEndpointInterface] Press ENTER to toggle between loaded motions and ZMQ stream
+[ZMQManager] Initialized (default: PLANNER mode)
+  - Host: 127.0.0.1:33909
+  - Command topic: 'command' (start/stop/mode)
+    Format: { start: bool, stop: bool, planner: bool }
+  - Planner topic: 'planner' (movement)
+  - Pose topic: 'pose' (streamed motion)
+  - VR_3PT safety filter: max position step 0.03 m, max orientation step 5 deg, stop after 10 rejects
+[       OK ] PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd (303 ms)
+[----------] 14 tests from PlannerLease (304 ms total)
+
+[----------] 3 tests from PlannerTerminalHold
+[ RUN      ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity (0 ms)
+[ RUN      ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions (0 ms)
+[ RUN      ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity (0 ms)
+[----------] 3 tests from PlannerTerminalHold (0 ms total)
+
+[----------] 5 tests from ReferenceLease
+[ RUN      ] ReferenceLease.RequiresArmAndNonnegativeIndex
+[       OK ] ReferenceLease.RequiresArmAndNonnegativeIndex (0 ms)
+[ RUN      ] ReferenceLease.ExpiresWithoutFirstFrameAtDeadline
+[       OK ] ReferenceLease.ExpiresWithoutFirstFrameAtDeadline (0 ms)
+[ RUN      ] ReferenceLease.DuplicateAndOlderFramesDoNotExtendDeadline
+[       OK ] ReferenceLease.DuplicateAndOlderFramesDoNotExtendDeadline (0 ms)
+[ RUN      ] ReferenceLease.NewFrameCannotReviveExpiredLeaseWithoutPolling
+[       OK ] ReferenceLease.NewFrameCannotReviveExpiredLeaseWithoutPolling (0 ms)
+[ RUN      ] ReferenceLease.IncreasingFramesExtendDeadlineAndRearmPreservesHighWater
+[       OK ] ReferenceLease.IncreasingFramesExtendDeadlineAndRearmPreservesHighWater (0 ms)
+[----------] 5 tests from ReferenceLease (0 ms total)
+
+[----------] 5 tests from ReferenceValidation
+[ RUN      ] ReferenceValidation.ValidatesWholeFrameBeforeReturningIndex
+[       OK ] ReferenceValidation.ValidatesWholeFrameBeforeReturningIndex (0 ms)
+[ RUN      ] ReferenceValidation.RejectsWrongLayoutAndTruncatedPayload
+[       OK ] ReferenceValidation.RejectsWrongLayoutAndTruncatedPayload (0 ms)
+[ RUN      ] ReferenceValidation.RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex
+[       OK ] ReferenceValidation.RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex (0 ms)
+[ RUN      ] ReferenceValidation.DecodesBigEndianIndexAndFloatValidation
+[       OK ] ReferenceValidation.DecodesBigEndianIndexAndFloatValidation (0 ms)
+[ RUN      ] ReferenceValidation.CommandRequiresThreeBooleanScalars
+[       OK ] ReferenceValidation.CommandRequiresThreeBooleanScalars (0 ms)
+[----------] 5 tests from ReferenceValidation (0 ms total)
+
+[----------] 8 tests from Vr3PtSafetyFilter
+[ RUN      ] Vr3PtSafetyFilter.FirstFrameAlwaysAccepted
+[       OK ] Vr3PtSafetyFilter.FirstFrameAlwaysAccepted (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.SmallStepAccepted
+[       OK ] Vr3PtSafetyFilter.SmallStepAccepted (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.LargePositionStepRejectedAndFrozen
+[Vr3PtSafetyFilter] reject: position-step observed=0.3000m limit=0.0300m streak=1
+[       OK ] Vr3PtSafetyFilter.LargePositionStepRejectedAndFrozen (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.LargeQuatStepRejected
+[Vr3PtSafetyFilter] reject: orientation-step observed=1.5708rad limit=0.0873rad streak=1
+[       OK ] Vr3PtSafetyFilter.LargeQuatStepRejected (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.NonUnitQuatIsNormalizedAndAccepted
+[       OK ] Vr3PtSafetyFilter.NonUnitQuatIsNormalizedAndAccepted (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.NaNRejected
+[Vr3PtSafetyFilter] reject: NaN/Inf/invalid-quat observed=0.0000 limit=0.0000 streak=1
+[       OK ] Vr3PtSafetyFilter.NaNRejected (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.EStopAfterStreak
+[Vr3PtSafetyFilter] reject: position-step observed=0.5000m limit=0.0300m streak=1
+[       OK ] Vr3PtSafetyFilter.EStopAfterStreak (0 ms)
+[ RUN      ] Vr3PtSafetyFilter.GoodFrameResetsStreak
+[Vr3PtSafetyFilter] reject: position-step observed=0.5000m limit=0.0300m streak=1
+[Vr3PtSafetyFilter] reject: position-step observed=0.4950m limit=0.0300m streak=1
+[       OK ] Vr3PtSafetyFilter.GoodFrameResetsStreak (0 ms)
+[----------] 8 tests from Vr3PtSafetyFilter (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 36 tests from 6 test suites ran. (304 ms total)
+[  PASSED  ] 35 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] FK.TestFKAndGlobalVelocities
+
+ 1 FAILED TEST

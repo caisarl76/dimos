@@ -1,0 +1,77 @@
+{
+  "status": "study_only",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.4864143969025463,
+      "speed": 0.0007262054403917945,
+      "yaw_rate": -0.00036021380032819685
+    },
+    {
+      "name": "left_4s_1",
+      "passed": true,
+      "start": 1404224.510687674,
+      "end": 1404228.5173662,
+      "seconds": 4.0,
+      "forward_displacement_m": -0.008758533255380507,
+      "yaw_change_rad": 0.63296066331977
+    },
+    {
+      "name": "left_4s_1_settled",
+      "passed": true,
+      "elapsed": 1.9693198199383914,
+      "speed": 0.007534361888359112,
+      "yaw_rate": 0.013788672839195016
+    },
+    {
+      "name": "right_4s_2",
+      "passed": true,
+      "start": 1404230.485227463,
+      "end": 1404234.470755029,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.0008473626001795097,
+      "yaw_change_rad": -0.6512832546446904
+    },
+    {
+      "name": "right_4s_2_settled",
+      "passed": true,
+      "elapsed": 2.3364118670579046,
+      "speed": 0.0038560003995497714,
+      "yaw_rate": -0.017203137245313062
+    },
+    {
+      "name": "left_4s_3",
+      "passed": true,
+      "start": 1404236.820359326,
+      "end": 1404240.830308332,
+      "seconds": 4.0,
+      "forward_displacement_m": -0.004289712355000637,
+      "yaw_change_rad": 0.7185225153174698
+    },
+    {
+      "name": "left_4s_3_settled",
+      "passed": true,
+      "elapsed": 2.220526082906872,
+      "speed": 0.003069500483167361,
+      "yaw_rate": 0.014803989205866733
+    },
+    {
+      "name": "right_4s_4",
+      "passed": true,
+      "start": 1404243.050254253,
+      "end": 1404247.040510632,
+      "seconds": 4.0,
+      "forward_displacement_m": 0.010263819761601425,
+      "yaw_change_rad": -0.6351244526786208
+    },
+    {
+      "name": "right_4s_4_settled",
+      "passed": true,
+      "elapsed": 2.282771202037111,
+      "speed": 0.0028609075009219786,
+      "yaw_rate": -0.017707506057289994
+    }
+  ],
+  "error": null
+}

@@ -1,0 +1,103 @@
+Note: Google Test filter = PlannerHorizon.*:PlannerTerminalHold.*:PlannerLease.*:ReferenceLease.*:ReferenceValidation.*-PlannerLease.ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd
+[==========] Running 32 tests from 5 test suites.
+[----------] Global test environment set-up.
+[----------] 6 tests from PlannerHorizon
+[ RUN      ] PlannerHorizon.RefreshesAt54ButNot55RemainingFrames
+[       OK ] PlannerHorizon.RefreshesAt54ButNot55RemainingFrames (0 ms)
+[ RUN      ] PlannerHorizon.UsesObservationWindowPeriodAndLookahead
+[       OK ] PlannerHorizon.UsesObservationWindowPeriodAndLookahead (0 ms)
+[ RUN      ] PlannerHorizon.LegacyIsDisabledByDefault
+[       OK ] PlannerHorizon.LegacyIsDisabledByDefault (0 ms)
+[ RUN      ] PlannerHorizon.NoFutureObservationWindowNeedsNoRefresh
+[       OK ] PlannerHorizon.NoFutureObservationWindowNeedsNoRefresh (0 ms)
+[ RUN      ] PlannerHorizon.ExcludesTurnIdleAndOtherLocomotionModes
+[       OK ] PlannerHorizon.ExcludesTurnIdleAndOtherLocomotionModes (0 ms)
+[ RUN      ] PlannerHorizon.RequiresActivePlayingPlannerMotion
+[       OK ] PlannerHorizon.RequiresActivePlayingPlannerMotion (0 ms)
+[----------] 6 tests from PlannerHorizon (0 ms total)
+
+[----------] 13 tests from PlannerLease
+[ RUN      ] PlannerLease.ExpiredPending
+[       OK ] PlannerLease.ExpiredPending (0 ms)
+[ RUN      ] PlannerLease.HealthyHeartbeatMotionExpiry
+[       OK ] PlannerLease.HealthyHeartbeatMotionExpiry (0 ms)
+[ RUN      ] PlannerLease.DuplicateDoesNotRenew
+[       OK ] PlannerLease.DuplicateDoesNotRenew (0 ms)
+[ RUN      ] PlannerLease.RearmBarrier
+[       OK ] PlannerLease.RearmBarrier (0 ms)
+[ RUN      ] PlannerLease.EndCannotClearLatch
+[       OK ] PlannerLease.EndCannotClearLatch (0 ms)
+[ RUN      ] PlannerLease.PoseSuspendsPlannerLease
+[       OK ] PlannerLease.PoseSuspendsPlannerLease (0 ms)
+[ RUN      ] PlannerLease.HandbackNeedsNewBegin
+[       OK ] PlannerLease.HandbackNeedsNewBegin (0 ms)
+[ RUN      ] PlannerLease.LegacyPlannerRejected
+[       OK ] PlannerLease.LegacyPlannerRejected (0 ms)
+[ RUN      ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath
+[       OK ] PlannerLease.RejectsInvalidIntentAndNonfiniteWithFastMath (0 ms)
+[ RUN      ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow
+[       OK ] PlannerLease.CapsFutureDeadlineAndBoundsRearmWindow (0 ms)
+[ RUN      ] PlannerLease.SharedDeadlineSequenceOracle
+[       OK ] PlannerLease.SharedDeadlineSequenceOracle (1 ms)
+[ RUN      ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload
+[       OK ] PlannerLease.ParserRejectsMalformedLayoutBeforeReadingPayload (0 ms)
+[ RUN      ] PlannerLease.ControlParserCannotStartOrStopMotors
+[       OK ] PlannerLease.ControlParserCannotStartOrStopMotors (0 ms)
+[----------] 13 tests from PlannerLease (1 ms total)
+
+[----------] 3 tests from PlannerTerminalHold
+[ RUN      ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity (0 ms)
+[ RUN      ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.KeepsMovingSamplesAndTerminalPositions (0 ms)
+[ RUN      ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity
+LocalMotionPlannerBase constructor
+config_.version: 0
+config_.motion_look_ahead_steps: 2
+config_.default_height: 0.78874
+config_.initial_random_seed: 1234
+Available modes number: 4
+[       OK ] PlannerTerminalHold.LegacyPlannerKeepsItsTerminalVelocity (0 ms)
+[----------] 3 tests from PlannerTerminalHold (0 ms total)
+
+[----------] 5 tests from ReferenceLease
+[ RUN      ] ReferenceLease.RequiresArmAndNonnegativeIndex
+[       OK ] ReferenceLease.RequiresArmAndNonnegativeIndex (0 ms)
+[ RUN      ] ReferenceLease.ExpiresWithoutFirstFrameAtDeadline
+[       OK ] ReferenceLease.ExpiresWithoutFirstFrameAtDeadline (0 ms)
+[ RUN      ] ReferenceLease.DuplicateAndOlderFramesDoNotExtendDeadline
+[       OK ] ReferenceLease.DuplicateAndOlderFramesDoNotExtendDeadline (0 ms)
+[ RUN      ] ReferenceLease.NewFrameCannotReviveExpiredLeaseWithoutPolling
+[       OK ] ReferenceLease.NewFrameCannotReviveExpiredLeaseWithoutPolling (0 ms)
+[ RUN      ] ReferenceLease.IncreasingFramesExtendDeadlineAndRearmPreservesHighWater
+[       OK ] ReferenceLease.IncreasingFramesExtendDeadlineAndRearmPreservesHighWater (0 ms)
+[----------] 5 tests from ReferenceLease (0 ms total)
+
+[----------] 5 tests from ReferenceValidation
+[ RUN      ] ReferenceValidation.ValidatesWholeFrameBeforeReturningIndex
+[       OK ] ReferenceValidation.ValidatesWholeFrameBeforeReturningIndex (0 ms)
+[ RUN      ] ReferenceValidation.RejectsWrongLayoutAndTruncatedPayload
+[       OK ] ReferenceValidation.RejectsWrongLayoutAndTruncatedPayload (0 ms)
+[ RUN      ] ReferenceValidation.RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex
+[       OK ] ReferenceValidation.RejectsUnsupportedVersionsDtypesEndianAndNegativeIndex (0 ms)
+[ RUN      ] ReferenceValidation.DecodesBigEndianIndexAndFloatValidation
+[       OK ] ReferenceValidation.DecodesBigEndianIndexAndFloatValidation (0 ms)
+[ RUN      ] ReferenceValidation.CommandRequiresThreeBooleanScalars
+[       OK ] ReferenceValidation.CommandRequiresThreeBooleanScalars (0 ms)
+[----------] 5 tests from ReferenceValidation (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 32 tests from 5 test suites ran. (2 ms total)
+[  PASSED  ] 32 tests.

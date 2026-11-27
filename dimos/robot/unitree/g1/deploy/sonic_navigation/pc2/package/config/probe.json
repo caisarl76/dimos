@@ -1,0 +1,22 @@
+{
+  "interface": "enP8p1s0",
+  "dds_domain": 0,
+  "body_joints": 29,
+  "local_ports": {
+    "native_reference": 5556,
+    "native_feedback": 5557,
+    "sensor_cloud": 17101,
+    "sensor_state": 17102,
+    "graph_zenoh_router": 17111,
+    "mcp_server": 9990
+  },
+  "torso_to_sensor": [
+    0.0002835,
+    3e-05,
+    0.41618,
+    0.9997985784932998,
+    1.2289293145202804e-18,
+    -0.020069938783589012,
+    6.122000644719466e-17
+  ]
+}

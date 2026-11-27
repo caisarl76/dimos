@@ -36,6 +36,10 @@ logger = setup_logger()
 
 
 class ReplanningAStarPlannerConfig(ModuleConfig):
+    min_angular_velocity: float = Field(default=0.2, ge=0, allow_inf_nan=False)
+    # Heading error (rad) above which the robot turns in place before following the path.
+    # Past 90 deg the follower turns in place anyway.
+    initial_rotation_tolerance: float = Field(default=0.35, gt=0, le=1.5708)
     robot_width: float = Field(default_factory=lambda m: m["g"].robot_width)
     robot_rotation_diameter: float = Field(default_factory=lambda m: m["g"].robot_rotation_diameter)
     nerf_speed: float = 1.0
@@ -67,6 +71,8 @@ class ReplanningAStarPlanner(Module, NavigationInterface):
             robot_rotation_diameter=self.config.robot_rotation_diameter,
             nerf_speed=self.config.nerf_speed,
             simulation=bool(self.config.g.simulation),
+            min_angular_velocity=self.config.min_angular_velocity,
+            initial_rotation_tolerance=self.config.initial_rotation_tolerance,
         )
 
     @rpc

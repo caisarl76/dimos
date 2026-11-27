@@ -23,7 +23,6 @@ import zmq
 
 from dimos.robot.unitree.g1.sonic_feedback import FeedbackBuffer, decode_feedback
 from dimos.robot.unitree.g1.sonic_feedback_module import SonicFeedbackModule
-from dimos.robot.unitree.g1.sonic_test_support import WAIT_S
 from dimos.utils.testing.waiting import wait_until
 
 
@@ -157,23 +156,16 @@ def test_invalid_freshness_threshold_is_rejected(threshold):
         FeedbackBuffer(stale_after=threshold)
 
 
-# Expiry tests take a short window; the rest assert fresh feedback, so their window must outlast
-# a slow runner's wait_until polls (0.1 s sleeps) and RPCs after the packet arrived.
-expires_quickly = pytest.mark.parametrize("telemetry", [0.2], indirect=True)
-
-
 @pytest.fixture
-def telemetry(request):
+def telemetry():
     # XPUB lets the fixture wait for subscription readiness without sleeps.
     with zmq.Context() as context, context.socket(zmq.XPUB) as publisher:
         publisher.setsockopt(zmq.LINGER, 0)
         port = publisher.bind_to_random_port("tcp://127.0.0.1")
-        module = SonicFeedbackModule(
-            endpoint=f"tcp://127.0.0.1:{port}", stale_after=getattr(request, "param", 30.0)
-        )
+        module = SonicFeedbackModule(endpoint=f"tcp://127.0.0.1:{port}", stale_after=0.2)
         try:
             module.start()
-            assert publisher.poll(int(WAIT_S * 1000))
+            assert publisher.poll(3000)
             assert publisher.recv() == b"\x01g1_debug"
             yield module, publisher
         finally:
@@ -189,7 +181,7 @@ def test_socket_feedback_reaches_typed_streams_and_rpc(telemetry, payload):
     unsubscribe = module.feedback.subscribe(lambda state: (received.append(state), done.set()))
     try:
         publisher.send(b"g1_debug" + msgpack.packb(payload))
-        assert done.wait(WAIT_S)
+        assert done.wait(3.0)
         assert received[0].body_q[18] == 18.0
         assert bodies[0].name[18] == "g1/left_elbow"
         assert bodies[0].position[18] == 18.0
@@ -204,12 +196,12 @@ def test_socket_feedback_reaches_typed_streams_and_rpc(telemetry, payload):
 def test_bad_frame_does_not_kill_receiver_or_refresh_feedback(telemetry, payload):
     module, publisher = telemetry
     publisher.send(b"g1_debug\xc1")
-    wait_until(lambda: module.get_status()["invalid_packets"] == 1, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["invalid_packets"] == 1, timeout=3.0)
     assert module.get_status()["state"] == "waiting"
     assert module.get_feedback() is None
 
     publisher.send(b"g1_debug" + msgpack.packb(payload))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
     assert module.get_feedback().index == 12
 
 
@@ -223,15 +215,14 @@ def test_absent_publisher_and_stopped_module_never_report_fresh(telemetry):
     assert module.get_feedback() is None
 
 
-@expires_quickly
 def test_lost_stream_expires_without_republishing_old_measurements(telemetry, payload):
     module, publisher = telemetry
     received = []
     unsubscribe = module.feedback.subscribe(received.append)
     try:
         publisher.send(b"g1_debug" + msgpack.packb(payload))
-        wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
-        wait_until(lambda: module.get_status()["state"] == "stale", timeout=WAIT_S)
+        wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
+        wait_until(lambda: module.get_status()["state"] == "stale", timeout=3.0)
         assert module.get_feedback() is None
         assert len(received) == 1
     finally:
@@ -241,7 +232,7 @@ def test_lost_stream_expires_without_republishing_old_measurements(telemetry, pa
 def test_stop_invalidates_a_previously_fresh_snapshot(telemetry, payload):
     module, publisher = telemetry
     publisher.send(b"g1_debug" + msgpack.packb(payload))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
     assert module.get_feedback() is not None
 
     module.stop()
@@ -257,7 +248,7 @@ def test_output_failure_marks_fault_and_hides_cached_snapshot(telemetry, payload
     )
     publisher.send(b"g1_debug" + msgpack.packb(payload))
 
-    wait_until(lambda: module.get_status()["state"] == "fault", timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["state"] == "fault", timeout=3.0)
 
     assert module.get_feedback() is None
     assert module.get_status()["accepted_packets"] == 1
@@ -379,7 +370,7 @@ def test_guard_reaches_typed_stream_and_status_rpc(telemetry, payload, guard_pay
     unsubscribe = module.feedback.subscribe(received.append)
     try:
         publisher.send(b"g1_debug" + msgpack.packb(payload))
-        wait_until(lambda: len(received) == 1, timeout=WAIT_S)
+        wait_until(lambda: len(received) == 1, timeout=3.0)
         assert received[0].reference_guard.planner_confirmed
         assert module.get_status()["reference_guard"] == guard_payload
         assert module.get_feedback().reference_guard.expired
@@ -387,13 +378,12 @@ def test_guard_reaches_typed_stream_and_status_rpc(telemetry, payload, guard_pay
         unsubscribe()
 
 
-@expires_quickly
 def test_stale_guard_never_reports_current_handover_confirmation(telemetry, payload, guard_payload):
     module, publisher = telemetry
     payload["reference_guard"] = guard_payload
     publisher.send(b"g1_debug" + msgpack.packb(payload))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
-    wait_until(lambda: module.get_status()["state"] == "stale", timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
+    wait_until(lambda: module.get_status()["state"] == "stale", timeout=3.0)
     assert module.get_feedback() is None
     assert module.get_status()["reference_guard"] is None
 
@@ -401,22 +391,21 @@ def test_stale_guard_never_reports_current_handover_confirmation(telemetry, payl
 def test_missing_guard_replaces_previous_confirmation(telemetry, payload, guard_payload):
     module, publisher = telemetry
     publisher.send(b"g1_debug" + msgpack.packb(payload | {"reference_guard": guard_payload}))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
     publisher.send(b"g1_debug" + msgpack.packb(payload | {"index": 13}))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 2, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 2, timeout=3.0)
     assert module.get_status()["state"] == "fresh"
     assert module.get_status()["reference_guard"] is None
     assert module.get_feedback().reference_guard is None
 
 
-@expires_quickly
 def test_malformed_guard_does_not_refresh_last_confirmed_sample(telemetry, payload, guard_payload):
     module, publisher = telemetry
     publisher.send(b"g1_debug" + msgpack.packb(payload | {"reference_guard": guard_payload}))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
     publisher.send(b"g1_debug" + msgpack.packb(payload | {"index": 13, "reference_guard": {}}))
-    wait_until(lambda: module.get_status()["invalid_packets"] == 1, timeout=WAIT_S)
-    wait_until(lambda: module.get_status()["state"] == "stale", timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["invalid_packets"] == 1, timeout=3.0)
+    wait_until(lambda: module.get_status()["state"] == "stale", timeout=3.0)
     assert module.get_status()["reference_guard"] is None
     assert module.get_status()["accepted_packets"] == 1
 
@@ -427,7 +416,7 @@ def test_guard_confirmation_is_unavailable_when_receiver_ends(
 ):
     module, publisher = telemetry
     publisher.send(b"g1_debug" + msgpack.packb(payload | {"reference_guard": guard_payload}))
-    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=WAIT_S)
+    wait_until(lambda: module.get_status()["accepted_packets"] == 1, timeout=3.0)
     if ending == "stopped":
         module.stop()
     else:
@@ -437,7 +426,86 @@ def test_guard_confirmation_is_unavailable_when_receiver_ends(
         publisher.send(
             b"g1_debug" + msgpack.packb(payload | {"index": 13, "reference_guard": guard_payload})
         )
-        wait_until(lambda: module.get_status()["state"] == "fault", timeout=WAIT_S)
+        wait_until(lambda: module.get_status()["state"] == "fault", timeout=3.0)
     assert module.get_status()["state"] == ending
     assert module.get_status()["reference_guard"] is None
     assert module.get_feedback() is None
+
+
+def test_navigation_fields_are_optional_and_packet_coherent(payload):
+    legacy = decode(payload)
+    assert legacy.base_quat_measured is None
+    assert legacy.reference_heading_quat is None
+    assert legacy.planner_reference_active is None
+    payload.update(
+        base_quat_measured=[2, 0, 0, 0],
+        reference_heading_quat=[1, 0, 0, 0],
+        planner_reference_active=[1],
+    )
+    state = decode(payload)
+    assert state.base_quat_measured == (1, 0, 0, 0)
+    assert state.reference_heading_quat == (1, 0, 0, 0)
+    assert state.planner_reference_active is True
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("base_quat_measured", [0, 0, 0, 0]),
+        ("base_quat_measured", [1, 0, 0]),
+        ("base_quat_measured", [float("nan"), 0, 0, 0]),
+        ("reference_heading_quat", [True, 0, 0, 0]),
+        ("planner_reference_active", [2]),
+        ("planner_reference_active", [True]),
+        ("planner_reference_active", [0, 1]),
+        ("planner_reference_active", None),
+    ],
+)
+def test_malformed_navigation_field_cannot_refresh_feedback(payload, field, value):
+    buffer = FeedbackBuffer(stale_after=0.2)
+    buffer.accept(decode(payload))
+    payload[field] = value
+    with pytest.raises(ValueError):
+        buffer.accept(decode(payload))
+    assert buffer.latest(now=100.2) is None
+
+
+@pytest.fixture
+def planner_guard_payload():
+    return {
+        "mode": 0,
+        "high_water": 12,
+        "applied_sequence": 12,
+        "rearm_barrier": 10,
+        "lease_armed": True,
+        "latched": False,
+        "idle_ack_sequence": 11,
+        "fault": None,
+    }
+
+
+def test_planner_guard_is_typed_and_distinct_from_pose(payload, planner_guard_payload):
+    payload["planner_guard"] = planner_guard_payload
+    state = decode(payload)
+    assert state.reference_guard is None
+    assert state.planner_guard.high_water == 12
+    assert state.planner_guard.idle_ack_sequence == 11
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("high_water", -1),
+        ("applied_sequence", 13),
+        ("idle_ack_sequence", 13),
+        ("rearm_barrier", 13),
+        ("mode", 2),
+        ("latched", 1),
+        ("fault", 3),
+    ],
+)
+def test_invalid_planner_guard_rejected(payload, planner_guard_payload, field, value):
+    planner_guard_payload[field] = value
+    payload["planner_guard"] = planner_guard_payload
+    with pytest.raises(ValueError):
+        decode(payload)

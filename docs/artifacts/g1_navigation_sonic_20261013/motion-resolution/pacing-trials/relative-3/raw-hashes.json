@@ -1,0 +1,86 @@
+{
+  "conversions.jsonl": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "deploy.log": {
+    "sha256": "402dca3a05546c32b86eb3ca70f1f8be24767910ab05be7f018a8a370ee16eda",
+    "bytes": 37746
+  },
+  "harness.py": {
+    "sha256": "750a936747834c950b398030d73d31c6840a3bc4640fab7bb0575d91780c62ae",
+    "bytes": 39559
+  },
+  "inputs.jsonl": {
+    "sha256": "6e8fdeb15f06f22a7f4ee6103a5cbec8130ab41c4bb378bbfe923ca955c156c9",
+    "bytes": 163857
+  },
+  "manifest.json": {
+    "sha256": "3bab6aedd072ef67a6cd6407c070ae639d43592e6ff5218fcda477f38120ff6d",
+    "bytes": 3707
+  },
+  "noise-helper.py": {
+    "sha256": "b78963675465e5c873212d287e4229e388f63b041f2eb98e1f2f99d380f0c6bd",
+    "bytes": 3735
+  },
+  "physics-latest.json": {
+    "sha256": "19ab32c7b1a9c59cf617a451412c4f9bb41bd944627b79e94a9e2b89b1855ee0",
+    "bytes": 3883
+  },
+  "physics.jsonl": {
+    "sha256": "5ec472d11f56389a517c8f21e0a19dc5a5a0b57b21922771edbb4d1b9f2cbdbe",
+    "bytes": 12887085
+  },
+  "planner-motion.csv": {
+    "sha256": "087cde063e707ce7949839d692d46e476c362a8dd0d08f03491ad3ef25c3546f",
+    "bytes": 623391
+  },
+  "planner-motion.csv.replans.csv": {
+    "sha256": "57983adb7ff0fdc134c6706e6dd877798c5e5f92da699847b43730c9efc6f24c",
+    "bytes": 96383
+  },
+  "references.jsonl": {
+    "sha256": "3ade4f215c1115362daa30dba8afea9baa1a159b4b1236c3d98ee2c39af070cd",
+    "bytes": 4422522
+  },
+  "release": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "results.json": {
+    "sha256": "c4c2f678ad8ad5888057c7bbe278cf9d9402c5d4ebb7883ff20d4ebeeb14f427",
+    "bytes": 1557
+  },
+  "sent.jsonl": {
+    "sha256": "dfedf765469a1bebe171e393a39d6a061e3b9895707adc1f3f0fbe1ef723490f",
+    "bytes": 4456330
+  },
+  "sim-config.json": {
+    "sha256": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+    "bytes": 10216
+  },
+  "sim-ready": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "sim-stop": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "sim.log": {
+    "sha256": "da31a6207fef99c85dd88312d278e805f224b286c916e215ec01fbd73885f565",
+    "bytes": 130
+  },
+  "target-motion.csv": {
+    "sha256": "67416997f016140764068eb468c8b70de9cc2cfe4d93dba1407be94ed6675afc",
+    "bytes": 812044
+  },
+  "target-motion.csv.frames.csv": {
+    "sha256": "15089ebb7f27a6d3aa636a94db85b973b390433e77809c58ddad36fbf8f24c16",
+    "bytes": 3130288
+  },
+  "telemetry.jsonl": {
+    "sha256": "bf763943ceda19e73601774e8ec66ba1706fbd6def62c93e13e479e9b3064a56",
+    "bytes": 21648171
+  }
+}

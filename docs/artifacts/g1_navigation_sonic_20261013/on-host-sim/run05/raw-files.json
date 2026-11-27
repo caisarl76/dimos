@@ -1,0 +1,66 @@
+{
+  "sim-ready": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "target-motion.csv.frames.csv": {
+    "sha256": "33e3a14a318c10d3e14621e6ffc8b77e5ac6f9a8b65c2ecaa180fa50653bdda2",
+    "bytes": 2650636
+  },
+  "planner-motion.csv.replans.csv": {
+    "sha256": "3e16a8413cd4685d485885f9b71d51c3c104d743974025c832537249ba0db3e3",
+    "bytes": 137177
+  },
+  "results.json": {
+    "sha256": "1bd6d849a53753e352c88ff151b2492d1e01f6d14cc66deb43e35e328deba899",
+    "bytes": 2142
+  },
+  "planner-motion.csv": {
+    "sha256": "71ac359191010e05de7bdc0c0d9b893116289100002ff33e02bf4574485f2b3b",
+    "bytes": 934094
+  },
+  "references.jsonl": {
+    "sha256": "a38a24245a2d51bbe27b99663552e7e266af2d32d4a4fccc1c252162c3a57edc",
+    "bytes": 3711202
+  },
+  "manifest.json": {
+    "sha256": "afefa02f339f2015c57a04d962eb9500401cc1458d334179d072a9bb72566f0d",
+    "bytes": 2126
+  },
+  "target-motion.csv": {
+    "sha256": "a02ace97d5ab4e554a20142d130cf4bdf6a1e3c04f476f5accb2fa224a9d2085",
+    "bytes": 686879
+  },
+  "telemetry.jsonl": {
+    "sha256": "2abfa9247feac1f2b4406da502e106385ce237020b64a2ed02164d61eb625f11",
+    "bytes": 18227155
+  },
+  "sim-config.json": {
+    "sha256": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+    "bytes": 10216
+  },
+  "physics-latest.json": {
+    "sha256": "56c4bffa6cff5702fb29243aede3b85de616c212030e3ed009311ac793ffb70a",
+    "bytes": 3789
+  },
+  "deploy.log": {
+    "sha256": "f29095777897f33b4d0669c3ac54a127f6d4ea75500aeacd34b2f32b75e0bcbb",
+    "bytes": 37440
+  },
+  "physics.jsonl": {
+    "sha256": "60a0612aa5d7f570132903adf2bec2b0006d1e5e8c1e5efd54daf33a69b58591",
+    "bytes": 11200765
+  },
+  "sim.log": {
+    "sha256": "4126b4aec5bcad5fdabae646060d05a61ed4ff34d38dd824d1ac1f96409da869",
+    "bytes": 130
+  },
+  "sim-stop": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "release": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

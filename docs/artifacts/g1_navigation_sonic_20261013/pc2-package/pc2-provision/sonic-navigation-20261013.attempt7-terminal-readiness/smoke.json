@@ -1,0 +1,9 @@
+{
+  "smoke": "passed",
+  "modules": [
+    "sonicexecutionmodule",
+    "sonicnavigationrelaymodule",
+    "sonicnavigationsensorsender"
+  ],
+  "planner_packet_bytes": 1339
+}

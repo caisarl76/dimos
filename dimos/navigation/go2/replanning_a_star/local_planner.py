@@ -76,6 +76,8 @@ class LocalPlanner(Resource):
         robot_width: float,
         nerf_speed: float = 1.0,
         simulation: bool = False,
+        min_angular_velocity: float = 0.2,
+        initial_rotation_tolerance: float = 0.35,
     ) -> None:
         self.cmd_vel = Subject()
         self.stopped_navigating = Subject()
@@ -89,6 +91,9 @@ class LocalPlanner(Resource):
         self._robot_width = robot_width
         self._navigation_map = navigation_map
         self._goal_tolerance = goal_tolerance
+        # Below this heading error the robot walks off and turns along the way;
+        # the arrival rotation keeps _orientation_tolerance.
+        self._initial_rotation_tolerance = initial_rotation_tolerance
 
         speed = self._speed
         if nerf_speed < 1.0:
@@ -98,6 +103,7 @@ class LocalPlanner(Resource):
             simulation,
             speed,
             self._control_frequency,
+            min_angular_velocity=min_angular_velocity,
         )
 
     def start(self) -> None:
@@ -184,7 +190,7 @@ class LocalPlanner(Resource):
             robot_yaw = current_odom.orientation.euler[2]
             initial_yaw_error = angle_diff(first_yaw, robot_yaw)
             self._controller.reset_yaw_error(initial_yaw_error)
-            angle_in_tolerance = abs(initial_yaw_error) < self._orientation_tolerance
+            angle_in_tolerance = abs(initial_yaw_error) < self._initial_rotation_tolerance
             if angle_in_tolerance:
                 position_in_tolerance = (
                     path.poses[0].position.distance(current_odom.position) < 0.01
@@ -249,7 +255,7 @@ class LocalPlanner(Resource):
         robot_yaw = current_odom.orientation.euler[2]
         yaw_error = angle_diff(first_yaw, robot_yaw)
 
-        if abs(yaw_error) < self._orientation_tolerance:
+        if abs(yaw_error) < self._initial_rotation_tolerance:
             with self._lock:
                 self._change_state("path_following")
             return self._compute_path_following()

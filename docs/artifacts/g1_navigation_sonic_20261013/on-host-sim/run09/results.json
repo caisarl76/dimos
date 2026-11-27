@@ -1,0 +1,30 @@
+{
+  "status": "failed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5069875940680504,
+      "speed": 0.002531432154517809,
+      "yaw_rate": -0.010596388284669642
+    },
+    {
+      "name": "before_noisy_trace_settled",
+      "passed": true,
+      "elapsed": 0.5131270589772612,
+      "speed": 0.0027306746193805766,
+      "yaw_rate": -0.009350081806529688
+    },
+    {
+      "name": "noisy_trace_replan_limit",
+      "passed": false,
+      "start": 1067573.949853998,
+      "end": 1067578.951657085,
+      "native_state_replans": 19,
+      "navigation_active": true,
+      "yaw_noise_rad": 0.005,
+      "source": "PController.advance, 0.2 m/s, alternating +/-0.01 rad lookahead error"
+    }
+  ],
+  "error": "AssertionError: fixed-target noisy trace triggered excess native replans"
+}

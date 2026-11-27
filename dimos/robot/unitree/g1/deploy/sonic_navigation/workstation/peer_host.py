@@ -1,0 +1,586 @@
+# Copyright 2026 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Workstation host of the two-host simulation: the validated peer blueprint, unmodified.
+
+Runs in its own process (and monotonic time namespace) with a private zenoh
+router. stdin carries JSON control lines; stdout carries JSON replies only.
+Teleop enters through MovementManager's existing tele_cmd_vel input. The torso
+-> MID360 mount is the nominal URDF value: a stand-in in simulation, and on the
+robot (walk_harness.py) only after the operator accepted it that day.
+"""
+
+from __future__ import annotations
+
+import argparse
+from functools import partial
+import hashlib
+import importlib
+import json
+import math
+import os
+from pathlib import Path
+import sys
+import threading
+import time
+from typing import Any, cast
+
+import numpy as np
+import psutil
+import zenoh
+
+from dimos.core.coordination.blueprint_config.parser import BlueprintConfigParser
+from dimos.core.coordination.module_coordinator import ModuleCoordinator
+from dimos.core.coordination.worker_manager_python import WorkerManagerPython
+from dimos.msgs.geometry_msgs.Pose import Pose
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
+from dimos.msgs.geometry_msgs.Quaternion import Quaternion
+from dimos.msgs.geometry_msgs.Transform import Transform
+from dimos.msgs.geometry_msgs.Twist import Twist
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
+from dimos.msgs.nav_msgs.OccupancyGrid import OccupancyGrid
+from dimos.msgs.nav_msgs.Odometry import Odometry
+from dimos.msgs.nav_msgs.Path import Path as NavPath
+from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
+from dimos.robot.unitree.g1.blueprints.navigation.unitree_g1_sonic_navigation_peer import (
+    unitree_g1_sonic_navigation_peer,
+)
+from dimos.robot.unitree.g1.g1_tf_publisher import (
+    _WAIST_PITCH_IDX,
+    _WAIST_ROLL_IDX,
+    _WAIST_YAW_IDX,
+    base_to_torso,
+    torso_to_mid360,
+)
+from dimos.robot.unitree.g1.sonic_navigation_peer_module import SonicNavigationPeerModule
+from dimos.robot.unitree.g1.sonic_navigation_readiness import INPUT_BUDGETS
+from dimos.robot.unitree.g1.sonic_navigation_sensor_module import SonicNavigationSensorReceiver
+
+NATIVE_NAMES = ("pointlio_native", "voxel_ray_tracing")
+SYNTHETIC_CELLS, SYNTHETIC_RESOLUTION = 200, 0.05  # a 10 m square around the robot
+# Operator map refresh (sessions 2026-10-22-2..6): voxels the operator's body left in
+# the near field, which the MID360 cannot re-observe to clear, are removed above the
+# mapped floor around the robot; live scans rebuild whatever is still visible.
+REFRESH_RADIUS_M = 2.5
+REFRESH_FLOOR_MARGIN_M = 0.12  # one and a half 0.08 m voxels: both floor layers stay
+REFRESH_HEADROOM_M = 1.5  # above the base: past the sensor and anything mapped near it
+# A lidar recording holds every scan in memory: 60 s of MID360 is about 70 MB.
+RECORD_MAX_S = 60.0
+RECORD_MAP_RADIUS_M = 3.0
+
+
+class LidarRecording:
+    """PointLio's sensor-frame scans and sensor poses over a bounded window: what the ray
+    map registered, so it can be replayed offline to see why voxels a person left behind
+    were not cleared (sessions 2026-10-22-3..6)."""
+
+    def __init__(self, seconds: float, now: float) -> None:
+        if not 0 < seconds <= RECORD_MAX_S:
+            raise ValueError(f"recording window must be within (0, {RECORD_MAX_S}] s")
+        self.until = now + seconds
+        self.frame_id = ""
+        self.scans: list[tuple[float, Any]] = []
+        self.poses: list[list[float]] = []
+
+    def add_scan(self, now: float, ts: float, frame_id: str, points: Any) -> None:
+        if now <= self.until:
+            self.frame_id = frame_id
+            self.scans.append((ts, np.asarray(points, dtype=np.float32)))
+
+    def add_pose(self, now: float, pose: list[float]) -> None:
+        """Sensor pose in odom: x, y, z, qx, qy, qz, qw, stamp."""
+        if now <= self.until:
+            self.poses.append(pose)
+
+    def save(self, path: Path, map_before: Any, map_after: Any) -> dict[str, Any]:
+        sizes = [len(points) for _, points in self.scans]
+        np.savez_compressed(
+            path,
+            points=np.concatenate([p for _, p in self.scans]) if self.scans else np.zeros((0, 3)),
+            scan_offsets=np.concatenate([[0], np.cumsum(sizes)]).astype(np.int64),
+            scan_ts=np.array([ts for ts, _ in self.scans]),
+            frame_id=self.frame_id,
+            poses=np.array(self.poses).reshape(-1, 8),
+            map_before=map_before,
+            map_after=map_after,
+        )
+        return {
+            "scans": len(sizes),
+            "points": int(sum(sizes)),
+            "poses": len(self.poses),
+            "frame_id": self.frame_id,
+        }
+
+
+def truth_sensor_pose(row: dict[str, Any], mount: Transform) -> Transform:
+    """Simulation only: odom->mid360_link from the MuJoCo pelvis and waist joints.
+
+    odom is the MuJoCo world. The chain matches the robot (pelvis, waist, mount), so the
+    production receiver composes it back into the pelvis pose.
+    """
+    qpos = row["qpos"]
+    w, x, y, z = qpos[3:7]
+    joints = qpos[7:]
+    pelvis = Transform(
+        translation=Vector3(*qpos[:3]),
+        rotation=Quaternion(x, y, z, w),
+        frame_id="odom",
+        child_frame_id="base_link",
+    )
+    waist = base_to_torso(joints[_WAIST_YAW_IDX], joints[_WAIST_ROLL_IDX], joints[_WAIST_PITCH_IDX])
+    return pelvis + waist + mount
+
+
+def synthetic_grid(x: float, y: float, obstacles: list[list[float]], ts: float) -> OccupancyGrid:
+    """Simulation-only costmap: free around (x, y), with oriented boxes occupied.
+
+    Each obstacle is [cx, cy, half_x, half_y, yaw]: half extents along the box's own axes.
+    """
+    half = SYNTHETIC_CELLS * SYNTHETIC_RESOLUTION / 2
+    ox, oy = x - half, y - half
+    cells = np.zeros((SYNTHETIC_CELLS, SYNTHETIC_CELLS), dtype=np.int8)
+    rows, cols = np.indices(cells.shape)
+    cx = ox + (cols + 0.5) * SYNTHETIC_RESOLUTION
+    cy = oy + (rows + 0.5) * SYNTHETIC_RESOLUTION
+    for bx, by, hx, hy, yaw in obstacles:
+        c, s = math.cos(yaw), math.sin(yaw)
+        along = (cx - bx) * c + (cy - by) * s
+        across = -(cx - bx) * s + (cy - by) * c
+        cells[(np.abs(along) <= hx) & (np.abs(across) <= hy)] = 100
+    return OccupancyGrid(
+        grid=cells,
+        resolution=SYNTHETIC_RESOLUTION,
+        origin=Pose(position=Vector3(ox, oy, 0.0)),
+        frame_id="odom",
+        ts=ts,
+    )
+
+
+if os.environ.get("SONIC_TWO_HOST_OUTPUT"):
+    # Workers re-import this entry module: audit link control calls (behavior unchanged).
+    # Simulation-only module from docs/artifacts on sys.path, not a dependency.
+    importlib.import_module("demo_navigation_audit").install()
+
+
+def reply(**fields: Any) -> None:
+    sys.stdout.write(json.dumps(fields) + "\n")
+    sys.stdout.flush()
+
+
+def open_router(endpoint: str) -> Any:
+    config = zenoh.Config()
+    for key, value in {
+        "mode": "router",
+        "listen/endpoints": [endpoint],
+        "connect/endpoints": [],
+        "scouting/multicast/enabled": False,
+        "scouting/gossip/enabled": True,
+    }.items():
+        config.insert_json5(key, json.dumps(value))
+    return zenoh.open(config)
+
+
+def save_snapshot(path: str, cloud: PointCloud2, grid: OccupancyGrid, odom: Odometry) -> None:
+    """Map points within 2 m of the robot, the costmap grid and the robot pose."""
+    points = cloud.points_f32()
+    near = np.hypot(points[:, 0] - odom.position.x, points[:, 1] - odom.position.y) <= 2.0
+    np.savez_compressed(
+        path,
+        points=points[near],
+        grid=np.asarray(grid.grid),
+        origin=[grid.origin.position.x, grid.origin.position.y],
+        resolution=grid.resolution,
+        robot=[odom.position.x, odom.position.y, odom.position.z, odom.yaw],
+    )
+
+
+def refresh_region(points: Any, x: float, y: float, base_z: float) -> dict[str, float] | None:
+    """The cylinder an operator refresh clears around base (x, y, base_z), or None.
+
+    The floor is the most populated 0.04 m height bin of the mapped points within the
+    radius and below the knees; without one the refresh refuses rather than guess.
+    """
+    near = np.hypot(points[:, 0] - x, points[:, 1] - y) <= REFRESH_RADIUS_M
+    low = points[near & (points[:, 2] < base_z - 0.4), 2]
+    if len(low) == 0:
+        return None
+    counts, edges = np.histogram(low, bins=np.arange(low.min(), low.max() + 0.08, 0.04))
+    peak = int(np.argmax(counts))
+    floor = float(np.median(low[(low >= edges[peak]) & (low < edges[peak + 1])]))
+    return {
+        "cx": x,
+        "cy": y,
+        "radius": REFRESH_RADIUS_M,
+        "floor": floor,
+        "z_min": floor + REFRESH_FLOOR_MARGIN_M,
+        "z_max": base_z + REFRESH_HEADROOM_M,
+    }
+
+
+def costmap_summary(
+    grid: OccupancyGrid, odom: Odometry | None, points: list[list[float]]
+) -> dict[str, Any]:
+    cells = np.asarray(grid.grid)
+    summary: dict[str, Any] = {
+        "stamp": grid.ts,
+        "shape": list(cells.shape),
+        "resolution": grid.resolution,
+        "sha256": hashlib.sha256(cells.tobytes()).hexdigest(),
+        "unknown": int((cells < 0).sum()),
+        "free": int((cells == 0).sum()),
+        "occupied": int((cells >= 100).sum()),
+    }
+    res, ox, oy = grid.resolution, grid.origin.position.x, grid.origin.position.y
+    values = []
+    for x, y in points:
+        col, row = int((x - ox) // res), int((y - oy) // res)
+        inside = 0 <= row < cells.shape[0] and 0 <= col < cells.shape[1]
+        values.append(int(cells[row, col]) if inside else None)
+    summary["values"] = values
+    if odom is None:
+        return summary
+    rows, cols = np.indices(cells.shape)
+    wx, wy = ox + (cols + 0.5) * res, oy + (rows + 0.5) * res
+    dist = np.hypot(wx - odom.position.x, wy - odom.position.y)
+    near = dist <= 1.2
+    summary.update(
+        robot_xy=[odom.position.x, odom.position.y],
+        robot_yaw=odom.yaw,
+        robot_cell=int(cells[np.unravel_index(np.argmin(dist), cells.shape)]),
+        startup_disk={
+            "radius_m": 1.2,
+            "cells": int(near.sum()),
+            "unknown": int((cells[near] < 0).sum()),
+            "free": int((cells[near] == 0).sum()),
+            "occupied": int((cells[near] >= 100).sum()),
+        },
+    )
+    summary["occupied_within_0.5m"] = int((cells[dist <= 0.5] >= 100).sum())
+    # The rear half-disk, for a support crane standing behind the robot (opt-in in the harness).
+    ahead = (wx - odom.position.x) * math.cos(odom.yaw) + (wy - odom.position.y) * math.sin(
+        odom.yaw
+    )
+    summary["occupied_within_0.5m_behind"] = int((cells[(dist <= 0.5) & (ahead < 0)] >= 100).sum())
+    margin = math.ceil(0.35 / res)
+    free = cells == 0
+    padded = np.pad(free, margin, constant_values=False)
+    clear = np.ones_like(free)
+    for dr in range(-margin, margin + 1):
+        for dc in range(-margin, margin + 1):
+            clear &= padded[
+                margin + dr : margin + dr + free.shape[0], margin + dc : margin + dc + free.shape[1]
+            ]
+    band = (dist >= 1.0) & (dist <= 2.5)
+    for name, mask in (
+        ("clear_goal", clear & band),
+        ("unknown_goal", (cells < 0) & band),
+        ("occupied_goal", (cells >= 100) & band),
+    ):
+        picks = np.argwhere(mask)
+        if len(picks):
+            r, c = picks[np.argmin(dist[mask])]
+            summary[name] = [float(wx[r, c]), float(wy[r, c])]
+    return summary
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--router", required=True)
+    parser.add_argument("--link-bind", required=True)
+    parser.add_argument("--cloud", required=True)
+    parser.add_argument("--state", required=True)
+    args = parser.parse_args()
+    router = open_router(args.router)
+    mount = torso_to_mid360()
+    t, q = mount.translation, mount.rotation
+    blueprint = unitree_g1_sonic_navigation_peer.solidify()
+    parsed = BlueprintConfigParser(blueprint).parse(
+        environ={},
+        overrides={
+            SonicNavigationSensorReceiver.name: {
+                "cloud_endpoint": args.cloud,
+                "state_endpoint": args.state,
+                "torso_to_sensor": [t.x, t.y, t.z, q.x, q.y, q.z, q.w],
+            },
+            SonicNavigationPeerModule.name: {
+                "link_bind": args.link_bind,
+                "extrinsic_valid": True,
+                "clock_domains": {name: "mid360" for name in INPUT_BUDGETS},
+            },
+            "g": {
+                "transport": "zenoh",
+                "viewer": "none",
+                "robot_ip": None,
+                "robot_ips": None,
+                "zenoh_mode": "client",
+                "zenoh_connect": args.router,
+                "zenoh_multicast": False,
+                "zenoh_scouting": False,
+                "zenoh_gossip": True,
+                "serve_coordinator_rpc": False,
+            },
+        },
+    )
+    lock = threading.Lock()
+    latest: dict[str, Any] = {}
+    counts: dict[str, int] = {}
+    tele: list[Twist | None] = [None]
+    recording: list[LidarRecording | None] = [None]
+    telemetry = (args.output / "peer-telemetry.jsonl").open("a", buffering=1)
+    subscriptions: list[Any] = []
+    coordinator = None
+
+    def receive(name: str, msg: Any) -> None:
+        now = time.monotonic()
+        with lock:
+            latest[name] = msg
+            counts[name] = counts.get(name, 0) + 1
+            if name == "cmd_vel":
+                telemetry.write(
+                    json.dumps({"peer_monotonic": now, "cmd_vel": [msg.linear.x, msg.angular.z]})
+                    + "\n"
+                )
+            elif name in ("odometry", "lio_odometry"):
+                # Base odometry and PointLio's own sensor pose, full 6-DoF, so walking-time
+                # base oscillation can be split into LIO error and mount/waist composition.
+                position, q = msg.position, msg.orientation
+                row: dict[str, Any] = {
+                    "peer_monotonic": now,
+                    "pose" if name == "odometry" else "lio": [
+                        position.x,
+                        position.y,
+                        position.z,
+                        q.x,
+                        q.y,
+                        q.z,
+                        q.w,
+                        msg.ts,
+                    ],
+                }
+                if name == "odometry":
+                    row["odom"] = [position.x, position.y, msg.yaw, msg.ts]
+                elif recording[0] is not None:
+                    recording[0].add_pose(now, row["lio"])
+                telemetry.write(json.dumps(row) + "\n")
+            elif name == "path":
+                # An empty Path is the planner clearing after a rejected/cancelled goal.
+                if msg.poses:
+                    counts["plan"] = counts.get("plan", 0) + 1
+                telemetry.write(
+                    json.dumps({"peer_monotonic": now, "path_poses": len(msg.poses)}) + "\n"
+                )
+
+    try:
+        coordinator = ModuleCoordinator.build(blueprint, parsed)
+        for (name, kind), transport in coordinator.transports.items():
+            if (name, kind) in {
+                ("cmd_vel", Twist),
+                ("global_costmap", OccupancyGrid),
+                ("odometry", Odometry),
+                ("lio_odometry", Odometry),
+                ("path", NavPath),
+                ("global_map", PointCloud2),
+            }:
+                subscriptions.append(transport.subscribe(partial(receive, name)))
+        teleop = coordinator.transports[("tele_cmd_vel", Twist)]
+        clear_region = coordinator.transports[("clear_region", PoseStamped)]
+        costmap_out = coordinator.transports[("global_costmap", OccupancyGrid)]
+        stop = threading.Event()
+        synthetic = threading.Event()
+        obstacles: list[list[float]] = []
+        truth = threading.Event()
+        lio_out = coordinator.transports[("lio_odometry", Odometry)]
+        lio_cloud_out = coordinator.transports[("lidar", PointCloud2)]
+
+        def publish_synthetic() -> None:
+            # Simulation-only stand-in for a frozen CostMapper: a free 6 m square around
+            # the robot plus any obstacle boxes, stamped with the latest real map stamp so
+            # its progress still tracks the real ray map. Production never clears cells.
+            while synthetic.is_set() and not stop.wait(0.2):
+                with lock:
+                    cloud, odom = latest.get("global_map"), latest.get("odometry")
+                    boxes = list(obstacles)
+                if cloud is None or odom is None:
+                    continue
+                costmap_out.broadcast(
+                    None, synthetic_grid(odom.position.x, odom.position.y, boxes, cloud.ts)
+                )
+
+        def publish_truth(scan: PointCloud2) -> None:
+            # Simulation-only stand-in for a frozen PointLIO: the replayed scans do not
+            # see the MuJoCo world, so its pose cannot follow the robot. Publish its two
+            # outputs from MuJoCo truth instead, stamped with each scan.
+            if not truth.is_set():
+                return
+            row = json.loads((args.output / "physics-latest.json").read_text())
+            sensor = truth_sensor_pose(row, mount)
+            lio_out.broadcast(
+                None,
+                Odometry(
+                    ts=scan.ts,
+                    frame_id="odom",
+                    child_frame_id="mid360_link",
+                    pose=Pose(position=sensor.translation, orientation=sensor.rotation),
+                ),
+            )
+            matrix = sensor.to_matrix()
+            points = scan.as_numpy()[0] @ matrix[:3, :3].T + matrix[:3, 3]
+            lio_cloud_out.broadcast(
+                None, PointCloud2.from_numpy(points, frame_id="odom", timestamp=scan.ts)
+            )
+
+        subscriptions.append(
+            coordinator.transports[("lidar_raw", PointCloud2)].subscribe(publish_truth)
+        )
+
+        def record_scan(scan: PointCloud2) -> None:
+            points = scan.points_f32()
+            with lock:  # never while the recording is being saved
+                if recording[0] is not None:
+                    recording[0].add_scan(time.monotonic(), scan.ts, scan.frame_id, points)
+
+        subscriptions.append(coordinator.transports[("lidar", PointCloud2)].subscribe(record_scan))
+
+        def map_near_robot() -> Any:
+            with lock:
+                cloud, odom = latest.get("global_map"), latest.get("odometry")
+            if cloud is None or odom is None:
+                return np.zeros((0, 3), dtype=np.float32)
+            points = cloud.points_f32()
+            distance = np.hypot(points[:, 0] - odom.position.x, points[:, 1] - odom.position.y)
+            return points[distance <= RECORD_MAP_RADIUS_M]
+
+        def publish_teleop() -> None:
+            while not stop.wait(0.1):
+                value = tele[0]
+                if value is not None:
+                    teleop.broadcast(None, value)
+
+        threading.Thread(target=publish_teleop, daemon=True).start()
+        reply(op="ready", pid=psutil.Process().pid, monotonic=time.monotonic())
+        for line in sys.stdin:
+            command = json.loads(line)
+            op = command["op"]
+            if op == "tele":
+                tele[0] = Twist(
+                    linear=Vector3(command["vx"], 0, 0), angular=Vector3(0, 0, command["wz"])
+                )
+                reply(op=op)
+            elif op == "tele_stop":
+                tele[0] = None
+                reply(op=op)
+            elif op == "pids":
+                manager = cast("WorkerManagerPython", coordinator._managers["python"])
+                natives = {}
+                for child in psutil.Process().children(recursive=True):
+                    try:
+                        name = Path(child.cmdline()[0]).name
+                    except (psutil.Error, IndexError):
+                        continue
+                    if name in NATIVE_NAMES:
+                        natives[name] = child.pid
+                reply(
+                    op=op,
+                    workers=[{"pid": w.pid, "modules": w.module_names} for w in manager.workers],
+                    natives=natives,
+                )
+            elif op == "costmap":
+                with lock:
+                    grid, odom = latest.get("global_costmap"), latest.get("odometry")
+                    seen = dict(counts)
+                summary = (
+                    None if grid is None else costmap_summary(grid, odom, command.get("points", []))
+                )
+                reply(op=op, counts=seen, costmap=summary)
+            elif op == "snapshot":
+                # Read-only evidence: map points within 2 m of the robot, the costmap grid
+                # and the robot pose, to see whether near-field occupied cells are the robot.
+                with lock:
+                    cloud, grid, odom = (
+                        latest.get("global_map"),
+                        latest.get("global_costmap"),
+                        latest.get("odometry"),
+                    )
+                saved = None
+                if cloud is not None and grid is not None and odom is not None:
+                    save_snapshot(command["path"], cloud, grid, odom)
+                    saved = command["path"]
+                reply(op=op, saved=saved)
+            elif op == "refresh_map":
+                # Operator-commanded, once the area is confirmed clear: drop what the map
+                # holds above the floor around the robot (RayTracingVoxelMap.clear_region).
+                with lock:
+                    cloud, odom = latest.get("global_map"), latest.get("odometry")
+                region = None
+                if cloud is not None and odom is not None:
+                    p = odom.position
+                    region = refresh_region(cloud.points_f32(), p.x, p.y, p.z)
+                if region is not None:
+                    clear_region.broadcast(
+                        None,
+                        PoseStamped(
+                            position=Vector3(region["cx"], region["cy"], 0.0),
+                            orientation=Quaternion(
+                                region["radius"], region["z_min"], region["z_max"], 0.0
+                            ),
+                            frame_id="odom",
+                            ts=time.time(),
+                        ),
+                    )
+                reply(op=op, region=region)
+            elif op == "record_lidar":
+                # Read-only evidence, blocking for the window: PointLio scans and poses
+                # plus the map near the robot before and after (LidarRecording).
+                try:
+                    active = LidarRecording(command["seconds"], time.monotonic())
+                except ValueError as error:
+                    reply(op=op, error=str(error))
+                    continue
+                before = map_near_robot()
+                with lock:
+                    recording[0] = active
+                time.sleep(command["seconds"])
+                with lock:
+                    recording[0] = None
+                reply(op=op, **active.save(Path(command["path"]), before, map_near_robot()))
+            elif op == "synthetic_costmap":
+                synthetic.set()
+                threading.Thread(target=publish_synthetic, daemon=True).start()
+                reply(op=op)
+            elif op == "synthetic_obstacles":
+                with lock:
+                    obstacles[:] = command["obstacles"]
+                reply(op=op)
+            elif op == "truth_lio":
+                (truth.set if command["on"] else truth.clear)()
+                reply(op=op)
+            elif op == "synthetic_stop":
+                synthetic.clear()
+                reply(op=op)
+            elif op == "stop":
+                reply(op=op)
+                break
+        stop.set()
+    finally:
+        for unsubscribe in subscriptions:
+            unsubscribe()
+        if coordinator is not None:
+            coordinator.stop()
+        telemetry.close()
+        router.close()
+
+
+if __name__ == "__main__":
+    main()

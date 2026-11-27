@@ -1,0 +1,47 @@
+{
+  "scope": "Private opt-in navigation runtime; shared baseline verified unchanged; no robot control launched",
+  "baseline_files_verified": 51,
+  "shared_inputs_sha256": {
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/cmake-offline/CMakeCache.txt": "cb47b777661e05048d518b379a8f529feca9fff21383e1d880e1681e102810d9",
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref": "32945c0290185d47cb3da1290ce6dac3495cc62fd16c4be8773de0ee2aab3853",
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/source/gear_sonic_deploy/target/release/run_tests": "936ca839795516bd98da0b24d753514469ff3dc8e40fc3d1c70c2a765ea947e0",
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/assets/model_decoder.onnx": "34bae8570d4a4421a5391a5c2befd745d4a02d182ec539e5f9da44c091c67509",
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/assets/model_encoder.onnx": "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae",
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/assets/planner/target_vel/V2/planner_sonic.onnx": "39b553e197f62f077975ba38512bc04781a3fc37c2af7c6756e04629f760edea"
+  },
+  "patched_source_sha256": {
+    "CMakeLists.txt": "45a8d927d54d93c6a294f4948caa9264c94999fccda05cda4cb6daa13201bddf",
+    "include/input_interface/planner_lease.hpp": "302a9c61def99b01a5cb8229ab6cde8b3fc0dd328355fb5678abde3743ccfbd4",
+    "include/input_interface/planner_packet.hpp": "5b6c660d7f18fc00f53ea50975a5009f430ec975ab19f65c55faec63b2d24bfd",
+    "include/input_interface/zmq_manager.hpp": "f295193cc0fb297d2713418ac7846cc0b95d3f6589bdb4d20f68b22c05a46838",
+    "include/input_interface/zmq_packed_message_subscriber.hpp": "21254ff806a29147b28016f6976914bae47b4c90cd3b5fe102c032ace1ca41e9",
+    "include/output_interface/zmq_output_handler.hpp": "c6a3089ce0a1ba57d47913a1f434ea1d8303817551946c5cea7e1142d1d642eb",
+    "src/g1_deploy_onnx_ref.cpp": "06d5a674d1f6d97882f6422d9f59ce1aca38ccb03f5827c1e840a3106692e899",
+    "unit_tests/test_planner_lease.cpp": "9c165d9c965b8e6caa6150e383b7d84817fe17e175a2bd6758cc5012e88db17a",
+    "unit_tests/test_planner_lease_cases.cpp": "c46697cc42f61d7e2e59865e4e399509f01c07cb12b44744675ec7c1e0ec25e5",
+    "unit_tests/test_planner_packet.cpp": "3071bf2e9e4bacb42a4b3f76abd7d05d0aad34023b7bafc6acb85f9da107fbd5",
+    "unit_tests/test_planner_receiver.cpp": "c07461b317d48381c189103f5b08a34649d7fe7646b5fa19cdfd377fcabaf05e"
+  },
+  "patch_sha256": "d6480739ef668af5a010cbb6b2fe2623d50470a49ea88de676dec5aa2b3dc52e",
+  "private_binary_sha256": "1e0185d6c96cc84c2d1d942585b40c782ecde575dac01c4249a4ac1e08406c9e",
+  "private_cache_sha256": "a8263175f9c5342400e6b40616c73e37dca03d9d37987034fb012782a0b303f5",
+  "configure": "BUILD_ROS2=OFF BUILD_DEPLOY_TESTS=ON FETCHCONTENT_FULLY_DISCONNECTED=ON TensorRT_ROOT=/home/jihun/TensorRT/TensorRT-10.13.0.35",
+  "guard_tests": "14/14 passed (including loopback real receiver)",
+  "full_suite": "32/33 passed; legacy FK fixture reference/bones_072925_test and g1/g1_29dof.xml absent from inspected source",
+  "baseline_fk_comparison": {
+    "baseline": {
+      "exit_code": 1,
+      "failure_count": 396,
+      "log_sha256": "ee50f7f1ba6fcc26a2e0fa4696b147187d0a996821dcecd607ddc0fdd5d16e77",
+      "fixture": "Read-only local official example motion directory aliased under the legacy path for diagnosis; not the missing original fixture"
+    },
+    "private": {
+      "exit_code": 1,
+      "failure_count": 396,
+      "log_sha256": "8fedb4b8be10678ce5ab735d1f7f27dde02a38fc1097982423288d1374362981",
+      "fixture": "Read-only local official example motion directory aliased under the legacy path for diagnosis; not the missing original fixture"
+    }
+  },
+  "patch_replay": "All 11 modified/new native files reproduced byte-for-byte from the inspected baseline",
+  "isolation_tests": "5/5 pytest; Ruff PASS; mypy preparer PASS"
+}

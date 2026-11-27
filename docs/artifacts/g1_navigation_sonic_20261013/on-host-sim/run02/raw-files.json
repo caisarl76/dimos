@@ -1,0 +1,54 @@
+{
+  "sim-ready": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "analysis.json": {
+    "sha256": "a9973ba7f8ba5b6ca4a8214ffcc1bf12dbd6750fa310813da30694ff8c5ce990",
+    "bytes": 765
+  },
+  "results.json": {
+    "sha256": "98c9e554c4971d145db04c3738272f4f11a0c0237a05fe6bcd265ec3a41e19a0",
+    "bytes": 514
+  },
+  "references.jsonl": {
+    "sha256": "c877681ca605f166b10577185392926a424c9a4ae4eded5e84de7a2e4a7218fa",
+    "bytes": 1022783
+  },
+  "manifest.json": {
+    "sha256": "511b21c811272c45d2b72fb44d29c1d5fb7e4aef0628b35ae80d8d8dddf0b0c1",
+    "bytes": 1572
+  },
+  "telemetry.jsonl": {
+    "sha256": "41d4b41a78a212350701fadadd11ee79e8701aed03cda4c9ddfce96f55d4f5d9",
+    "bytes": 9678579
+  },
+  "sim-config.json": {
+    "sha256": "2b349f3e3c24e93d8e8983f94e175a084927f5c1fbe42de68b895690c260f5d2",
+    "bytes": 10216
+  },
+  "physics-latest.json": {
+    "sha256": "67e3d36eecd81181b2481579e2c5bd3529a05148f2005c58d411eb36d1833fcf",
+    "bytes": 3595
+  },
+  "deploy.log": {
+    "sha256": "9ffceaf28150be9e7b913c38e77514fb943dcdea3e69f6465feccbc4e72306f6",
+    "bytes": 26454
+  },
+  "physics.jsonl": {
+    "sha256": "6f50bec7e3723e843bea5b729bab17f83650b99e6ef2799040dd3d52574ff3ae",
+    "bytes": 6848886
+  },
+  "sim.log": {
+    "sha256": "3f87d8438250b8cef077f762d7f6aa5ce7dcfa419f75d4334d54a63059802836",
+    "bytes": 130
+  },
+  "sim-stop": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "release": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "roots": [
+    "/home/jihun/work",
+    "/home/jihun/.cache/huggingface",
+    "/tmp"
+  ],
+  "pruned_directory_names": [
+    ".git",
+    ".mypy_cache",
+    ".next",
+    ".ruff_cache",
+    ".venv",
+    ".venv_data_collection",
+    ".venv_sim",
+    ".venv_teleop",
+    "__pycache__",
+    "blobs",
+    "node_modules",
+    "site-packages"
+  ],
+  "follow_symlinks": false,
+  "matches": [
+    "/home/jihun/work/rerun/crates/store/re_dataframe/src/snapshots/re_dataframe__query__tests__async_barebones_static.snap",
+    "/home/jihun/work/rerun/crates/store/re_dataframe/src/snapshots/re_dataframe__query__tests__barebones-2.snap",
+    "/home/jihun/work/rerun/crates/store/re_dataframe/src/snapshots/re_dataframe__query__tests__barebones.snap",
+    "/home/jihun/work/rerun/crates/store/re_dataframe/src/snapshots/re_dataframe__query__tests__async_barebones_temporal.snap"
+  ],
+  "errors": [
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-systemd-oomd.service-JDEiNm'",
+    "[Errno 13] Permission denied: '/tmp/codex-daemon-1000'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-systemd-resolved.service-N9aDII'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-power-profiles-daemon.service-W1YoYC'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-systemd-timesyncd.service-t6Ylov'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-colord.service-c2ld6F'",
+    "[Errno 13] Permission denied: '/tmp/.forticlient'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-systemd-logind.service-mPkQ1Z'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-switcheroo-control.service-Sa1ihz'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-upower.service-TeFL6K'",
+    "[Errno 13] Permission denied: '/tmp/snap-private-tmp'",
+    "[Errno 13] Permission denied: '/tmp/systemd-private-3109bf757e9440bea14636526964ef51-ModemManager.service-hyUTik'"
+  ],
+  "directories_scanned": 80992,
+  "elapsed_seconds": 18.13,
+  "broader_mount_search": "A separate unpruned search also included /mnt; interrupted after several minutes with no matches; not exhaustive."
+}

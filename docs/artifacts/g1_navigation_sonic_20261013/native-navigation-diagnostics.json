@@ -1,0 +1,8 @@
+{
+  "scope": "Optional timestamped CSV sidecars when guarded planner and existing target/planner log flags are enabled; no controller or admission behavior changes",
+  "baseline_cpp_sha256": "06d5a674d1f6d97882f6422d9f59ce1aca38ccb03f5827c1e840a3106692e899",
+  "diagnostic_cpp_sha256": "79685037fcfaaefb3d891a5a6110b0823263e66839874bf2556207a50f5473d3",
+  "patch_sha256": "f47966d5aac854a115381e27b27ad5a9538bfd69f186a4a747a27a97d9f4bdf0",
+  "private_binary_sha256": "ce396b2b005264a1dc13f282bc032d0baf56be14d0a3456c815d42611802648b",
+  "shared_native_baseline_files_unchanged": 51
+}

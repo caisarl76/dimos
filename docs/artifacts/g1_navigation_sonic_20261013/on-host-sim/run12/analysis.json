@@ -1,0 +1,247 @@
+{
+  "passed": true,
+  "completed": [
+    "backward",
+    "backward_settled",
+    "before_noisy_trace_settled",
+    "feedback_loss_200ms",
+    "forward",
+    "forward_settled",
+    "initial_idle_settled",
+    "left_turn",
+    "left_turn_settled",
+    "native_watchdog_250ms",
+    "noisy_trace_replan_limit",
+    "noisy_trace_settled",
+    "pose_expiry_settled",
+    "pose_handback_settled",
+    "pose_source_expiry_200ms",
+    "publisher_disconnect_settled",
+    "right_turn",
+    "right_turn_settled",
+    "seeded_pose_suspends_planner_watchdog",
+    "source_expiry_idle_without_latch",
+    "source_expiry_settled",
+    "source_outage_ends",
+    "source_pause_250ms",
+    "stopped_publisher_watchdog",
+    "subscriptions_loss",
+    "watchdog_settled"
+  ],
+  "missing": [],
+  "failed": [],
+  "run_status": "passed",
+  "run_error": null,
+  "wire_samples": {
+    "moving": 507,
+    "idle": 1187,
+    "pose": 163
+  },
+  "translating_noise": {
+    "passed": true,
+    "checks": {
+      "five_second_trace": true,
+      "advancing_physics": true,
+      "both_sensor_noise_signs": true,
+      "moving_wire": true,
+      "advancing_source": true,
+      "literal_heartbeats": true,
+      "active_throughout": true,
+      "native_replans": true,
+      "conversion_provenance": true,
+      "held_facing": true,
+      "fixed_movement": true,
+      "bounded_applied_latency": true,
+      "forward_physics": true,
+      "standing_envelope": true
+    },
+    "forward_displacement_m": 0.7571593048915715,
+    "native_state_replans": 16,
+    "planner_packets": 238,
+    "source_sequences": 48,
+    "attribution": {
+      "passed": true,
+      "errors": [],
+      "native_state_replans": 16,
+      "attributed": [
+        {
+          "monotonic": 1088347.25838881,
+          "acknowledged_sequences": [
+            1088347215483035,
+            1088347236381792,
+            1088347257207660
+          ],
+          "reasons": [
+            "mode_changed",
+            "speed_changed",
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088348.0583840501,
+          "acknowledged_sequences": [
+            1088348056186894
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088348.2583887042,
+          "acknowledged_sequences": [
+            1088348161021631,
+            1088348182057082,
+            1088348202907578,
+            1088348223875674,
+            1088348244784272
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088348.558379586,
+          "acknowledged_sequences": [
+            1088348475824337,
+            1088348497245653,
+            1088348518191468,
+            1088348539062190
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088348.8583831962,
+          "acknowledged_sequences": [
+            1088348791988864,
+            1088348813006011,
+            1088348833985515,
+            1088348855027793
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088349.2583843512,
+          "acknowledged_sequences": [
+            1088349213388182,
+            1088349234464071,
+            1088349255511753
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088349.458381467,
+          "acknowledged_sequences": [
+            1088349424458428,
+            1088349445787933
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088349.758386478,
+          "acknowledged_sequences": [
+            1088349740884002
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088349.8583871431,
+          "acknowledged_sequences": [
+            1088349845834346
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088350.25838253,
+          "acknowledged_sequences": [
+            1088350163727843,
+            1088350184589559,
+            1088350205385622,
+            1088350226200748,
+            1088350246994223
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088350.558380688,
+          "acknowledged_sequences": [
+            1088350478945415,
+            1088350500063079,
+            1088350520920211,
+            1088350542031598
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088350.858393941,
+          "acknowledged_sequences": [
+            1088350795031758,
+            1088350816033106,
+            1088350837227677
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088351.1583812851,
+          "acknowledged_sequences": [
+            1088351110510218,
+            1088351131481119,
+            1088351152528827
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088351.258388639,
+          "acknowledged_sequences": [
+            1088351215746496,
+            1088351236599290,
+            1088351257409127
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088351.4583846591,
+          "acknowledged_sequences": [
+            1088351425979991,
+            1088351446880328
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        },
+        {
+          "monotonic": 1088351.858425956,
+          "acknowledged_sequences": [
+            1088351846967597
+          ],
+          "reasons": [
+            "direction_changed"
+          ]
+        }
+      ]
+    },
+    "conversion_errors": []
+  },
+  "noise_proof_only_passed": false
+}

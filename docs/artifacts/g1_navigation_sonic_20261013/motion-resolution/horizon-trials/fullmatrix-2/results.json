@@ -1,0 +1,177 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "name": "initial_idle_settled",
+      "passed": true,
+      "elapsed": 0.5048080799169838,
+      "speed": 0.0007232770340304731,
+      "yaw_rate": -0.000976726429454386
+    },
+    {
+      "name": "forward",
+      "passed": true,
+      "start": 1144322.752744783,
+      "end": 1144324.762353459,
+      "forward_displacement_m": 0.08907219846217732,
+      "yaw_change_rad": -0.03627702608121652
+    },
+    {
+      "name": "forward_settled",
+      "passed": true,
+      "elapsed": 2.1110319630242884,
+      "speed": 0.0019346645849057421,
+      "yaw_rate": 0.011295524808165421
+    },
+    {
+      "name": "backward",
+      "passed": true,
+      "start": 1144326.882389192,
+      "end": 1144328.882314618,
+      "forward_displacement_m": -0.31190361677911993,
+      "yaw_change_rad": -0.05077710166856171
+    },
+    {
+      "name": "backward_settled",
+      "passed": true,
+      "elapsed": 2.0743471120949835,
+      "speed": 0.007798022328646004,
+      "yaw_rate": -0.000829302016580767
+    },
+    {
+      "name": "left_turn",
+      "passed": true,
+      "start": 1144330.962392216,
+      "end": 1144332.962804109,
+      "forward_displacement_m": -0.003624649199955682,
+      "yaw_change_rad": 0.07436807936144889
+    },
+    {
+      "name": "left_turn_settled",
+      "passed": true,
+      "elapsed": 2.157870094059035,
+      "speed": 0.005485756320866558,
+      "yaw_rate": 0.00928319257043471
+    },
+    {
+      "name": "right_turn",
+      "passed": true,
+      "start": 1144335.107416329,
+      "end": 1144337.127431662,
+      "forward_displacement_m": -0.001210186670237842,
+      "yaw_change_rad": -0.11146648704672373
+    },
+    {
+      "name": "right_turn_settled",
+      "passed": true,
+      "elapsed": 1.8202306609600782,
+      "speed": 0.01086482823682011,
+      "yaw_rate": 0.002533169618517632
+    },
+    {
+      "name": "before_noisy_trace_settled",
+      "passed": true,
+      "elapsed": 0.5257134349085391,
+      "speed": 0.0013990340586101263,
+      "yaw_rate": -0.0005921545525312612
+    },
+    {
+      "name": "noisy_trace_replan_limit",
+      "passed": true,
+      "start": 1144339.583807102,
+      "end": 1144344.605385186,
+      "request": 1144339.494056214,
+      "first_moving": 1144339.573487828,
+      "first_applied": 1144339.583807102,
+      "proof": "live",
+      "native_state_replans": 23,
+      "navigation_active": true,
+      "yaw_noise_rad": 0.005,
+      "source": "PController.advance, 0.2 m/s, alternating +/-0.01 rad lookahead error"
+    },
+    {
+      "name": "noisy_trace_settled",
+      "passed": true,
+      "elapsed": 1.648996268864721,
+      "speed": 0.0019971908956056086,
+      "yaw_rate": 0.014682495642424336
+    },
+    {
+      "name": "source_pause_250ms",
+      "passed": true
+    },
+    {
+      "name": "source_expiry_idle_without_latch",
+      "passed": true
+    },
+    {
+      "name": "source_expiry_settled",
+      "passed": true,
+      "elapsed": 1.773218034999445,
+      "speed": 0.0008397605608586682,
+      "yaw_rate": -0.023941636147048438
+    },
+    {
+      "name": "source_outage_ends",
+      "passed": true
+    },
+    {
+      "name": "native_watchdog_250ms",
+      "passed": true
+    },
+    {
+      "name": "watchdog_settled",
+      "passed": true,
+      "elapsed": 1.2319883299060166,
+      "speed": 0.008126559311434035,
+      "yaw_rate": -0.022539827846999164
+    },
+    {
+      "name": "feedback_loss_200ms",
+      "passed": true
+    },
+    {
+      "name": "seeded_pose_suspends_planner_watchdog",
+      "passed": true,
+      "duration": 1.302659529959783
+    },
+    {
+      "name": "pose_handback_settled",
+      "passed": true,
+      "elapsed": 2.163740044925362,
+      "speed": 0.00425815131651576,
+      "yaw_rate": -0.0021364418898301048
+    },
+    {
+      "name": "pose_source_expiry_200ms",
+      "passed": true,
+      "elapsed": 0.2086899969726801,
+      "native_age_ms": 221.436615
+    },
+    {
+      "name": "pose_expiry_settled",
+      "passed": true,
+      "elapsed": 1.1706859648693353,
+      "speed": 0.008793739951834615,
+      "yaw_rate": -0.012831348672891823
+    },
+    {
+      "name": "subscriptions_loss",
+      "passed": true
+    },
+    {
+      "name": "stopped_publisher_watchdog",
+      "passed": true,
+      "elapsed": 0.25337749696336687,
+      "injection": "unbind the sole publisher endpoint; actual subscriber pipes close"
+    },
+    {
+      "name": "publisher_disconnect_settled",
+      "passed": true,
+      "elapsed": 2.348408922087401,
+      "speed": 0.005738021300390263,
+      "yaw_rate": -0.0033394198504639165
+    }
+  ],
+  "error": null
+}

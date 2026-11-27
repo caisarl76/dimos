@@ -1,0 +1,7 @@
+{
+  "source": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_expiry_20261006/demo_sim_host.py",
+  "source_sha256": "25a07422d5349da76760136a0e552999ee362d2386aab5ca08e6331784a21c7f",
+  "copied_worker": "docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_sim_worker.py",
+  "change": "Record qvel, planar speed and published IMU at 50 Hz; add opt-in \u00b10.005 rad yaw noise only to the owned sensor publication, preserving physical state/config/support release and shared simulator source",
+  "copied_worker_sha256": "9fbc8d1caa472c8fdecaebcae5aa7cb118079a8bf7286a7923b4d66963b692be"
+}

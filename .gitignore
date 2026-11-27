@@ -45,6 +45,7 @@ result-*
 
 # Local environment and secrets
 .env
+.env.*
 .ssh/
 .bash_history
 

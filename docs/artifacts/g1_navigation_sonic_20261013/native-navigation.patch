@@ -1,0 +1,1008 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -242,6 +242,8 @@
+   target_link_directories(run_tests PRIVATE ${CUDA_LINK_DIRS})
+   target_link_libraries(run_tests GTest::GTest GTest::Main ${EXE_LIBS})
+   target_include_directories(run_tests PUBLIC ${EXE_INCLUDES})
++  target_compile_definitions(run_tests PRIVATE
++    SONIC_PLANNER_LEASE_CASES_DEFAULT="${PROJECT_SOURCE_DIR}/../../../../dimos/robot/unitree/g1/test_data/sonic_planner_lease_cases.json")
+ 
+   # Setting our output directory and C++ standard
+   set_target_properties(
+--- /dev/null
++++ b/include/input_interface/planner_lease.hpp
+@@ -0,0 +1,187 @@
++#pragma once
++
++#include <algorithm>
++#include <array>
++#include <bit>
++#include <cmath>
++#include <cstdint>
++#include <optional>
++#include <string>
++
++// All methods are called with the manager's planner mutex held. Clocks are
++// CLOCK_MONOTONIC seconds shared by the publisher and native process on pc2.
++struct GuardedPlannerPacket {
++    int32_t mode = 0;
++    std::array<float, 3> movement = {0, 0, 0};
++    std::array<float, 3> facing = {1, 0, 0};
++    float speed = 0;
++    float height = -1;
++    int64_t sequence = -1;
++    double deadline = 0;
++};
++
++struct PlannerGuardStatus {
++    int32_t mode = 0;
++    int64_t high_water = 0;
++    int64_t applied_sequence = 0;
++    int64_t rearm_barrier = 0;
++    bool lease_armed = false;
++    bool latched = false;
++    int64_t idle_ack_sequence = 0;
++    std::string fault = "disarmed";
++};
++
++class PlannerLease {
++public:
++    static constexpr double kLeaseSeconds = .250;
++
++    // Bit checks remain effective with the deployment project's -ffast-math.
++    static bool Finite(double x) {
++        return (std::bit_cast<uint64_t>(x) & 0x7ff0000000000000ULL) != 0x7ff0000000000000ULL;
++    }
++    static bool Finite(float x) {
++        return (std::bit_cast<uint32_t>(x) & 0x7f800000U) != 0x7f800000U;
++    }
++    static bool ValidIntent(const GuardedPlannerPacket& p) {
++        if ((p.mode != 0 && p.mode != 1) || !Finite(p.speed) || !Finite(p.height) || p.height != -1.f) return false;
++        for (float v : p.movement) if (!Finite(v)) return false;
++        auto horizontal_unit = [](const auto& v) {
++            return Finite(v[0]) && Finite(v[1]) && Finite(v[2]) && v[2] == 0.f &&
++                std::abs(v[0] * v[0] + v[1] * v[1] - 1.f) <= .0001f;
++        };
++        if (!horizontal_unit(p.facing)) return false;
++        if (p.mode == 0) {
++            return p.speed == 0.f && p.movement == std::array<float, 3>{0, 0, 0};
++        }
++        return p.speed >= .1f && p.speed <= .2f && horizontal_unit(p.movement);
++    }
++
++    bool Rearm(int64_t sequence, double deadline, double now) {
++        Tick(now);
++        if (pose_ || !Fresh(sequence, deadline, now)) return false;
++        s_.high_water = sequence;
++        s_.rearm_barrier = sequence;
++        s_.lease_armed = false;
++        awaiting_idle_ = true;
++        rearm_deadline_ = std::min(deadline, now + kLeaseSeconds);
++        last_receipt_ = now;
++        ForceIdle();
++        pending_.reset();
++        if (!s_.latched) s_.fault = "awaiting_idle";
++        return true;
++    }
++
++    bool Accept(const GuardedPlannerPacket& packet, double now) {
++        Tick(now);
++        if (pose_ || !Fresh(packet.sequence, packet.deadline, now) || !ValidIntent(packet)) return false;
++        if (awaiting_idle_) {
++            if (now >= rearm_deadline_ || packet.mode != 0) return false;
++        } else if (!s_.lease_armed || s_.latched) {
++            return false;
++        }
++        s_.high_water = packet.sequence;
++        last_receipt_ = now;
++        pending_ = packet;
++        pending_->deadline = std::min(packet.deadline, now + kLeaseSeconds);
++        return true;
++    }
++
++    // Acknowledgment means installation in the controller input buffer, never
++    // merely reception by the subscriber thread. Expired pending data is lost.
++    bool Install(double now) {
++        Tick(now);
++        if (!pending_) return false;
++        auto packet = *pending_;
++        pending_.reset();
++        if (pose_ || packet.deadline <= now || (!awaiting_idle_ && !s_.lease_armed)) return false;
++        if (awaiting_idle_) {
++            if (now >= rearm_deadline_ || packet.mode != 0) return false;
++            awaiting_idle_ = false;
++            s_.lease_armed = true;
++            s_.latched = false;
++            s_.fault.clear();
++        }
++        active_ = packet;
++        s_.mode = packet.mode;
++        s_.applied_sequence = packet.sequence;
++        if (packet.mode == 0) s_.idle_ack_sequence = packet.sequence;
++        return true;
++    }
++
++    bool End(int64_t sequence, double deadline, double now) {
++        Tick(now);
++        if (pose_ || !Fresh(sequence, deadline, now)) return false;
++        s_.high_water = sequence;
++        Close();
++        if (!s_.latched) s_.fault = "ended";
++        // End is installed by the manager's next input tick before status is
++        // published. The manager calls AcknowledgeEnd only after buffer update.
++        end_ack_ = sequence;
++        return true;
++    }
++    void AcknowledgeEnd() {
++        if (end_ack_) {
++            s_.applied_sequence = *end_ack_;
++            s_.idle_ack_sequence = *end_ack_;
++            end_ack_.reset();
++        }
++    }
++    void EnterPose() {
++        Close();
++        pose_ = true;
++        if (!s_.latched) s_.fault = "pose";
++    }
++    void Fault(const std::string& reason) {
++        Close();
++        s_.latched = true;
++        s_.fault = reason;
++    }
++    void Handback(double /*now*/) {
++        Close();
++        pose_ = false;
++        if (!s_.latched) s_.fault = "handback";
++    }
++    void Tick(double now) {
++        if (!Finite(now) || pose_) return;
++        if ((s_.lease_armed && now - last_receipt_ >= kLeaseSeconds) ||
++            (awaiting_idle_ && now >= rearm_deadline_)) {
++            Close();
++            s_.latched = true;
++            s_.fault = "planner_watchdog";
++        } else if (active_.deadline > 0 && now >= active_.deadline) {
++            ForceIdle();
++        }
++    }
++    const PlannerGuardStatus& status() const { return s_; }
++    const GuardedPlannerPacket& active() const { return active_; }
++    uint64_t idle_generation() const { return idle_generation_; }
++
++private:
++    bool Fresh(int64_t sequence, double deadline, double now) const {
++        return sequence > s_.high_water && Finite(now) && Finite(deadline) && deadline > now;
++    }
++    void ForceIdle() {
++        active_.mode = 0;
++        active_.movement = {0, 0, 0};
++        active_.speed = 0;
++        active_.deadline = 0;
++        s_.mode = 0;
++        ++idle_generation_;
++    }
++    void Close() {
++        s_.lease_armed = false;
++        awaiting_idle_ = false;
++        pending_.reset();
++        end_ack_.reset();
++        ForceIdle();
++    }
++    PlannerGuardStatus s_;
++    GuardedPlannerPacket active_;
++    std::optional<GuardedPlannerPacket> pending_;
++    std::optional<int64_t> end_ack_;
++    double last_receipt_ = 0;
++    double rearm_deadline_ = 0;
++    bool awaiting_idle_ = false;
++    bool pose_ = false;
++    uint64_t idle_generation_ = 1;
++};
+--- /dev/null
++++ b/include/input_interface/planner_packet.hpp
+@@ -0,0 +1,46 @@
++#pragma once
++#include "planner_lease.hpp"
++#include "zmq_packed_message_subscriber.hpp"
++
++namespace guarded_planner {
++using Header = ZMQPackedMessageSubscriber::DecodedHeader;
++using Buffer = ZMQPackedMessageSubscriber::BufferView;
++
++inline bool Field(const Header& h, const std::vector<Buffer>& b, size_t i,
++                  const char* name, const char* dtype, size_t count, size_t bytes) {
++    return i < h.fields.size() && i < b.size() && h.fields[i].name == name &&
++        h.fields[i].dtype == dtype && h.fields[i].shape == std::vector<size_t>{count} &&
++        !h.fields[i].optional && b[i].data && b[i].size == bytes;
++}
++template<class T> inline T Scalar(const Buffer& b) {
++    T value; std::memcpy(&value, b.data, sizeof(value)); return value;
++}
++inline std::optional<GuardedPlannerPacket> Planner(const Header& h, const std::vector<Buffer>& b) {
++    if (h.version != 1 || h.count != 1 || h.endian != "le" || !is_little_endian() ||
++        h.fields.size() != 7 || b.size() != 7 ||
++        !Field(h,b,0,"mode","i32",1,4) || !Field(h,b,1,"movement","f32",3,12) ||
++        !Field(h,b,2,"facing","f32",3,12) || !Field(h,b,3,"speed","f32",1,4) ||
++        !Field(h,b,4,"height","f32",1,4) || !Field(h,b,5,"planner_sequence","i64",1,8) ||
++        !Field(h,b,6,"planner_deadline","f64",1,8)) return {};
++    GuardedPlannerPacket p;
++    p.mode = Scalar<int32_t>(b[0]);
++    std::memcpy(p.movement.data(), b[1].data, 12);
++    std::memcpy(p.facing.data(), b[2].data, 12);
++    p.speed = Scalar<float>(b[3]); p.height = Scalar<float>(b[4]);
++    p.sequence = Scalar<int64_t>(b[5]); p.deadline = Scalar<double>(b[6]);
++    if (!PlannerLease::ValidIntent(p)) return {};
++    return p;
++}
++struct ControlPacket { int32_t action; int64_t sequence; double deadline; };
++inline std::optional<ControlPacket> Control(const Header& h, const std::vector<Buffer>& b) {
++    if (h.version != 1 || h.count != 1 || h.endian != "le" || !is_little_endian() ||
++        h.fields.size() != 6 || b.size() != 6 ||
++        !Field(h,b,0,"start","u8",1,1) || !Field(h,b,1,"stop","u8",1,1) ||
++        !Field(h,b,2,"planner","u8",1,1) || !Field(h,b,3,"navigation_control","i32",1,4) ||
++        !Field(h,b,4,"planner_sequence","i64",1,8) || !Field(h,b,5,"planner_deadline","f64",1,8) ||
++        Scalar<uint8_t>(b[0]) != 0 || Scalar<uint8_t>(b[1]) != 0 || Scalar<uint8_t>(b[2]) != 1) return {};
++    ControlPacket p{Scalar<int32_t>(b[3]), Scalar<int64_t>(b[4]), Scalar<double>(b[5])};
++    if ((p.action != 1 && p.action != 2) || p.sequence < 0 || !PlannerLease::Finite(p.deadline)) return {};
++    return p;
++}
++}
+--- a/include/input_interface/zmq_manager.hpp
++++ b/include/input_interface/zmq_manager.hpp
+@@ -57,6 +57,7 @@
+ #include "vr3pt_safety_filter.hpp"
+ #include "zmq_endpoint_interface.hpp"
+ #include "zmq_packed_message_subscriber.hpp"
++#include "planner_packet.hpp"
+ #include "../localmotion_kplanner.hpp"  // For LocomotionMode enum
+ #include "../math_utils.hpp"  // For normalize_vector
+ 
+@@ -90,7 +91,8 @@
+       bool zmq_conflate = false,
+       bool zmq_verbose = false,
+       Vr3PtSafetyFilter::Config vr3pt_filter_config = Vr3PtSafetyFilter::Config{},
+-      int reference_timeout_ms = 0
++      int reference_timeout_ms = 0,
++      bool guarded_planner = false
+     ) : InputInterface(), 
+         zmq_host_(zmq_host), 
+         zmq_port_(zmq_port), 
+@@ -99,7 +101,9 @@
+         planner_topic_(planner_topic),
+         zmq_conflate_(zmq_conflate), 
+         zmq_verbose_(zmq_verbose),
+-        vr3pt_filter_(vr3pt_filter_config), reference_guard_enabled_(reference_timeout_ms > 0) {
++        vr3pt_filter_(vr3pt_filter_config), reference_guard_enabled_(reference_timeout_ms > 0),
++        guarded_planner_enabled_(guarded_planner) {
++      if (guarded_planner && !reference_guard_enabled_) throw std::invalid_argument("Planner guard requires pose reference guard");
+       
+       type_ = InputType::NETWORK;
+       active_mode_ = ManagedMode::PLANNER;  // Default to planner mode
+@@ -115,7 +119,8 @@
+         /*timeout_ms=*/100,
+         zmq_verbose_,
+         /*use_conflate=*/false,
+-        /*rcv_hwm=*/3
++        /*rcv_hwm=*/3,
++        guarded_planner ? 1310 : 0, guarded_planner
+       );
+       
+       command_subscriber_->SetOnDecodedMessage(
+@@ -134,7 +139,8 @@
+         /*timeout_ms=*/100,
+         zmq_verbose_,
+         /*use_conflate=*/false, 
+-        /*rcv_hwm=*/3
++        /*rcv_hwm=*/3,
++        guarded_planner ? 1339 : 0, guarded_planner
+       );
+       
+       planner_subscriber_->SetOnDecodedMessage(
+@@ -189,6 +195,10 @@
+         latest_command_.valid = latest_command_.valid && latest_command_.stop;
+         latest_command_.start = false;
+         latest_command_.planner = true; // Preserve a pending stop, never its old mode request.
++        if (guarded_planner_enabled_) {
++          std::lock_guard<std::mutex> planner_lock(planner_mutex_);
++          planner_lease_.Handback(MonotonicNow());
++        }
+         std::cout << "[ReferenceGuard] EXPIRED: requesting planner IDLE" << std::endl;
+       }
+ 
+@@ -284,6 +294,10 @@
+             }
+ 
+             if (new_mode == ManagedMode::PLANNER) {
++              if (guarded_planner_enabled_) {
++                std::lock_guard<std::mutex> planner_lock(planner_mutex_);
++                planner_lease_.Handback(MonotonicNow());
++              }
+               if (reference_guard_enabled_) {
+                 pose_interface_->EndReferenceStream();
+                 force_guard_idle_ = true;
+@@ -309,6 +323,7 @@
+               // Clear planner buffer when switching away from planner mode
+               {
+                 std::lock_guard<std::mutex> lock(planner_mutex_);
++                if (guarded_planner_enabled_) planner_lease_.EnterPose();
+                 latest_planner_message_.valid = false;
+                 latest_planner_message_.timestamp = {};
+                 is_planner_ready_ = false;
+@@ -346,6 +361,10 @@
+                       DataBuffer<MovementState>& movement_state_buffer,
+                       std::mutex& current_motion_mutex,
+       bool& report_temperature) override {
++      if (guarded_planner_enabled_ && (vr3pt_estop_requested_ || emergency_stop_ || stop_control_)) {
++        std::lock_guard<std::mutex> lock(planner_mutex_);
++        planner_lease_.Fault("operator_stop");
++      }
+       if (!has_planner) {
+         std::cerr << "[ZMQCommandManager ERROR] Planner not available in planner mode" << std::endl;
+         operator_state.stop = true;
+@@ -416,7 +435,7 @@
+         has_hand_joints_ = false;
+       }
+ 
+-      if (reference_guard_enabled_ && force_guard_idle_) {
++      if (reference_guard_enabled_ && !guarded_planner_enabled_ && force_guard_idle_) {
+         {
+           std::lock_guard<std::mutex> lock(planner_mutex_);
+           latest_planner_message_.valid = false;
+@@ -452,6 +471,26 @@
+     }
+ 
+     bool ReferenceGuardEnabled() const { return reference_guard_enabled_; }
++    bool GuardedPlannerEnabled() const { return guarded_planner_enabled_; }
++    PlannerGuardStatus GetPlannerGuardStatus() {
++      std::lock_guard<std::mutex> lock(planner_mutex_);
++      return planner_lease_.status();
++    }
++    // Called by the control thread after UpdateHeadingState, using the same
++    // correction as observations. The input thread never reads shared arrays.
++    void SetPlannerHeading(const std::array<double,4>& measured,
++                           const std::array<double,4>& reference) {
++      auto yaw = [](const auto& q) {
++        return std::atan2(2*(q[0]*q[3]+q[1]*q[2]), 1-2*(q[2]*q[2]+q[3]*q[3]));
++      };
++      for (auto v : measured) if (!PlannerLease::Finite(v)) return;
++      for (auto v : reference) if (!PlannerLease::Finite(v)) return;
++      std::lock_guard<std::mutex> lock(planner_mutex_);
++      measured_yaw_ = yaw(measured);
++      reference_yaw_ = yaw(reference);
++      if (!planner_heading_ready_) stopped_world_yaw_ = measured_yaw_;
++      planner_heading_ready_ = true;
++    }
+     ReferenceGuardStatus GetReferenceGuardStatus() const {
+         auto status = pose_interface_->GetReferenceGuardStatus();
+         status.planner_selected = active_mode_ == ManagedMode::PLANNER;
+@@ -654,6 +693,34 @@
+       }
+ 
+       // Apply planner commands if planner is ready
++      if (guarded_planner_enabled_) {
++        std::lock_guard<std::mutex> lock(planner_mutex_);
++        const double now = MonotonicNow();
++        planner_lease_.Tick(now);
++        const auto generation = planner_lease_.idle_generation();
++        if (generation != applied_idle_generation_) {
++          // Freeze world yaw on stop; later heading resets only transform it.
++          if (planner_heading_ready_) stopped_world_yaw_ = measured_yaw_;
++          applied_idle_generation_ = generation;
++        }
++        const bool installed = planner_state.enabled && planner_state.initialized &&
++                               planner_heading_ready_ && planner_lease_.Install(now);
++        const auto& packet = planner_lease_.active();
++        std::array<double,3> movement{packet.movement[0], packet.movement[1], 0};
++        std::array<double,3> facing{packet.facing[0], packet.facing[1], 0};
++        if (!installed && packet.deadline == 0) {
++          const auto yaw = stopped_world_yaw_ - reference_yaw_;
++          facing = {std::cos(yaw), std::sin(yaw), 0};
++        }
++        movement_state_buffer.SetData(MovementState(packet.mode, movement, facing,
++            packet.mode == 0 ? -1.f : packet.speed, -1.f));
++        planner_lease_.AcknowledgeEnd();
++        force_guard_idle_ = false;
++        has_upper_body_control_ = false;
++        has_vr_3point_control_ = false;
++        has_hand_joints_ = false;
++        return;
++      }
+       if (planner_state.enabled && planner_state.initialized) {
+         std::lock_guard<std::mutex> lock(planner_mutex_);
+         
+@@ -751,6 +818,15 @@
+         const ZMQPackedMessageSubscriber::DecodedHeader& hdr,
+         const std::vector<ZMQPackedMessageSubscriber::BufferView>& bufs) {
+       
++      if (guarded_planner_enabled_ && hdr.fields.size() == 6) {
++        auto control = guarded_planner::Control(hdr, bufs);
++        if (!control) return;
++        std::lock_guard<std::mutex> lock(planner_mutex_);
++        if (active_mode_ != ManagedMode::PLANNER) return;
++        if (control->action == 1) planner_lease_.Rearm(control->sequence, control->deadline, MonotonicNow());
++        else planner_lease_.End(control->sequence, control->deadline, MonotonicNow());
++        return;
++      }
+       if (reference_guard_enabled_ && !ValidateGuardCommand(hdr, bufs)) return;
+       if (hdr.fields.empty() || bufs.empty()) return;
+       
+@@ -850,6 +926,13 @@
+         const std::string& topic,
+         const ZMQPackedMessageSubscriber::DecodedHeader& hdr,
+         const std::vector<ZMQPackedMessageSubscriber::BufferView>& bufs) {
++      if (guarded_planner_enabled_) {
++        auto packet = guarded_planner::Planner(hdr, bufs);
++        if (!packet) return;
++        std::lock_guard<std::mutex> lock(planner_mutex_);
++        if (active_mode_ == ManagedMode::PLANNER) planner_lease_.Accept(*packet, MonotonicNow());
++        return;
++      }
+       if (reference_guard_enabled_) return; // Stationary guarded-v4 pilot only.
+ 
+       
+@@ -1346,6 +1429,16 @@
+     Vr3PtSafetyFilter vr3pt_filter_;
+     bool vr3pt_estop_requested_ = false;
+     const bool reference_guard_enabled_;
++    const bool guarded_planner_enabled_;
++    PlannerLease planner_lease_;
++    double measured_yaw_ = 0;
++    double reference_yaw_ = 0;
++    double stopped_world_yaw_ = 0;
++    bool planner_heading_ready_ = false;
++    uint64_t applied_idle_generation_ = 0;
++    static double MonotonicNow() {
++      return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
++    }
+     std::atomic<bool> rearm_requires_planner_{false};
+     bool force_guard_idle_ = false;
+ };
+--- a/include/input_interface/zmq_packed_message_subscriber.hpp
++++ b/include/input_interface/zmq_packed_message_subscriber.hpp
+@@ -115,10 +115,13 @@
+       int timeout_ms = 1000,
+       bool verbose = true,
+       bool conflate = false,
+-      int rcv_hwm = -1
++      int rcv_hwm = -1,
++      size_t max_packet_bytes = 0,
++      bool exact_payload = false
+     )
+       : host_(host), port_(port), topic_(topic), timeout_ms_(timeout_ms), verbose_(verbose),
+         conflate_(conflate), rcv_hwm_(rcv_hwm),
++        max_packet_bytes_(max_packet_bytes), exact_payload_(exact_payload),
+         context_(1), running_(false) {}
+ 
+     // Non-copyable, non-movable
+@@ -191,6 +194,7 @@
+ 
+         socket_->set(zmq::sockopt::rcvtimeo, timeout_ms_);
+         socket_->set(zmq::sockopt::linger, 0);
++        if (max_packet_bytes_ > 0) socket_->set(zmq::sockopt::maxmsgsize, static_cast<int64_t>(max_packet_bytes_));
+         if (rcv_hwm_ > 0) {
+           socket_->set(zmq::sockopt::rcvhwm, rcv_hwm_);
+         }
+@@ -267,6 +271,7 @@
+         if (!r1) return false;
+ 
+         size_t packed_size = packed_frame.size();
++        if (max_packet_bytes_ > 0 && packed_size > max_packet_bytes_) return false;
+         const unsigned char* packed_data = static_cast<const unsigned char*>(packed_frame.data());
+         
+         // Strip topic prefix if configured
+@@ -334,7 +339,7 @@
+         size_t offset = 0;
+         for (const auto& field : decoded.fields) {
+           size_t field_bytes = field.ComputeByteSize();
+-          if (offset + field_bytes > data_size) {
++          if (field_bytes > data_size - offset) {
+             if (verbose_) {
+               std::cerr << "[ZMQPackedMessageSubscriber] Field " << field.name 
+                         << " exceeds data bounds" << std::endl;
+@@ -344,6 +349,7 @@
+           buffers.push_back(BufferView{data_start + offset, field_bytes});
+           offset += field_bytes;
+         }
++        if (exact_payload_ && offset != data_size) return false;
+ 
+         if (verbose_) {
+           std::cout << "[ZMQPackedMessageSubscriber] Received packed message: header_bytes=" << json_len 
+@@ -425,6 +431,8 @@
+     bool verbose_;
+     bool conflate_;
+     int rcv_hwm_;
++    size_t max_packet_bytes_;
++    bool exact_payload_;
+ 
+     zmq::context_t context_;
+     std::unique_ptr<zmq::socket_t> socket_;
+--- a/include/output_interface/zmq_output_handler.hpp
++++ b/include/output_interface/zmq_output_handler.hpp
+@@ -122,11 +122,13 @@
+  * @brief OutputInterface that publishes state data over a ZMQ PUB socket.
+  */
+ #include "../input_interface/reference_lease.hpp"
++#include "../input_interface/planner_lease.hpp"
+ 
+ class ZMQOutputHandler : public OutputInterface {
+ public:
+     static constexpr bool DEBUG_LOGGING = true;
+     void SetReferenceGuardStatus(ReferenceGuardStatus status) { reference_guard_status_ = status; }
++    void SetPlannerGuardStatus(PlannerGuardStatus status) { planner_guard_status_ = std::move(status); }
+ 
+     /**
+      * @brief Construct the handler: create a ZMQ PUB socket and bind to the given port.
+@@ -194,7 +196,7 @@
+         pack_combined_state(heading_state_buffer);
+ 
+         // 3. Send once on user topic (e.g. "g1_debug")
+-        if (state_data_sbuf_.size() > 0) {
++        if (state_data_sbuf_.size() > 0 && topic_.size() + state_data_sbuf_.size() <= 131072) {
+             send_zmq_message(topic_, state_data_sbuf_);
+         }
+ 
+@@ -236,6 +238,7 @@
+ 
+ private:
+     std::optional<ReferenceGuardStatus> reference_guard_status_;
++    std::optional<PlannerGuardStatus> planner_guard_status_;
+     zmq::context_t realtime_debug_context_;                ///< ZMQ context (1 I/O thread).
+     std::unique_ptr<zmq::socket_t> realtime_debug_socket_; ///< ZMQ PUB socket.
+ 
+@@ -289,7 +292,19 @@
+         // Visualisation fields: output_data_map_.size() (typically 11)
+         int num_state_fields = has_heading_state ? 20 : 18;
+         int num_viz_fields = static_cast<int>(output_data_map_.size());
+-        pk.pack_map(num_state_fields + num_viz_fields + (reference_guard_status_ ? 1 : 0));
++        pk.pack_map(num_state_fields + num_viz_fields + (reference_guard_status_ ? 1 : 0) + (planner_guard_status_ ? 1 : 0));
++        if (planner_guard_status_) {
++            const auto& s = *planner_guard_status_;
++            pk.pack("planner_guard"); pk.pack_map(8);
++            pk.pack("mode"); pk.pack(s.mode);
++            pk.pack("high_water"); pk.pack(s.high_water);
++            pk.pack("applied_sequence"); pk.pack(s.applied_sequence);
++            pk.pack("rearm_barrier"); pk.pack(s.rearm_barrier);
++            pk.pack("lease_armed"); pk.pack(s.lease_armed);
++            pk.pack("latched"); pk.pack(s.latched);
++            pk.pack("idle_ack_sequence"); pk.pack(s.idle_ack_sequence);
++            pk.pack("fault"); if (s.fault.empty()) pk.pack_nil(); else pk.pack(s.fault);
++        }
+         if (reference_guard_status_) {
+             const auto& s = *reference_guard_status_;
+             pk.pack("reference_guard"); pk.pack_map(10);
+--- a/src/g1_deploy_onnx_ref.cpp
++++ b/src/g1_deploy_onnx_ref.cpp
+@@ -2200,7 +2200,8 @@
+       double initial_max_close_ratio = 1.0,
+       bool enable_dex3_hands = true,
+       Vr3PtSafetyFilter::Config vr3pt_filter_config = Vr3PtSafetyFilter::Config{},
+-      int reference_timeout_ms = 0)
++      int reference_timeout_ms = 0,
++      bool guarded_planner = false)
+       : time_(0.0),
+         publish_dt_(0.002),
+         control_dt_(0.02),
+@@ -2539,7 +2540,7 @@
+       else if (input_type == "zmq_manager") {
+         input_interface_ = std::make_unique<ZMQManager>(
+           zmq_host, zmq_port, zmq_topic, "command", "planner", zmq_conflate,
+-          zmq_verbose, vr3pt_filter_config, reference_timeout_ms
++          zmq_verbose, vr3pt_filter_config, reference_timeout_ms, guarded_planner
+         );
+         std::cout << "Initialized ZMQ manager" << std::endl;
+         std::cout << "  Host: " << zmq_host << ":" << zmq_port << std::endl;
+@@ -3809,7 +3810,13 @@
+               return;
+             }
+ 
+-            auto gather_input_start_time = std::chrono::steady_clock::now(); 
++            if (auto manager = dynamic_cast<ZMQManager*>(input_interface_.get());
++                manager && manager->GuardedPlannerEnabled() &&
++                (movement_mode_changed || facing_direction_changed || height_changed ||
++                 (!under_static_motion_mode && (movement_speed_changed || movement_direction_changed)))) {
++              std::cout << "[PlannerGuardTrace] motion_state_replan" << std::endl;
++            }
++            auto gather_input_start_time = std::chrono::steady_clock::now();
+             
+             int current_mode = static_cast<int>(LocomotionMode::IDLE);
+             std::array<float, 3> movement_direction = {0.0f, 0.0f, 0.0f};
+@@ -4028,6 +4035,11 @@
+             // Update heading state (handles reinitialize_heading_ and frame-0 init)
+             // Must run before any orientation observation functions
+             UpdateHeadingState();
++            if (auto manager = dynamic_cast<ZMQManager*>(input_interface_.get());
++                manager && manager->GuardedPlannerEnabled()) {
++              auto states = state_logger_->GetLatest(1);
++              if (!states.empty()) manager->SetPlannerHeading(states[0].base_quat, ComputeApplyDeltaHeading());
++            }
+ 
+             // Gather all observations using modular functions
+             // This may update token_state_data_ with encoder output (if encoder is used)
+@@ -4089,6 +4101,7 @@
+                     planner_->planner_state_.initialized && current_motion_copy && current_motion_copy->name == "planner_motion" &&
+                     current_encoder_mode_copy == 0 && current_play_copy && !operator_state.stop;
+                 zmq->SetReferenceGuardStatus(status);
++                if (manager->GuardedPlannerEnabled()) zmq->SetPlannerGuardStatus(manager->GetPlannerGuardStatus());
+               }
+               output_interface->publish(
+                 vr_3point_position_buffer_, vr_3point_orientation_buffer_, vr_3point_compliance_buffer_,
+@@ -4251,7 +4264,8 @@
+     std::cout << "  --policy-precision <16|32>: specify precision to run the policy model at (default: 32)" << std::endl;
+     std::cout << "  --zmq-host <host>: ZMQ server host (default: localhost)" << std::endl;
+     std::cout << "  --zmq-port <port>: ZMQ server port (default: 5556)" << std::endl;
+-    std::cout << "  --reference-timeout-ms <50..2000>: opt-in stationary v4 guard; planner topic disabled" << std::endl;
++    std::cout << "  --reference-timeout-ms <50..2000>: opt-in pose v4 guard; planner topic disabled unless --guarded-planner" << std::endl;
++    std::cout << "  --guarded-planner: opt-in sequenced planner lease; requires pose guard and zmq_manager" << std::endl;
+     std::cout << "  --zmq-topic <topic>: ZMQ topic/prefix (default: pose)" << std::endl;
+     std::cout << "  --zmq-conflate: enable ZMQ CONFLATE (default: disabled)" << std::endl;
+     std::cout << "  --zmq-verbose: enable ZMQ subscriber verbose logs" << std::endl;
+@@ -4317,6 +4331,7 @@
+   bool enable_dex3_hands = true;
+   Vr3PtSafetyFilter::Config vr3pt_filter_config;
+   int reference_timeout_ms = 0;
++  bool guarded_planner = false;
+   for (int i = 4; i < argc; i++) {
+     if (std::string(argv[i]) == "--disable-crc-check") {
+       disableCrcCheck = true;
+@@ -4485,6 +4500,8 @@
+       if (i + 1 < argc) { zmq_host = argv[i + 1]; i++; }
+     } else if (std::string(argv[i]) == "--zmq-port") {
+       if (i + 1 < argc) { zmq_port = std::stoi(argv[i + 1]); i++; }
++    } else if (std::string(argv[i]) == "--guarded-planner") {
++      guarded_planner = true;
+     } else if (std::string(argv[i]) == "--reference-timeout-ms") {
+       if (i + 1 >= argc) { std::cerr << "Missing reference timeout" << std::endl; return 1; }
+       try {
+@@ -4594,6 +4611,10 @@
+   }
+ 
+   std::cout << "[DEBUG] Creating G1Deploy object..." << std::endl;
++  if (guarded_planner && reference_timeout_ms <= 0) {
++    std::cerr << "Guarded planner requires --reference-timeout-ms" << std::endl;
++    return 1;
++  }
+   if (reference_timeout_ms > 0 && (inputType != "zmq_manager" || plannerFile.empty() || encoderFile.empty())) {
+     std::cerr << "Reference guard requires zmq_manager, planner and encoder" << std::endl;
+     return 1;
+@@ -4629,7 +4650,8 @@
+     initial_max_close_ratio,
+     enable_dex3_hands,
+     vr3pt_filter_config,
+-    reference_timeout_ms
++    reference_timeout_ms,
++    guarded_planner
+   );
+   std::cout << "[DEBUG] G1Deploy object created successfully!" << std::endl;
+   
+--- /dev/null
++++ b/unit_tests/test_planner_lease.cpp
+@@ -0,0 +1,115 @@
++#include <gtest/gtest.h>
++#include <limits>
++#include "input_interface/planner_lease.hpp"
++
++namespace {
++GuardedPlannerPacket Idle(int64_t seq, double deadline) {
++    GuardedPlannerPacket p;
++    p.sequence = seq; p.deadline = deadline;
++    return p;
++}
++GuardedPlannerPacket Walk(int64_t seq, double deadline) {
++    auto p = Idle(seq, deadline);
++    p.mode = 1; p.movement = {1, 0, 0}; p.speed = .2f;
++    return p;
++}
++void Begin(PlannerLease& lease, double now = 10) {
++    ASSERT_TRUE(lease.Rearm(10, now + .2, now));
++    ASSERT_TRUE(lease.Accept(Idle(11, now + .2), now));
++    ASSERT_TRUE(lease.Install(now));
++    ASSERT_TRUE(lease.status().lease_armed);
++}
++}
++
++TEST(PlannerLease, ExpiredPending) {
++    PlannerLease lease; Begin(lease);
++    ASSERT_TRUE(lease.Accept(Walk(12, 10.01), 10));
++    EXPECT_FALSE(lease.Install(10.015));
++    EXPECT_EQ(lease.status().mode, 0);
++    EXPECT_FALSE(lease.status().latched);
++    EXPECT_EQ(lease.status().applied_sequence, 11);
++}
++TEST(PlannerLease, HealthyHeartbeatMotionExpiry) {
++    PlannerLease lease; Begin(lease);
++    ASSERT_TRUE(lease.Accept(Walk(12, 10.01), 10));
++    ASSERT_TRUE(lease.Install(10));
++    lease.Tick(10.015);
++    EXPECT_EQ(lease.status().mode, 0);
++    EXPECT_FALSE(lease.status().latched);
++    EXPECT_TRUE(lease.status().lease_armed);
++    lease.Tick(10.251);
++    EXPECT_TRUE(lease.status().latched);
++    EXPECT_FALSE(lease.status().lease_armed);
++}
++TEST(PlannerLease, DuplicateDoesNotRenew) {
++    PlannerLease lease; Begin(lease);
++    EXPECT_FALSE(lease.Accept(Idle(11, 11), 10.2));
++    lease.Tick(10.251);
++    EXPECT_TRUE(lease.status().latched);
++}
++TEST(PlannerLease, RearmBarrier) {
++    PlannerLease lease;
++    ASSERT_TRUE(lease.Rearm(10, 10.2, 10));
++    EXPECT_FALSE(lease.Accept(Walk(11, 10.2), 10));
++    EXPECT_FALSE(lease.Accept(Idle(10, 10.2), 10));
++    ASSERT_TRUE(lease.Accept(Idle(11, 10.2), 10));
++    EXPECT_EQ(lease.status().idle_ack_sequence, 0);
++    ASSERT_TRUE(lease.Install(10));
++    EXPECT_EQ(lease.status().idle_ack_sequence, 11);
++    EXPECT_EQ(lease.status().rearm_barrier, 10);
++}
++TEST(PlannerLease, EndCannotClearLatch) {
++    PlannerLease lease; Begin(lease); lease.Tick(10.251);
++    ASSERT_TRUE(lease.End(12, 10.5, 10.3));
++    EXPECT_TRUE(lease.status().latched);
++    EXPECT_FALSE(lease.Accept(Walk(13, 10.5), 10.3));
++    ASSERT_TRUE(lease.Rearm(14, 10.5, 10.3));
++    EXPECT_TRUE(lease.status().latched);
++    ASSERT_TRUE(lease.Accept(Idle(15, 10.5), 10.3));
++    EXPECT_TRUE(lease.Install(10.3));
++    EXPECT_FALSE(lease.status().latched);
++}
++TEST(PlannerLease, PoseSuspendsPlannerLease) {
++    PlannerLease lease; Begin(lease); lease.EnterPose(); lease.Tick(20);
++    EXPECT_FALSE(lease.status().latched);
++    EXPECT_FALSE(lease.Accept(Idle(12, 20.2), 20));
++    EXPECT_FALSE(lease.Rearm(12, 20.2, 20));
++}
++TEST(PlannerLease, HandbackNeedsNewBegin) {
++    PlannerLease lease; Begin(lease); lease.EnterPose(); lease.Handback(20);
++    EXPECT_EQ(lease.status().high_water, 11);
++    EXPECT_FALSE(lease.Accept(Walk(12, 20.2), 20));
++    EXPECT_TRUE(lease.Rearm(12, 20.2, 20));
++}
++TEST(PlannerLease, LegacyPlannerRejected) {
++    PlannerLease lease; Begin(lease);
++    EXPECT_FALSE(lease.Accept(GuardedPlannerPacket{}, 10));
++}
++TEST(PlannerLease, RejectsInvalidIntentAndNonfiniteWithFastMath) {
++    PlannerLease lease; Begin(lease);
++    auto p = Walk(12, 10.2);
++    p.speed = std::numeric_limits<float>::quiet_NaN();
++    EXPECT_FALSE(lease.Accept(p, 10));
++    p = Walk(12, std::numeric_limits<double>::infinity());
++    EXPECT_FALSE(lease.Accept(p, 10));
++    p = Walk(12, 10.2); p.movement = {1, 0, .001f};
++    EXPECT_FALSE(lease.Accept(p, 10));
++    p = Idle(12, 10.2); p.speed = .1f;
++    EXPECT_FALSE(lease.Accept(p, 10));
++    p = Walk(12, 10.2); p.speed = .201f;
++    EXPECT_FALSE(lease.Accept(p, 10));
++    p = Walk(12, 10.2); p.height = 0;
++    EXPECT_FALSE(lease.Accept(p, 10));
++    EXPECT_EQ(lease.status().high_water, 11);
++}
++TEST(PlannerLease, CapsFutureDeadlineAndBoundsRearmWindow) {
++    PlannerLease lease; Begin(lease);
++    ASSERT_TRUE(lease.Accept(Walk(12, 100), 10));
++    ASSERT_TRUE(lease.Install(10));
++    lease.Tick(10.251);
++    EXPECT_EQ(lease.status().mode, 0);
++    EXPECT_TRUE(lease.status().latched);
++    ASSERT_TRUE(lease.Rearm(13, 100, 20));
++    EXPECT_FALSE(lease.Accept(Idle(14, 100), 20.251));
++    EXPECT_TRUE(lease.status().latched);
++}
+--- /dev/null
++++ b/unit_tests/test_planner_lease_cases.cpp
+@@ -0,0 +1,49 @@
++#include <gtest/gtest.h>
++#include <nlohmann/json.hpp>
++#include <cstdlib>
++#include <fstream>
++#include "input_interface/planner_lease.hpp"
++
++TEST(PlannerLease, SharedDeadlineSequenceOracle) {
++    const char* path = std::getenv("SONIC_PLANNER_LEASE_CASES");
++    if (!path) path = SONIC_PLANNER_LEASE_CASES_DEFAULT;
++    std::ifstream stream(path);
++    ASSERT_TRUE(stream.good());
++    nlohmann::json oracle; stream >> oracle;
++    ASSERT_EQ(oracle.at("schema"), 1);
++    for (const auto& test_case : oracle.at("cases")) {
++        PlannerLease lease;
++        SCOPED_TRACE(test_case.at("name").get<std::string>());
++        for (const auto& step : test_case.at("steps")) {
++            SCOPED_TRACE(step.dump());
++            auto action = step.at("action").get<std::string>();
++            bool accepted = false;
++            double now = step.value("now", 0.0);
++            int64_t seq = step.value("sequence", int64_t{-1});
++            double deadline = step.value("deadline", 0.0);
++            if (action == "rearm") accepted = lease.Rearm(seq, deadline, now);
++            else if (action == "end") accepted = lease.End(seq, deadline, now);
++            else if (action == "install") accepted = lease.Install(now);
++            else if (action == "tick") lease.Tick(now);
++            else if (action == "pose") lease.EnterPose();
++            else if (action == "handback") lease.Handback(now);
++            else if (action == "ack_end") lease.AcknowledgeEnd();
++            else if (action == "idle" || action == "walk" || action == "legacy") {
++                GuardedPlannerPacket p;
++                if (action != "legacy") { p.sequence = seq; p.deadline = deadline; }
++                if (action == "walk") { p.mode = 1; p.movement = {1, 0, 0}; p.speed = .2f; }
++                accepted = lease.Accept(p, now);
++            } else FAIL() << "Unknown oracle action";
++            if (step.contains("accepted")) EXPECT_EQ(accepted, step.at("accepted"));
++            const auto& s = lease.status();
++            nlohmann::json actual = {
++                {"mode", s.mode}, {"high_water", s.high_water},
++                {"applied_sequence", s.applied_sequence}, {"rearm_barrier", s.rearm_barrier},
++                {"lease_armed", s.lease_armed}, {"latched", s.latched},
++                {"idle_ack_sequence", s.idle_ack_sequence}, {"fault", s.fault}
++            };
++            for (auto it = step.at("expect").begin(); it != step.at("expect").end(); ++it)
++                EXPECT_EQ(actual.at(it.key()), it.value()) << it.key();
++        }
++    }
++}
+--- /dev/null
++++ b/unit_tests/test_planner_packet.cpp
+@@ -0,0 +1,52 @@
++#include <gtest/gtest.h>
++#include "input_interface/planner_packet.hpp"
++
++namespace {
++struct PlannerFrame {
++    guarded_planner::Header header{1,"le",1,{
++        {"mode","i32",{1}}, {"movement","f32",{3}}, {"facing","f32",{3}},
++        {"speed","f32",{1}}, {"height","f32",{1}},
++        {"planner_sequence","i64",{1}}, {"planner_deadline","f64",{1}}}};
++    GuardedPlannerPacket packet;
++    std::vector<guarded_planner::Buffer> buffers{
++        {&packet.mode,4},{packet.movement.data(),12},{packet.facing.data(),12},
++        {&packet.speed,4},{&packet.height,4},{&packet.sequence,8},{&packet.deadline,8}};
++};
++}
++TEST(PlannerLease, ParserRejectsMalformedLayoutBeforeReadingPayload) {
++    PlannerFrame frame;
++    ASSERT_TRUE(guarded_planner::Planner(frame.header,frame.buffers));
++    frame.header.fields[1].shape = {1,3};
++    EXPECT_FALSE(guarded_planner::Planner(frame.header,frame.buffers));
++    frame.header.fields[1].shape = {3};
++    frame.buffers[0].size = 1;
++    EXPECT_FALSE(guarded_planner::Planner(frame.header,frame.buffers));
++    frame.buffers[0].size = 4;
++    frame.header.fields[5].name = "mode";
++    EXPECT_FALSE(guarded_planner::Planner(frame.header,frame.buffers));
++    frame.header.fields[5].name = "planner_sequence";
++    frame.header.endian = "be";
++    EXPECT_FALSE(guarded_planner::Planner(frame.header,frame.buffers));
++    frame.header.endian = "le";
++    frame.header.version = 2;
++    EXPECT_FALSE(guarded_planner::Planner(frame.header,frame.buffers));
++}
++TEST(PlannerLease, ControlParserCannotStartOrStopMotors) {
++    guarded_planner::Header header{1,"le",1,{
++        {"start","u8",{1}},{"stop","u8",{1}},{"planner","u8",{1}},
++        {"navigation_control","i32",{1}},{"planner_sequence","i64",{1}},
++        {"planner_deadline","f64",{1}}}};
++    uint8_t start = 0, stop = 0, planner = 1;
++    int32_t control = 1; int64_t seq = 10; double deadline = 10.2;
++    std::vector<guarded_planner::Buffer> buffers{
++        {&start,1},{&stop,1},{&planner,1},{&control,4},{&seq,8},{&deadline,8}};
++    ASSERT_TRUE(guarded_planner::Control(header,buffers));
++    start = 1;
++    EXPECT_FALSE(guarded_planner::Control(header,buffers));
++    start = 0; stop = 1;
++    EXPECT_FALSE(guarded_planner::Control(header,buffers));
++    stop = 0; planner = 0;
++    EXPECT_FALSE(guarded_planner::Control(header,buffers));
++    planner = 1; control = 3;
++    EXPECT_FALSE(guarded_planner::Control(header,buffers));
++}
+--- /dev/null
++++ b/unit_tests/test_planner_receiver.cpp
+@@ -0,0 +1,103 @@
++#include <gtest/gtest.h>
++#include "input_interface/zmq_manager.hpp"
++
++namespace {
++double Now() {
++    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
++}
++template<class Predicate> bool Wait(Predicate predicate) {
++    const auto limit = Now() + 1;
++    while (Now() < limit) {
++        if (predicate()) return true;
++        std::this_thread::sleep_for(std::chrono::milliseconds(2));
++    }
++    return false;
++}
++template<class T> void Bytes(std::vector<char>& data, const T& value) {
++    const auto* ptr = reinterpret_cast<const char*>(&value);
++    data.insert(data.end(), ptr, ptr + sizeof(value));
++}
++void Send(zmq::socket_t& socket, const std::string& topic, nlohmann::json fields, std::vector<char> payload) {
++    const auto header = nlohmann::json{{"v",1},{"endian","le"},{"count",1},{"fields",fields}}.dump();
++    std::vector<char> packet(topic.begin(), topic.end());
++    packet.resize(topic.size() + 1280, 0);
++    std::memcpy(packet.data() + topic.size(), header.data(), header.size());
++    packet.insert(packet.end(), payload.begin(), payload.end());
++    socket.send(zmq::buffer(packet), zmq::send_flags::none);
++}
++nlohmann::json F(const char* name, const char* dtype, int count) {
++    return { {"name",name},{"dtype",dtype},{"shape",{count}} };
++}
++void Control(zmq::socket_t& socket, int action, int64_t sequence, double deadline) {
++    std::vector<char> payload;
++    Bytes(payload,uint8_t{0}); Bytes(payload,uint8_t{0}); Bytes(payload,uint8_t{1});
++    Bytes(payload,int32_t{action}); Bytes(payload,sequence); Bytes(payload,deadline);
++    Send(socket,"command",{F("start","u8",1),F("stop","u8",1),F("planner","u8",1),
++        F("navigation_control","i32",1),F("planner_sequence","i64",1),F("planner_deadline","f64",1)},payload);
++}
++void Planner(zmq::socket_t& socket, int mode, int64_t sequence, double deadline, bool trailing = false) {
++    std::vector<char> payload;
++    Bytes(payload,int32_t{mode});
++    Bytes(payload,std::array<float,3>{mode ? 1.f : 0.f,0,0});
++    Bytes(payload,std::array<float,3>{1,0,0});
++    Bytes(payload,mode ? .2f : 0.f); Bytes(payload,-1.f);
++    Bytes(payload,sequence); Bytes(payload,deadline);
++    if (trailing) Bytes(payload,uint8_t{1});
++    Send(socket,"planner",{F("mode","i32",1),F("movement","f32",3),F("facing","f32",3),
++        F("speed","f32",1),F("height","f32",1),F("planner_sequence","i64",1),
++        F("planner_deadline","f64",1)},payload);
++}
++}
++
++TEST(PlannerLease, ReceiverAcknowledgesOnlyInstalledIdleAndStopsOnEnd) {
++    zmq::context_t context(1);
++    zmq::socket_t peer(context, zmq::socket_type::xpub);
++    peer.set(zmq::sockopt::linger, 0);
++    peer.bind("tcp://127.0.0.1:*");
++    const auto address = peer.get(zmq::sockopt::last_endpoint);
++    const int port = std::stoi(address.substr(address.rfind(':') + 1));
++    ZMQManager manager("127.0.0.1",port,"pose","command","planner",false,false,{},200,true);
++    bool command = false, planner = false;
++    ASSERT_TRUE(Wait([&] {
++        zmq::message_t subscription;
++        if (peer.recv(subscription,zmq::recv_flags::dontwait) && subscription.size() > 1) {
++            const auto* bytes = static_cast<const char*>(subscription.data());
++            const std::string topic(bytes + 1, subscription.size() - 1);
++            if (bytes[0] == 1 && topic == "command") command = true;
++            if (bytes[0] == 1 && topic == "planner") planner = true;
++        }
++        return command && planner;
++    }));
++    manager.SetPlannerHeading(euler_z_to_quat_d(.5),euler_z_to_quat_d(.2));
++    MotionDataReader reader;
++    std::shared_ptr<const MotionSequence> motion = std::make_shared<MotionSequence>();
++    int frame = 0; OperatorState op; bool reset = false, temperature = false;
++    DataBuffer<HeadingState> heading; DataBuffer<MovementState> movement;
++    PlannerState state{true,true}; std::mutex mutex;
++    auto apply = [&] {
++        manager.update();
++        manager.handle_input(reader,motion,frame,op,reset,heading,true,state,movement,mutex,temperature);
++    };
++    Control(peer,1,10,Now()+.2);
++    ASSERT_TRUE(Wait([&] { return manager.GetPlannerGuardStatus().high_water == 10; }));
++    Planner(peer,0,11,Now()+.2);
++    ASSERT_TRUE(Wait([&] { return manager.GetPlannerGuardStatus().high_water == 11; }));
++    EXPECT_EQ(manager.GetPlannerGuardStatus().idle_ack_sequence,0);
++    apply();
++    ASSERT_EQ(manager.GetPlannerGuardStatus().idle_ack_sequence,11);
++    ASSERT_TRUE(manager.GetPlannerGuardStatus().lease_armed);
++    Planner(peer,1,12,Now()+.2);
++    ASSERT_TRUE(Wait([&] { return manager.GetPlannerGuardStatus().high_water == 12; }));
++    apply();
++    ASSERT_EQ(movement.GetDataWithTime().data->locomotion_mode,1);
++    Control(peer,2,13,Now()+.2);
++    ASSERT_TRUE(Wait([&] { return manager.GetPlannerGuardStatus().high_water == 13; }));
++    EXPECT_EQ(manager.GetPlannerGuardStatus().idle_ack_sequence,11);
++    apply();
++    EXPECT_EQ(manager.GetPlannerGuardStatus().idle_ack_sequence,13);
++    EXPECT_EQ(movement.GetDataWithTime().data->locomotion_mode,0);
++    EXPECT_DOUBLE_EQ(movement.GetDataWithTime().data->facing_direction[0],std::cos(.3));
++    manager.SetPlannerHeading(euler_z_to_quat_d(.8),euler_z_to_quat_d(.2));
++    apply();
++    EXPECT_DOUBLE_EQ(movement.GetDataWithTime().data->facing_direction[0],std::cos(.3));
++}

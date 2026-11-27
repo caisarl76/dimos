@@ -1,0 +1,115 @@
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/localmotion_kplanner.hpp
+@@ -216,6 +216,7 @@
+     int motion_look_ahead_steps = 2;      // 50Hz: 0.02s * 2 = 0.04s
+     double default_height = 0.788740;      // Default robot height
+     int initial_random_seed = 1234;        // Initial random seed for planner
++    bool zero_terminal_velocity = false; // Guarded planner holds its terminal pose.
+ };
+ 
+ /**
+@@ -510,10 +511,14 @@
+             }
+         }
+ 
+-        // Handle last frame velocity
++        // Guarded playback holds/pads the final pose in every encoder window.
++        // Its velocity must agree with that constant pose. Keep legacy planner
++        // behavior opt-in compatible and retain every in-range finite difference.
+         for(int joint = 0; joint < 29; ++joint)
+         {
+-            planner_motion_50hz_.JointVelocities(planner_motion_50hz_.timesteps-1)[joint] = planner_motion_50hz_.JointVelocities(planner_motion_50hz_.timesteps-2)[joint];
++            planner_motion_50hz_.JointVelocities(planner_motion_50hz_.timesteps-1)[joint] =
++                config_.zero_terminal_velocity ? 0.0 :
++                planner_motion_50hz_.JointVelocities(planner_motion_50hz_.timesteps-2)[joint];
+         }
+         motion_available_ = true;
+         return true;
+--- a/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp
+@@ -2468,6 +2468,7 @@
+       if (!planner_path.empty()) {
+         PlannerConfig planner_config;
+         planner_config.model_path = planner_path;
++        planner_config.zero_terminal_velocity = guarded_planner;
+         if (planner_path.find("V0") != std::string::npos)
+         {
+           planner_config.version = 0;
+--- /dev/null
++++ b/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/unit_tests/test_planner_terminal_hold.cpp
+@@ -0,0 +1,75 @@
++#include <gtest/gtest.h>
++
++#include "localmotion_kplanner.hpp"
++
++namespace {
++// Supply deterministic backend output; exercise the real native resampler.
++// No controller, inference engine, DDS connection or GPU is constructed.
++class TerminalPlanner : public LocalMotionPlannerBase {
++ public:
++  explicit TerminalPlanner(bool hold_terminal = true) {
++    config_.zero_terminal_velocity = hold_terminal;
++    for (int frame = 0; frame < 3; ++frame) {
++      output_[frame * 36 + 2] = 0.79f;
++      output_[frame * 36 + 3] = 1.0f;
++      for (int joint = 0; joint < 29; ++joint) {
++        output_[frame * 36 + 7 + joint] = 0.01f * frame * (joint + 1);
++      }
++    }
++  }
++
++  bool InitializeSpecific() override { return true; }
++  void RunInference() override {}
++  void UpdateInputTensors(int, float, float, const std::array<float, 3>&,
++                         const std::array<float, 3>&, int) override {}
++  float* GetContextBuffer() override { return context_.data(); }
++  int32_t GetNumPredFrames() override { return 3; }
++  const float* GetMujocoQposBuffer() override { return output_.data(); }
++  float* GetMovementDirectionValues() override { return direction_.data(); }
++  float* GetFacingDirectionValues() override { return direction_.data(); }
++  float GetTargetVelValue() override { return 0; }
++  float GetHeightValue() override { return -1; }
++  int32_t GetRandomSeedValue() override { return 1234; }
++  int32_t GetModeValue() override { return 0; }
++
++ private:
++  std::array<float, 108> output_{};
++  std::array<float, 144> context_{};
++  std::array<float, 3> direction_{1, 0, 0};
++};
++}  // namespace
++
++TEST(PlannerTerminalHold, FullBodyAndLowerBodyTerminalReferenceHasZeroVelocity) {
++  TerminalPlanner planner;
++  ASSERT_TRUE(planner.ResampleGeneratedSequence50Hz());
++  const auto& motion = planner.planner_motion_50hz_;
++  ASSERT_EQ(motion.timesteps, 5);
++  // Every clamped future sample in both enabled encoder features reads this
++  // same terminal buffer. Assert the buffer invariant, not a copy of gather.
++  for (int joint = 0; joint < 29; ++joint) {
++    EXPECT_DOUBLE_EQ(motion.JointVelocities(4)[joint], 0.0) << joint;
++  }
++  for (int joint : lower_body_joint_mujoco_order_in_isaaclab_index) {
++    EXPECT_DOUBLE_EQ(motion.JointVelocities(4)[joint], 0.0) << joint;
++  }
++}
++
++TEST(PlannerTerminalHold, KeepsMovingSamplesAndTerminalPositions) {
++  TerminalPlanner planner;
++  ASSERT_TRUE(planner.ResampleGeneratedSequence50Hz());
++  const auto& motion = planner.planner_motion_50hz_;
++  // Joint 0 moves 0.01 rad per 30 Hz frame: 0.3 rad/s. The last
++  // in-range interval is 0.018 -> 0.020 over 0.02 s: 0.1 rad/s.
++  EXPECT_NEAR(motion.JointVelocities(0)[0], 0.3, 1e-6);
++  EXPECT_NEAR(motion.JointVelocities(3)[0], 0.1, 1e-6);
++  EXPECT_NEAR(motion.JointPositions(4)[0], 0.02, 1e-6);
++  EXPECT_NEAR(motion.JointPositions(4)[28], 0.58, 1e-6);
++}
++
++TEST(PlannerTerminalHold, LegacyPlannerKeepsItsTerminalVelocity) {
++  TerminalPlanner planner(false);
++  ASSERT_TRUE(planner.ResampleGeneratedSequence50Hz());
++  const auto& motion = planner.planner_motion_50hz_;
++  EXPECT_NEAR(motion.JointVelocities(4)[0], 0.1, 1e-6);
++  EXPECT_NEAR(motion.JointVelocities(3)[0], 0.1, 1e-6);
++}

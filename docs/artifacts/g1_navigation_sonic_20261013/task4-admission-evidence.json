@@ -1,0 +1,44 @@
+{
+  "scope": "Host-only Task 4 admission and RPC integration; no robot commands or simulator launched",
+  "tests": {
+    "passed": 369,
+    "failed": 0,
+    "command": ".venv/bin/python -m pytest dimos/robot/unitree/g1/test_sonic_*.py dimos/robot/unitree/g1/test_planner_lease_cases.py -q --tb=line",
+    "junit_sha256": "d83c32fa59fdce3b0af58dd84feaefd0d8c714f08e15763c33bac1a04d14fdd0"
+  },
+  "checks": [
+    "Ruff changed files PASS",
+    "mypy 4 production files PASS",
+    "original imported SONIC baseline 20 hashes unchanged"
+  ],
+  "tested_behaviors": [
+    "explicit admission and sequence fencing",
+    "atomic immutable velocity input through real pLCM",
+    "literal held-motion heartbeat under IMU noise",
+    "350 ms source IDLE and fresh-input resume",
+    "2 s source outage ends navigation",
+    "all three native subscriptions required",
+    "feedback and native lease loss latch admission",
+    "blocked cancellation permits native IDLE and bounded shutdown",
+    "inflight goal cannot reopen ended request",
+    "pose waits for matching cancellation and fresh measured settling proof",
+    "pose suspension and confirmed handback drain prior target",
+    "shared JSON oracle pins Python test-only lease to C++"
+  ],
+  "source_sha256": {
+    "dimos/robot/unitree/g1/sonic_navigation.py": "ef6b79f6b3acdc4b41e447f5418e2918f6de6d0215d0e9c54383d42e974850c0",
+    "dimos/robot/unitree/g1/sonic_navigation_session.py": "ab500d72b5c1a1b3953e778c3e9f374dc9e9e30b514285e8933ba8a20e8d199c",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "a860e9ccbd2e9f7013031d9724d0f8980417749ba45f094a1368fabd46a35898",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "7306f7f3e26db0a0ab485337d574c80ee4763a72cff212d924d5e9e2149a18ca",
+    "dimos/robot/unitree/g1/test_sonic_navigation_session.py": "54b5b9a1facf196b4a62f653f589f85afdf7f8f556466b5c35d261c9f5050bdf",
+    "dimos/robot/unitree/g1/test_sonic_execution_module.py": "b53b916a770bfe27f442f2fe366d6981df5cadf271a24825e5d55618ef6d84bf",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "14ff7f88fc79828c6db10901ad7c4ea95272720cb77fae6e5233985616028f98",
+    "dimos/robot/unitree/g1/test_planner_lease_cases.py": "a537889237d5980fd4e9aa60efb3c5267bb6bb0a805a584416fb3aa6240256ea",
+    "dimos/robot/unitree/g1/test_utils/sonic_planner_lease.py": "fbe02ab52b62618fd5c18782b4b1af31d6fb7c5d84903e023c68e557b9f4a6ae"
+  },
+  "remaining_gates": [
+    "Task 3 unchanged FK exact fixture absent; official example substitute fails 396 assertions in baseline and private builds",
+    "Task 5 real native MuJoCo proof and Stage A independent review",
+    "Tasks 6\u201311 peer/sensors/compositions and real pc2 commissioning"
+  ]
+}

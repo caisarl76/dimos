@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-21",
+  "time_cst": "13:46",
+  "robot": "shut down by the operator before the checks",
+  "task_processes": {
+    "workstation": "none (harness, peer host, viewer, simulations)",
+    "pc2": "none (no containers, no g1_deploy or SONIC process)"
+  },
+  "launch_check_only": {
+    "exit": 0,
+    "ready": true,
+    "blocking": [],
+    "tolerated": [],
+    "report": "pc2:/home/unitree/dimos-navigation-verify-20261009/sonic-navigation-20261013/checks/20261021-134652/readiness.json"
+  },
+  "verify_package": {
+    "package_manifest": "ok",
+    "environment_fingerprints": {
+      "files": 1232,
+      "result": "ok"
+    },
+    "shared_controllers": "ok",
+    "task_controller_binary": "ok",
+    "models": "ok"
+  },
+  "original_native_source": {
+    "root": "/home/unitree/GR00T-WholeBodyControl",
+    "files": 71,
+    "result": "ok"
+  },
+  "task_native_source": {
+    "files": 87,
+    "result": "ok"
+  }
+}
