@@ -1,0 +1,212 @@
+{
+  "completed_date": "2026-10-13",
+  "scope": "Native MuJoCo/Pi0.5 validation through SonicServiceModule and SonicExecutionModule in two DimOS workers",
+  "authoritative_run": "run01",
+  "native_trial_count": 1,
+  "hardware_connected": false,
+  "audit_passed": true,
+  "cases": [
+    {
+      "scenario": "live",
+      "outcome": "finished",
+      "accepted_predictions": 17,
+      "discarded_predictions": 1,
+      "streaming_seconds": 6.000875259051099,
+      "handback_confirmed_s": 0.12140326295047998,
+      "source_age_range_s": [
+        0.042034622048959136,
+        0.11535780399572104
+      ],
+      "admission_age_range_s": [
+        0.35244100203271955,
+        0.4392441409872845
+      ],
+      "inference_roundtrip_range_s": [
+        0.30104047199711204,
+        0.3248367140768096
+      ],
+      "freeze_to_handback_s": null,
+      "unique_rgb": 18,
+      "unique_states": 18,
+      "native_applied_index_range": [
+        64,
+        343
+      ],
+      "arm_peak_rad_s": 3.517691135406494,
+      "physics": {
+        "samples": 499,
+        "minimum_pelvis_height_m": 0.7798367238020326,
+        "maximum_tilt_deg": 8.227222117472206,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "progress": 1.0
+    },
+    {
+      "scenario": "cancel",
+      "outcome": "cancelled",
+      "accepted_predictions": 5,
+      "discarded_predictions": 1,
+      "streaming_seconds": 1.5171131850220263,
+      "handback_confirmed_s": 0.2185235139913857,
+      "source_age_range_s": [
+        0.047474161023274064,
+        0.10879198496695608
+      ],
+      "admission_age_range_s": [
+        0.3568758590845391,
+        0.41797169495839626
+      ],
+      "inference_roundtrip_range_s": [
+        0.2992301440099254,
+        0.3203319900203496
+      ],
+      "freeze_to_handback_s": null,
+      "unique_rgb": 6,
+      "unique_states": 6,
+      "native_applied_index_range": [
+        409,
+        478
+      ],
+      "arm_peak_rad_s": 5.980698108673096,
+      "physics": {
+        "samples": 292,
+        "minimum_pelvis_height_m": 0.7842464816361288,
+        "maximum_tilt_deg": 6.955596485033981,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "progress": 0.2507628473298003
+    },
+    {
+      "scenario": "camera_loss",
+      "outcome": "failed",
+      "accepted_predictions": 6,
+      "discarded_predictions": 0,
+      "streaming_seconds": 2.193790088989772,
+      "handback_confirmed_s": 0.12659455800894648,
+      "source_age_range_s": [
+        0.05394235206767917,
+        0.12248664896469563
+      ],
+      "admission_age_range_s": [
+        0.36697112198453397,
+        0.4436765529680997
+      ],
+      "inference_roundtrip_range_s": [
+        0.29983697598800063,
+        0.3226186929969117
+      ],
+      "freeze_to_handback_s": 0.6782077320385724,
+      "unique_rgb": 6,
+      "unique_states": 6,
+      "native_applied_index_range": [
+        544,
+        645
+      ],
+      "arm_peak_rad_s": 2.934393882751465,
+      "physics": {
+        "samples": 318,
+        "minimum_pelvis_height_m": 0.7843136635437177,
+        "maximum_tilt_deg": 8.104366557561407,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "progress": 0.36597613332560286
+    }
+  ],
+  "evidence_counts": {
+    "paired_camera_snapshots": 338,
+    "task_inference_requests": 30,
+    "accepted_predictions": 28,
+    "discarded_predictions": 2,
+    "pose_packets": 647
+  },
+  "supplemental_metrics": "run01/supplemental-metrics.json",
+  "verification": {
+    "independent_source_and_evidence_review": "Passed after documented harness/audit fixes; see review.md",
+    "ruff_check_passed": true,
+    "ruff_format_check_passed": true,
+    "ruff_python_files": 4,
+    "bash_syntax_passed": true,
+    "jsonl_parser_selfcheck": "Valid rows accepted; truncated JSON row raises JSONDecodeError",
+    "git_diff_check_passed": true,
+    "audit_evidence_hashes_match": true,
+    "production_source_test_hashes_match_prior_record": true,
+    "prior_record": "../g1_sonic_service_20261012/verification.json",
+    "prior_focused_sonic_tests": 262,
+    "focused_sonic_tests_rerun_this_milestone": false,
+    "full_repository_suite_run": false,
+    "replay_and_speed_plot_visually_inspected": true
+  },
+  "cleanup": {
+    "service_stop_returned": true,
+    "execution_stop_returned": true,
+    "coordinator_stopped": true,
+    "reference_endpoint_rebound": true,
+    "planner_confirmed_before_native_stop": true,
+    "native_simulator_camera_exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "native_children_reaped": true,
+    "policy_recorder_stopped": true,
+    "owned_policy_pid_reaped": 683031,
+    "owned_policy_reap_evidence": "run01-launch.log final line",
+    "host_process_and_gpu_check": "Observed after run/render in this session using escalated host process/GPU listings: owned harness, policy boot and native controller absent; existing policy PID 1212423 and DimOS simulator PID 3707867 retained; GPU 1 allocation released"
+  },
+  "replay": {
+    "video": "run01/replay/live_policy_replay.mp4",
+    "speed_plot": "run01/replay/joint_speeds.png",
+    "codec": "h264",
+    "width": 1280,
+    "height": 680,
+    "fps": 20,
+    "frames": 210,
+    "seconds": 10.5,
+    "method": "recorded qpos with mj_forward only; zero-order pose sampling",
+    "physics_mujoco_version": "3.8.1",
+    "renderer_mujoco_version": "3.10.0",
+    "arm_speed": {
+      "left_max_rad_s": 2.8418829441070557,
+      "right_max_rad_s": 3.517691135406494
+    }
+  },
+  "limits": [
+    "Nominal uncalibrated simulated camera; hardware image/state alignment and clock mapping unverified",
+    "Empty scene with a handover-trained checkpoint; no bottle-to-tray success claim; task_success remains null",
+    "Minimum hand/lower-body collision-geometry distance -3.59 mm; collision-free motion and hardware readiness not established",
+    "Planner handback does not imply all physical joints settled",
+    "Policy provenance hashes measured before run; size/mtime unchanged afterward, full checkpoint not rehashed afterward"
+  ],
+  "next": "Reusable D435i/measured-body-and-Dex3 observation adapter, starting with read-only alignment and hardware profile validation",
+  "sha256": {
+    "docs/artifacts/g1_sonic_service_native_20261013/demo_audit.py": "950bb76413948e037fa819c12a14e92f46de0adef8bd846495230f65f0109e20",
+    "docs/artifacts/g1_sonic_service_native_20261013/demo_native_service.py": "9af3e96bcf71712cc7151402007eda7a70bc8f83480ed03cbaae9be237236aac",
+    "docs/artifacts/g1_sonic_service_native_20261013/demo_policy_recorder.py": "cc9b7a3a0862fe9226bbd824a7a8d281c721b18c1f47c83b6dc1636bd99fa61b",
+    "docs/artifacts/g1_sonic_service_native_20261013/demo_render.py": "0738224a8234b835611dd4b228770333eb8cd110fcce614d2daa8760d3c62f1f",
+    "docs/artifacts/g1_sonic_service_native_20261013/demo_run_trial.sh": "c8270506f8ee2cbd9b09e91cd434f9d755c574c21888e7528bb516344dc9e5ea",
+    "docs/artifacts/g1_sonic_service_native_20261013/review.md": "7b989be8e20387ba4430741c97bf42cda9ce887feb1f5168dca2d2892383ef3a",
+    "docs/artifacts/g1_sonic_service_native_20261013/policy-provenance.json": "94788bde14470b07969a25b51e3ebd767634be13d7222a0a9883dc8be7a41299",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01-launch.log": "07100466f13aa685df8087a9ac39fe6d4ca12f59c40a7c503ee9d040585a122c",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01-audit.log": "260e710b6cf07391865838cf4acb7ee9d585c766a7e98244ac9a0709bb423047",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/result.json": "68391e4fbed629eef88814483e615788c18b6c47ac2ab3c01419d7c61a222299",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/audit.json": "260e710b6cf07391865838cf4acb7ee9d585c766a7e98244ac9a0709bb423047",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/manifest.json": "d6d0c0dc109583888c1a09a417d29878b404cbf62e4e6fa7e5b38e2eae3b1b7c",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/policy-provenance.json": "56c148c58474cd12440ad95bba39dad371b11df52c2cc715ea7f8c14c3346a99",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/supplemental-metrics.json": "1ca4dafe4876639743361c4fb7136903f2a38cf396863ddbb95f71b62e73de88",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/replay-inputs.json": "475926d8ed7e89163ee698c91c2716805ca1e154834577791505d32eee4e1c1c",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/replay/render_info.json": "a15b12f36a094d3c27b322277b7fbd07cf771dd14a81bc7f21e92bff120c364c",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/replay/live_policy_replay.mp4": "785b38b551b7a9d1db9f492f808336fa268c8e2db7c4a1e3137b546ceca03305",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/replay/preview.png": "78a3a91deac7acfc75cccbbaf0646f1b6a123ca70f1d8cd3c943239a9f72b4a3",
+    "docs/artifacts/g1_sonic_service_native_20261013/run01/replay/joint_speeds.png": "1a62345936c5b017f45511eef9db327c05726685a98c5d94e5357d864be7abd3",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "485ef9072431cb15ca955d321735339586b3813d3708a6c47772309d5461d665",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+    "docs/platforms/humanoid/g1/sonic-service-native-validation.md": "58395c181d794c9d5635dcfc04b2c0fb6cabdaea0b887340cac62b444a4b1fa7",
+    "docs/platforms/humanoid/g1/sonic-service-coordinator.md": "c704bebb2aca62ab313b1ed930cef3adf4327f1a2da733b3d7854d1bd1470c3e",
+    "docs/platforms/humanoid/g1/sonic-execution-module.md": "37be50efe9510262af708e85571230997cd1b9a856d1b01aa7f09fdd7e6cdcbf",
+    "docs/superpowers/plans/2026-10-13-sonic-service-native-validation.md": "bd5c39dff448a0d43b7cffc02222d24ad684cb46aa99508b29aa6e8314f64aef"
+  }
+}

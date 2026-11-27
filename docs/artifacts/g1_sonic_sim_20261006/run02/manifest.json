@@ -1,0 +1,34 @@
+{
+  "netns": "net:[4026533302]",
+  "host_netns": "net:[4026533448]",
+  "interfaces": [
+    [
+      1,
+      "lo"
+    ]
+  ],
+  "command": [
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/target/release/g1_deploy_onnx_ref",
+    "lo",
+    "/tmp/dimos-sonic-sim-assets-20261006/model_decoder.onnx",
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/reference/example",
+    "--obs-config",
+    "/tmp/dimos-sonic-sim-assets-20261006/observation_config.yaml",
+    "--encoder-file",
+    "/tmp/dimos-sonic-sim-assets-20261006/model_encoder.onnx",
+    "--planner-file",
+    "/tmp/dimos-sonic-sim-assets-20261006/planner/target_vel/V2/planner_sonic.onnx",
+    "--input-type",
+    "zmq_manager",
+    "--output-type",
+    "zmq",
+    "--zmq-host",
+    "127.0.0.1",
+    "--zmq-port",
+    "15556",
+    "--zmq-out-port",
+    "15557",
+    "--disable-crc-check"
+  ],
+  "binary_sha256": "eaaeb1c61e8285e7c08f071c4bec40955effd3e9d561318b9ea7c126c8c138d4"
+}

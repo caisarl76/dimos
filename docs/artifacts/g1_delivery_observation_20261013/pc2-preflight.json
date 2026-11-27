@@ -1,0 +1,22 @@
+{
+  "pc2_wall_time": 1791883653.822457,
+  "processes": [
+    {
+      "pid": 15857,
+      "argv": ".venv/bin/python -u code/g1_head_camera_server.py --device /dev/video4 --name egocentric --width 640 --height 480 --publish-fps 30"
+    }
+  ],
+  "video_devices": [
+    "/dev/video5",
+    "/dev/video4",
+    "/dev/video3",
+    "/dev/video2",
+    "/dev/video1",
+    "/dev/video0"
+  ],
+  "fuser": {
+    "returncode": 0,
+    "stdout": " 15857",
+    "stderr": "/dev/video4:        m\n"
+  }
+}

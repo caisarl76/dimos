@@ -1,0 +1,48 @@
+{
+  "adapter": {
+    "state": "waiting",
+    "readiness_reason": "measurement acquisition timestamps unavailable",
+    "camera_age_s": 0.1384615627130188,
+    "measured_state_age_s": null,
+    "observation_age_s": null,
+    "feedback_receipt_age_s": null,
+    "camera_source_to_feedback_receipt_s": null,
+    "diagnostic_state": null,
+    "diagnostic_time_basis": "camera source versus telemetry receipt; acquisition alignment unverified",
+    "clock_mapping": "same-host UNIX to monotonic; fixed offset",
+    "clock_mapping_uncertainty_s": 5.91999878452043e-07,
+    "camera_time_uncertainty_s": 0.015000591999878451,
+    "clock_offset_s": 1791861209.9134052,
+    "max_skew_s": 0.03,
+    "accepted_images": 134,
+    "accepted_measured_states": 0,
+    "observations_published": 0,
+    "rejected_images": 1,
+    "rejected_states": 0,
+    "rejected_feedback": 0,
+    "last_rejection": "acquisition time stale, future or invalid"
+  },
+  "feedback": {
+    "state": "waiting",
+    "endpoint": "tcp://127.0.0.1:5557",
+    "age_s": null,
+    "stale_after_s": 0.2,
+    "accepted_packets": 0,
+    "invalid_packets": 0,
+    "rejected_indices": 0,
+    "error": null,
+    "reference_guard": null
+  },
+  "rgb_frames": 135,
+  "rgb_hz": 15.136682004142145,
+  "camera_source_age_s": {
+    "min": 0.07595157623291016,
+    "median": 0.08636951446533203,
+    "max": 0.23626160621643066
+  },
+  "snapshot": "camera.png",
+  "camera_return_code": 0,
+  "service_observations": 0,
+  "scope": "camera and subscriber-only diagnostics; no controller/task start",
+  "mapping_and_skew": "provisional diagnostic settings; hardware not commissioned"
+}

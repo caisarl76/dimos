@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-13",
+  "milestone": "D435i observation adapter foundation and read-only pc2_222 camera diagnostics",
+  "status": "software verified; hardware measurement alignment pending",
+  "checks": {
+    "focused_sonic_suite": {
+      "passed": 293,
+      "new_tests": 31,
+      "log": "pytest.log"
+    },
+    "generated_registry_comparison": {
+      "passed": 5,
+      "log": "registry.log"
+    },
+    "ruff_check": {
+      "files": 5,
+      "result": "passed",
+      "log": "ruff-check.log"
+    },
+    "ruff_format": {
+      "files": 5,
+      "result": "passed",
+      "log": "ruff-format.log"
+    },
+    "mypy": {
+      "files": 3,
+      "options": [
+        "--follow-imports=silent"
+      ],
+      "result": "passed",
+      "log": "mypy.log"
+    },
+    "full_repository_suite": "not run",
+    "known_warning": "Existing pytest startup subprocess ResourceWarning remains in test logs"
+  },
+  "hardware": {
+    "host": "pc2_222",
+    "ip": "192.168.0.222",
+    "scope": "Native camera acquisition and ZMQ subscriber only; no controller, policy, service task, mode change or motion commands",
+    "duration_seconds": 10,
+    "deployment": "Temporary /tmp import overlay; no installation into robot checkout",
+    "probe_result": "pc2-result.json",
+    "raw_probe_log": "pc2-probe.log",
+    "snapshot": "pc2-camera.png",
+    "cleanup": "pc2-cleanup.json",
+    "rgb_frames": 135,
+    "rgb_hz": 15.136682004142145,
+    "accepted_images": 134,
+    "rejected_images": 1,
+    "feedback_packets": 0,
+    "service_observations": 0,
+    "camera_return_code": 0,
+    "final_adapter_state": "waiting",
+    "readiness_reason": "measurement acquisition timestamps unavailable",
+    "joint_alignment_validated": false,
+    "camera_only_depth_recheck": "Earlier installed check-camera command reported 91 RGB/90 aligned depth frames at 640x480, approximately 15 Hz and exit 0; separate raw log was not saved",
+    "cleanup_confirmed": true,
+    "source_manifest": "source-manifest.json",
+    "manifest_matches_local_sources": true
+  },
+  "review": {
+    "agent": "observation_adapter_review",
+    "scope": "independent source review; reviewer did not run hardware or tests",
+    "final_result": "No remaining material findings, including final probe transport/capture changes",
+    "fixed_findings": [
+      "Account for the full camera uncertainty interval, allowable offset drift and subsequent clock-sampling bracket uncertainty",
+      "Attempt every probe cleanup action even if another cleanup raises"
+    ]
+  },
+  "earlier_probe_failures": [
+    {
+      "log": "pc2-bootstrap-failure.log",
+      "cause": "Namespace package path does not support insert",
+      "fix": "Assign combined package search path"
+    },
+    {
+      "log": "pc2-transport-failure.log",
+      "cause": "Typed native transport used for Python telemetry dataclass",
+      "fix": "Use repository make_transport factory"
+    },
+    {
+      "log": "pc2-capture-failure.log",
+      "cause": "Local Python Out subscription did not see native camera publisher; snapshot absent",
+      "fix": "Subscribe to camera transport and tolerate absent diagnostic snapshot in bootstrap"
+    }
+  ],
+  "limits": [
+    "Native g1_debug receipt/ROS output timestamps do not establish body or individual hand acquisition times",
+    "No SONIC telemetry arrived during the final camera probe; diagnostic hand mapping was not validated on hardware",
+    "Timestamped measured-state producer is still required; service output was intentionally absent",
+    "30 ms skew and 5 ms camera timestamp error are provisional settings, not measured hardware calibration",
+    "Adapter requires same-host monotonic clock for measured-state producer and service",
+    "Camera snapshot shows floor/furniture; bottle/tray framing and physical finger identities remain to verify",
+    "No bottle grasp, tray placement or live policy execution was attempted"
+  ],
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_observation.py": "4fe64f76249f093b285bd3806f98546e31d7392b5005b778734cea4e52dbc40c",
+    "dimos/robot/unitree/g1/sonic_observation_pairing.py": "b50ccdf280c6eac9e7825492b57e2b61d9a1dd3a6ba0f29cba0758f643709d84",
+    "dimos/robot/unitree/g1/sonic_observation_module.py": "6d55c6d25e781fc2e05277de37cf3ca68758b4e966ffc396713ed1e13816f7d1",
+    "dimos/robot/unitree/g1/sonic_feedback.py": "9c29f93c50d20d59c4a8e9244509069ebaa84c690db7b66c5bce9d02871058be",
+    "dimos/robot/unitree/g1/sonic_feedback_module.py": "e723a74e38c7f0ed4e3e7a81b39bce11f5cd8ec021ef9ed9e544371b60534bdb",
+    "scripts/demo_g1_sonic_observation.py": "4581f28f24593a8d20439eca2d11f128f0478ebc4ae2c83f30517cb699bb0a2a",
+    "dimos/robot/unitree/g1/test_sonic_observation_pairing.py": "915d04a582c455dbf9cd6557a16d126bc501988bb5cdaa02efd67fb9f7bd23e4",
+    "dimos/robot/unitree/g1/test_sonic_observation_module.py": "434a2eeb0962a180a89f3724c514e144edf3ab537508a5de60bbc6ea906b5da0",
+    "dimos/robot/all_blueprints.py": "1189e3cd3269a11276ee69dff4b5193f8dcf6f9576ed5b31ce00ba2b8e78b156",
+    "docs/platforms/humanoid/g1/sonic-observation-adapter.md": "db0b15fe03c495b89315fb922b7f8696ad96e2c5f9226dc26cea825c32290c8a",
+    "docs/platforms/humanoid/g1/sonic-service-coordinator.md": "f7eaff3f96707dcee9ddbf131a466b75e7201699bb402002b9fc7f94961321d1",
+    "docs/platforms/humanoid/g1/index.md": "4e6801d03f11adde3db293633125666e785ba1e4550f5ff3e40c17f1e07977a4"
+  },
+  "artifact_sha256": {
+    "pc2-camera.png": "b1285daf97a6ddb146b94acb9e9b8341fcdc99445a9b8dd2833c584f58f17324",
+    "pytest.log": "3c109217e3434e264b74898d7fea0e50d7a6943b06c483e2a14cd1e3c82bb6a1",
+    "pc2-transport-failure.log": "5745e67125dc0ad5db8ceec9617ff9a39dc49f58f8378b4e3997da656b7a374a",
+    "pc2-capture-failure.log": "6a820b94e87d2655e20f67a174817e5b619d01d02ae395f3f038833d618b7683",
+    "ruff-format.log": "f114d83b30c5c657ee43a847a45bafccaea255d82673feb87c26d252c61e29c1",
+    "pc2-probe.log": "c3c8511344b2c35bd35137a89452c8afbed4abb16408227e6d06e873b04ecea0",
+    "pc2-bootstrap-failure.log": "0075bd58028642a8560c46d68a16adedd40f4dc4f6d339c3882add406fa862d0",
+    "registry.log": "8456678ed7dc422af76db60a93912b78c590b3ca654f46369f6489fe4b871a8d",
+    "pc2-result.json": "eb36473b28c11eecf2402373ca2a12c471cbcd3b3b235964d9dbcde11fe8716d",
+    "source-manifest.json": "7aaa405db9b0bee1b65cd1b6f1f9d1728a4ce7cfcb9bd40a8add366560518767",
+    "pc2-bootstrap.py": "694cedf9121ffc06baf4a8b0ae4fc41b1269cd7ebaeff4179e5b374c9e9dbd7e",
+    "mypy.log": "8228fcc5ce46d42d01caf3cd941f4e9c5f2bcc372bb5b147a2f0572d2dd675a8",
+    "ruff-check.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "pc2-cleanup.json": "fa4c54d59f49c5cb0e133cc45556289e9612bb7b544a10fa39c7add22603d8f0"
+  }
+}

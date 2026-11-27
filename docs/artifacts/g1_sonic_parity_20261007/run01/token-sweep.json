@@ -1,0 +1,27 @@
+{
+  "input": "Last arm-hold input; all ten future elbow positions offset equally, other fields fixed",
+  "offset_range_rad": [
+    0.0,
+    0.1
+  ],
+  "step_rad": 0.001,
+  "input_count": 101,
+  "unique_tokens": 14,
+  "token_change_offsets_rad": [
+    0.028,
+    0.032,
+    0.034,
+    0.042,
+    0.045,
+    0.049,
+    0.05,
+    0.053,
+    0.056,
+    0.064,
+    0.08,
+    0.083,
+    0.095
+  ],
+  "max_token_change_from_zero": 0.0625,
+  "limits": "Frozen-input sensitivity only; does not establish the cause of closed-loop tracking error"
+}

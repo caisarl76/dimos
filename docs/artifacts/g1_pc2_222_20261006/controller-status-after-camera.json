@@ -1,0 +1,44 @@
+{
+  "started_utc": "2026-10-06T06:17:22.819574+00:00",
+  "queries": {
+    "motion_switcher.CheckMode": [
+      0,
+      {
+        "form": "0",
+        "name": "ai"
+      }
+    ],
+    "motion_switcher.GetServerApiVersion": [
+      0,
+      "1.0.0.1"
+    ],
+    "sport.GetServerApiVersion": [
+      0,
+      "1.0.0.0"
+    ],
+    "get_fsm_id": {
+      "api_id": 7001,
+      "return_code": 0,
+      "data_raw": "{\"data\":0}"
+    },
+    "get_fsm_mode": {
+      "api_id": 7002,
+      "return_code": 0,
+      "data_raw": "{\"data\":0}"
+    },
+    "get_balance_mode": {
+      "api_id": 7003,
+      "return_code": 7301,
+      "data_raw": "{\"data\":0}"
+    }
+  },
+  "local_client_methods_present": {
+    "GetFsmId": false,
+    "SwitchToUserCtrl": false,
+    "SwitchToInternalCtrl": false
+  },
+  "checkout_status": {
+    "return_code": 0,
+    "entries": []
+  }
+}

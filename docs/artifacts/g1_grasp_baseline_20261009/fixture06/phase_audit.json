@@ -1,0 +1,51 @@
+{
+  "approach_open": {
+    "max_xy_drift_m": 2.334212489059566e-06,
+    "max_bottom_m": 0.7010000000000001,
+    "opposed_samples": 0,
+    "samples": 100
+  },
+  "close": {
+    "max_xy_drift_m": 0.010672065612084173,
+    "max_bottom_m": 0.7000035997105384,
+    "opposed_samples": 32,
+    "samples": 125
+  },
+  "lift": {
+    "max_xy_drift_m": 0.02440467293708462,
+    "max_bottom_m": 0.7970945004386235,
+    "opposed_samples": 100,
+    "samples": 100
+  },
+  "hold": {
+    "max_xy_drift_m": 0.025328128635825127,
+    "max_bottom_m": 0.797132011440602,
+    "opposed_samples": 50,
+    "samples": 50
+  },
+  "lower": {
+    "max_xy_drift_m": 0.026001757316007852,
+    "max_bottom_m": 0.7959263004393822,
+    "opposed_samples": 100,
+    "samples": 100
+  },
+  "release": {
+    "max_xy_drift_m": 0.06177146667062493,
+    "max_bottom_m": 0.7000109209605097,
+    "opposed_samples": 35,
+    "samples": 126
+  },
+  "final": {
+    "time": 12.0,
+    "bottle_pos": [
+      0.45087189046097165,
+      -0.10496052432516963,
+      0.7249771893093276
+    ],
+    "bottom_m": 0.6998578427947055,
+    "opposed_contact": false,
+    "supports": [
+      "world"
+    ]
+  }
+}

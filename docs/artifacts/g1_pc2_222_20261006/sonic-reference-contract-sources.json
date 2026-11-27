@@ -1,0 +1,13 @@
+{
+  "host": "pc2_222",
+  "date": "2026-10-06",
+  "method": "Read-only SSH source inspection and SHA256; no controller invocation or command publisher",
+  "source_to_running_binary_correspondence": "not established",
+  "files": {
+    "/home/unitree/g1_sonic_eval/code/sonic_policy_streamer.py": "14b1d26e82b5f0ea464c2e25540e5da44a8f363bb2926f8339b6f73643a9279b",
+    "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_manager.hpp": "327723b44dcb3cc38c4ca65f9bcb2aebce06c062224f7d1a28738b8fc15e934b",
+    "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_endpoint_interface.hpp": "0c182fa3dfe1310a07e07860b4653f56c24ef725eb4695a4e991f499ff03a39f",
+    "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/zmq_packed_message_subscriber.hpp": "35d5142bfce39c0632e96dbb6f17316a0d200f044c62f1f7e9edabfa351452c4",
+    "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp": "f36f3eda33f7625d70f6cec0fcc94da9abf9be2ff3d98ed8a7ab5627436eecb8"
+  }
+}

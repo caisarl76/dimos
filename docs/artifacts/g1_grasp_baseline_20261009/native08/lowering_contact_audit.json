@@ -1,0 +1,462 @@
+[
+  {
+    "lower_elapsed": 0,
+    "bottle": [
+      0.3174709012604431,
+      -0.15446553728582543,
+      0.8743570056677259
+    ],
+    "bottom": 0.7906540910437921,
+    "tilt": 14.386957040535135,
+    "opposed": true,
+    "table": false,
+    "speed": 0.015226605667361224,
+    "contacts": [
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 3.99542714045122
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 3.9937994429546944
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_1_link",
+        "normal_force_n": 0.7255175589749768
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_1_link",
+        "normal_force_n": 0.7255240463063415
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_1_link",
+        "normal_force_n": 0.7255111885829069
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_2_link",
+        "normal_force_n": 1.33265403486714
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_2_link",
+        "normal_force_n": 1.3325863666241673
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_2_link",
+        "normal_force_n": 1.3327606586386112
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_2_link",
+        "normal_force_n": 1.3322767730949405
+      },
+      {
+        "geom": "",
+        "body": "right_hand_middle_1_link",
+        "normal_force_n": 5.988429566513557
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 1,
+    "bottle": [
+      0.3224054235849161,
+      -0.13638530904480717,
+      0.8438622089071642
+    ],
+    "bottom": 0.7603460691597717,
+    "tilt": 12.51188068934582,
+    "opposed": true,
+    "table": false,
+    "speed": 0.06572764820378726,
+    "contacts": [
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 1.5078207434974653
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 1.5138672683633438
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 1.520466377482177
+      },
+      {
+        "geom": "",
+        "body": "right_hand_thumb_2_link",
+        "normal_force_n": 0.7998582593661876
+      },
+      {
+        "geom": "",
+        "body": "right_hand_middle_1_link",
+        "normal_force_n": 5.034119715797461
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 2,
+    "bottle": [
+      0.3444770980315598,
+      -0.15571952165655242,
+      0.7830026986502322
+    ],
+    "bottom": 0.6999423750990541,
+    "tilt": 9.658087180532961,
+    "opposed": false,
+    "table": true,
+    "speed": 0.028827626071043222,
+    "contacts": [
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.1547852460006354
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.15198980677220864
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.1575369133457452
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.16238495325763222
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.1473680783982741
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 3,
+    "bottle": [
+      0.3317021652361715,
+      -0.145333609698206,
+      0.7814497890240694
+    ],
+    "bottom": 0.6999042624862285,
+    "tilt": 3.989617376307189,
+    "opposed": false,
+    "table": true,
+    "speed": 0.05320036514360403,
+    "contacts": [
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.25279330008292106
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.2800044468789752
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.2197141834285188
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 4,
+    "bottle": [
+      0.33271316650569605,
+      -0.1513127056452807,
+      0.7798069085740086
+    ],
+    "bottom": 0.699451883255998,
+    "tilt": 0.8330672704606232,
+    "opposed": false,
+    "table": true,
+    "speed": 0.06461394671331172,
+    "contacts": [
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 1.9919579360347037
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 1.9328741923307602
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 2.033306888614978
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 2.131508861458922
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 1.8136064126214806
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 9.018427563370636
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 5,
+    "bottle": [
+      0.33790314029586327,
+      -0.15218352018555642,
+      0.7802434251462796
+    ],
+    "bottom": 0.6992850507329132,
+    "tilt": 2.351482723661807,
+    "opposed": false,
+    "table": true,
+    "speed": 0.005891132706127676,
+    "contacts": [
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 3.5230723425415134
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 3.532194231381782
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 3.5148003102095426
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 3.507909764490468
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 3.5377119542828495
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 4.187154271509568
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 4.213470171981008
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 4.184379101888395
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 4.187854317244729
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 6,
+    "bottle": [
+      0.3386403927221976,
+      -0.1612042463429466,
+      0.781444788574544
+    ],
+    "bottom": 0.6991073001373947,
+    "tilt": 6.578912527877626,
+    "opposed": false,
+    "table": true,
+    "speed": 0.03454439159494049,
+    "contacts": [
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 5.625796390848421
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 5.635558555734007
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 5.618290181333783
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 5.622655056451172
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 5.628731359379762
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 13.74397324630845
+      },
+      {
+        "geom": "",
+        "body": "right_wrist_yaw_link",
+        "normal_force_n": 13.499159982951316
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 7,
+    "bottle": [
+      0.2665447227869427,
+      -0.1740146804720478,
+      0.7249300994548767
+    ],
+    "bottom": 0.699913869132502,
+    "tilt": 89.98837551926165,
+    "opposed": false,
+    "table": true,
+    "speed": 0.0779973399133058,
+    "contacts": [
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.155065996298556
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.33368622894814726
+      },
+      {
+        "geom": "task_table",
+        "body": "world",
+        "normal_force_n": 0.2947858662201104
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 8,
+    "bottle": [
+      0.23964711563900265,
+      -0.22189949721735663,
+      0.024799347745794696
+    ],
+    "bottom": -0.00022944024053225473,
+    "tilt": 89.97938096368757,
+    "opposed": false,
+    "table": false,
+    "speed": 0.015297941386003568,
+    "contacts": [
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.38899816331425796
+      },
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.3902182360441311
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 9,
+    "bottle": [
+      0.2303111550823634,
+      -0.2334414409438537,
+      0.02485784700222988
+    ],
+    "bottom": -0.00014215299777017507,
+    "tilt": 89.99999999999996,
+    "opposed": false,
+    "table": false,
+    "speed": 0.01514828647674203,
+    "contacts": [
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.39240000000000014
+      },
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.39239999999999986
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 10,
+    "bottle": [
+      0.22107755213907485,
+      -0.2448716399097999,
+      0.02485784700222988
+    ],
+    "bottom": -0.00014215299777014384,
+    "tilt": 89.99999999999999,
+    "opposed": false,
+    "table": false,
+    "speed": 0.015148286476741888,
+    "contacts": [
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.39239999999999997
+      },
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.39240000000000025
+      }
+    ]
+  },
+  {
+    "lower_elapsed": 12,
+    "bottle": [
+      0.20256275036103746,
+      -0.26779095639306316,
+      0.02485784700222988
+    ],
+    "bottom": -0.00014215299777013343,
+    "tilt": 90.00000000000001,
+    "opposed": false,
+    "table": false,
+    "speed": 0.015148286476742103,
+    "contacts": [
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.3924000000000002
+      },
+      {
+        "geom": "floor",
+        "body": "world",
+        "normal_force_n": 0.39239999999999986
+      }
+    ]
+  }
+]

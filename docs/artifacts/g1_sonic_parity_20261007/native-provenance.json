@@ -1,0 +1,7 @@
+{
+  "diagnostic_binary": "/tmp/dimos-sonic-parity-20261007/g1_deploy_onnx_ref",
+  "diagnostic_binary_sha256": "cc3639ac9d39fe42c6ed73c5068596dc7a485b78a3f832c04eec9271f2529d30",
+  "diagnostic_source_sha256": "ef75d1c7aacff73c010f4b753ff19e1692eec096706de8eb3bddf1886e619e60",
+  "prior_binary_sha256": "b9a95ae89b4ce328526715b0cee30689d06dbf5c23f23479dc64ddbfce19750e",
+  "patch_sha256": "7716e4b4cd4d7bed61d65781ff94a3c9390291ef3bf87c71a087ed0ca925ee1a"
+}

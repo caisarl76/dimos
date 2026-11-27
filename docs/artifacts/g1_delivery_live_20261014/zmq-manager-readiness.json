@@ -1,0 +1,44 @@
+{
+  "recorded_at_utc": "2026-10-14T01:45:11.726982+00:00",
+  "host": "192.168.0.222",
+  "controller_pid": 15850,
+  "input_type": "zmq_manager",
+  "reference_endpoint": "tcp://192.168.0.62:5556",
+  "workstation_reference_listener_present": false,
+  "controller_output_type": "all",
+  "feedback_endpoint": "tcp://192.168.0.222:5557",
+  "operator_report": "Init Done / waiting for a start command",
+  "network_subscriber_check": "No g1_debug packets in three seconds; see zmq-manager-feedback.json.",
+  "localhost_subscriber_check": {
+    "duration_seconds": 3,
+    "packets": 1,
+    "topic": "robot_config",
+    "packet_size_bytes": 367,
+    "g1_debug_packets": 0
+  },
+  "interpretation": "Runtime is initialized and awaiting start. Configuration publication establishes a local output connection; absence of measured telemetry is consistent with the operator report and inspected state machine.",
+  "installed_source": {
+    "head": "087f9ac01d46f6d8e4d0b73c01ae64799f292a38",
+    "cpp_header_files_checked": 45,
+    "reference_guard_or_timeout_matches": 0,
+    "dirty_control_files": [
+      "include/output_interface/zmq_output_handler.hpp",
+      "include/state_logger.hpp",
+      "src/g1_deploy_onnx_ref.cpp",
+      "src/state_logger.cpp"
+    ]
+  },
+  "guard_patch_check": {
+    "command": "git apply --check -",
+    "exit_code": 1,
+    "files_not_applying": [
+      "include/input_interface/zmq_manager.hpp",
+      "include/output_interface/zmq_output_handler.hpp",
+      "src/g1_deploy_onnx_ref.cpp"
+    ],
+    "log": "pc2-guard-apply-check.log",
+    "mutated_files": false
+  },
+  "next_step": "Port the tested reference guard to an isolated copy of this source, preserve its local changes, build and verify it before supplying the operator a new launch command.",
+  "scope": "Read-only inspections and subscriptions only. No start, mode switch, motion command, process signal, build or installation."
+}

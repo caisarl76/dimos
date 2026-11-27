@@ -1,0 +1,58 @@
+{
+  "started_date": "2026-10-12",
+  "completed_date": "2026-10-13",
+  "scope": "DimOS SonicServiceModule with local protocol peers and actual worker-process RPC/observation-stream wiring",
+  "validation": {
+    "focused_sonic_tests": 262,
+    "coordinator_tests": 24,
+    "coordinator_worker_integration_tests": 2,
+    "registry_comparison_tests": 5,
+    "pytest_log": "pytest.log",
+    "registry_log": "registry.log",
+    "ruff_check_passed": true,
+    "ruff_format_check_passed": true,
+    "ruff_files": [
+      "dimos/robot/unitree/g1/sonic_service_module.py",
+      "dimos/robot/unitree/g1/test_sonic_service_module.py",
+      "dimos/robot/unitree/g1/sonic_execution_module.py"
+    ],
+    "mypy": {
+      "passed": true,
+      "follow_imports": "silent",
+      "files": [
+        "dimos/robot/unitree/g1/sonic_execution_module.py",
+        "dimos/robot/unitree/g1/sonic_service_module.py"
+      ]
+    },
+    "git_diff_check_passed": true,
+    "independent_source_review": "Approved after fixing unconfirmed-handback fault latching, progress during recovery and preflight cancellation precedence; reviewer did not run tests",
+    "full_repository_suite_run": false
+  },
+  "behavior": {
+    "one_active_request": true,
+    "policy_selection": "Explicit configured alias and endpoint, shared declared execution profile",
+    "original_observation_time_preserved": true,
+    "inference_off_supervisor_loop": true,
+    "finish_cancel_and_camera_expiry": "Local scripted protocol tests passed",
+    "unknown_ownership": "Fault latched; no automatic start retry or new request",
+    "object_success": "Remains unknown until an explicit external report with evidence"
+  },
+  "check_notes": [
+    "Initial registry generation wrote the registry and intentionally failed on its uncommitted state; all five checks passed afterward in CI comparison mode",
+    "The sandbox blocked pytest's plugin socket during the first comparison attempt; the approved rerun passed",
+    "Existing pytest startup subprocess ResourceWarning remains visible",
+    "No native controller, MuJoCo physics, GPU policy process or hardware connection started for this coordinator milestone"
+  ],
+  "remaining": [
+    "Native MuJoCo/Pi0.5 validation through the new service RPCs",
+    "Hardware observation alignment and deployment profile commissioning",
+    "Object-outcome verifier and bottle-to-tray service validation"
+  ],
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_service_module.py": "daa43e1eb96f87f548f2598b51e64c3d9e6ece40a013bb44ba3a89a33174a0e0",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "2f5454997429eddfb9a025425791a5ada7e4785257b59d0c929ebca156139a9e",
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "485ef9072431cb15ca955d321735339586b3813d3708a6c47772309d5461d665",
+    "dimos/robot/all_blueprints.py": "71278c113b8b17b96e8ecfacd11985c2ba2c5d19d1fb377acfb085931179926f",
+    "docs/artifacts/g1_sonic_service_20261012/pytest.log": "3798f584815bd31d639e954eb52d5a3bfefaf1f7b16f79273368da977d73506b"
+  }
+}

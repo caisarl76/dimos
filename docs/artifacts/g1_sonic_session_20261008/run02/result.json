@@ -1,0 +1,148 @@
+{
+  "evidence": "scripted feedback and in-memory packets; no physical or native simulation",
+  "cases": [
+    {
+      "case": "finish",
+      "result": {
+        "task_id": "finish",
+        "phase": "done",
+        "outcome": "finished",
+        "reason": "finish requested",
+        "handback_confirmed": true,
+        "last_frame_index": 59,
+        "last_chunk_sequence": 0
+      },
+      "pose_packets": 60,
+      "elapsed_scripted_seconds": 1.22,
+      "phases": [
+        "seeding",
+        "arming",
+        "waiting_for_chunk",
+        "running",
+        "handback",
+        "done"
+      ],
+      "journal": "finish.jsonl"
+    },
+    {
+      "case": "cancel",
+      "result": {
+        "task_id": "cancel",
+        "phase": "done",
+        "outcome": "cancelled",
+        "reason": "cancel requested",
+        "handback_confirmed": true,
+        "last_frame_index": 59,
+        "last_chunk_sequence": 0
+      },
+      "pose_packets": 60,
+      "elapsed_scripted_seconds": 1.22,
+      "phases": [
+        "seeding",
+        "arming",
+        "waiting_for_chunk",
+        "running",
+        "handback",
+        "done"
+      ],
+      "journal": "cancel.jsonl"
+    },
+    {
+      "case": "chunk_exhaustion",
+      "result": {
+        "task_id": "chunk_exhaustion",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "chunk horizon exhausted",
+        "handback_confirmed": true,
+        "last_frame_index": 71,
+        "last_chunk_sequence": 0
+      },
+      "pose_packets": 72,
+      "elapsed_scripted_seconds": 1.46,
+      "phases": [
+        "seeding",
+        "arming",
+        "waiting_for_chunk",
+        "running",
+        "handback",
+        "done"
+      ],
+      "journal": "chunk_exhaustion.jsonl"
+    },
+    {
+      "case": "first_chunk_timeout",
+      "result": {
+        "task_id": "first_chunk_timeout",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "first chunk timeout",
+        "handback_confirmed": true,
+        "last_frame_index": 61,
+        "last_chunk_sequence": -1
+      },
+      "pose_packets": 62,
+      "elapsed_scripted_seconds": 1.26,
+      "phases": [
+        "seeding",
+        "arming",
+        "waiting_for_chunk",
+        "handback",
+        "done"
+      ],
+      "journal": "first_chunk_timeout.jsonl"
+    },
+    {
+      "case": "feedback_loss",
+      "result": {
+        "task_id": "feedback_loss",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "feedback stale; handback timeout",
+        "handback_confirmed": false,
+        "last_frame_index": 65,
+        "last_chunk_sequence": 0
+      },
+      "pose_packets": 66,
+      "elapsed_scripted_seconds": 1.62,
+      "phases": [
+        "seeding",
+        "arming",
+        "waiting_for_chunk",
+        "running",
+        "handback",
+        "done"
+      ],
+      "journal": "feedback_loss.jsonl"
+    },
+    {
+      "case": "handback_timeout",
+      "result": {
+        "task_id": "handback_timeout",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "cancel requested; handback timeout",
+        "handback_confirmed": false,
+        "last_frame_index": 59,
+        "last_chunk_sequence": 0
+      },
+      "pose_packets": 60,
+      "elapsed_scripted_seconds": 1.5,
+      "phases": [
+        "seeding",
+        "arming",
+        "waiting_for_chunk",
+        "running",
+        "handback",
+        "done"
+      ],
+      "journal": "handback_timeout.jsonl"
+    }
+  ],
+  "source_sha256": {
+    "docs/artifacts/g1_sonic_session_20261008/demo_session.py": "c3e7a31636be1d4b4f2f67ba083c1c43d54f99d7fdb3bb61281454805ea46d4e",
+    "dimos/robot/unitree/g1/sonic_session.py": "9995758ae23001988234883ca2c9df0be9178d3254f4a2536a978dff3515551f",
+    "dimos/robot/unitree/g1/sonic_feedback.py": "9c29f93c50d20d59c4a8e9244509069ebaa84c690db7b66c5bce9d02871058be",
+    "dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1"
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "audit_passed": true,
+  "cases": [
+    {
+      "scenario": "replay",
+      "outcome": "finished",
+      "session_planner_confirmed": true,
+      "first_passive_planner_after_request_s": 0.12527528498321772,
+      "terminal_after_request_s": 0.14108274097088724,
+      "arm_peak_rad_s": 3.6437089443206787,
+      "peak_body_motor_slot": 26,
+      "peak_since_running_s": 0.40054039598908275,
+      "peak_since_injection_s": null,
+      "peak_nearest_hand_clearance_m": {
+        "left": -0.0004553896234712592,
+        "right": 0.02
+      },
+      "arm_peak_after_handback_request_rad_s": 3.389147996902466,
+      "physics": {
+        "samples": 750,
+        "minimum_pelvis_height_m": 0.7805306084100826,
+        "maximum_tilt_deg": 8.43544902266099,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "settling_window": {
+        "duration_s": 0.4992621139390394,
+        "samples": 26,
+        "max_gap_s": 0.02105738001409918,
+        "max_body_speed_rad_s": 0.021932456642389297
+      }
+    },
+    {
+      "scenario": "cancel",
+      "outcome": "cancelled",
+      "session_planner_confirmed": true,
+      "first_passive_planner_after_request_s": 0.11554532300215214,
+      "terminal_after_request_s": 0.12098449794575572,
+      "arm_peak_rad_s": 3.6527674198150635,
+      "peak_body_motor_slot": 26,
+      "peak_since_running_s": 0.38278465101029724,
+      "peak_since_injection_s": -0.42456383001990616,
+      "peak_nearest_hand_clearance_m": {
+        "left": -0.0003757606903431084,
+        "right": 0.01951821707864714
+      },
+      "arm_peak_after_handback_request_rad_s": 2.868103504180908,
+      "physics": {
+        "samples": 242,
+        "minimum_pelvis_height_m": 0.7835982006173203,
+        "maximum_tilt_deg": 8.105579985492021,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "settling_window": {
+        "duration_s": 0.48010455595795065,
+        "samples": 25,
+        "max_gap_s": 0.02101257408503443,
+        "max_body_speed_rad_s": 0.044116802513599396
+      }
+    },
+    {
+      "scenario": "inference_stall",
+      "outcome": "failed",
+      "session_planner_confirmed": true,
+      "first_passive_planner_after_request_s": 0.1253795640077442,
+      "terminal_after_request_s": 0.1411936399526894,
+      "arm_peak_rad_s": 3.555079698562622,
+      "peak_body_motor_slot": 26,
+      "peak_since_running_s": 0.43002789898309857,
+      "peak_since_injection_s": 0.026736017083749175,
+      "peak_nearest_hand_clearance_m": {
+        "left": -0.00042783828472203305,
+        "right": 0.02
+      },
+      "arm_peak_after_handback_request_rad_s": 2.8384108543395996,
+      "physics": {
+        "samples": 236,
+        "minimum_pelvis_height_m": 0.7837486193509395,
+        "maximum_tilt_deg": 7.571504208852985,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "settling_window": {
+        "duration_s": 0.48155824409332126,
+        "samples": 25,
+        "max_gap_s": 0.021068541100248694,
+        "max_body_speed_rad_s": 0.07873326539993286
+      }
+    },
+    {
+      "scenario": "feedback_loss",
+      "outcome": "failed",
+      "session_planner_confirmed": false,
+      "first_passive_planner_after_request_s": 0.1253229940775782,
+      "terminal_after_request_s": 2.0169521589996293,
+      "arm_peak_rad_s": 3.482292652130127,
+      "peak_body_motor_slot": 26,
+      "peak_since_running_s": 0.3718422839883715,
+      "peak_since_injection_s": -0.434767515049316,
+      "peak_nearest_hand_clearance_m": {
+        "left": -0.000474776552203431,
+        "right": 0.015056903140367704
+      },
+      "arm_peak_after_handback_request_rad_s": 2.769681692123413,
+      "physics": {
+        "samples": 343,
+        "minimum_pelvis_height_m": 0.7834924162496737,
+        "maximum_tilt_deg": 8.301381660462212,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "settling_window": {
+        "duration_s": 0.49836180708371103,
+        "samples": 26,
+        "max_gap_s": 0.021360948914662004,
+        "max_body_speed_rad_s": 0.0066763111390173435
+      }
+    },
+    {
+      "scenario": "publisher_loss",
+      "outcome": "failed",
+      "session_planner_confirmed": true,
+      "first_passive_planner_after_request_s": 0.3119638180360198,
+      "terminal_after_request_s": 0.32252182497177273,
+      "arm_peak_rad_s": 6.438680648803711,
+      "peak_body_motor_slot": 26,
+      "peak_since_running_s": 0.3575774769997224,
+      "peak_since_injection_s": -0.4488742840476334,
+      "peak_nearest_hand_clearance_m": {
+        "left": -0.00038135238107395923,
+        "right": 0.0
+      },
+      "arm_peak_after_handback_request_rad_s": 2.895211696624756,
+      "physics": {
+        "samples": 252,
+        "minimum_pelvis_height_m": 0.7832674149732309,
+        "maximum_tilt_deg": 8.382933836932738,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "settling_window": {
+        "duration_s": 0.478987768990919,
+        "samples": 25,
+        "max_gap_s": 0.02101446397136897,
+        "max_body_speed_rad_s": 0.055026255548000336
+      }
+    }
+  ],
+  "cleanup": {
+    "exit_codes": [
+      0,
+      0
+    ],
+    "initial_wait_warning": "Command '['/tmp/dimos-sonic-expiry-20261006/gear_sonic_deploy/target/release/g1_deploy_onnx_ref', 'lo', '/tmp/dimos-sonic-sim-assets-20261006/model_decoder.onnx', '/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/reference/example', '--obs-config', '/tmp/dimos-sonic-sim-assets-20261006/observation_config.yaml', '--encoder-file', '/tmp/dimos-sonic-sim-assets-20261006/model_encoder.onnx', '--planner-file', '/tmp/dimos-sonic-sim-assets-20261006/planner/target_vel/V2/planner_sonic.onnx', '--input-type', 'zmq_manager', '--output-type', 'zmq', '--zmq-host', '127.0.0.1', '--zmq-port', '15556', '--zmq-out-port', '15557', '--disable-crc-check', '--reference-timeout-ms', '200']' timed out after 8 seconds"
+  },
+  "limits": [
+    "Protocol/lifecycle validation with recorded training-data actions; no VLA or object interaction",
+    "Speed peaks and hand/body contacts retained, not hardware-acceptance evidence",
+    "Feedback loss withheld only from task consumer; independent recorder remained active"
+  ]
+}

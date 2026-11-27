@@ -1,0 +1,11 @@
+{
+  "completed_utc": "2026-10-06T06:11:26.666219+00:00",
+  "binary": "/home/unitree/dimos/dimos/hardware/sensors/camera/realsense/rust/target/release/realsense_native",
+  "binary_sha256": "2648b7b6178f3a23eed6e49816a1e49c8651cb8fa698b6f870d188c96f5d51aa",
+  "librealsense_prefix": "/home/unitree/.local/share/dimos/native-realsense/librealsense-2.58.1",
+  "librealsense_version": "2.58.1",
+  "backend": "V4L2",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "librealsense_commit": "bf2778061d5dd29776e9aca8765f75852671760b",
+  "log": "/home/unitree/.local/share/dimos/native-realsense/build-20261006.log"
+}

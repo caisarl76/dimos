@@ -1,0 +1,527 @@
+{
+  "started_utc": "2026-10-14T08:30:28.891187+00:00",
+  "observation_seconds": 8,
+  "interface": "enP8p1s0",
+  "creates_command_writers": false,
+  "participants": {
+    "01102871-216d-aa7b-7a2d-bfd0000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:33718@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "3113"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "g1_estimator_runner"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "rt/lf/odommodestate",
+        "rt/lowstate",
+        "rt/odommodestate"
+      ]
+    },
+    "0110364a-71bc-7865-7ee5-28a5000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:55658@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "3200"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "unitree_slam"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "pixel_topic_",
+        "rt/SymState",
+        "rt/api/slam_operate/request",
+        "rt/api/slam_operate/response",
+        "rt/api/sport/request",
+        "rt/api/sport/response",
+        "rt/collision_clouds",
+        "rt/dog_imu_raw",
+        "rt/dog_odom",
+        "rt/ele_clouds",
+        "rt/global_map",
+        "rt/grid_clouds",
+        "rt/gridmap",
+        "rt/lf/bmsstate",
+        "rt/lf/lowstate",
+        "rt/lowstate",
+        "rt/no_warning_clouds",
+        "rt/odommodestate",
+        "rt/planner_map",
+        "rt/pre_collision_clouds",
+        "rt/pre_safe_clouds",
+        "rt/safe_clouds",
+        "rt/slam_info",
+        "rt/slam_key_info",
+        "rt/unitree/slam_mapping/odom",
+        "rt/unitree/slam_mapping/points",
+        "rt/unitree/slam_relocation/global_map",
+        "rt/unitree/slam_relocation/odom",
+        "rt/unitree/slam_relocation/points",
+        "rt/unitree/slam_relocation/web_points",
+        "rt/unitree_slam/waypoints",
+        "rt/utlidar/cloud_livox_mid360",
+        "rt/utlidar/imu_livox_mid360",
+        "rt/warning_clouds",
+        "rt/wirelesscontroller"
+      ]
+    },
+    "0110671b-f071-85f3-6d6c-7175000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:38908@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "2927"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "python3"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "rt/api/arm/request",
+        "rt/api/arm/response",
+        "rt/api/sport/request",
+        "rt/api/sport/response",
+        "rt/arm/action/state",
+        "rt/arm_sdk",
+        "rt/armsdk",
+        "rt/lf/bmsstate",
+        "rt/lowstate",
+        "rt/sportmodestate"
+      ]
+    },
+    "0110b007-3cc6-dd25-98f8-c35d000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "unitree-g1-nx"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "localprocess"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "10218"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "python"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "DCPSParticipant",
+        "DCPSPublication",
+        "DCPSSubscription",
+        "rt/arm_sdk",
+        "rt/dex3/left/cmd",
+        "rt/dex3/left/state",
+        "rt/dex3/right/cmd",
+        "rt/dex3/right/state",
+        "rt/lowcmd",
+        "rt/lowstate"
+      ]
+    },
+    "0110bef6-8657-0c35-7177-9769000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:36106@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "2909"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "emergency_stop"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "rt/api/basic_demarcate/request",
+        "rt/api/basic_demarcate/response",
+        "rt/api/sport/request",
+        "rt/api/sport/response",
+        "rt/lf/emergency_stop",
+        "rt/lowcmd",
+        "rt/lowstate"
+      ]
+    },
+    "0110c40f-2d71-e71c-7554-2d17000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:44153@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "4450"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "g1_dex_protocol_v2.0"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "rt/api/dex3_msg_controller/request",
+        "rt/api/dex3_msg_controller/response",
+        "rt/dex3/right/cmd",
+        "rt/dex3/right/state",
+        "rt/lf/dex3/right/state"
+      ]
+    },
+    "0110e724-4fca-6474-d4a8-9125000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:54066@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "2891"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "g1_dex_protocol_v2.0"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "rt/api/dex3_msg_controller/request",
+        "rt/api/dex3_msg_controller/response",
+        "rt/dex3/left/cmd",
+        "rt/dex3/left/state",
+        "rt/lf/dex3/left/state"
+      ]
+    },
+    "0110feea-e75a-938d-7026-d2fb000001c1": {
+      "metadata": {
+        "Property<__Hostname>": {
+          "key": "__Hostname",
+          "value": "Unitree"
+        },
+        "Property<__NetworkAddresses>": {
+          "key": "__NetworkAddresses",
+          "value": "udp/239.255.0.1:7400@3,udp/192.168.123.161:54863@3"
+        },
+        "Property<__Pid>": {
+          "key": "__Pid",
+          "value": "2466"
+        },
+        "Property<__ProcessName>": {
+          "key": "__ProcessName",
+          "value": "basic_service"
+        }
+      },
+      "qos_keys": [
+        "Liveliness",
+        "Property<__Hostname>",
+        "Property<__NetworkAddresses>",
+        "Property<__Pid>",
+        "Property<__ProcessName>"
+      ],
+      "related_topics": [
+        "rt/api/basic_clearoip/request",
+        "rt/api/basic_clearoip/response",
+        "rt/api/basic_clearoip_lease/request",
+        "rt/api/basic_clearoip_lease/response",
+        "rt/api/basic_demarcate/request",
+        "rt/api/basic_demarcate/response",
+        "rt/api/basic_demarcate_lease/request",
+        "rt/api/basic_demarcate_lease/response",
+        "rt/api/basic_softlimit/request",
+        "rt/api/basic_softlimit/response",
+        "rt/api/basic_softlimit_lease/request",
+        "rt/api/basic_softlimit_lease/response",
+        "rt/api/basic_taumax/request",
+        "rt/api/basic_taumax/response",
+        "rt/api/basic_taumax_lease/request",
+        "rt/api/basic_taumax_lease/response",
+        "rt/api/config/request",
+        "rt/api/config/response",
+        "rt/config_change_status",
+        "rt/lf/bmsstate",
+        "rt/lf/lowstate",
+        "rt/lf/mainboardstate",
+        "rt/lf/secondary_imu",
+        "rt/lowcmd",
+        "rt/lowstate",
+        "rt/secondary_imu"
+      ]
+    }
+  },
+  "writers": {
+    "0110feea-e75a-938d-7026-d2fb00000203": {
+      "instance_handle": 2525567652881451477,
+      "topic": "rt/lowstate",
+      "type": "unitree_hg::msg::dds_::LowState_",
+      "participant": "0110feea-e75a-938d-7026-d2fb000001c1",
+      "metadata": {}
+    },
+    "0110e724-4fca-6474-d4a8-912500000203": {
+      "instance_handle": 16389202365457800511,
+      "topic": "rt/dex3/left/state",
+      "type": "unitree_hg::msg::dds_::HandState_",
+      "participant": "0110e724-4fca-6474-d4a8-9125000001c1",
+      "metadata": {}
+    },
+    "0110c40f-2d71-e71c-7554-2d1700000203": {
+      "instance_handle": 10123424808320590587,
+      "topic": "rt/dex3/right/state",
+      "type": "unitree_hg::msg::dds_::HandState_",
+      "participant": "0110c40f-2d71-e71c-7554-2d17000001c1",
+      "metadata": {}
+    },
+    "0110bef6-8657-0c35-7177-976900000e03": {
+      "instance_handle": 17429439713701983017,
+      "topic": "rt/lowcmd",
+      "type": "unitree_hg::msg::dds_::LowCmd_",
+      "participant": "0110bef6-8657-0c35-7177-9769000001c1",
+      "metadata": {}
+    },
+    "0110671b-f071-85f3-6d6c-717500000403": {
+      "instance_handle": 11048832402714234388,
+      "topic": "rt/arm_sdk",
+      "type": "unitree_hg::msg::dds_::LowCmd_",
+      "participant": "0110671b-f071-85f3-6d6c-7175000001c1",
+      "metadata": {}
+    }
+  },
+  "readers": {
+    "0110feea-e75a-938d-7026-d2fb00000a04": {
+      "instance_handle": 7463139393879045735,
+      "topic": "rt/lowcmd",
+      "type": "unitree_hg::msg::dds_::LowCmd_",
+      "participant": "0110feea-e75a-938d-7026-d2fb000001c1",
+      "metadata": {}
+    },
+    "0110e724-4fca-6474-d4a8-912500000604": {
+      "instance_handle": 18082629630776989370,
+      "topic": "rt/dex3/left/cmd",
+      "type": "unitree_hg::msg::dds_::HandCmd_",
+      "participant": "0110e724-4fca-6474-d4a8-9125000001c1",
+      "metadata": {}
+    },
+    "0110364a-71bc-7865-7ee5-28a500005304": {
+      "instance_handle": 9334337605462132756,
+      "topic": "rt/lowstate",
+      "type": "unitree_hg::msg::dds_::LowState_",
+      "participant": "0110364a-71bc-7865-7ee5-28a5000001c1",
+      "metadata": {}
+    },
+    "0110c40f-2d71-e71c-7554-2d1700000604": {
+      "instance_handle": 6387760406084619282,
+      "topic": "rt/dex3/right/cmd",
+      "type": "unitree_hg::msg::dds_::HandCmd_",
+      "participant": "0110c40f-2d71-e71c-7554-2d17000001c1",
+      "metadata": {}
+    },
+    "01102871-216d-aa7b-7a2d-bfd000000604": {
+      "instance_handle": 11770925480145000506,
+      "topic": "rt/lowstate",
+      "type": "unitree_hg::msg::dds_::LowState_",
+      "participant": "01102871-216d-aa7b-7a2d-bfd0000001c1",
+      "metadata": {}
+    },
+    "0110bef6-8657-0c35-7177-976900000204": {
+      "instance_handle": 14674152653268661541,
+      "topic": "rt/lowstate",
+      "type": "unitree_hg::msg::dds_::LowState_",
+      "participant": "0110bef6-8657-0c35-7177-9769000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00000504": {
+      "instance_handle": 8091666327082492766,
+      "topic": "rt/arm_sdk",
+      "type": "unitree_hg::msg::dds_::LowCmd_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00000704": {
+      "instance_handle": 602536444420090936,
+      "topic": "rt/lowcmd",
+      "type": "unitree_hg::msg::dds_::LowCmd_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    },
+    "0110671b-f071-85f3-6d6c-717500000204": {
+      "instance_handle": 2298903834927352092,
+      "topic": "rt/lowstate",
+      "type": "unitree_hg::msg::dds_::LowState_",
+      "participant": "0110671b-f071-85f3-6d6c-7175000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00000904": {
+      "instance_handle": 1867994429780614297,
+      "topic": "rt/lowstate",
+      "type": "unitree_hg::msg::dds_::LowState_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00000b04": {
+      "instance_handle": 13808719015865954716,
+      "topic": "rt/dex3/left/cmd",
+      "type": "unitree_hg::msg::dds_::HandCmd_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00000d04": {
+      "instance_handle": 9092173686766967659,
+      "topic": "rt/dex3/right/cmd",
+      "type": "unitree_hg::msg::dds_::HandCmd_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00000f04": {
+      "instance_handle": 7481948957590043920,
+      "topic": "rt/dex3/left/state",
+      "type": "unitree_hg::msg::dds_::HandState_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    },
+    "0110b007-3cc6-dd25-98f8-c35d00001104": {
+      "instance_handle": 6161037659105094396,
+      "topic": "rt/dex3/right/state",
+      "type": "unitree_hg::msg::dds_::HandState_",
+      "participant": "0110b007-3cc6-dd25-98f8-c35d000001c1",
+      "metadata": {}
+    }
+  },
+  "traffic_by_publication_handle": {
+    "rt/arm_sdk": {},
+    "rt/lowcmd": {},
+    "rt/lowstate": {
+      "2525567652881451477": {
+        "samples": 8320,
+        "first_monotonic": 6552.972557508,
+        "last_monotonic": 6560.919894859,
+        "last_source_timestamp_ns": 1791966636880482716,
+        "last_tick": 6580721,
+        "last_mode_machine": 5,
+        "last_joint_positions": [
+          0.06343010812997818,
+          0.11338674277067184,
+          0.1378427892923355,
+          0.17358696460723877,
+          -0.21302591264247894,
+          -0.10313218086957932,
+          0.09099062532186508,
+          -0.10958588123321533,
+          -0.2521694004535675,
+          0.22912558913230896,
+          -0.2955106496810913,
+          0.09288376569747925,
+          -0.04955001547932625,
+          -0.003999366890639067,
+          -0.019058864563703537,
+          0.003511378075927496,
+          0.10639595240354538,
+          -0.6745680570602417,
+          1.0915591716766357,
+          -0.1540692001581192,
+          -0.07038335502147675,
+          0.04733768850564957,
+          0.11906328052282333,
+          -0.17229720950126648,
+          0.6893805861473083,
+          1.2492595911026,
+          -0.0496506467461586,
+          0.18639065325260162,
+          -0.17015202343463898
+        ]
+      }
+    },
+    "rt/dex3/left/cmd": {},
+    "rt/dex3/right/cmd": {},
+    "rt/dex3/left/state": {},
+    "rt/dex3/right/state": {}
+  }
+}

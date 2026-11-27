@@ -1,0 +1,78 @@
+{
+  "scope": "Workstation-only isolated MuJoCo; no hardware contact",
+  "unit_tests": {
+    "command": ".venv/bin/python -m pytest docs/artifacts/g1_sonic_hold_return_20261007/test_elbow_cycle.py -q --no-cov",
+    "red": "17 failed, 9 passed on previous reach-only behavior",
+    "green": "26 passed in 0.06s",
+    "exit_code": 0
+  },
+  "sources": {
+    "demo_audit_cycle.py": "8f8abd40da47c9ca8ce1662ef41c482a690c3cfa29c0fccbed63d724be6f7a57",
+    "demo_elbow_cycle.py": "980236abff4d63befee8fec43f84d095496f370681efbbd659a9ff7bdd68d10a",
+    "demo_hold_return_sim.py": "cc9ddc72955ecd089e48150cb2f9adfdb102db2dd89f0bb8060e3e600e832589",
+    "test_elbow_cycle.py": "4e9b5169184877f2d8fc6427af5de6550ec829e4c174bda55e5006ea02e62410",
+    "demo_arm_encoder.py": "2f3eba29953f021cef70ca9d909c4dd1e52e77cdb87f90ea30222f50c9c75f04"
+  },
+  "model_assets_sha256": {
+    "/tmp/dimos-sonic-sim-assets-20261006/model_encoder.onnx": "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae",
+    "/tmp/dimos-sonic-sim-assets-20261006/model_decoder.onnx": "34bae8570d4a4421a5391a5c2befd745d4a02d182ec539e5f9da44c091c67509",
+    "/tmp/dimos-sonic-sim-assets-20261006/observation_config.yaml": "4a67713b310932e50aca81f19188c8d76013148e98b15c8b5bbea995f12e59f0",
+    "/tmp/dimos-sonic-sim-assets-20261006/planner/target_vel/V2/planner_sonic.onnx": "39b553e197f62f077975ba38512bc04781a3fc37c2af7c6756e04629f760edea"
+  },
+  "report_sha256": "efc13d1e2296f42a19cf93b61c042513ca26d4a31e2462134e72aaeeaf4275f8",
+  "audit_sha256": "3f235efb4da695312d6040356fddb070354ce2e121684a999748b0248587757e",
+  "runs": [
+    {
+      "run": "cycle01",
+      "scenario": "cycle",
+      "outcome": "SUCCEEDED",
+      "required_outcome_met": true,
+      "evidence_checks_passed": true,
+      "fault_injected": false
+    },
+    {
+      "run": "cycle02",
+      "scenario": "cycle",
+      "outcome": "SUCCEEDED",
+      "required_outcome_met": true,
+      "evidence_checks_passed": true,
+      "fault_injected": false
+    },
+    {
+      "run": "cancel_hold01",
+      "scenario": "cancel_hold",
+      "outcome": "CANCELLED",
+      "required_outcome_met": true,
+      "evidence_checks_passed": true,
+      "fault_injected": true
+    },
+    {
+      "run": "stale_hold01",
+      "scenario": "stale_hold",
+      "outcome": "HOLD_GAP",
+      "required_outcome_met": true,
+      "evidence_checks_passed": true,
+      "fault_injected": true
+    },
+    {
+      "run": "cancel_return01",
+      "scenario": "cancel_return",
+      "outcome": "HOLD_VIOLATION",
+      "required_outcome_met": false,
+      "evidence_checks_passed": true,
+      "fault_injected": false
+    },
+    {
+      "run": "cancel_return02",
+      "scenario": "cancel_return",
+      "outcome": "CANCELLED",
+      "required_outcome_met": true,
+      "evidence_checks_passed": true,
+      "fault_injected": true
+    }
+  ],
+  "review": "Helper/runner and final evidence reviewed; negative hold outcome preserved separately from evidence consistency.",
+  "lint": "ruff check and format --check passed on five Python files",
+  "process_cleanup": "No matching isolated probe/controller processes after all six trials",
+  "doc_links": "Local report/roadmap links resolved"
+}

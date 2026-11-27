@@ -1,0 +1,7 @@
+{
+  "dimos/robot/unitree/g1/sonic_observation.py": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b",
+  "dimos/robot/unitree/g1/sonic_delivery_observation.py": "b67d7af6987445cafa5f12dffaeab189aacb34ea861ac930628636c93328f56e",
+  "dimos/robot/unitree/g1/sonic_delivery_observation_module.py": "21701af32af9ff2bf2bd7fd4d554744f54ee0557a981c62dd88e100e2bf7e544",
+  "dimos/robot/unitree/g1/sonic_feedback.py": "9c29f93c50d20d59c4a8e9244509069ebaa84c690db7b66c5bce9d02871058be",
+  "docs/artifacts/g1_delivery_live_20261014/demo_existing_camera_delivery.py": "bdc31daa21c53193b018524a9976d253fb759ba13ad645cb3d1229f4e9920510"
+}

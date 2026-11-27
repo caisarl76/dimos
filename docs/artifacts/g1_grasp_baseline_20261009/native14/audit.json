@@ -1,0 +1,68 @@
+{
+  "run": "docs/artifacts/g1_grasp_baseline_20261009/native14",
+  "task_success": false,
+  "session": {
+    "task_id": "grasp",
+    "phase": "done",
+    "outcome": "finished",
+    "reason": "finish requested",
+    "handback_confirmed": true,
+    "last_frame_index": 1297,
+    "last_chunk_sequence": 248
+  },
+  "cleanup_passed": true,
+  "stages": [
+    "prepare",
+    "open",
+    "pregrasp"
+  ],
+  "reference_failure": "Bottle tipped before a secure grasp",
+  "runner_error": null,
+  "independent_score": "waiting_lift",
+  "score_events": [
+    {
+      "time": 5.604999999999903,
+      "status": "waiting_lift"
+    }
+  ],
+  "maximum_bottle_displacement_m": 0.026000086449642225,
+  "maximum_bottle_bottom_m": 0.699940518007026,
+  "opposed_finger_contact_samples": 0,
+  "minimum_pelvis_height_m": 0.7780933854152524,
+  "maximum_tilt_deg": 7.952901412153217,
+  "maximum_arm_joint_speed_rad_s": 0.804279088973999,
+  "no_automatic_reset": true,
+  "single_initial_object_placement": true,
+  "support_band_disabled": true,
+  "setup_xy_alignment_count": 1,
+  "setup_xy_translation_m": [
+    -0.03015922134146546,
+    0.025970933997880887
+  ],
+  "no_in_task_xy_alignment": true,
+  "pose_packets": 1298,
+  "median_pose_gap_s": 0.020736407954245806,
+  "maximum_pose_gap_s": 0.025701920967549086,
+  "maximum_encode_source_age_s": 0.043483283021487296,
+  "last_diagnostic": {
+    "monotonic": 957155.293823733,
+    "stage": "pregrasp",
+    "elapsed": 10.514111383003183,
+    "failure": "Bottle tipped before a secure grasp",
+    "bottle_tilt_deg": 15.184269282782294
+  },
+  "source_hash_checks": {
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_grasp_baseline_20261009/demo_native_grasp.py": true,
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_grasp_baseline_20261009/demo_grasp_reference.py": true,
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_grasp_baseline_20261009/scene.xml": true,
+    "/home/jihun/work/dimos_dev/build/sonic-grasp-runtime/source/gear_sonic_deploy/target/release/g1_deploy_onnx_ref": true,
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_grasp_baseline_20261009/runtime-rebuild.json": true,
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/thirdparty/unitree_sdk2/thirdparty/lib/x86_64/libddsc.so.0": true,
+    "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic_deploy/thirdparty/unitree_sdk2/thirdparty/lib/x86_64/libddscxx.so.0": true,
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_pick_place_20261009/demo_task_sim.py": true,
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_pick_place_20261009/demo_task_metrics.py": true,
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_arm_group_20261008/demo_arm_encoder.py": true,
+    "/home/jihun/work/dimos_dev/dimos/robot/unitree/g1/sonic_session.py": true
+  },
+  "unavailable_sources": []
+}

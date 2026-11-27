@@ -1,0 +1,252 @@
+{
+  "inspected_on": "2026-10-06",
+  "method": "Read-only source, process, log, model-file and saved NPZ metadata inspection; NPZ loaded with allow_pickle=False.",
+  "earlier_dds_process": {
+    "name": "g1_deploy_onnx_ref",
+    "pid": 39396,
+    "source": "dds-ownership.json",
+    "limitation": "Exited before /proc inspection. Exact executable, arguments and loaded model files were not recovered."
+  },
+  "pc2_process_observation": "No g1_deploy_onnx_ref, sonic_policy_streamer or sonic_token_stream match at the start of this follow-up inspection.",
+  "launcher": {
+    "host": "workstation",
+    "path": "/home/jihun/work/lerobot/examples/g1_dex3_training/g1_groot_real_run.sh",
+    "deploy_target": "pc2_222",
+    "deploy_directory": "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy",
+    "selected_args": "--cp policy/sonic_v1_1/model --obs-config policy/sonic_v1_1/observation_config.yaml --input-type zmq_manager --zmq-host localhost real",
+    "executed_during_inspection": false
+  },
+  "robot_repository": {
+    "path": "/home/unitree/GR00T-WholeBodyControl",
+    "head": "087f9ac01d46f6d8e4d0b73c01ae64799f292a38",
+    "dirty": true
+  },
+  "installed_binary_candidates": [
+    {
+      "path": "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/target/release/g1_deploy_onnx_ref",
+      "sha256": "5526b184875f6f5e392cf6a5c95a8f55ab2d0a698177078a214db2231a0ec425"
+    },
+    {
+      "path": "/home/unitree/GR00T-WholeBodyControl-sonic-telemetry-20261001/gear_sonic_deploy/target/release/g1_deploy_onnx_ref",
+      "sha256": "9b241c67d7065f26372164af3cf81111dad4a9b9f859161ea8d44f7a95855b06"
+    }
+  ],
+  "installed_model_files": [
+    "policy/sonic_v1_1/model_decoder.onnx",
+    "policy/sonic_v1_1/model_encoder.onnx",
+    "policy/sonic_v1_1/observation_config.yaml"
+  ],
+  "workstation_server_process_output": [
+    "996910 uv run --project ../.. python -u sonic_policy_server.py --policy-path /mnt/data/jihun/g1_models/he_psi0_sonic78sonicstate_ho5_matched640k/pretrained_model --port 5560 --noise-scale 0",
+    "996916 /home/jihun/work/lerobot/.venv/bin/python3 -u sonic_policy_server.py --policy-path /mnt/data/jihun/g1_models/he_psi0_sonic78sonicstate_ho5_matched640k/pretrained_model --port 5560 --noise-scale 0"
+  ],
+  "saved_run_metadata": [
+    {
+      "path": "/home/unitree/g1_sonic_eval/runs/run22_he_psi0_laptop_t0.npz",
+      "args": {
+        "policy_path": null,
+        "policy_server": "tcp://192.168.0.62:5560",
+        "policy_timeout_s": 1.5,
+        "device": "cuda",
+        "backbone_dtype": null,
+        "deploy_host": "localhost",
+        "action_port": 5556,
+        "state_port": 5557,
+        "images": "zmq",
+        "dataset_root": null,
+        "episode": null,
+        "camera_host": "localhost",
+        "camera_port": 5555,
+        "stereo_camera": "head_camera",
+        "task": "close a laptop g1",
+        "replan_s": 0.4,
+        "policy_fps": 30,
+        "chunk_blend_s": 0.3,
+        "noise_seed": null,
+        "noise_scale": null,
+        "duration_s": 30,
+        "gate_dir": null,
+        "log": "../runs/run22_he_psi0_laptop_t0.npz",
+        "max_chunk_age_s": 1,
+        "max_state_age_s": 0.2,
+        "max_token_step": 0.05,
+        "max_arm_speed": 6,
+        "arm_range_margin": 0.15,
+        "state_source": "robot",
+        "handoff_blend_s": 2,
+        "dex3_right_order": "dataset",
+        "end": "planner",
+        "startup_tokens": null,
+        "start": "planner",
+        "action_space": "sonic78",
+        "encoder_model": null,
+        "observation_config": null,
+        "robot_xml": null
+      },
+      "arrays": {
+        "wall": {
+          "shape": [
+            1865
+          ],
+          "dtype": "float64"
+        },
+        "t_ep": {
+          "shape": [
+            1865
+          ],
+          "dtype": "float64"
+        },
+        "phase": {
+          "shape": [
+            1865
+          ],
+          "dtype": "<U16"
+        },
+        "frame": {
+          "shape": [
+            1865
+          ],
+          "dtype": "int64"
+        },
+        "token": {
+          "shape": [
+            1865,
+            64
+          ],
+          "dtype": "float32"
+        },
+        "hands": {
+          "shape": [
+            1865,
+            14
+          ],
+          "dtype": "float32"
+        },
+        "chunk_t0": {
+          "shape": [
+            1865
+          ],
+          "dtype": "float64"
+        },
+        "state": {
+          "shape": [
+            1865,
+            28
+          ],
+          "dtype": "float32"
+        },
+        "episode": {
+          "shape": [],
+          "dtype": "int64"
+        }
+      }
+    },
+    {
+      "path": "/home/unitree/g1_sonic_eval/runs/run23_he_psi0_laptop_t0.npz",
+      "args": {
+        "policy_path": null,
+        "policy_server": "tcp://192.168.0.62:5560",
+        "policy_timeout_s": 1.5,
+        "device": "cuda",
+        "backbone_dtype": null,
+        "deploy_host": "localhost",
+        "action_port": 5556,
+        "state_port": 5557,
+        "images": "zmq",
+        "dataset_root": null,
+        "episode": null,
+        "camera_host": "localhost",
+        "camera_port": 5555,
+        "stereo_camera": "head_camera",
+        "task": "close a laptop g1",
+        "replan_s": 0.4,
+        "policy_fps": 30,
+        "chunk_blend_s": 0.3,
+        "noise_seed": null,
+        "noise_scale": null,
+        "duration_s": 30,
+        "gate_dir": null,
+        "log": "../runs/run23_he_psi0_laptop_t0.npz",
+        "max_chunk_age_s": 1,
+        "max_state_age_s": 0.2,
+        "max_token_step": 0.05,
+        "max_arm_speed": 6,
+        "arm_range_margin": 0.15,
+        "state_source": "robot",
+        "handoff_blend_s": 2,
+        "dex3_right_order": "dataset",
+        "end": "planner",
+        "startup_tokens": null,
+        "start": "planner",
+        "action_space": "sonic78",
+        "encoder_model": null,
+        "observation_config": null,
+        "robot_xml": null
+      },
+      "arrays": {
+        "wall": {
+          "shape": [
+            1865
+          ],
+          "dtype": "float64"
+        },
+        "t_ep": {
+          "shape": [
+            1865
+          ],
+          "dtype": "float64"
+        },
+        "phase": {
+          "shape": [
+            1865
+          ],
+          "dtype": "<U16"
+        },
+        "frame": {
+          "shape": [
+            1865
+          ],
+          "dtype": "int64"
+        },
+        "token": {
+          "shape": [
+            1865,
+            64
+          ],
+          "dtype": "float32"
+        },
+        "hands": {
+          "shape": [
+            1865,
+            14
+          ],
+          "dtype": "float32"
+        },
+        "chunk_t0": {
+          "shape": [
+            1865
+          ],
+          "dtype": "float64"
+        },
+        "state": {
+          "shape": [
+            1865,
+            28
+          ],
+          "dtype": "float32"
+        },
+        "episode": {
+          "shape": [],
+          "dtype": "int64"
+        }
+      }
+    }
+  ],
+  "run23_log": "[streamer] policy ready: 0.29 s per chunk (warm)\n[streamer] policy tcp://192.168.0.62:5560 images ['observation.images.egocentric'] live camera 30.0s\n[streamer] when the deploy has printed 'Init Done', press Enter to start control in PLANNER mode: [streamer] command: start control, PLANNER mode\n[streamer] move the robot into position at the table (planner mode), then press Enter to start the episode: [streamer] command: POSE mode (streamed tokens)\n[streamer] chunk inference s: median 0.29, max 0.30, n 73\n[streamer] token slew limit active on 0 ticks so far\n[streamer] command: PLANNER mode (deploy left running)\n",
+  "limitations": [
+    "The current server argv and saved run metadata are separate observations; they do not prove which checkpoint served each historical run.",
+    "Saved runs record the laptop-closing task, not the proposed object-to-tray service, and do not establish physical task success.",
+    "Source-defined command and feedback interfaces were inspected but not exercised.",
+    "No controller, streamer, policy, camera, mode transition or clock adjustment was started by this inspection."
+  ]
+}

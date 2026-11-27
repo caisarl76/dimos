@@ -1,0 +1,38 @@
+{
+  "wall_time": 1791880525.2581,
+  "roots": {
+    "/home/unitree/xr-dex3-packages": {
+      "exists": true,
+      "scanned_files": 179,
+      "matches": [
+        "20261002-terminal/666e800d03ed/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/tests/README_mode_handoff.md",
+        "20261002-terminal/666e800d03ed/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/tests/dex3_hand_field_decoder_test.cpp",
+        "20261002-terminal/666e800d03ed/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/xr_dex3_hold.hpp",
+        "20261002-terminal/666e800d03ed/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/dex3_hands.hpp",
+        "20261002-terminal/666e800d03ed/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/dex3_hand_field_decoder.hpp",
+        "20261002-terminal/cf0524186976/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/tests/README_mode_handoff.md",
+        "20261002-terminal/cf0524186976/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/tests/dex3_hand_field_decoder_test.cpp",
+        "20261002-terminal/cf0524186976/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/xr_dex3_hold.hpp",
+        "20261002-terminal/cf0524186976/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/dex3_hands.hpp",
+        "20261002-terminal/cf0524186976/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/input_interface/dex3_hand_field_decoder.hpp"
+      ],
+      "truncated": false
+    },
+    "/home/unitree/unitree_sdk2-main": {
+      "exists": true,
+      "scanned_files": 793,
+      "matches": [
+        "README.md",
+        "thirdparty/include/dds/ddsi/q_protocol.h",
+        "thirdparty/include/dds/ddsi/ddsi_entity_index.h",
+        "example/h1/README.md",
+        "example/h1/README_zh.md",
+        "example/g1/dex3/g1_dex3_example.cpp",
+        "include/unitree/idl/go2/LowState_.hpp",
+        "include/unitree/idl/hg/LowState_.hpp",
+        "include/unitree/idl/hg/HandState_.hpp"
+      ],
+      "truncated": false
+    }
+  }
+}

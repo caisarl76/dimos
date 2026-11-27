@@ -1,0 +1,30 @@
+{
+  "duplicate_packets_until_expiry": {
+    "expired_observed_after_phase_ms": 139.96466802200302,
+    "confirmed_observed_after_phase_ms": 240.2799180126749,
+    "age_at_first_expired_observation_ms": 219.200358,
+    "distinct_feedback_indices": 65
+  },
+  "publisher_disconnected": {
+    "expired_observed_after_phase_ms": 141.3170569576323,
+    "confirmed_observed_after_phase_ms": 241.31575098726898,
+    "age_at_first_expired_observation_ms": 220.875014,
+    "distinct_feedback_indices": 86
+  },
+  "no_first_frame": {
+    "expired_observed_after_phase_ms": 278.45022798283026,
+    "confirmed_observed_after_phase_ms": 398.7996489740908,
+    "age_at_first_expired_observation_ms": 208.894681,
+    "distinct_feedback_indices": 63
+  },
+  "physics_before_shutdown": {
+    "samples": 201,
+    "height_min_m": 0.7843320585244905,
+    "height_max_m": 0.7877098236440117,
+    "max_tilt_deg": 2.5647175856363953,
+    "automatic_resets": 0,
+    "band_enabled_any": false
+  },
+  "status": "typed_guard_probe_passed",
+  "assertions_passed": 20
+}

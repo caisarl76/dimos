@@ -1,0 +1,118 @@
+{
+  "passed": true,
+  "scope": "offline conversion and wire compatibility; no physical task validation",
+  "lerobot_revision": "bca7f48e49e3f3b0b0035e6e58980118939cb7ed",
+  "source": "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002",
+  "converted": "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_sonic78_50hz_261002",
+  "fps": 50,
+  "counts": {
+    "episodes": 43,
+    "frames": 18970,
+    "wire_packets_dataset_order": 18970,
+    "wire_packets_sim_order": 18970
+  },
+  "command_packets_equal": 4,
+  "native_50hz_rows_exact": 40,
+  "planner_start_mode_flags": [
+    [
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      1
+    ]
+  ],
+  "captured_planner_token_verified": true,
+  "planner_start_first_hand_targets": "14 explicit zeros",
+  "lifecycle_pose_frames": 352,
+  "packet_size_bytes": 1604,
+  "checkpoint_configs_only_no_weights_loaded": {
+    "wbt_groot_he_full/pretrained_model": {
+      "path": "/mnt/data/jihun/g1_models/wbt_groot_he_full/pretrained_model/config.json",
+      "sha256": "d1c00da63bd93d962ccc6e12bb98326849050df78145fd7cfff939cbef122c99",
+      "type": "groot",
+      "chunk_size": 40,
+      "chunk_duration_at_50hz_s": 0.8,
+      "image_keys": [
+        "observation.images.egocentric"
+      ]
+    },
+    "wbt_pi05_he_full/pretrained_model_ema": {
+      "path": "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/config.json",
+      "sha256": "58cc89cd2e44e5dd894765770ce63956ce24be251edd75c8f134c7ade37bd55d",
+      "type": "pi05",
+      "chunk_size": 50,
+      "chunk_duration_at_50hz_s": 1.0,
+      "image_keys": [
+        "observation.images.egocentric"
+      ]
+    }
+  },
+  "source_sha256": {
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/stream_backends.py": "a465cb8d50ebd34bc8da88b4e62284de46b3a6ce1245191b711da8f7250a0f6b",
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_token_stream.py": "c7220ece84b1bbbc24fd973b26b604d71ecdf0b790336a8b1729bd99dd2f54e4",
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_targets.py": "2c3b8c5f5c9d7bc55031ef3a7406236583d8f07ad51605164f7ff056ef3b900a",
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/prepare_wbt_sonic78.py": "0ae19bf58c269205151e5ac23453669bd4dff79cd1a7743aca0e7ee064a58782",
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_policy_streamer.py": "39e35760e097563ec8ed36a53f02cde74a9c0b7116e1a0c76d40a074bc61c1fb",
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_policy_server.py": "62ebd81c839002917ff9ef4fb9270e5ee81dd3f4fb2e8eb3d528b3e70b1e0aaa",
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/g1_groot_real_run.sh": "7907ab02ac064340af92c95b623b5f12530bbe44e9785eb6bb7ca0efb1ec6b5b"
+  },
+  "dimos_serializer_sha256": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1",
+  "audit_script_sha256": "302664c7271255def0ef4ec7b67d3aa9a9c3f8697d2d3d3d6ce7945b06c8b81c",
+  "dataset_file_sha256": {
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000000.parquet": "d60baa04c4de63f3a57bc5efeeeffebccfc092efc58cc14f3107f47f08c33513",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000001.parquet": "4e25525a80c136e63b89adb30056e4474ee15e19481e56b84d4ef9c8617613cc",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000002.parquet": "8d023ffe104e4b9759f1353609e808fbb099b897e2e9b263a0ac76de53aecee4",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000003.parquet": "6b911b399e3c4786794ea7cb6c48c766cb8f9267bf952f4cc450528810d4d972",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000004.parquet": "87f3d828adb37630336e98cc960c49e8d19b1be8d81d2bb012da6e8620980480",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000005.parquet": "f5cc05a454f5317a638d267e0af45daedc762f4d423d88b794174d0811802965",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000006.parquet": "38142665164c663cf72963b41a8e8f4941b65cccd809c1f28c020091423a67af",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000007.parquet": "45439486032b8e0b1fa60a485c0f8bb2ae25c46b9db7d7083a6d3f98e0986e5e",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000008.parquet": "2965d537f946c613df1fa1161f69b5488296b45062759c4b4472a81b4604c632",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000009.parquet": "333bdd4de2ea3217bb628e34093af9b59251669ff255e6593126d66e77b9b1b7",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000010.parquet": "782eef37234392ff6643da4000df7d233858c64380ebaedc80c98aec198b54d8",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000011.parquet": "433f5279ca8c57a208e074686b5a21fd68459f8f02dabf07249af6084ecfbc14",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000012.parquet": "439911712b58562557c442267671757a5d56c3d22283ffa4978840ceffc2b55b",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000013.parquet": "b565e989a1b2ffc67168f3a0b5d88b0509a523c3b43e353abe8d88351dfee937",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000014.parquet": "05a329d54376e9d7be85385e4092dec2ba9e6a9b0e0c191a4afb363a2e89733b",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000015.parquet": "571aba0df33ffdafebe17c747ac5d5d5dab7be30c526f36db809aa607d5469e4",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000016.parquet": "4b2d7635fb1547578e3a8e55dd69072df00fc96393686f0b5b0b6e1f6fe46086",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000017.parquet": "ded9a2f08a4ef8c3ef14c605784dda9bc9b144c1db32ce457a9a5815dda1cdee",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000018.parquet": "bd9d42007af6ea4bf97656f25f4db4922f0c55648205a5e4087062d1dc8312ed",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000019.parquet": "c5a4a5138bcc602bc7bc247e75883025ebf8bb4c35f0e6749a33afd0d46d84f9",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000020.parquet": "40bc0c32df6fb14990085ad512d5d48b7bdda839381354605d93fa83618d5b3c",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000021.parquet": "a8813e6319bc418396475e0c9b1b17e843332d72c276c1179df1dc49687fff88",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000022.parquet": "adeca82b5dd9e7c61162b3d42bf0c81307c8894242c9737edbd91f6174c1896e",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000023.parquet": "2dfd65bfd724574ce283469fcfdb0104cd87baf3fdff9c3d75b6f6514014f300",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000024.parquet": "9af28738638a49131feebb3ea9a3676797800d44741f70f4c06695dbd2c84dd6",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000025.parquet": "fa4aa6d051b66c055ed33b4995b74d6698e8bba88dd7996b4a5c5d2b4cc938b5",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000026.parquet": "04b5c3aed3623e9008ab3d6edd303fe8e2699419597106f1c199ada554edc0cd",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000027.parquet": "75826f30c8a0739fa9267c25823bfb2c1bbaad5f7d3d875c4c808d77f76d9632",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000028.parquet": "ed269e0043851b80e6353ede8f421c31f7888b4abc13173da350da207c6a798d",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000029.parquet": "85e221a63738f4650095183651b6efaa13d0f37aa4efb4de99f2453c6e0fcd5b",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000030.parquet": "a705d90e714e4895467aeec3457008b002c2b8f4ae96a0e17802f755e8e54e60",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000031.parquet": "ea620270201c847987f9709e21c5c361b3fa34929513fc7f08e8f2c9527be23b",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000032.parquet": "7febd38089be1f602599ee106950398974f5c62e3afe64eb9aa6fe910b396530",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000033.parquet": "acdf2fbae40653edb8eb881bde1d893a149f479b7075bdd9847d054db56152dc",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000034.parquet": "e3594cb35434ad3d1da43df21e1c722c4b52f99b8e3090ef0a52109b1c7c7231",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000035.parquet": "12948120f20fa3829a783e06a0ef9a8ae7f820545a639e0bde15963f93caa4e7",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000036.parquet": "a21abcd0b99d4f2fd719834bc296b8630532b5329b2165eea0df83bfb58eef66",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000037.parquet": "43498f523042d142aa523afe278114187ef82ca44726e53166497cf6f3012258",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000038.parquet": "f6bc341d80820a12d25083ba623d1fdcd24e2190204f66aa9ba06541bd9df4fa",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000039.parquet": "984fe0f502489499f7a88ff32e28ae42acf3db8baa1a2612e36604d9ca1bbfa4",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000040.parquet": "cad07334f8b131bf0861b61298c466460f4a6f748364b00c475e45ab416ec524",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000041.parquet": "06658ffc3d8e9061fe044d2a189cba6723313d77dae234edc01bcd45e3e8f034",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/data/chunk-000/episode_000042.parquet": "077b606357910a98662c8c17e3a9d23cead61913d0122ef442bf28afba55ca72",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_sonic78_50hz_261002/data/chunk-000/file-000.parquet": "6d775fc302af0996a2aa858ebf017163e513669401f728a668ca968b4cace325",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_260930_subset_261002/meta/info.json": "863c9c4e1cda4ad103de157ab4219da1b18801b231fafd1f25aefcd397fc5293",
+    "/mnt/data/jihun/datasets/G1_WBT_GR00T/handover_bottle_sonic78_50hz_261002/meta/info.json": "55cd611a49a24cc9aae743b030664a9a04806975d8cb6e660c3580e612a972c2"
+  }
+}

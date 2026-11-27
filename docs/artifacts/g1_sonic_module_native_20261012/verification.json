@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-12",
+  "scope": "Actual DimOS SonicExecutionModule blueprint/worker RPC with live Pi0.5, guarded native SONIC and MuJoCo",
+  "authoritative_run": "run05",
+  "validation": {
+    "focused_sonic_tests": 238,
+    "module_tests": 16,
+    "pytest_log": "pytest.log",
+    "ruff": {
+      "passed": true,
+      "format_check_passed": true,
+      "files": 5
+    },
+    "mypy": {
+      "passed": true,
+      "files": [
+        "dimos/robot/unitree/g1/sonic_execution_module.py"
+      ],
+      "follow_imports": "silent",
+      "log": "mypy.log"
+    },
+    "native_cases": [
+      "live",
+      "cancel",
+      "camera_loss"
+    ],
+    "audit_passed": true,
+    "independent_raw_evidence_review": "No blocking or false-pass findings; qualified simulation boundary pass",
+    "full_repository_suite_run": false
+  },
+  "runtime": {
+    "network": "private user/network namespace, loopback only",
+    "policy_gpu": 1,
+    "model": "wbt_pi05_he_full/pretrained_model_ema",
+    "replan_interval_seconds": 0.35,
+    "max_observation_age_seconds": 0.85,
+    "native_reference_expiry_ms": 200
+  },
+  "cleanup": {
+    "native_children_exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "coordinator_stopped": true,
+    "module_stop_returned": true,
+    "endpoint_rebound": true,
+    "temporary_policy_reaped": true,
+    "host_process_check": "Only pre-existing policy server PID1212423 and its uv wrapper PID1212417 remain; no demo_native_module, demo_policy_boot or guarded native controller process found"
+  },
+  "earlier_attempts": {
+    "run01": "Receive-budget arrival race; confirmed recovery, incomplete final reporting due post-stop RPC query",
+    "run02": "Policy observation expired before admission; recovery and cleanup passed",
+    "run03": "120-second policy startup timeout; native simulation not launched",
+    "run04": "Live and cancel passed; observation expired before camera-freeze injection at 400ms request cadence; overall failed"
+  },
+  "limits": [
+    "No hardware connection",
+    "Empty scene; no grasp/placement validation",
+    "Nominal uncalibrated MJCF camera",
+    "Source/model hashes were recorded; policy checkpoint hash measured after run",
+    "Existing pytest subprocess ResourceWarning",
+    "Pose gap metrics are observer receipt spacing, not publisher timing",
+    "Simulation motion speeds are not hardware limit approval"
+  ],
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "4730fd8101cd62c0585aa61763f9abd568c6546e3b9147382dfb6067c02eaf6a",
+    "dimos/robot/unitree/g1/test_sonic_execution_module.py": "d238272cbb3bd5a0d57e7df43b09994d2cc18eeb145a08acaadd22ee50ccdad5",
+    "docs/artifacts/g1_sonic_module_native_20261012/demo_audit.py": "7893b90008fc1496b6211703da389671729e8eea67b4f4837bff4fb0dd3a14ef",
+    "docs/artifacts/g1_sonic_module_native_20261012/demo_native_module.py": "adb030a0b250978e309585d1686da7ccbe6cf4c97d220425bed0459b07c1eed6",
+    "docs/artifacts/g1_sonic_module_native_20261012/demo_policy_boot.py": "ab73d18da2259c0acea7dc2ad62c46c3588c6cef7f5f4fa597c5a80be3effabc",
+    "docs/artifacts/g1_sonic_module_native_20261012/demo_run_private_policy_trial.sh": "611b5839163e8182cbc2e8e07b849886b8baf808ec0b3b14624c13a302ca06c9",
+    "docs/artifacts/g1_sonic_module_native_20261012/demo_run_trial.sh": "5903ebe354eac83f3f5f0d987eee9f3f794f6e78fb555149fdab23168445b626",
+    "docs/artifacts/g1_sonic_module_native_20261012/pytest.log": "80e9f4703619c65b5735013c16a48269073de48193be4d6db277c1eb33c0684f",
+    "docs/artifacts/g1_sonic_module_native_20261012/mypy.log": "5d4b6d285b77932e3d08212c3b4974d0a803f98ec60408ac6ccf6a063fa6c19e",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/result.json": "aadd57a44722cc34f2d3593c8604313b25bfe85518deb03ea0a97d445cbfe7f9",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/audit.json": "4397fc1c98b8d4af2069f2592a163a09464cd2ddd9f8bad326ec9f9e87b62587",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/manifest.json": "719ceb513b97bd871b380e8f2415fc90f389d9116a18460dca0c88700e693498",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/policy-provenance.json": "842515e884e00f539a3acad11e8259b15ef5e94333cce6754749f089094d3ea8",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/replay/render_info.json": "1578c58c7d4b59ee99caf9b1984601972c602f4901db2a8d0dc91ffba68d95f3",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/replay/live_policy_replay.mp4": "7ccff8e6d67dddb7e03ef0a62c0a91c8e0d8e76a6bb58fcc04bc66e5f9034333",
+    "docs/artifacts/g1_sonic_module_native_20261012/run05/replay/joint_speeds.png": "f129d6d8b74c872406eb927eebcd2a9c91a44467d98a0e31044f4c52026d5d85",
+    "docs/platforms/humanoid/g1/sonic-execution-module.md": "6101829081b3a6fcd5f7cdbb626bcd3d7d0f2ea54955fbe176bad4dff726a5c8",
+    "docs/platforms/humanoid/g1/sonic-execution-native-validation.md": "08f67691dbf31a41554dbbaf4bf4b1492b1f9d2051ff13b21b417fcea9f8b21b"
+  }
+}

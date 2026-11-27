@@ -1,0 +1,70 @@
+{
+  "checkpoint": "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema",
+  "policy_gpu": 1,
+  "device": "cuda",
+  "port": 15561,
+  "noise_scale": 0,
+  "OMP_NUM_THREADS": 4,
+  "MKL_NUM_THREADS": 4,
+  "HF_HUB_OFFLINE": 1,
+  "TRANSFORMERS_OFFLINE": 1,
+  "startup_timeout_seconds": 300,
+  "files_measured_after_run": {
+    "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/model.safetensors": {
+      "sha256": "5b09054ed96bc60c5a969675a13c3e3439f1d4bc52c0e2d261e1f23f15822a09",
+      "bytes": 16574137080,
+      "mtime_ns": 1791192016000000000
+    },
+    "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/config.json": {
+      "sha256": "58cc89cd2e44e5dd894765770ce63956ce24be251edd75c8f134c7ade37bd55d",
+      "bytes": 4580,
+      "mtime_ns": 1791257685281303355
+    },
+    "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/policy_preprocessor.json": {
+      "sha256": "bd8b90b3d96d542a30fa0218110513712eee324048ff9a66f7376763c783a3d0",
+      "bytes": 4026,
+      "mtime_ns": 1791192017000000000
+    },
+    "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/policy_postprocessor.json": {
+      "sha256": "3e1e3d1dceddfb1f5288400fb7611be8dedce76d304ba959ab33c4943b5615dd",
+      "bytes": 780,
+      "mtime_ns": 1791192017000000000
+    },
+    "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/tokenizer/tokenizer.json": {
+      "sha256": "7336bb4ce016bf8543de94e3a17c3d6ca502a6fc8628fec6ed88893639d7a296",
+      "bytes": 34387384,
+      "mtime_ns": 1791192017000000000
+    },
+    "/mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema/tokenizer/tokenizer_config.json": {
+      "sha256": "d36fcc5eed92f7b30976de93450dcb6229663e13c41be1f59ae54f2f20c9cc24",
+      "bytes": 502,
+      "mtime_ns": 1791192016000000000
+    },
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_policy_server.py": {
+      "sha256": "62ebd81c839002917ff9ef4fb9270e5ee81dd3f4fb2e8eb3d528b3e70b1e0aaa",
+      "bytes": 4631,
+      "mtime_ns": 1791433074437219777
+    },
+    "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_policy_streamer.py": {
+      "sha256": "e9e40f2e7e5c416b956bfe8a52941a5cf2258523e1972b24b866ccdef6dbb63d",
+      "bytes": 43277,
+      "mtime_ns": 1791772296291619954
+    },
+    "/home/jihun/work/lerobot/src/lerobot/policies/pi05/modeling_pi05.py": {
+      "sha256": "35b6ecd4d3b5cbe8065c1c990dfcc1b799f03b79507fdb2de15e78d04fab104e",
+      "bytes": 61368,
+      "mtime_ns": 1790556354609979587
+    },
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_module_native_20261012/demo_run_private_policy_trial.sh": {
+      "sha256": "611b5839163e8182cbc2e8e07b849886b8baf808ec0b3b14624c13a302ca06c9",
+      "bytes": 2177,
+      "mtime_ns": 1791794902705871559
+    },
+    "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_module_native_20261012/demo_policy_boot.py": {
+      "sha256": "ab73d18da2259c0acea7dc2ad62c46c3588c6cef7f5f4fa597c5a80be3effabc",
+      "bytes": 654,
+      "mtime_ns": 1791794902673871958
+    }
+  },
+  "note": "Checkpoint/source hashes recorded after run; launcher log records the executed path and arguments. Model files were not modified by this task."
+}

@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-12",
+  "scope": "Reusable DimOS execution module for the existing guarded SONIC session",
+  "validation": {
+    "focused_sonic_tests": {
+      "passed": 232,
+      "log": "pytest.log"
+    },
+    "module_tests": 10,
+    "registry_tests": {
+      "passed": 5,
+      "mode": "CI=1 comparison after generation",
+      "log": "registry.log"
+    },
+    "ruff": {
+      "passed": true,
+      "log": "ruff.log"
+    },
+    "mypy": {
+      "passed": true,
+      "files": [
+        "dimos/robot/unitree/g1/sonic_execution_module.py",
+        "dimos/robot/unitree/g1/sonic_session.py"
+      ],
+      "follow_imports": "silent",
+      "log": "mypy.log"
+    },
+    "review": "Independent read-only review; shutdown race fixed and regression verified; no blocking findings remain",
+    "full_repository_suite_run": false
+  },
+  "native_controller_started": false,
+  "physics_simulation_started": false,
+  "hardware_connected": false,
+  "gpu_inference_started": false,
+  "notes": [
+    "Real local TCP ZMQ peer simulates protocol state, not physics.",
+    "DimOS worker-process RPC was exercised.",
+    "Concurrent stop regression failed before lifecycle serialization and passed afterward.",
+    "Initial registry generator reports uncommitted changes by design; generated-file comparison then passed.",
+    "Sandbox socket denial prevented initial final-check runs; authorized reruns succeeded.",
+    "Existing subprocess ResourceWarning appears at pytest startup.",
+    "Physical object success is unverified; module task_success remains null."
+  ],
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_execution_module.py": "06c2f4c342d387249dce9b747126e1ade7f7bc3be6cf7d82eee06fce034be130",
+    "dimos/robot/unitree/g1/test_sonic_execution_module.py": "50b8a503d247fa0e845a5a41011c9406c098601f929d536e75f9364531a843f1",
+    "dimos/robot/unitree/g1/sonic_session.py": "5e94b3605b6b9972166ba228f53ed6414d904fa2ea2e0b08a304b16b53fa3b43",
+    "dimos/robot/unitree/g1/test_sonic_session.py": "c416685dbe41c58ac0caabbe56a0363ef4a6b84b72511f78c2552906679307b3",
+    "dimos/robot/unitree/g1/sonic_feedback.py": "9c29f93c50d20d59c4a8e9244509069ebaa84c690db7b66c5bce9d02871058be",
+    "dimos/robot/unitree/g1/sonic_reference.py": "182f24b81edfcf4f6f6ee04ffec935b947dc3bce2adf9793e6be5e224905f1e1",
+    "dimos/robot/all_blueprints.py": "8940bddda3cb5de868404746f99efff3fc9cc916580fd4f1fac7d88290c6e32a",
+    "docs/platforms/humanoid/g1/sonic-execution-module.md": "ece543f27c3d5daeec394572239cf1af58f17d7471949a4c7b8c53f4ac64692c"
+  }
+}

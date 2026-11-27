@@ -1,0 +1,115 @@
+{
+  "started_utc": "2026-10-06T06:14:18.670995+00:00",
+  "native_executable": "/home/unitree/dimos/dimos/hardware/sensors/camera/realsense/rust/target/release/realsense_native",
+  "native_return_code": 0,
+  "configuration": {
+    "frame_id_prefix": null,
+    "width": 640,
+    "height": 480,
+    "fps": 15,
+    "align_depth_to_color": true,
+    "enable_depth": true,
+    "enable_pointcloud": false,
+    "pointcloud_fps": 5,
+    "camera_info_fps": 1,
+    "frame_id": "d435_link",
+    "enable_color": true,
+    "color_auto_exposure_priority": false,
+    "enable_infrared": false,
+    "emitter_enabled": true,
+    "enable_imu": false,
+    "imu_hz": 400,
+    "imu_info": {
+      "gyro_noise_density": 0.0002,
+      "gyro_random_walk": 1e-05,
+      "accel_noise_density": 0.0018,
+      "accel_random_walk": 0.0001
+    },
+    "pointcloud_decimation": 2,
+    "depth_trunc_m": 5,
+    "serial_number": null
+  },
+  "transport": "zenoh",
+  "network_interface": "lo",
+  "topics": {
+    "color_image": {
+      "messages": 91,
+      "observed_hz": 15.21,
+      "width": 640,
+      "height": 480,
+      "frame_id": "d435_color_optical_frame",
+      "last_timestamp": 1791267265.6475594,
+      "distinct_timestamps": 91,
+      "format": "RGB",
+      "dtype": "uint8",
+      "shape": [
+        480,
+        640,
+        3
+      ]
+    },
+    "depth_image": {
+      "messages": 90,
+      "observed_hz": 15.04,
+      "width": 640,
+      "height": 480,
+      "frame_id": "d435_color_optical_frame",
+      "last_timestamp": 1791267265.6474385,
+      "distinct_timestamps": 90,
+      "format": "DEPTH16",
+      "dtype": "uint16",
+      "shape": [
+        480,
+        640
+      ],
+      "valid_fraction": 0.996015625,
+      "median_positive": 1248
+    },
+    "tf": {
+      "messages": 91,
+      "observed_hz": 15.21
+    },
+    "camera_info": {
+      "messages": 6,
+      "observed_hz": 1,
+      "width": 640,
+      "height": 480,
+      "frame_id": "d435_color_optical_frame",
+      "last_timestamp": 1791267265.5807383,
+      "distinct_timestamps": 6,
+      "K": [
+        604.1785888671875,
+        0,
+        316.75347900390625,
+        0,
+        603.9077758789062,
+        255.6288299560547,
+        0,
+        0,
+        1
+      ],
+      "distortion_model": "plumb_bob"
+    },
+    "depth_camera_info": {
+      "messages": 6,
+      "observed_hz": 1,
+      "width": 640,
+      "height": 480,
+      "frame_id": "d435_color_optical_frame",
+      "last_timestamp": 1791267265.5807383,
+      "distinct_timestamps": 6,
+      "K": [
+        604.1785888671875,
+        0,
+        316.75347900390625,
+        0,
+        603.9077758789062,
+        255.6288299560547,
+        0,
+        0,
+        1
+      ],
+      "distortion_model": "plumb_bob"
+    }
+  }
+}

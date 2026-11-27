@@ -1,0 +1,67 @@
+{
+  "audit_passed": true,
+  "cases": [
+    {
+      "scenario": "replay",
+      "outcome": "finished",
+      "session_planner_confirmed": true,
+      "first_passive_planner_after_request_s": 0.2205624779453501,
+      "terminal_after_request_s": 0.2218762569827959,
+      "arm_peak_rad_s": 5.214659690856934,
+      "peak_body_motor_slot": 24,
+      "peak_since_running_s": 0.6337694219546393,
+      "peak_since_injection_s": null,
+      "peak_nearest_hand_clearance_m": {
+        "left": 0.002877924645331565,
+        "right": 0.02
+      },
+      "arm_peak_after_handback_request_rad_s": 3.396103620529175,
+      "physics": {
+        "samples": 753,
+        "minimum_pelvis_height_m": 0.7822947573056634,
+        "maximum_tilt_deg": 8.24150717062154,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "settling_window": {
+        "duration_s": 0.4999848149018362,
+        "samples": 26,
+        "max_gap_s": 0.021020993939600885,
+        "max_body_speed_rad_s": 0.021054990589618683
+      }
+    }
+  ],
+  "prediction_count": 28,
+  "server_latency_range_s": [
+    0.2810901269549504,
+    0.29360147495754063
+  ],
+  "roundtrip_range_s": [
+    0.2833147549536079,
+    0.29617870203219354
+  ],
+  "arrival_observation_age_range_s": [
+    0.3024343380238861,
+    0.32014342304319143
+  ],
+  "hand_target_range_rad": [
+    -1.5083603858947754,
+    1.528228759765625
+  ],
+  "pose_timing": {
+    "packets": 610,
+    "median_gap_s": 0.02016433607786894,
+    "maximum_gap_s": 0.02156021201517433
+  },
+  "cleanup": {
+    "exit_codes": [
+      0,
+      0
+    ],
+    "initial_wait_warning": null
+  },
+  "limits": [
+    "Real Pi0.5 inference with recorded training RGB/state; no live visual feedback or object interaction",
+    "Speed peaks and hand/body contacts retained, not hardware-acceptance evidence"
+  ]
+}
