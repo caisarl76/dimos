@@ -21,7 +21,7 @@ The margin reserves one polling period, generation lookahead, and one apply tick
 
 Apply `../native-horizon-refresh.patch` after the earlier native navigation/diagnostics and terminal-hold patches, from the directory containing `gear_sonic_deploy`:
 
-```sh
+```sh skip
 patch -p1 --batch -i /absolute/path/native-horizon-refresh.patch
 cmake -S gear_sonic_deploy -B /path/to/private-cmake
 cmake --build /path/to/private-cmake --target run_tests g1_deploy_onnx_ref -j2

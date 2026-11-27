@@ -44,7 +44,10 @@ from dimos.msgs.sensor_msgs.Imu import Imu
 from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
 
 if __package__:
-    from .demo_dds_lio_adapter import encode_cloud, encode_imu
+    from .demo_dds_lio_adapter import (  # noqa: TID252  # run as a package or as a script
+        encode_cloud,
+        encode_imu,
+    )
 else:
     from demo_dds_lio_adapter import encode_cloud, encode_imu
 
@@ -159,22 +162,26 @@ def run(fixture: Path, output: Path) -> None:
     }.items():
         config.insert_json5(key, json.dumps(value))
     router = zenoh.open(config)
-    blueprint = autoconnect(
-        PointLio.blueprint(),
-        RayTracingVoxelMap.blueprint(voxel_size=0.05, worker_threads=2),
-        CostMapper.blueprint(initial_safe_radius_meters=0.0),
-    ).global_config(
-        transport="zenoh",
-        viewer="none",
-        n_workers=3,
-        robot_ip=None,
-        robot_ips=None,
-        zenoh_mode="client",
-        zenoh_connect=endpoint,
-        zenoh_multicast=False,
-        zenoh_scouting=False,
-        zenoh_gossip=True,
-        serve_coordinator_rpc=False,
+    blueprint = (
+        autoconnect(
+            PointLio.blueprint(),
+            RayTracingVoxelMap.blueprint(voxel_size=0.05, worker_threads=2),
+            CostMapper.blueprint(initial_safe_radius_meters=0.0),
+        )
+        .global_config(
+            transport="zenoh",
+            viewer="none",
+            n_workers=3,
+            robot_ip=None,
+            robot_ips=None,
+            zenoh_mode="client",
+            zenoh_connect=endpoint,
+            zenoh_multicast=False,
+            zenoh_scouting=False,
+            zenoh_gossip=True,
+            serve_coordinator_rpc=False,
+        )
+        .solidify()
     )
     assert {a.module for a in blueprint.active_blueprints} == {
         PointLio,

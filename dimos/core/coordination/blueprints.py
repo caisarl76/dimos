@@ -228,6 +228,10 @@ class BlueprintProtocol(Protocol):
 
     def configurators(self, *checks: "SystemConfigurator") -> Self: ...
 
+    def validators(
+        self, *checks: Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None]
+    ) -> Self: ...
+
 
 @dataclass(frozen=True)
 class Blueprint(BlueprintProtocol):
@@ -272,13 +276,13 @@ class Blueprint(BlueprintProtocol):
         return state
 
     @classmethod
-    def cbor_decode(cls, data: dict[str, Any]) -> "Blueprint":
+    def cbor_decode(cls, data: dict[str, Any]) -> Self:
         for name in _PROXY_FIELDS:
             data[name] = MappingProxyType(data[name])
         return cls(**data)
 
     @classmethod
-    def create(cls, module: type[ModuleBase], **kwargs: Any) -> "Blueprint":
+    def create(cls, module: type[ModuleBase], **kwargs: Any) -> Self:
         blueprint = BlueprintAtom.create(module, kwargs)
         return cls(blueprints=(blueprint,))
 
@@ -482,7 +486,7 @@ class Blueprint(BlueprintProtocol):
 
     def validators(
         self, *checks: Callable[["Blueprint", Mapping[str, Mapping[str, Any]]], None]
-    ) -> "Blueprint":
+    ) -> Self:
         return replace(self, validator_checks=self.validator_checks + tuple(checks))
 
     @cached_property

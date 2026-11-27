@@ -359,7 +359,7 @@ def observe_peer(
 
 
 def build_pc2(output: Path) -> ModuleCoordinator:
-    blueprint = unitree_g1_sonic_navigation_pc2
+    blueprint = unitree_g1_sonic_navigation_pc2.solidify()
     parsed = BlueprintConfigParser(blueprint).parse(
         environ={},
         overrides={
@@ -889,7 +889,8 @@ def run_two_host(args: Any) -> None:
                 "pc2_graph_validated_before_startup",
                 bool(unitree_g1_sonic_navigation_pc2.validator_checks),
                 modules=sorted(
-                    a.module.__name__ for a in unitree_g1_sonic_navigation_pc2.active_blueprints
+                    a.module.__name__
+                    for a in unitree_g1_sonic_navigation_pc2.solidify().active_blueprints
                 ),
             )
             peer = PeerHost(args.output, PEER_CLOCK_OFFSETS[0], peer_log)

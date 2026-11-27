@@ -915,7 +915,7 @@ jitter adds length; sampled once a second the walk was 3.33 m.
 
 Sessions 1-6 ran attempt 12 (`7320a98e1`) on pc2 with the walk harness from the deploy
 layout (`6fe3cc635`), without `--ignore-rear-occupancy`; session 7 ran `693a86b94` with
-it ([hardware](/docs/artifacts/g1_navigation_sonic_20261013/hardware/), `results.json`
+it (`docs/artifacts/g1_navigation_sonic_20261013/hardware/`: `results.json`
 and `raw-hashes.sha256` per session).
 
 | Session | Cases |

@@ -22,7 +22,7 @@ Regressions: fixture replay detects padding despite a passing physical case; cha
 
 Reproduce from the worktree root:
 
-```sh
+```sh skip
 python3 docs/artifacts/g1_navigation_sonic_20261013/demo_navigation_horizon_proof.py \
   docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/fullmatrix-trials/fullmatrix-1 \
   docs/artifacts/g1_navigation_sonic_20261013/motion-resolution/horizon-trials/transitions-{1,2,3} \

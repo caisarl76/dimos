@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 from functools import partial
 import hashlib
+import importlib
 import json
 import math
 import os
@@ -168,9 +169,8 @@ def synthetic_grid(x: float, y: float, obstacles: list[list[float]], ts: float) 
 
 if os.environ.get("SONIC_TWO_HOST_OUTPUT"):
     # Workers re-import this entry module: audit link control calls (behavior unchanged).
-    import demo_navigation_audit  # type: ignore[import-not-found]  # docs/artifacts, simulation
-
-    demo_navigation_audit.install()
+    # Simulation-only module from docs/artifacts on sys.path, not a dependency.
+    importlib.import_module("demo_navigation_audit").install()
 
 
 def reply(**fields: Any) -> None:
@@ -305,7 +305,7 @@ def main() -> None:
     router = open_router(args.router)
     mount = torso_to_mid360()
     t, q = mount.translation, mount.rotation
-    blueprint = unitree_g1_sonic_navigation_peer
+    blueprint = unitree_g1_sonic_navigation_peer.solidify()
     parsed = BlueprintConfigParser(blueprint).parse(
         environ={},
         overrides={

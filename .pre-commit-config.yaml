@@ -1,6 +1,8 @@
 default_stages: [pre-commit]
 default_install_hook_types: [pre-commit, commit-msg]
-exclude: (dimos/models/.*)|(deprecated)
+# Kept byte-exact: copies of the harness that ran (their hashes are in the run records), and
+# the planner lease cases, a pc2 payload input pinned in pc2/manifest.json.
+exclude: (dimos/models/.*)|(deprecated)|(^docs/artifacts/g1_navigation_sonic_20261013/on-host-sim/)|(^dimos/robot/unitree/g1/test_data/sonic_planner_lease_cases\.json$)
 repos:
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks

@@ -30,9 +30,10 @@ import cyclonedds.domain  # noqa: F401  # the real reader stack must import in t
 import unitree_sdk2py.idl.unitree_hg.msg.dds_  # noqa: F401
 
 config = Path(__file__).with_name("config") / "pc2-graph.json"
-parsed = BlueprintConfigParser(blueprint).parse(config_path=config, environ={})
-kwargs = {a.name: {**a.kwargs, **parsed.module_kwargs(a.name)} for a in blueprint.active_blueprints}
-validate_sonic_navigation_graph(blueprint, kwargs, role="pc2")
+graph = blueprint.solidify()
+parsed = BlueprintConfigParser(graph).parse(config_path=config, environ={})
+kwargs = {a.name: {**a.kwargs, **parsed.module_kwargs(a.name)} for a in graph.active_blueprints}
+validate_sonic_navigation_graph(graph, kwargs, role="pc2")
 idle = encode_planner(PlannerIntent(0, (0, 0, 0), (1, 0, 0), 0.0), sequence=1, deadline=1.0)
 assert idle.startswith(b"planner") and len(idle) == 1339, len(idle)
 try:
