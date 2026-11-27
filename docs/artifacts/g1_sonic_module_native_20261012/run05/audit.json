@@ -1,0 +1,127 @@
+{
+  "audit_passed": true,
+  "camera_frames": 331,
+  "renderer": "NVIDIA GeForce RTX 3060/PCIe/SSE2",
+  "camera_render_median_s": 0.004143238998949528,
+  "cases": [
+    {
+      "scenario": "live",
+      "outcome": "finished",
+      "predictions": 18,
+      "native_applied_index_range": [
+        64,
+        345
+      ],
+      "native_accepted_index_range": [
+        65,
+        345
+      ],
+      "unique_rgb": 18,
+      "unique_states": 18,
+      "roundtrip_range_s": [
+        0.29778613906819373,
+        0.3139284329954535
+      ],
+      "arrival_age_range_s": [
+        0.3437787239672616,
+        0.4565685080597177
+      ],
+      "handback_confirmed_s": 0.13984929595608264,
+      "freeze_to_handback_s": null,
+      "arm_peak_rad_s": 3.347599744796753,
+      "pose_timing": {
+        "packets": 346,
+        "median_gap_s": 0.02143984695430845,
+        "maximum_gap_s": 0.024574788054451346
+      },
+      "physics": {
+        "samples": 497,
+        "minimum_pelvis_height_m": 0.7808848448009951,
+        "maximum_tilt_deg": 8.428375307948292,
+        "automatic_resets": 0,
+        "support_disabled": true
+      }
+    },
+    {
+      "scenario": "cancel",
+      "outcome": "cancelled",
+      "predictions": 5,
+      "native_applied_index_range": [
+        411,
+        481
+      ],
+      "native_accepted_index_range": [
+        411,
+        481
+      ],
+      "unique_rgb": 5,
+      "unique_states": 5,
+      "roundtrip_range_s": [
+        0.30127483198884875,
+        0.32325439201667905
+      ],
+      "arrival_age_range_s": [
+        0.37264616193715483,
+        0.4487826839322224
+      ],
+      "handback_confirmed_s": 0.12814831594005227,
+      "freeze_to_handback_s": null,
+      "arm_peak_rad_s": 5.309918403625488,
+      "pose_timing": {
+        "packets": 137,
+        "median_gap_s": 0.02139124652603641,
+        "maximum_gap_s": 0.02357563201803714
+      },
+      "physics": {
+        "samples": 286,
+        "minimum_pelvis_height_m": 0.7843482830057076,
+        "maximum_tilt_deg": 7.252405467933018,
+        "automatic_resets": 0,
+        "support_disabled": true
+      }
+    },
+    {
+      "scenario": "camera_loss",
+      "outcome": "failed",
+      "predictions": 6,
+      "native_applied_index_range": [
+        549,
+        649
+      ],
+      "native_accepted_index_range": [
+        549,
+        649
+      ],
+      "unique_rgb": 6,
+      "unique_states": 6,
+      "roundtrip_range_s": [
+        0.30166913906577975,
+        0.33156378101557493
+      ],
+      "arrival_age_range_s": [
+        0.36055834498256445,
+        0.45301345095504075
+      ],
+      "handback_confirmed_s": 0.11622790503315628,
+      "freeze_to_handback_s": 0.6392102980753407,
+      "arm_peak_rad_s": 2.8269784450531006,
+      "pose_timing": {
+        "packets": 167,
+        "median_gap_s": 0.021380730962846428,
+        "maximum_gap_s": 0.024265240994282067
+      },
+      "physics": {
+        "samples": 319,
+        "minimum_pelvis_height_m": 0.7841606730978363,
+        "maximum_tilt_deg": 8.17130667091236,
+        "automatic_resets": 0,
+        "support_disabled": true
+      }
+    }
+  ],
+  "limits": [
+    "nominal MJCF camera, not calibrated D435i",
+    "empty scene, no grasp or placement",
+    "handover checkpoint evaluated outside training scene"
+  ]
+}

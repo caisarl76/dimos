@@ -1,0 +1,73 @@
+{
+  "observed_on": "2026-10-06",
+  "planner_mode_evidence": "Reported active by the user; this probe does not infer controller mode.",
+  "robot_commands_sent": false,
+  "robot_files_modified": false,
+  "controller": {
+    "pid": 25395,
+    "executable": "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy/target/release/g1_deploy_onnx_ref",
+    "cwd": "/home/unitree/GR00T-WholeBodyControl/gear_sonic_deploy",
+    "executable_sha256_via_proc": "5526b184875f6f5e392cf6a5c95a8f55ab2d0a698177078a214db2231a0ec425",
+    "argv": "./target/release/g1_deploy_onnx_ref enP8p1s0 policy/sonic_v1_1/model_decoder.onnx reference/example/ --obs-config policy/sonic_v1_1/observation_config.yaml --encoder-file policy/sonic_v1_1/model_encoder.onnx --planner-file planner/target_vel/V2/planner_sonic.onnx --input-type keyboard --output-type all --zmq-host localhost",
+    "tcp_5557_listener_pid": 25395,
+    "limitation": "This identifies the current session; it does not retrospectively identify the earlier exited PID 39396."
+  },
+  "module_status": {
+    "state": "fresh",
+    "endpoint": "tcp://192.168.0.222:5557",
+    "age_s": 0.018485546053852886,
+    "stale_after_s": 0.2,
+    "accepted_packets": 249,
+    "invalid_packets": 0,
+    "rejected_indices": 0,
+    "error": null
+  },
+  "module_last_source_timestamp": null,
+  "capture_started_utc_pc2": "2026-10-06T09:40:50.607839+00:00",
+  "capture_duration_s": 8.002731487000347,
+  "sonic_packets_received": 400,
+  "sonic_rows_recorded": 134,
+  "invalid_recorded_sonic_samples": 0,
+  "rejected_indices": 0,
+  "dds_samples_taken": {
+    "body": 2896,
+    "left_hand": 2851,
+    "right_hand": 2853
+  },
+  "groups": {
+    "body": {
+      "paired_samples": 133,
+      "unpaired_samples": 1,
+      "max_read_gap_ms": 2.4563449997003772,
+      "max_position_difference_rad": 6.693601608276367e-05,
+      "max_position_difference_deg": 0.00383515121896216,
+      "worst_position_joint": "g1/right_hip_yaw",
+      "max_velocity_difference_rad_s": 0.07542316056787968
+    },
+    "left_hand": {
+      "paired_samples": 134,
+      "unpaired_samples": 0,
+      "max_read_gap_ms": 2.281901999594993,
+      "max_position_difference_rad": 2.944469451904297e-05,
+      "max_position_difference_deg": 0.0016870567249931494,
+      "worst_position_joint": "g1/left_hand_motor_2",
+      "max_velocity_difference_rad_s": 0.22900837659835815
+    },
+    "right_hand": {
+      "paired_samples": 134,
+      "unpaired_samples": 0,
+      "max_read_gap_ms": 2.1183400003792485,
+      "max_position_difference_rad": 6.437301635742188e-05,
+      "max_position_difference_deg": 0.0036883021518068857,
+      "worst_position_joint": "g1/right_hand_motor_6",
+      "max_velocity_difference_rad_s": 0.5725209712982178
+    }
+  },
+  "limitations": [
+    "Comparison uses nearby local read times, not simultaneous sensor capture times.",
+    "Position agreement in these poses does not establish every anatomical hand mapping or motion readiness.",
+    "The current session uses keyboard input, so it is not the previously traced zmq_manager command integration configuration.",
+    "Nonzero velocity differences are recorded separately and are not treated as verified velocity equivalence.",
+    "Zero source ROS timestamp provides no sensor acquisition-time or cross-host synchronization guarantee."
+  ]
+}

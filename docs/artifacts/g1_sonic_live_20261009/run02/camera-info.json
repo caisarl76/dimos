@@ -1,0 +1,102 @@
+{
+  "scene": "/home/jihun/work/GR00T-WholeBodyControl/gear_sonic/data/robot_model/model_data/g1/scene_43dof.xml",
+  "camera": "head_camera",
+  "size": [
+    640,
+    480
+  ],
+  "nominal_fovy_deg": 45.0,
+  "nominal_K": [
+    [
+      579.4112549695428,
+      0,
+      320
+    ],
+    [
+      0,
+      579.4112549695428,
+      240
+    ],
+    [
+      0,
+      0,
+      1
+    ]
+  ],
+  "camera_parent": "torso_link",
+  "camera_position": [
+    0.06,
+    0.0,
+    0.45
+  ],
+  "camera_quaternion_wxyz": [
+    0.6515477423451215,
+    0.2752506903280633,
+    -0.2754699671476764,
+    -0.6510291038951777
+  ],
+  "state_joint_names": [
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_pitch_joint",
+    "left_wrist_yaw_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint",
+    "right_wrist_roll_joint",
+    "right_wrist_pitch_joint",
+    "right_wrist_yaw_joint",
+    "left_hand_thumb_0_joint",
+    "left_hand_thumb_1_joint",
+    "left_hand_thumb_2_joint",
+    "left_hand_middle_0_joint",
+    "left_hand_middle_1_joint",
+    "left_hand_index_0_joint",
+    "left_hand_index_1_joint",
+    "right_hand_thumb_0_joint",
+    "right_hand_thumb_1_joint",
+    "right_hand_thumb_2_joint",
+    "right_hand_index_0_joint",
+    "right_hand_index_1_joint",
+    "right_hand_middle_0_joint",
+    "right_hand_middle_1_joint"
+  ],
+  "qpos_indices": {
+    "left_shoulder_pitch_joint": 22,
+    "left_shoulder_roll_joint": 23,
+    "left_shoulder_yaw_joint": 24,
+    "left_elbow_joint": 25,
+    "left_wrist_roll_joint": 26,
+    "left_wrist_pitch_joint": 27,
+    "left_wrist_yaw_joint": 28,
+    "right_shoulder_pitch_joint": 36,
+    "right_shoulder_roll_joint": 37,
+    "right_shoulder_yaw_joint": 38,
+    "right_elbow_joint": 39,
+    "right_wrist_roll_joint": 40,
+    "right_wrist_pitch_joint": 41,
+    "right_wrist_yaw_joint": 42,
+    "left_hand_thumb_0_joint": 29,
+    "left_hand_thumb_1_joint": 30,
+    "left_hand_thumb_2_joint": 31,
+    "left_hand_middle_0_joint": 32,
+    "left_hand_middle_1_joint": 33,
+    "left_hand_index_0_joint": 34,
+    "left_hand_index_1_joint": 35,
+    "right_hand_thumb_0_joint": 43,
+    "right_hand_thumb_1_joint": 44,
+    "right_hand_thumb_2_joint": 45,
+    "right_hand_index_0_joint": 48,
+    "right_hand_index_1_joint": 49,
+    "right_hand_middle_0_joint": 46,
+    "right_hand_middle_1_joint": 47
+  },
+  "calibration": "supplied MJCF nominal camera; physical mounting not calibrated",
+  "timestamp": "physics snapshot local monotonic time, before rendering",
+  "gl_renderer": "NVIDIA GeForce RTX 3060/PCIe/SSE2",
+  "gl_vendor": "NVIDIA Corporation"
+}

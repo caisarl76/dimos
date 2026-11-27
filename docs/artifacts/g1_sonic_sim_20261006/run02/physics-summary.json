@@ -1,0 +1,66 @@
+{
+  "start_planner": {
+    "samples": 88,
+    "height_min_m": 0.9580726009573822,
+    "height_max_m": 0.9709497226619541,
+    "tilt_max_deg": 11.805731922103561,
+    "max_reset_count": 0,
+    "max_abs_qvel": 28.779818974174166
+  },
+  "release_support_and_settle": {
+    "samples": 116,
+    "height_min_m": 0.7736399294967177,
+    "height_max_m": 0.7921113647197637,
+    "tilt_max_deg": 9.590875757134933,
+    "max_reset_count": 0,
+    "max_abs_qvel": 10.625298855948529
+  },
+  "streamed_reference": {
+    "samples": 44,
+    "height_min_m": 0.7860423225008285,
+    "height_max_m": 0.7860881052708126,
+    "tilt_max_deg": 2.6918164940875045,
+    "max_reset_count": 0,
+    "max_abs_qvel": 1.4394987163828976
+  },
+  "duplicate_index_changed_token": {
+    "samples": 6,
+    "height_min_m": 0.7860892638643021,
+    "height_max_m": 0.786102986914062,
+    "tilt_max_deg": 2.655558121131031,
+    "max_reset_count": 0,
+    "max_abs_qvel": 0.006730537179940167
+  },
+  "older_index_changed_token": {
+    "samples": 12,
+    "height_min_m": 0.7861058043577681,
+    "height_max_m": 0.7861305914473756,
+    "tilt_max_deg": 2.6724601295275003,
+    "max_reset_count": 0,
+    "max_abs_qvel": 0.006063551936520602
+  },
+  "publisher_disconnected": {
+    "samples": 43,
+    "height_min_m": 0.7861317183443778,
+    "height_max_m": 0.7861532159411558,
+    "tilt_max_deg": 2.6683743117522503,
+    "max_reset_count": 0,
+    "max_abs_qvel": 0.0048309635306395225
+  },
+  "return_to_planner": {
+    "samples": 107,
+    "height_min_m": 0.786153892126483,
+    "height_max_m": 0.7876517553825534,
+    "tilt_max_deg": 2.6382191101370704,
+    "max_reset_count": 0,
+    "max_abs_qvel": 0.4849299150042023
+  },
+  "controller_stop": {
+    "samples": 108,
+    "height_min_m": 0.218199103523077,
+    "height_max_m": 0.7927547668488157,
+    "tilt_max_deg": 122.26812980885974,
+    "max_reset_count": 2,
+    "max_abs_qvel": 21.778498189177217
+  }
+}

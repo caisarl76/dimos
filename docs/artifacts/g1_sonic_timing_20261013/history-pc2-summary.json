@@ -1,0 +1,1347 @@
+{
+  "schema": "g1-dds-timing-audit-v1",
+  "started_utc_pc2": "2026-10-13T05:05:57.688676+00:00",
+  "requested_seconds": 8.0,
+  "duration_ns": 8042954928,
+  "stop_reason": "duration",
+  "interface": "enP8p1s0",
+  "domain": 0,
+  "creates_command_writers": false,
+  "qos": {
+    "Durability": {
+      "kind": "Volatile"
+    },
+    "History": {
+      "kind": "KeepLast",
+      "depth": 256
+    },
+    "Reliability": {
+      "kind": "BestEffort"
+    }
+  },
+  "record_limit": 20000,
+  "discarded_after_record_limit": 0,
+  "dds_status_counters": {
+    "body": {
+      "sample_lost": 0,
+      "sample_rejected": 0
+    },
+    "left_hand": {
+      "sample_lost": 0,
+      "sample_rejected": 0
+    },
+    "right_hand": {
+      "sample_lost": 0,
+      "sample_rejected": 0
+    }
+  },
+  "counter_limits": "Best-effort loss/history replacement may be unreported; zero is not proof of no loss",
+  "identities": {
+    "participants": {
+      "0110c31a-8851-8e6c-43b8-0787000001c1": {
+        "instance_handle": "5001550655214969040",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "localprocess"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "45639"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python"
+          }
+        }
+      },
+      "0110c31a-eb23-86bb-d609-b765000001c1": {
+        "instance_handle": "17142995206784730757",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "localprocess"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "45639"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python"
+          }
+        }
+      },
+      "01106302-dd63-0540-aa48-ba25000001c1": {
+        "instance_handle": "1114956598506130724",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7426@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36490"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "0110aa05-6d12-1c1f-973c-8d35000001c1": {
+        "instance_handle": "13198918612388722793",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:36705@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2932"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "robot_state_service"
+          }
+        }
+      },
+      "01104d07-a48b-71d5-0c75-8f66000001c1": {
+        "instance_handle": "2134871629093377216",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:43360@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "3059"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "xfkTon"
+          }
+        }
+      },
+      "0110e90e-40b6-40d7-8ba0-0e2f000001c1": {
+        "instance_handle": "7859140775182864267",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:52947@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2805"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "0110e90e-fc9c-6df1-bd20-a3a5000001c1": {
+        "instance_handle": "3328483600135512734",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:52947@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2805"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "0110f30e-8e30-effc-a92d-2d9f000001c1": {
+        "instance_handle": "13906813500086170854",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:53334@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2652"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "0110bd12-d81b-05f3-ce3b-2505000001c1": {
+        "instance_handle": "12880438186312762160",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7432@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36740"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "0110d712-68f4-14c6-7d9a-cbf5000001c1": {
+        "instance_handle": "16661647860835840457",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7430@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36629"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "01105c18-65c0-fbdd-6b37-0890000001c1": {
+        "instance_handle": "10777077112774183330",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7410@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36475"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "map_server"
+          }
+        }
+      },
+      "01105b1a-a9b5-4c11-cde5-350d000001c1": {
+        "instance_handle": "11524003563294685258",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:39762@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "42699"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "g1_deploy_onnx_ref"
+          }
+        }
+      },
+      "0110ff1d-2b91-bab8-dff7-8c00000001c1": {
+        "instance_handle": "17633921298833281510",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:56886@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2837"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "motion_switcher_service"
+          }
+        }
+      },
+      "01100f20-88c4-e1f6-d45e-ab7c000001c1": {
+        "instance_handle": "13814952432230277232",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7420@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36609"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "0110cc32-7628-3f3b-6377-683b000001c1": {
+        "instance_handle": "12495996411956335573",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7422@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36385"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "0110ec3a-4843-3abf-0a8a-450f000001c1": {
+        "instance_handle": "12557954648266569567",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7436@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36858"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python"
+          }
+        }
+      },
+      "0110b14a-82a0-574f-99b4-7a70000001c1": {
+        "instance_handle": "8218840031830358918",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:33824@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "35950"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "transform_publisher"
+          }
+        }
+      },
+      "01101f4b-6fda-7a4a-7fc3-8b3d000001c1": {
+        "instance_handle": "13907977095006121632",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:33206@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2681"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "01109d51-08e9-f474-af2a-d6c3000001c1": {
+        "instance_handle": "15522408521344718493",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7440@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37367"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "waypoint_follower"
+          }
+        }
+      },
+      "01109860-6ee3-4b70-a664-6688000001c1": {
+        "instance_handle": "7004059571676275989",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7446@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37365"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "bt_navigator"
+          }
+        }
+      },
+      "01104364-85e9-6929-9a17-337c000001c1": {
+        "instance_handle": "15816818613615249280",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:59024@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "3037"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "unitreeWebRTCClientMaster"
+          }
+        }
+      },
+      "0110d66f-1ea0-89df-2cdd-18d6000001c1": {
+        "instance_handle": "14976961631794234011",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7450@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37361"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "planner_server"
+          }
+        }
+      },
+      "0110c072-c7c9-b7ec-7142-4f0a000001c1": {
+        "instance_handle": "444029771339072868",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:54219@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2880"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "01101e75-12d5-2e0f-d5e6-b0f8000001c1": {
+        "instance_handle": "16616636544678139344",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:54520@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2569"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "basic_service"
+          }
+        }
+      },
+      "01107177-224c-d142-dfe8-aa8b000001c1": {
+        "instance_handle": "17003698655391967580",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7416@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36454"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "static_transform_publisher"
+          }
+        }
+      },
+      "01105c82-851e-b744-4579-d052000001c1": {
+        "instance_handle": "14739285823252784764",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7418@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36539"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "lifecycle_manager"
+          }
+        }
+      },
+      "01104c87-120d-2b15-0da0-e6d3000001c1": {
+        "instance_handle": "5721541432063667005",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:58397@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2817"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "LogStreamService"
+          }
+        }
+      },
+      "0110768d-64f0-0c11-619c-b9ab000001c1": {
+        "instance_handle": "3766841687193000282",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:54118@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2968"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "ai_odom_node"
+          }
+        }
+      },
+      "0110798d-e33f-6723-52e6-c643000001c1": {
+        "instance_handle": "15375590482883998232",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:33324@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2663"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "battery_guard"
+          }
+        }
+      },
+      "0110c790-e97b-7e4d-b1b3-e904000001c1": {
+        "instance_handle": "15481614482889911973",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:48900@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "3027"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "vui_service"
+          }
+        }
+      },
+      "0110f490-c61f-d134-b776-2237000001c1": {
+        "instance_handle": "4907115547195920615",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7414@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36453"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "static_transform_publisher"
+          }
+        }
+      },
+      "01107793-901c-190f-c489-f787000001c1": {
+        "instance_handle": "6055537645191546398",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7444@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37369"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "velocity_smoother"
+          }
+        }
+      },
+      "01108597-6ee8-a885-ad16-a12b000001c1": {
+        "instance_handle": "2965900199098636406",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:34984@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2763"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "g1_dex_protocol_v2.0"
+          }
+        }
+      },
+      "01107198-c052-e1f5-b0ff-4398000001c1": {
+        "instance_handle": "12165147319108961158",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7434@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37057"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "0110eea6-0f71-490f-e983-d933000001c1": {
+        "instance_handle": "4798252208369438683",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:50659@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2639"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "0110efac-ee45-e2ff-46c9-989c000001c1": {
+        "instance_handle": "5199096040090778119",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:44444@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "3378"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "lidar_driver"
+          }
+        }
+      },
+      "0110adae-9644-7f7c-6108-7599000001c1": {
+        "instance_handle": "4816111909354403133",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:39087@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2772"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "g1_dex_protocol_v2.0"
+          }
+        }
+      },
+      "0110eeaf-df77-8761-0683-1dac000001c1": {
+        "instance_handle": "2277470617279912518",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7428@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36591"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "011004bd-5d27-d9fb-c75d-9468000001c1": {
+        "instance_handle": "15187308614467895131",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:44584@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2941"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "robot_type_api_server"
+          }
+        }
+      },
+      "0110cbc3-aad9-4797-8e97-c6d6000001c1": {
+        "instance_handle": "11936089878226552224",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:57378@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "1"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "dds_bridge"
+          }
+        }
+      },
+      "011023cc-7575-a2b8-6fc2-d6a3000001c1": {
+        "instance_handle": "12780621764958259346",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7448@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37363"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "behavior_server"
+          }
+        }
+      },
+      "011001d0-4f96-1199-ed10-e047000001c1": {
+        "instance_handle": "14888817801698984841",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7452@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37371"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "lifecycle_manager"
+          }
+        }
+      },
+      "01104cd3-c506-b19e-e9d2-4ab1000001c1": {
+        "instance_handle": "17395488289289842552",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:44192@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36166"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "fastlio_mapping"
+          }
+        }
+      },
+      "01105fd5-fa1d-f902-4e45-9e68000001c1": {
+        "instance_handle": "1887845344285926724",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:53958@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "3398"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "unitree_slam"
+          }
+        }
+      },
+      "0110dcd7-4adb-d78a-a2be-d560000001c1": {
+        "instance_handle": "4526111226529385698",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:43560@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "1"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3"
+          }
+        }
+      },
+      "011075db-94e4-0d44-6841-b41f000001c1": {
+        "instance_handle": "383827480069844074",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7438@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37357"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "controller_server"
+          }
+        }
+      },
+      "0110d3e0-3e73-7caa-5889-0d99000001c1": {
+        "instance_handle": "3266525650832266713",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7412@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36085"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "d435_publisher_zmqrgb"
+          }
+        }
+      },
+      "01106de1-db8f-f790-dc02-5ac9000001c1": {
+        "instance_handle": "17349145696184069996",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7424@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "36306"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "01107ce3-a88c-d960-a83c-9242000001c1": {
+        "instance_handle": "16329258532460031374",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "Unitree"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.161:38761@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "2787"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "emergency_stop"
+          }
+        }
+      },
+      "01103bf7-672f-b114-ca77-673e000001c1": {
+        "instance_handle": "7418778426063870885",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:60402@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "35886"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "01101efe-12a0-fbe3-b712-1e4c000001c1": {
+        "instance_handle": "15502174836482305350",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:40729@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "35952"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "icp_node"
+          }
+        }
+      },
+      "011099ff-1adc-af3f-6da6-a551000001c1": {
+        "instance_handle": "11439762507233257346",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:58654@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "35833"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "python3.10"
+          }
+        }
+      },
+      "0110fcff-30f4-cb37-3dd9-67fb000001c1": {
+        "instance_handle": "6293080988683213794",
+        "metadata": {
+          "Property<__Hostname>": {
+            "key": "__Hostname",
+            "value": "unitree-g1-nx"
+          },
+          "Property<__NetworkAddresses>": {
+            "key": "__NetworkAddresses",
+            "value": "udp/239.255.0.1:7400@2,udp/192.168.123.164:7442@2"
+          },
+          "Property<__Pid>": {
+            "key": "__Pid",
+            "value": "37359"
+          },
+          "Property<__ProcessName>": {
+            "key": "__ProcessName",
+            "value": "smoother_server"
+          }
+        }
+      }
+    },
+    "publications": {
+      "01101e75-12d5-2e0f-d5e6-b0f800000203": {
+        "instance_handle": "3907431970384153552",
+        "metadata": {},
+        "participant": "01101e75-12d5-2e0f-d5e6-b0f8000001c1",
+        "topic": "rt/lowstate"
+      },
+      "0110cbc3-aad9-4797-8e97-c6d600000203": {
+        "instance_handle": "13014843405495554203",
+        "metadata": {},
+        "participant": "0110cbc3-aad9-4797-8e97-c6d6000001c1",
+        "topic": "rt/lowstate"
+      },
+      "01108597-6ee8-a885-ad16-a12b00000203": {
+        "instance_handle": "369636824008726510",
+        "metadata": {},
+        "participant": "01108597-6ee8-a885-ad16-a12b000001c1",
+        "topic": "rt/dex3/left/state"
+      },
+      "0110adae-9644-7f7c-6108-759900000203": {
+        "instance_handle": "14204215454361295321",
+        "metadata": {},
+        "participant": "0110adae-9644-7f7c-6108-7599000001c1",
+        "topic": "rt/dex3/right/state"
+      }
+    }
+  },
+  "installed_idl_fields": {
+    "LowState_": {
+      "version": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint32']], array[uint32, 2]]",
+      "mode_pr": "typing.Annotated[int, 'uint8']",
+      "mode_machine": "typing.Annotated[int, 'uint8']",
+      "tick": "typing.Annotated[int, 'uint32']",
+      "imu_state": "unitree_sdk2py.idl.unitree_hg.msg.dds_.IMUState_",
+      "motor_state": "typing.Annotated[typing.Sequence[ForwardRef('unitree_sdk2py.idl.unitree_hg.msg.dds_.MotorState_')], array[unitree_sdk2py.idl.unitree_hg.msg.dds_._MotorState_.MotorState_, 35]]",
+      "wireless_remote": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint8']], array[uint8, 40]]",
+      "reserve": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint32']], array[uint32, 4]]",
+      "crc": "typing.Annotated[int, 'uint32']"
+    },
+    "HandState_": {
+      "motor_state": "typing.Annotated[typing.Sequence[ForwardRef('unitree_sdk2py.idl.unitree_hg.msg.dds_.MotorState_')], sequence[unitree_sdk2py.idl.unitree_hg.msg.dds_._MotorState_.MotorState_]]",
+      "press_sensor_state": "typing.Annotated[typing.Sequence[ForwardRef('unitree_sdk2py.idl.unitree_hg.msg.dds_.PressSensorState_')], sequence[unitree_sdk2py.idl.unitree_hg.msg.dds_._PressSensorState_.PressSensorState_]]",
+      "imu_state": "unitree_sdk2py.idl.unitree_hg.msg.dds_.IMUState_",
+      "power_v": "typing.Annotated[float, 'float32']",
+      "power_a": "typing.Annotated[float, 'float32']",
+      "system_v": "typing.Annotated[float, 'float32']",
+      "device_v": "typing.Annotated[float, 'float32']",
+      "error": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint32']], array[uint32, 2]]",
+      "reserve": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint32']], array[uint32, 2]]"
+    },
+    "MotorState_": {
+      "mode": "typing.Annotated[int, 'uint8']",
+      "q": "typing.Annotated[float, 'float32']",
+      "dq": "typing.Annotated[float, 'float32']",
+      "ddq": "typing.Annotated[float, 'float32']",
+      "tau_est": "typing.Annotated[float, 'float32']",
+      "temperature": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'int16']], array[int16, 2]]",
+      "vol": "typing.Annotated[float, 'float32']",
+      "sensor": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint32']], array[uint32, 2]]",
+      "motorstate": "typing.Annotated[int, 'uint32']",
+      "reserve": "typing.Annotated[typing.Sequence[typing.Annotated[int, 'uint32']], array[uint32, 4]]"
+    }
+  },
+  "summary": {
+    "acquisition_alignment_verified": false,
+    "time_basis": "DDS source metadata and local take calls; sensor acquisition unverified",
+    "groups": {
+      "body": {
+        "valid_samples": 6736,
+        "invalid_samples": 0,
+        "observed_take_rate_hz": 837.5031391199162,
+        "publisher_transitions": 0,
+        "publishers": {
+          "3907431970384153552": {
+            "samples": 6736,
+            "missing_source_timestamps": 0,
+            "source_repeats": 0,
+            "source_regressions": 0,
+            "source_period_ms": {
+              "min": 0.527053,
+              "median": 0.993148,
+              "max": 78.874285
+            },
+            "source_after_local_take": 0,
+            "source_to_take_end_ms": {
+              "min": 6.46229,
+              "median": 243.1202865,
+              "max": 339.735054
+            },
+            "take_call_ms": {
+              "min": 13.794426,
+              "median": 34.226635,
+              "max": 101.857763
+            },
+            "wall_minus_monotonic_step_ms": {
+              "min": -0.000895,
+              "median": 0.0,
+              "max": 0.001215
+            },
+            "tick_samples": 6736,
+            "tick_repeats": 270,
+            "tick_decreases_wrap_or_reset": 0,
+            "tick_negative_step_modulo_2_32": [],
+            "tick_positive_step_range": [
+              1,
+              79
+            ]
+          }
+        }
+      },
+      "left_hand": {
+        "valid_samples": 6074,
+        "invalid_samples": 0,
+        "observed_take_rate_hz": 755.1950812075967,
+        "publisher_transitions": 0,
+        "publishers": {
+          "369636824008726510": {
+            "samples": 6074,
+            "missing_source_timestamps": 0,
+            "source_repeats": 0,
+            "source_regressions": 0,
+            "source_period_ms": {
+              "min": 0.116961,
+              "median": 1.339947,
+              "max": 16.900424
+            },
+            "source_after_local_take": 2,
+            "source_to_take_end_ms": {
+              "min": -1.855921,
+              "median": 64.814895,
+              "max": 175.388024
+            },
+            "take_call_ms": {
+              "min": 3.632691,
+              "median": 13.72226,
+              "max": 55.080829
+            },
+            "wall_minus_monotonic_step_ms": {
+              "min": -0.002081,
+              "median": 0.0,
+              "max": 0.001376
+            },
+            "tick_samples": 0,
+            "tick_repeats": 0,
+            "tick_decreases_wrap_or_reset": 0,
+            "tick_negative_step_modulo_2_32": [],
+            "tick_positive_step_range": null
+          }
+        }
+      },
+      "right_hand": {
+        "valid_samples": 6164,
+        "invalid_samples": 0,
+        "observed_take_rate_hz": 766.3849984464316,
+        "publisher_transitions": 0,
+        "publishers": {
+          "14204215454361295321": {
+            "samples": 6164,
+            "missing_source_timestamps": 0,
+            "source_repeats": 0,
+            "source_regressions": 0,
+            "source_period_ms": {
+              "min": 0.118127,
+              "median": 1.338197,
+              "max": 13.93294
+            },
+            "source_after_local_take": 6,
+            "source_to_take_end_ms": {
+              "min": -4.633213,
+              "median": 68.4172755,
+              "max": 168.43164
+            },
+            "take_call_ms": {
+              "min": 1.998341,
+              "median": 14.223989,
+              "max": 79.310984
+            },
+            "wall_minus_monotonic_step_ms": {
+              "min": -0.001088,
+              "median": 0.0,
+              "max": 0.001312
+            },
+            "tick_samples": 0,
+            "tick_repeats": 0,
+            "tick_decreases_wrap_or_reset": 0,
+            "tick_negative_step_modulo_2_32": [],
+            "tick_positive_step_range": null
+          }
+        }
+      }
+    }
+  }
+}

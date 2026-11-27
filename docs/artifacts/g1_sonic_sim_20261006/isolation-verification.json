@@ -1,0 +1,10 @@
+{
+  "verified_host_netns": "net:[4026531840]",
+  "run02_netns": "net:[4026533302]",
+  "interfaces": [
+    "lo"
+  ],
+  "namespace_creation": "unshare --user --map-root-user --net",
+  "launch_guard_comparison_netns": "net:[4026533448]",
+  "note": "The supplied --host-netns value in the raw launch manifest was captured inside the Codex restricted command environment. A subsequent unrestricted readlink verified the actual host namespace above. The trial used a newly created private namespace with only loopback, distinct from both; no physical interfaces or veth were attached."
+}

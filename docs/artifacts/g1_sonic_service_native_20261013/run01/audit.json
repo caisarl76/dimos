@@ -1,0 +1,126 @@
+{
+  "audit_passed": true,
+  "camera_frames": 338,
+  "cases": [
+    {
+      "scenario": "live",
+      "outcome": "finished",
+      "accepted_predictions": 17,
+      "discarded_predictions": 1,
+      "streaming_seconds": 6.000875259051099,
+      "handback_confirmed_s": 0.12140326295047998,
+      "source_age_range_s": [
+        0.042034622048959136,
+        0.11535780399572104
+      ],
+      "admission_age_range_s": [
+        0.35244100203271955,
+        0.4392441409872845
+      ],
+      "inference_roundtrip_range_s": [
+        0.30104047199711204,
+        0.3248367140768096
+      ],
+      "freeze_to_handback_s": null,
+      "unique_rgb": 18,
+      "unique_states": 18,
+      "native_applied_index_range": [
+        64,
+        343
+      ],
+      "arm_peak_rad_s": 3.517691135406494,
+      "physics": {
+        "samples": 499,
+        "minimum_pelvis_height_m": 0.7798367238020326,
+        "maximum_tilt_deg": 8.227222117472206,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "progress": 1.0
+    },
+    {
+      "scenario": "cancel",
+      "outcome": "cancelled",
+      "accepted_predictions": 5,
+      "discarded_predictions": 1,
+      "streaming_seconds": 1.5171131850220263,
+      "handback_confirmed_s": 0.2185235139913857,
+      "source_age_range_s": [
+        0.047474161023274064,
+        0.10879198496695608
+      ],
+      "admission_age_range_s": [
+        0.3568758590845391,
+        0.41797169495839626
+      ],
+      "inference_roundtrip_range_s": [
+        0.2992301440099254,
+        0.3203319900203496
+      ],
+      "freeze_to_handback_s": null,
+      "unique_rgb": 6,
+      "unique_states": 6,
+      "native_applied_index_range": [
+        409,
+        478
+      ],
+      "arm_peak_rad_s": 5.980698108673096,
+      "physics": {
+        "samples": 292,
+        "minimum_pelvis_height_m": 0.7842464816361288,
+        "maximum_tilt_deg": 6.955596485033981,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "progress": 0.2507628473298003
+    },
+    {
+      "scenario": "camera_loss",
+      "outcome": "failed",
+      "accepted_predictions": 6,
+      "discarded_predictions": 0,
+      "streaming_seconds": 2.193790088989772,
+      "handback_confirmed_s": 0.12659455800894648,
+      "source_age_range_s": [
+        0.05394235206767917,
+        0.12248664896469563
+      ],
+      "admission_age_range_s": [
+        0.36697112198453397,
+        0.4436765529680997
+      ],
+      "inference_roundtrip_range_s": [
+        0.29983697598800063,
+        0.3226186929969117
+      ],
+      "freeze_to_handback_s": 0.6782077320385724,
+      "unique_rgb": 6,
+      "unique_states": 6,
+      "native_applied_index_range": [
+        544,
+        645
+      ],
+      "arm_peak_rad_s": 2.934393882751465,
+      "physics": {
+        "samples": 318,
+        "minimum_pelvis_height_m": 0.7843136635437177,
+        "maximum_tilt_deg": 8.104366557561407,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "progress": 0.36597613332560286
+    }
+  ],
+  "renderer": "NVIDIA GeForce RTX 3060/PCIe/SSE2",
+  "evidence_sha256": {
+    "result.json": "68391e4fbed629eef88814483e615788c18b6c47ac2ab3c01419d7c61a222299",
+    "manifest.json": "d6d0c0dc109583888c1a09a417d29878b404cbf62e4e6fa7e5b38e2eae3b1b7c",
+    "policy-wire/policy-wire.jsonl": "efa00512606e5054aa99431fb68c4ef179978058e41a5f6eb70fa5b8ba235ea6",
+    "service-status.jsonl": "6cc16837f384bab7b9716406aa0fd909e19e71601dbc05e52530959ddace9938"
+  },
+  "limits": [
+    "nominal uncalibrated camera",
+    "empty scene; object success unverified",
+    "not hardware commissioning"
+  ]
+}

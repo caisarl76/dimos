@@ -1,0 +1,72 @@
+{
+  "recorded_at_utc": "2026-10-13T14:50:39.869066+00:00",
+  "scope": "Local supervised delivery-freshness prototype; acquisition age/skew unknown; no hardware service or motion commissioned.",
+  "checks": {
+    "sonic_regression": {
+      "passed": 366,
+      "new_cases": 39,
+      "exit_code": 0,
+      "log": "pytest.log"
+    },
+    "final_registry_and_budget_assertions": {
+      "passed": 6,
+      "exit_code": 0,
+      "log": "pytest-final.log",
+      "note": "Five registry checks and one updated service test; the latter is also counted in the SONIC suite."
+    },
+    "registry_generation": {
+      "exit_code": 1,
+      "log": "registry-generate.log",
+      "note": "Generator updated registry, then intentionally fails on uncommitted changes. Subsequent CI-mode content comparison passed. No commit was made."
+    },
+    "mypy": {
+      "source_files": 6,
+      "exit_code": 0,
+      "log": "mypy.log"
+    },
+    "ruff": {
+      "files": 9,
+      "exit_code": 0,
+      "log": "ruff.log"
+    },
+    "ruff_format": {
+      "files": 9,
+      "exit_code": 0,
+      "log": "ruff-format.log"
+    },
+    "git_diff_check": {
+      "exit_code": 0
+    },
+    "independent_source_review": {
+      "result": "No remaining material findings",
+      "record": "source-review.json"
+    },
+    "full_repository_suite": "Not run",
+    "existing_warning": "Pytest startup subprocess ResourceWarning remains in logs."
+  },
+  "hardware": {
+    "host": "192.168.0.222",
+    "preflight": "pc2-preflight.json",
+    "preflight_result": "g1_head_camera_server.py PID 15857 owns /dev/video4; no matching SONIC process observed in this bounded unprivileged snapshot.",
+    "paired_delivery_probe": "Not run: native camera already owned by another session.",
+    "actions": "Read-only process/device inventory only; no source installation, camera acquisition, policy inference, controller commands, process signals or mode changes on PC2."
+  },
+  "remaining": [
+    "Validate four live inputs through the adapter after arranging an idle camera or adapting the active server protocol.",
+    "Confirm physical hand mapping and bottle/tray camera framing.",
+    "Package chosen receivers into persistent deployment and choose timing budgets from deployment evidence.",
+    "Measure dropout recovery, commission a supervised service with a compatible policy, and verify object outcome separately."
+  ],
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_observation.py": "64d4900e6b162ba41addc8742099f744180d0248bccf38fc7c3b9a09ecc8a85b",
+    "dimos/robot/unitree/g1/sonic_delivery_observation.py": "b67d7af6987445cafa5f12dffaeab189aacb34ea861ac930628636c93328f56e",
+    "dimos/robot/unitree/g1/sonic_delivery_observation_module.py": "21701af32af9ff2bf2bd7fd4d554744f54ee0557a981c62dd88e100e2bf7e544",
+    "dimos/robot/unitree/g1/sonic_session.py": "c261b496e908bcfd1a5107bc8a25a357f991155e1a1fcfbfd214709d69427553",
+    "dimos/robot/unitree/g1/sonic_service_module.py": "467e434341f3e8fc435e72b4da16669fac79b10bfcaf586a711e2ffeb4861861",
+    "scripts/demo_g1_sonic_delivery.py": "92e9e62de95514c0fb50a10ac7fc4625755c14afa800761fbc32a9f499dca084",
+    "dimos/robot/unitree/g1/test_sonic_delivery_observation.py": "4efb38a4bd2fa2c2fbf35109dcff8a8b1e8c0b2a2f2bd1a32753723ba9e4e619",
+    "dimos/robot/unitree/g1/test_sonic_delivery_observation_module.py": "d760f145cb6608e0e934acfe46cc6d22c873e07eed4afc589820115307d5ee95",
+    "dimos/robot/unitree/g1/test_sonic_service_module.py": "42cf0431adb4684173a43084565ba9646a3dd29b9ced3409ed7edb2b5008428b",
+    "dimos/robot/all_blueprints.py": "b0a99acee08cd2eb59ca8a27d21a33f240bd0f5525d7e5080e544787578a3ffa"
+  }
+}

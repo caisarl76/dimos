@@ -1,0 +1,8 @@
+{
+  "finished_unix": 1791948945.8491673,
+  "native_binary_sha256": "c59a92204944d1fb242911dd5111ac8cb1a1144810809da05453f8ea9ac7d42e",
+  "original_source_changed": [],
+  "original_binary_sha256": "5526b184875f6f5e392cf6a5c95a8f55ab2d0a698177078a214db2231a0ec425",
+  "original_binary_unchanged": true,
+  "excluded_test": "FK.TestFKAndGlobalVelocities: original fixture reference/bones_072925_test absent"
+}

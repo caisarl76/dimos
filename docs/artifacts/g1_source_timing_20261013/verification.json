@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-13",
+  "milestone": "Read-only source provenance audit for hardware observations",
+  "result": "Actual vendor state publisher implementation and defensible acquisition bounds not established; external camera stamp/wire incompatibilities documented",
+  "scope": "Read-only SSH process/package/source reads and official documentation lookup",
+  "initial_process_check": {
+    "pc2_wall_time": 1791873826.6524537,
+    "sonic_pid": 7227,
+    "zmq_host": "192.168.0.62",
+    "matching_camera_processes": 0
+  },
+  "later_process_check": {
+    "pc2_wall_time": 1791877616.7327049,
+    "matching_processes": [],
+    "record": "pc2-source-inventory.json"
+  },
+  "actions_not_taken": [
+    "controller command or lifecycle operation",
+    "camera acquisition",
+    "policy inference",
+    "DDS writer",
+    "robot file edit or software installation",
+    "new observation contract implementation"
+  ],
+  "user_information": "Unitree publisher timing documentation/source not available or not known",
+  "pending_requirement": "Supervised delivery-freshness prototype versus verified acquisition-time bounds",
+  "checks": {
+    "captured_source_hashes": "verified against stored source text",
+    "package_inventories": "both bounded inventories finished without truncation",
+    "tests": "not rerun; no product code changed"
+  },
+  "limits": [
+    "Source capture does not attest a running binary",
+    "Inventory excludes build/install/log directories and is not an exhaustive system search",
+    "Process inventories are unprivileged snapshots and can change",
+    "Vendor documentation portal did not expose sufficient article content in browser",
+    "No hardware acquisition-time or delivery-time control readiness established"
+  ],
+  "sources": {
+    "/home/unitree/minji/physical_ai_agent/camera/src/d435_cpp/src/d435_publisher_zmqrgb.cpp": "c7e38919ac80336835f443759029e7b0946db4b15f7b016d282a9fc1c0382955",
+    "/home/unitree/minji/physical_ai_agent/camera/src/d435_cpp/package.xml": "dce619ba5a0ba69852ec7eed6f3f75c8fc955ac2fa67ba760a31327d93f51b07"
+  },
+  "primary_sources": [
+    "https://raw.githubusercontent.com/unitreerobotics/unitree_ros2/master/cyclonedds_ws/src/unitree/unitree_hg/msg/HandState.msg",
+    "https://raw.githubusercontent.com/unitreerobotics/unitree_ros2/master/cyclonedds_ws/src/unitree/unitree_hg/msg/LowState.msg",
+    "https://support.unitree.com/home/en/G1_developer/basic_services_interface",
+    "https://support.unitree.com/home/en/G1_developer/dexterous_hand"
+  ],
+  "artifact_sha256": {
+    "pc2-source-inventory.json": "4d818f447d49ce812452cca32998c68d7f0a8f865a3802df511efa49b854724a",
+    "pc2-publisher-files.json": "9ae630eb9c8bf6e42dc8608204ee2aed6961fb426cdff97dcef2120e4dfac814"
+  },
+  "documentation_sha256": "916d2939207da5e2ea071a25362641e64f1e35510ea73ff8ee26990a8f25a1af",
+  "lerobot_reference": {
+    "path": "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_policy_streamer.py",
+    "sha256": "e9e40f2e7e5c416b956bfe8a52941a5cf2258523e1972b24b866ccdef6dbb63d",
+    "inspected_methods": [
+      "LiveImages._recv",
+      "StateSubscriber.latest",
+      "StateSubscriber.age"
+    ],
+    "finding": "LiveImages decodes JSON/base64 images; the inspected external camera source sends MessagePack/binary JPEG"
+  },
+  "review": {
+    "agent": "observation_adapter_review",
+    "result": "No material inaccuracies found",
+    "scope": "New documentation section against captured PC2 source/package inventories; LeRobot comparison verified separately by the main agent from earlier source inspection",
+    "tests_run": false
+  }
+}

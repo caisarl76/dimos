@@ -1,0 +1,117 @@
+{
+  "scene": "/home/jihun/work/dimos_dev/docs/artifacts/g1_pick_place_20261009/scene.xml",
+  "scene_sha256": "c32b833c546cef12cab3df4155a705d3417db3dd7cfc7202c14dfc66cd48d71a",
+  "dimensions": {
+    "bottle_radius_m": 0.025,
+    "bottle_height_m": 0.16,
+    "bottle_mass_kg": 0.08,
+    "table_top_m": 0.7,
+    "tray_inner_dimensions_m": [
+      0.22,
+      0.18
+    ]
+  },
+  "robot_joint_and_actuator_mapping_preserved": true,
+  "initial_robot_environment_clearance_m_capped_0_1": 0.07493415456193339,
+  "camera": "unchanged nominal head_camera; physical extrinsics uncalibrated",
+  "ik_scope": "position-only static geometry probes; no trajectory or SONIC execution",
+  "waypoints": [
+    {
+      "name": "pregrasp",
+      "target_m": [
+        0.32,
+        -0.14,
+        0.82
+      ],
+      "error_m": 4.7541894947642765e-06,
+      "joints_rad": [
+        -0.05304806228752198,
+        -0.3964683466087438,
+        0.5199988349714338,
+        0.4098602768906319,
+        0.17807560766056743,
+        -0.6161901550295618,
+        -0.35492502027192746
+      ],
+      "robot_environment_clearance_m_capped_0_1": 0.07026853302901426
+    },
+    {
+      "name": "grasp_center",
+      "target_m": [
+        0.4,
+        -0.14,
+        0.8
+      ],
+      "error_m": 5.073240932432024e-06,
+      "joints_rad": [
+        -0.41537810153780175,
+        -0.31344550166199686,
+        0.4932217247984155,
+        0.7044953018076933,
+        0.2341374705647982,
+        -0.3020068669577119,
+        -0.28214937886981434
+      ],
+      "robot_environment_clearance_m_capped_0_1": 0.049417402594225
+    },
+    {
+      "name": "lift",
+      "target_m": [
+        0.4,
+        -0.14,
+        0.9
+      ],
+      "error_m": 1.9789690954864818e-06,
+      "joints_rad": [
+        -0.3739354228828266,
+        -0.3779881779574995,
+        0.4302076072168983,
+        0.47696016567789656,
+        0.20296635987365302,
+        -0.5269444893074207,
+        -0.3292449520393425
+      ],
+      "robot_environment_clearance_m_capped_0_1": 0.07699671421300511
+    },
+    {
+      "name": "above_tray",
+      "target_m": [
+        0.43,
+        0.14,
+        0.9
+      ],
+      "error_m": 4.398595425235308e-05,
+      "joints_rad": [
+        -1.16024958109536,
+        0.3016531264777646,
+        0.4652909538483585,
+        1.1906540638412024,
+        0.24383775126422144,
+        0.03288577285671086,
+        -0.08364017182303722
+      ],
+      "robot_environment_clearance_m_capped_0_1": 0.07699671421300511
+    }
+  ],
+  "visible_pixels": {
+    "bottle": {
+      "pixels": 6517,
+      "bbox_xyxy": [
+        423,
+        262,
+        504,
+        389
+      ]
+    },
+    "tray": {
+      "pixels": 39223,
+      "bbox_xyxy": [
+        66,
+        241,
+        284,
+        449
+      ]
+    }
+  },
+  "pass": true
+}

@@ -1,0 +1,73 @@
+{
+  "encoder_frames": 648,
+  "input_max_abs_error": 7.450580596923828e-09,
+  "input_blocks_max_abs_error": {
+    "positions": 0.0,
+    "velocities": 0.0,
+    "orientation": 7.450580596923828e-09,
+    "unused": 0.0
+  },
+  "input_within_1e_6": true,
+  "native_vs_cpu_exact_input": {
+    "max_abs_token_error": 0.0,
+    "frames_within_1e_6": 648,
+    "mismatches": []
+  },
+  "native_vs_cpu_reconstructed_input": {
+    "max_abs_token_error": 0.0,
+    "frames_within_1e_6": 648
+  },
+  "external_decoder_consumption": {
+    "ticks": 411,
+    "unmatched_ticks": [],
+    "matches_latest_preceding_sent_token": 411,
+    "scope": "After first 100 ms of streaming until publisher closure; token content, not packet identity",
+    "timestamp_limit": "Decoder trace timestamp is after inference/output; reference timestamp precedes socket send. Matching is content evidence, not exact consumption latency."
+  },
+  "reference_cadence": {
+    "frames": 414,
+    "median_period_ms": 19.99134599464014,
+    "max_period_ms": 52.73003497859463,
+    "mean_rate_hz": 49.815942137695636
+  },
+  "phase_measurements": {
+    "arm_hold": {
+      "samples_last_half_second": 25,
+      "measured_elbow_mean_rad": 1.0439418363571167,
+      "scaled_policy_action_mean_rad": 1.010426264128656,
+      "action_minus_measured_mean_rad": -0.03351557222846075
+    },
+    "elbow_reach": {
+      "samples_last_half_second": 25,
+      "measured_elbow_mean_rad": 1.0472626638412477,
+      "scaled_policy_action_mean_rad": 1.0399174479853928,
+      "action_minus_measured_mean_rad": -0.007345215855854823
+    },
+    "elbow_return": {
+      "samples_last_half_second": 26,
+      "measured_elbow_mean_rad": 1.00468844633836,
+      "scaled_policy_action_mean_rad": 0.9301014950724272,
+      "action_minus_measured_mean_rad": -0.07458695126593298
+    }
+  },
+  "reach": {
+    "target_rad": 1.1180493593215943,
+    "measured_rad": 1.048669457435608,
+    "absolute_error_rad": -0.06937990188598642,
+    "measured_delta_rad": 0.008477210998535156,
+    "delta_error_rad": -0.09152278900146485
+  },
+  "return": {
+    "target_rad": 1.0180493593215942,
+    "measured_rad": 1.0005252361297607,
+    "absolute_error_rad": -0.017524123191833496,
+    "change_from_measured_baseline_rad": -0.03966701030731201
+  },
+  "tracking_within_0_05_rad": false,
+  "limits": [
+    "Captured unloaded mode-0 inputs only, without upper-body overrides",
+    "Tokens may repeat across references; content matching is not a per-reference acknowledgment",
+    "Diagnostic logging changes control-loop workload",
+    "last_action is scaled policy output logged with state, not an independently captured DDS command"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "wall_time": 1791939798.8345788,
+  "processes": [
+    {
+      "pid": 9269,
+      "argv": ".venv/bin/python -u code/g1_head_camera_server.py --device /dev/video4 --name egocentric --width 640 --height 480 --publish-fps 30"
+    },
+    {
+      "pid": 9639,
+      "argv": "just run g1_deploy_onnx_ref enP8p1s0 policy/sonic_v1_1/model_decoder.onnx reference/example/ --obs-config policy/sonic_v1_1/observation_config.yaml --encoder-file policy/sonic_v1_1/model_encoder.onnx --planner-file planner/target_vel/V2/planner_sonic.onnx --input-type keyboard --output-type all --zmq-host localhost"
+    },
+    {
+      "pid": 9643,
+      "argv": "sh -cu ./target/release/g1_deploy_onnx_ref enP8p1s0 policy/sonic_v1_1/model_decoder.onnx reference/example/ --obs-config policy/sonic_v1_1/observation_config.yaml --encoder-file policy/sonic_v1_1/model_encoder.onnx --planner-file planner/target_vel/V2/planner_sonic.onnx --input-type keyboard --output-type all --zmq-host localhost"
+    },
+    {
+      "pid": 9644,
+      "argv": "./target/release/g1_deploy_onnx_ref enP8p1s0 policy/sonic_v1_1/model_decoder.onnx reference/example/ --obs-config policy/sonic_v1_1/observation_config.yaml --encoder-file policy/sonic_v1_1/model_encoder.onnx --planner-file planner/target_vel/V2/planner_sonic.onnx --input-type keyboard --output-type all --zmq-host localhost"
+    }
+  ],
+  "ports": "State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                                    \nLISTEN 0      128          0.0.0.0:22        0.0.0.0:*                                              \nLISTEN 0      4096         0.0.0.0:111       0.0.0.0:*                                              \nLISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*                                              \nLISTEN 0      100          0.0.0.0:5557      0.0.0.0:*    users:((\"g1_deploy_onnx_\",pid=9644,fd=51))\nLISTEN 0      100          0.0.0.0:5555      0.0.0.0:*    users:((\"python\",pid=9269,fd=10))         \nLISTEN 0      128             [::]:22           [::]:*                                              \nLISTEN 0      4096            [::]:111          [::]:*                                              \n",
+  "remaining_probe_overlays": [],
+  "reference_guard_source_hits": [],
+  "reference_guard_source_hit_count": 0
+}

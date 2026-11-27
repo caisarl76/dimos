@@ -1,0 +1,44 @@
+{
+  "samples": 31,
+  "maximum_position_error_m": 1.2390929552158322e-15,
+  "maximum_orientation_error_deg": 4.517745487845101e-06,
+  "joint_names": [
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_pitch_joint",
+    "left_wrist_yaw_joint"
+  ],
+  "joint_limits_rad": [
+    [
+      -3.0892,
+      2.6704
+    ],
+    [
+      -1.5882,
+      2.2515
+    ],
+    [
+      -2.618,
+      2.618
+    ],
+    [
+      -1.0472,
+      2.0944
+    ],
+    [
+      -1.97222,
+      1.97222
+    ],
+    [
+      -1.61443,
+      1.61443
+    ],
+    [
+      -1.61443,
+      1.61443
+    ]
+  ]
+}

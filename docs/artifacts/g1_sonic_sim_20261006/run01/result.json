@@ -1,0 +1,6 @@
+{
+  "status": "incomplete",
+  "events": [],
+  "checks": {},
+  "error": "RuntimeError: A simulation process exited; inspect logs"
+}

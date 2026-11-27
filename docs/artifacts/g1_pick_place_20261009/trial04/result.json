@@ -1,0 +1,1397 @@
+{
+  "status": "native_session_cases_completed",
+  "cases": [
+    {
+      "scenario": "live",
+      "started": 720727.247401763,
+      "running_started": 720728.318308745,
+      "ended": 720740.460965637,
+      "injection": null,
+      "handback_time": 720740.318928819,
+      "status": {
+        "task_id": "live",
+        "phase": "done",
+        "outcome": "finished",
+        "reason": "finish requested",
+        "handback_confirmed": true,
+        "last_frame_index": 647,
+        "last_chunk_sequence": 33
+      },
+      "post_handback_physics": {
+        "monotonic": 720743.448334516,
+        "sim_time": 22.474999999999813,
+        "pelvis": [
+          0.059670123098983285,
+          -0.06256051147504323,
+          0.7832806838279432
+        ],
+        "tilt_deg": 5.4505321269011375,
+        "band": false,
+        "automatic_resets": 0,
+        "setup_robot_resets": 1,
+        "task_reset_count": 1,
+        "kp": [
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          40.179237365722656,
+          28.501245498657227,
+          28.501245498657227,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453
+        ],
+        "kd": [
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          2.557889699935913,
+          1.8144457340240479,
+          1.8144457340240479,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012
+        ],
+        "qpos": [
+          0.059670123098983285,
+          -0.06256051147504323,
+          0.7832806838279432,
+          0.9920557473702407,
+          -0.011955471399415217,
+          -0.046019316604161496,
+          -0.11646752041911258,
+          0.1805262951150964,
+          0.06506684234728921,
+          0.1618956400175956,
+          0.14971919142867232,
+          -0.2279129209119843,
+          -0.04108056790641963,
+          0.006696248975914296,
+          -0.04808162691526507,
+          -0.22352725023888578,
+          0.2701172925375392,
+          -0.17616897183222754,
+          0.0022413201627232223,
+          0.09685150591158159,
+          0.04970912807981703,
+          0.1254709104534828,
+          -0.14456518173838953,
+          0.2258822662041065,
+          -0.2197554165865427,
+          0.8551797305287757,
+          0.04857023304448518,
+          -0.5340845022925652,
+          0.3143142281148373,
+          -0.09732199303691637,
+          -0.18008432668410485,
+          1.7455525493540274,
+          -0.14304633366302552,
+          -1.6126650394859172,
+          -1.5350121162191852,
+          -1.716996982982696,
+          0.05769568396004862,
+          -0.2662607468174473,
+          0.5459442448886764,
+          1.1057501700268364,
+          -0.34559406845665674,
+          0.3263071038195176,
+          -0.06675225106399407,
+          0.0036119406328945906,
+          -0.03569497976381027,
+          -1.7193108743274303,
+          1.56556739490456,
+          1.7185769420478847,
+          1.5709109601290812,
+          1.745671765790814,
+          0.39999868471493893,
+          -0.1399998139202504,
+          0.7799414836885515,
+          0.9999999934414137,
+          -1.5315618025026532e-07,
+          -8.278114206464604e-06,
+          0.00011423057345261213
+        ],
+        "max_abs_qvel": 0.2096774164406393,
+        "task": {
+          "time": 22.474999999999813,
+          "position_m": [
+            0.3999974624398652,
+            -0.13999926515360414,
+            0.7799414767034454
+          ],
+          "bottom_m": 0.6999406408138593,
+          "inside_tray": false,
+          "linear_speed_m_s": 0.00022657250606692147,
+          "angular_speed_rad_s": 0.003014774145826577,
+          "opposed_finger_contact": false,
+          "hand_contact": false,
+          "hand_clearance_m_capped_0_1": 0.1,
+          "table_support": true,
+          "tray_support": false,
+          "contacts": [
+            {
+              "geom": "task_table",
+              "body": "world",
+              "normal_force_n": 0.1508395702662614
+            },
+            {
+              "geom": "task_table",
+              "body": "world",
+              "normal_force_n": 0.1454914344361567
+            },
+            {
+              "geom": "task_table",
+              "body": "world",
+              "normal_force_n": 0.17153183114588202
+            },
+            {
+              "geom": "task_table",
+              "body": "world",
+              "normal_force_n": 0.14394593823461516
+            },
+            {
+              "geom": "task_table",
+              "body": "world",
+              "normal_force_n": 0.1730218116181702
+            }
+          ]
+        },
+        "mujoco_version": "3.8.1"
+      },
+      "passive_planner_confirmed": true,
+      "max_arm_speed_rad_s": 5.8942461013793945,
+      "max_hand_speed_rad_s": 2.5224483013153076,
+      "pose_timing": {
+        "packets": 648,
+        "median_gap_s": 0.020163564011454582,
+        "maximum_gap_s": 0.024668827070854604
+      },
+      "settling_window": {
+        "duration_s": 0.4995158329838887,
+        "samples": 26,
+        "max_gap_s": 0.021133441012352705,
+        "max_body_speed_rad_s": 0.027739612385630608
+      },
+      "physics_envelope": {
+        "samples": 785,
+        "minimum_pelvis_height_m": 0.7781170696600023,
+        "maximum_tilt_deg": 10.30472229763975,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "task_status": "waiting_lift",
+      "task_events": [
+        {
+          "time": 6.68999999999988,
+          "status": "waiting_lift"
+        }
+      ],
+      "task_success": false,
+      "task_metrics": {
+        "maximum_bottle_bottom_m": 0.6999410697258335,
+        "minimum_hand_bottle_distance_m": 0.02441145517547059,
+        "opposed_finger_contact_samples": 0,
+        "tray_support_samples": 0,
+        "bottle_contact_bodies": [
+          "world"
+        ]
+      },
+      "accepted_predictions": 34,
+      "inference_failed": false,
+      "injection_verified": true,
+      "passed": true
+    }
+  ],
+  "events": [
+    {
+      "event": "start_native_planner",
+      "monotonic": 720716.908751707,
+      "elapsed": 30.97752886696253
+    },
+    {
+      "event": "session_start",
+      "monotonic": 720727.249040397,
+      "elapsed": 41.31781748693902,
+      "scenario": "live"
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 720728.258991849,
+      "elapsed": 42.327768877963535,
+      "scenario": "live",
+      "task_id": "live",
+      "phase": "arming",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 50,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 720728.29923721,
+      "elapsed": 42.36801422794815,
+      "scenario": "live",
+      "task_id": "live",
+      "phase": "waiting_for_chunk",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 52,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "policy_started",
+      "monotonic": 720728.318491999,
+      "elapsed": 42.38726905104704,
+      "scenario": "live"
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720728.319452333,
+      "elapsed": 42.38822931202594,
+      "scenario": "live",
+      "sequence": 0,
+      "camera_sequence": 112,
+      "observed_at": 720728.227083697,
+      "observation_age": 0.09236735804006457
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 720728.625633359,
+      "elapsed": 42.69441039999947,
+      "scenario": "live",
+      "task_id": "live",
+      "phase": "running",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 68,
+      "last_chunk_sequence": 0
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720728.682753474,
+      "elapsed": 42.75153049698565,
+      "scenario": "live",
+      "sequence": 1,
+      "camera_sequence": 116,
+      "observed_at": 720728.642109578,
+      "observation_age": 0.040642273030243814
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720729.025137813,
+      "elapsed": 43.09391484502703,
+      "scenario": "live",
+      "sequence": 2,
+      "camera_sequence": 119,
+      "observed_at": 720728.949346777,
+      "observation_age": 0.07578939397353679
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720729.388044759,
+      "elapsed": 43.45682180800941,
+      "scenario": "live",
+      "sequence": 3,
+      "camera_sequence": 123,
+      "observed_at": 720729.34360882,
+      "observation_age": 0.04443273402284831
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720729.730940437,
+      "elapsed": 43.799717454006895,
+      "scenario": "live",
+      "sequence": 4,
+      "camera_sequence": 126,
+      "observed_at": 720729.650661052,
+      "observation_age": 0.08027855004183948
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720730.074496323,
+      "elapsed": 44.14327330503147,
+      "scenario": "live",
+      "sequence": 5,
+      "camera_sequence": 129,
+      "observed_at": 720729.958517894,
+      "observation_age": 0.11597679392434657
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720730.437160371,
+      "elapsed": 44.505937317037024,
+      "scenario": "live",
+      "sequence": 6,
+      "camera_sequence": 133,
+      "observed_at": 720730.369132607,
+      "observation_age": 0.0680267889983952
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720730.780499433,
+      "elapsed": 44.84927639795933,
+      "scenario": "live",
+      "sequence": 7,
+      "camera_sequence": 136,
+      "observed_at": 720730.655953243,
+      "observation_age": 0.12454452703241259
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720731.122722493,
+      "elapsed": 45.19149952894077,
+      "scenario": "live",
+      "sequence": 8,
+      "camera_sequence": 140,
+      "observed_at": 720731.06568071,
+      "observation_age": 0.05704099696595222
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720731.485778597,
+      "elapsed": 45.554555622977205,
+      "scenario": "live",
+      "sequence": 9,
+      "camera_sequence": 143,
+      "observed_at": 720731.379692769,
+      "observation_age": 0.1060848810011521
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720731.828611981,
+      "elapsed": 45.897388993995264,
+      "scenario": "live",
+      "sequence": 10,
+      "camera_sequence": 147,
+      "observed_at": 720731.769269853,
+      "observation_age": 0.059341221931390464
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720732.171510628,
+      "elapsed": 46.24028767796699,
+      "scenario": "live",
+      "sequence": 11,
+      "camera_sequence": 150,
+      "observed_at": 720732.078100484,
+      "observation_age": 0.09340922301635146
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720732.535031444,
+      "elapsed": 46.60380845901091,
+      "scenario": "live",
+      "sequence": 12,
+      "camera_sequence": 154,
+      "observed_at": 720732.48805946,
+      "observation_age": 0.04697104706428945
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720732.877620161,
+      "elapsed": 46.946397145977244,
+      "scenario": "live",
+      "sequence": 13,
+      "camera_sequence": 157,
+      "observed_at": 720732.795267765,
+      "observation_age": 0.08235165604855865
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720733.220594889,
+      "elapsed": 47.28937193099409,
+      "scenario": "live",
+      "sequence": 14,
+      "camera_sequence": 161,
+      "observed_at": 720733.18529721,
+      "observation_age": 0.03529641299974173
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720733.583450257,
+      "elapsed": 47.652227201033384,
+      "scenario": "live",
+      "sequence": 15,
+      "camera_sequence": 164,
+      "observed_at": 720733.493066254,
+      "observation_age": 0.09038303105626255
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720733.926138832,
+      "elapsed": 47.994915853021666,
+      "scenario": "live",
+      "sequence": 16,
+      "camera_sequence": 168,
+      "observed_at": 720733.902118477,
+      "observation_age": 0.024019017932005227
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720734.288990596,
+      "elapsed": 48.35776754200924,
+      "scenario": "live",
+      "sequence": 17,
+      "camera_sequence": 171,
+      "observed_at": 720734.209621197,
+      "observation_age": 0.07936820399481803
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720734.63242761,
+      "elapsed": 48.70120464102365,
+      "scenario": "live",
+      "sequence": 18,
+      "camera_sequence": 175,
+      "observed_at": 720734.59887163,
+      "observation_age": 0.03355490998364985
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720734.975246256,
+      "elapsed": 49.04402329097502,
+      "scenario": "live",
+      "sequence": 19,
+      "camera_sequence": 178,
+      "observed_at": 720734.911635759,
+      "observation_age": 0.06360956898424774
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720735.338048973,
+      "elapsed": 49.406825994024985,
+      "scenario": "live",
+      "sequence": 20,
+      "camera_sequence": 182,
+      "observed_at": 720735.30629436,
+      "observation_age": 0.03175367205403745
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720735.680956117,
+      "elapsed": 49.74973306199536,
+      "scenario": "live",
+      "sequence": 21,
+      "camera_sequence": 185,
+      "observed_at": 720735.614332056,
+      "observation_age": 0.06662313803099096
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720736.023716788,
+      "elapsed": 50.09249380999245,
+      "scenario": "live",
+      "sequence": 22,
+      "camera_sequence": 188,
+      "observed_at": 720735.921166087,
+      "observation_age": 0.10254979692399502
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720736.386464812,
+      "elapsed": 50.45524183800444,
+      "scenario": "live",
+      "sequence": 23,
+      "camera_sequence": 192,
+      "observed_at": 720736.331271012,
+      "observation_age": 0.05519300606101751
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720736.729483116,
+      "elapsed": 50.798260131967254,
+      "scenario": "live",
+      "sequence": 24,
+      "camera_sequence": 195,
+      "observed_at": 720736.619250687,
+      "observation_age": 0.11023156100418419
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720737.072869559,
+      "elapsed": 51.14164650300518,
+      "scenario": "live",
+      "sequence": 25,
+      "camera_sequence": 199,
+      "observed_at": 720737.02937538,
+      "observation_age": 0.04349277797155082
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720737.436091357,
+      "elapsed": 51.504868375952356,
+      "scenario": "live",
+      "sequence": 26,
+      "camera_sequence": 202,
+      "observed_at": 720737.337273936,
+      "observation_age": 0.09881594695616513
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720737.778962328,
+      "elapsed": 51.84773934993427,
+      "scenario": "live",
+      "sequence": 27,
+      "camera_sequence": 206,
+      "observed_at": 720737.74713689,
+      "observation_age": 0.031824028003029525
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720738.121706407,
+      "elapsed": 52.190483351936564,
+      "scenario": "live",
+      "sequence": 28,
+      "camera_sequence": 209,
+      "observed_at": 720738.054666942,
+      "observation_age": 0.06703841197304428
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720738.484521323,
+      "elapsed": 52.55329835996963,
+      "scenario": "live",
+      "sequence": 29,
+      "camera_sequence": 213,
+      "observed_at": 720738.454906323,
+      "observation_age": 0.029614116996526718
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720738.827296338,
+      "elapsed": 52.89607328095008,
+      "scenario": "live",
+      "sequence": 30,
+      "camera_sequence": 216,
+      "observed_at": 720738.758130246,
+      "observation_age": 0.06916517298668623
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720739.170192278,
+      "elapsed": 53.23896934604272,
+      "scenario": "live",
+      "sequence": 31,
+      "camera_sequence": 219,
+      "observed_at": 720739.05033785,
+      "observation_age": 0.11985341703984886
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720739.533821336,
+      "elapsed": 53.60259829193819,
+      "scenario": "live",
+      "sequence": 32,
+      "camera_sequence": 223,
+      "observed_at": 720739.467090547,
+      "observation_age": 0.06672989600338042
+    },
+    {
+      "event": "inference_requested",
+      "monotonic": 720739.877914009,
+      "elapsed": 53.946691088960506,
+      "scenario": "live",
+      "sequence": 33,
+      "camera_sequence": 226,
+      "observed_at": 720739.759695361,
+      "observation_age": 0.11821753694675863
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 720740.319934754,
+      "elapsed": 54.38871180603746,
+      "scenario": "live",
+      "task_id": "live",
+      "phase": "handback",
+      "outcome": "finished",
+      "reason": "finish requested",
+      "handback_confirmed": false,
+      "last_frame_index": 647,
+      "last_chunk_sequence": 33
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 720740.460945887,
+      "elapsed": 54.529722937964834,
+      "scenario": "live",
+      "task_id": "live",
+      "phase": "done",
+      "outcome": "finished",
+      "reason": "finish requested",
+      "handback_confirmed": true,
+      "last_frame_index": 647,
+      "last_chunk_sequence": 33
+    },
+    {
+      "event": "case_complete",
+      "monotonic": 720743.573699981,
+      "elapsed": 57.64247742597945,
+      "scenario": "live",
+      "passed": true,
+      "status": {
+        "task_id": "live",
+        "phase": "done",
+        "outcome": "finished",
+        "reason": "finish requested",
+        "handback_confirmed": true,
+        "last_frame_index": 647,
+        "last_chunk_sequence": 33
+      }
+    }
+  ],
+  "baseline_physics": {
+    "monotonic": 720726.228719091,
+    "sim_time": 5.679999999999901,
+    "pelvis": [
+      0.05977225540485842,
+      -0.06588035553028072,
+      0.7829058530496523
+    ],
+    "tilt_deg": 4.866838535511198,
+    "band": false,
+    "automatic_resets": 0,
+    "setup_robot_resets": 1,
+    "task_reset_count": 1,
+    "kp": [
+      99.09842681884766,
+      99.09842681884766,
+      40.179237365722656,
+      99.09842681884766,
+      28.501245498657227,
+      28.501245498657227,
+      99.09842681884766,
+      99.09842681884766,
+      40.179237365722656,
+      99.09842681884766,
+      28.501245498657227,
+      28.501245498657227,
+      40.179237365722656,
+      28.501245498657227,
+      28.501245498657227,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      16.77832794189453,
+      16.77832794189453,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      16.77832794189453,
+      16.77832794189453
+    ],
+    "kd": [
+      6.308801651000977,
+      6.308801651000977,
+      2.557889699935913,
+      6.308801651000977,
+      1.8144457340240479,
+      1.8144457340240479,
+      6.308801651000977,
+      6.308801651000977,
+      2.557889699935913,
+      6.308801651000977,
+      1.8144457340240479,
+      1.8144457340240479,
+      2.557889699935913,
+      1.8144457340240479,
+      1.8144457340240479,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      1.0681414604187012,
+      1.0681414604187012,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      1.0681414604187012,
+      1.0681414604187012
+    ],
+    "qpos": [
+      0.05977225540485842,
+      -0.06588035553028072,
+      0.7829058530496523,
+      0.9990970575183181,
+      0.00026690742374203884,
+      -0.042457572254580626,
+      -0.0015339416265792783,
+      0.16326209925034912,
+      0.09104404679556835,
+      0.23492812582413483,
+      0.1531601673582815,
+      -0.20702178917782524,
+      -0.07156480956804515,
+      0.03889450744479155,
+      -0.08380771113809474,
+      -0.15261154636478805,
+      0.2727793252469836,
+      -0.21566269300501692,
+      0.04866562703584231,
+      0.05685161822684175,
+      0.02373402497118424,
+      0.13566768710995122,
+      -0.17060858661726794,
+      0.20968789425256348,
+      -0.2030748504436492,
+      0.7955664349225343,
+      0.18832975508746874,
+      -0.501712232326663,
+      0.32505866509097225,
+      -0.02979606128573901,
+      0.001875313147073433,
+      1.7456705854151058,
+      -1.2345546181192022,
+      -1.734900282427112,
+      -1.54804171645655,
+      -1.7281294510665153,
+      0.08225037511669499,
+      -0.25049140337977044,
+      0.479574249622001,
+      1.0624070014238465,
+      -0.39922362195450994,
+      0.34440918953695604,
+      -0.028788641912525215,
+      0.0001224177011463053,
+      -0.010256125722453286,
+      -1.7277907373886974,
+      1.5352721340348514,
+      1.7276991034789235,
+      1.5594786414132507,
+      1.745424385153496,
+      0.3999982910393631,
+      -0.14000027258122938,
+      0.7799414863848483,
+      0.999999999929629,
+      1.7970178399205636e-06,
+      -1.0930404406253065e-05,
+      4.2472804989392665e-06
+    ],
+    "max_abs_qvel": 0.02334383235005003,
+    "task": {
+      "time": 5.679999999999901,
+      "position_m": [
+        0.39999867039834736,
+        -0.1399999706458472,
+        0.7799414836884012
+      ],
+      "bottom_m": 0.6999410697225564,
+      "inside_tray": false,
+      "linear_speed_m_s": 0.0002679662815747282,
+      "angular_speed_rad_s": 0.0035228008449008446,
+      "opposed_finger_contact": false,
+      "hand_contact": false,
+      "hand_clearance_m_capped_0_1": 0.1,
+      "table_support": true,
+      "tray_support": false,
+      "contacts": [
+        {
+          "geom": "task_table",
+          "body": "world",
+          "normal_force_n": 0.15332426894635795
+        },
+        {
+          "geom": "task_table",
+          "body": "world",
+          "normal_force_n": 0.17182885007651244
+        },
+        {
+          "geom": "task_table",
+          "body": "world",
+          "normal_force_n": 0.1439190374277223
+        },
+        {
+          "geom": "task_table",
+          "body": "world",
+          "normal_force_n": 0.1574029731976584
+        },
+        {
+          "geom": "task_table",
+          "body": "world",
+          "normal_force_n": 0.15831146308168778
+        }
+      ]
+    },
+    "mujoco_version": "3.8.1"
+  },
+  "task_setup": {
+    "monotonic": 720725.412266959,
+    "sim_time": 4.879999999999918,
+    "reason": "initial source placement before task scoring"
+  },
+  "warmups": [
+    0.3522270849207416,
+    0.30747475707903504,
+    0.3008515399415046
+  ],
+  "cleanup_planner_confirmed": true,
+  "child_exit_codes": [
+    0,
+    0,
+    0
+  ],
+  "children_reaped": true,
+  "policy_requests": [
+    {
+      "sequence": 0,
+      "scenario": "live",
+      "camera_sequence": 112,
+      "observed_at": 720728.227083697,
+      "received_at": 720728.62077627,
+      "observation_age_s": 0.39369257306680083,
+      "server_latency_s": 0.2882282920181751,
+      "roundtrip_s": 0.29053906397894025,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 1,
+      "scenario": "live",
+      "camera_sequence": 116,
+      "observed_at": 720728.642109578,
+      "received_at": 720729.003926502,
+      "observation_age_s": 0.36181692394893616,
+      "server_latency_s": 0.30088048696052283,
+      "roundtrip_s": 0.3030495159327984,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 2,
+      "scenario": "live",
+      "camera_sequence": 119,
+      "observed_at": 720728.949346777,
+      "received_at": 720729.326467666,
+      "observation_age_s": 0.3771208889083937,
+      "server_latency_s": 0.28890145698096603,
+      "roundtrip_s": 0.2909903390100226,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 3,
+      "scenario": "live",
+      "camera_sequence": 123,
+      "observed_at": 720729.34360882,
+      "received_at": 720729.68941866,
+      "observation_age_s": 0.3458098400151357,
+      "server_latency_s": 0.2881980260135606,
+      "roundtrip_s": 0.29026979696936905,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 4,
+      "scenario": "live",
+      "camera_sequence": 126,
+      "observed_at": 720729.650661052,
+      "received_at": 720730.053123714,
+      "observation_age_s": 0.40246266208123416,
+      "server_latency_s": 0.3052847699727863,
+      "roundtrip_s": 0.3073747910093516,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 5,
+      "scenario": "live",
+      "camera_sequence": 129,
+      "observed_at": 720729.958517894,
+      "received_at": 720730.375715161,
+      "observation_age_s": 0.41719726694282144,
+      "server_latency_s": 0.2874936449807137,
+      "roundtrip_s": 0.28961992100812495,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 6,
+      "scenario": "live",
+      "camera_sequence": 133,
+      "observed_at": 720730.369132607,
+      "received_at": 720730.758751948,
+      "observation_age_s": 0.38961934100370854,
+      "server_latency_s": 0.29068118007853627,
+      "roundtrip_s": 0.29280847997870296,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 7,
+      "scenario": "live",
+      "camera_sequence": 136,
+      "observed_at": 720730.655953243,
+      "received_at": 720731.101534779,
+      "observation_age_s": 0.44558153592515737,
+      "server_latency_s": 0.3006367109483108,
+      "roundtrip_s": 0.3028454079758376,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 8,
+      "scenario": "live",
+      "camera_sequence": 140,
+      "observed_at": 720731.06568071,
+      "received_at": 720731.444437032,
+      "observation_age_s": 0.3787563219666481,
+      "server_latency_s": 0.30142647202592343,
+      "roundtrip_s": 0.3034837240120396,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 9,
+      "scenario": "live",
+      "camera_sequence": 143,
+      "observed_at": 720731.379692769,
+      "received_at": 720731.807304086,
+      "observation_age_s": 0.4276113170199096,
+      "server_latency_s": 0.29821308702230453,
+      "roundtrip_s": 0.3004213289823383,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 10,
+      "scenario": "live",
+      "camera_sequence": 147,
+      "observed_at": 720731.769269853,
+      "received_at": 720732.150289915,
+      "observation_age_s": 0.3810200620209798,
+      "server_latency_s": 0.30401388206519186,
+      "roundtrip_s": 0.306331082014367,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 11,
+      "scenario": "live",
+      "camera_sequence": 150,
+      "observed_at": 720732.078100484,
+      "received_at": 720732.473374928,
+      "observation_age_s": 0.3952744440175593,
+      "server_latency_s": 0.2874634809559211,
+      "roundtrip_s": 0.28971360495779663,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 12,
+      "scenario": "live",
+      "camera_sequence": 154,
+      "observed_at": 720732.48805946,
+      "received_at": 720732.836295723,
+      "observation_age_s": 0.34823626303113997,
+      "server_latency_s": 0.2869321189355105,
+      "roundtrip_s": 0.28913559403736144,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 13,
+      "scenario": "live",
+      "camera_sequence": 157,
+      "observed_at": 720732.795267765,
+      "received_at": 720733.19928887,
+      "observation_age_s": 0.40402110503055155,
+      "server_latency_s": 0.3030629629502073,
+      "roundtrip_s": 0.30517966696061194,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 14,
+      "scenario": "live",
+      "camera_sequence": 161,
+      "observed_at": 720733.18529721,
+      "received_at": 720733.542016312,
+      "observation_age_s": 0.3567191020119935,
+      "server_latency_s": 0.29539802693761885,
+      "roundtrip_s": 0.29749179095961154,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 15,
+      "scenario": "live",
+      "camera_sequence": 164,
+      "observed_at": 720733.493066254,
+      "received_at": 720733.884814932,
+      "observation_age_s": 0.3917486780555919,
+      "server_latency_s": 0.2901015770621598,
+      "roundtrip_s": 0.2920802199514583,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 16,
+      "scenario": "live",
+      "camera_sequence": 168,
+      "observed_at": 720733.902118477,
+      "received_at": 720734.247651191,
+      "observation_age_s": 0.3455327139236033,
+      "server_latency_s": 0.3001736010191962,
+      "roundtrip_s": 0.3022260289872065,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 17,
+      "scenario": "live",
+      "camera_sequence": 171,
+      "observed_at": 720734.209621197,
+      "received_at": 720734.59111021,
+      "observation_age_s": 0.38148901308886707,
+      "server_latency_s": 0.28819631796795875,
+      "roundtrip_s": 0.2903592740185559,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 18,
+      "scenario": "live",
+      "camera_sequence": 175,
+      "observed_at": 720734.59887163,
+      "received_at": 720734.933845683,
+      "observation_age_s": 0.33497405296657234,
+      "server_latency_s": 0.28677748900372535,
+      "roundtrip_s": 0.2889153059804812,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 19,
+      "scenario": "live",
+      "camera_sequence": 178,
+      "observed_at": 720734.911635759,
+      "received_at": 720735.296716673,
+      "observation_age_s": 0.3850809138966724,
+      "server_latency_s": 0.30318323301617056,
+      "roundtrip_s": 0.3052151019219309,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 20,
+      "scenario": "live",
+      "camera_sequence": 182,
+      "observed_at": 720735.30629436,
+      "received_at": 720735.639475372,
+      "observation_age_s": 0.3331810120726004,
+      "server_latency_s": 0.28888911998365074,
+      "roundtrip_s": 0.2910076139960438,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 21,
+      "scenario": "live",
+      "camera_sequence": 185,
+      "observed_at": 720735.614332056,
+      "received_at": 720735.982250442,
+      "observation_age_s": 0.36791838600765914,
+      "server_latency_s": 0.2878742979373783,
+      "roundtrip_s": 0.2900884159607813,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 22,
+      "scenario": "live",
+      "camera_sequence": 188,
+      "observed_at": 720735.921166087,
+      "received_at": 720736.345118931,
+      "observation_age_s": 0.4239528439939022,
+      "server_latency_s": 0.30141870595980436,
+      "roundtrip_s": 0.30365568201523274,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 23,
+      "scenario": "live",
+      "camera_sequence": 192,
+      "observed_at": 720736.331271012,
+      "received_at": 720736.708185672,
+      "observation_age_s": 0.3769146599806845,
+      "server_latency_s": 0.29818658996373415,
+      "roundtrip_s": 0.30027825804427266,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 24,
+      "scenario": "live",
+      "camera_sequence": 195,
+      "observed_at": 720736.619250687,
+      "received_at": 720737.051719794,
+      "observation_age_s": 0.4324691070942208,
+      "server_latency_s": 0.2908340790309012,
+      "roundtrip_s": 0.2931614570552483,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 25,
+      "scenario": "live",
+      "camera_sequence": 199,
+      "observed_at": 720737.02937538,
+      "received_at": 720737.394655194,
+      "observation_age_s": 0.36527981399558485,
+      "server_latency_s": 0.3009680110262707,
+      "roundtrip_s": 0.3031286499463022,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 26,
+      "scenario": "live",
+      "camera_sequence": 202,
+      "observed_at": 720737.337273936,
+      "received_at": 720737.73744958,
+      "observation_age_s": 0.4001756439683959,
+      "server_latency_s": 0.2877251959871501,
+      "roundtrip_s": 0.28973167191725224,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 27,
+      "scenario": "live",
+      "camera_sequence": 206,
+      "observed_at": 720737.74713689,
+      "received_at": 720738.100358412,
+      "observation_age_s": 0.35322152206208557,
+      "server_latency_s": 0.3033518339507282,
+      "roundtrip_s": 0.3054741070372984,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 28,
+      "scenario": "live",
+      "camera_sequence": 209,
+      "observed_at": 720738.054666942,
+      "received_at": 720738.443173672,
+      "observation_age_s": 0.38850672997068614,
+      "server_latency_s": 0.3065594380022958,
+      "roundtrip_s": 0.3087779820198193,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 29,
+      "scenario": "live",
+      "camera_sequence": 213,
+      "observed_at": 720738.454906323,
+      "received_at": 720738.806074676,
+      "observation_age_s": 0.3511683529941365,
+      "server_latency_s": 0.2912135550286621,
+      "roundtrip_s": 0.29314713296480477,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 30,
+      "scenario": "live",
+      "camera_sequence": 216,
+      "observed_at": 720738.758130246,
+      "received_at": 720739.148858591,
+      "observation_age_s": 0.39072834502439946,
+      "server_latency_s": 0.3021107369568199,
+      "roundtrip_s": 0.30407289892900735,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 31,
+      "scenario": "live",
+      "camera_sequence": 219,
+      "observed_at": 720739.05033785,
+      "received_at": 720739.512603583,
+      "observation_age_s": 0.4622657330473885,
+      "server_latency_s": 0.3279708169866353,
+      "roundtrip_s": 0.3303208880824968,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 32,
+      "scenario": "live",
+      "camera_sequence": 223,
+      "observed_at": 720739.467090547,
+      "received_at": 720739.875462827,
+      "observation_age_s": 0.4083722800714895,
+      "server_latency_s": 0.3162433640100062,
+      "roundtrip_s": 0.3186567008960992,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    },
+    {
+      "sequence": 33,
+      "scenario": "live",
+      "camera_sequence": 226,
+      "observed_at": 720739.759695361,
+      "received_at": 720740.197956252,
+      "observation_age_s": 0.43826089100912213,
+      "server_latency_s": 0.2982584519777447,
+      "roundtrip_s": 0.3003957220353186,
+      "shape": [
+        50,
+        78
+      ],
+      "accepted": true
+    }
+  ],
+  "accepted_predictions": 34,
+  "cleanup_passed": true
+}

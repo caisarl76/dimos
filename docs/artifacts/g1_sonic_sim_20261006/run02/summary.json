@@ -1,0 +1,25 @@
+{
+  "scope": "one stationary SONIC MuJoCo trial; not manipulation or hardware qualification",
+  "controller_binary_sha256": "eaaeb1c61e8285e7c08f071c4bec40955effd3e9d561318b9ea7c126c8c138d4",
+  "stream_to_handback_physics": {
+    "samples": 212,
+    "height_min_m": 0.7860423225008285,
+    "height_max_m": 0.7876517553825534,
+    "tilt_max_deg": 2.6918164940875045,
+    "automatic_resets": 0
+  },
+  "duplicate_index_token_accepted": true,
+  "older_index_token_accepted": true,
+  "publisher_loss": {
+    "observed_samples": 101,
+    "token_error": 0.0,
+    "feedback_state": "fresh"
+  },
+  "shutdown": {
+    "controller_exit": 0,
+    "feedback_state": "stale",
+    "feedback_age_at_check_s": 5.538295787991956,
+    "first_observed_body_damping_after_stop_request_s": 0.12036960996920243,
+    "automatic_resets": 2
+  }
+}

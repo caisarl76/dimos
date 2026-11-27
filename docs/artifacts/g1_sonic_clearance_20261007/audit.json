@@ -1,0 +1,442 @@
+[
+  {
+    "trial": "cycle01",
+    "status": "failed",
+    "error": "RuntimeError: Preparation did not establish 20 mm hand clearance and bounded speeds for 0.5 s",
+    "cycle_exercised": false,
+    "fault_handback_confirmed": true
+  },
+  {
+    "trial": "cycle02",
+    "outcome": "SUCCEEDED",
+    "trial_status": "failed",
+    "trial_error": "TimeoutError: No measured settling interval within six seconds",
+    "duration_s": 8.792633831966668,
+    "existing_cycle_audit": {
+      "not_run": "TimeoutError: No measured settling interval within six seconds"
+    },
+    "clearance_checks": {
+      "ready_interval_at_least_half_second": true,
+      "ready_recorded_coverage_and_gaps": true,
+      "ready_all_physics_clear": true,
+      "ready_all_feedback_qualified": true,
+      "cycle_all_recorded_clearance_above_10mm": true,
+      "geometry_sample_gaps_below_80ms": true,
+      "distance_query_cap_recorded": true
+    },
+    "minimum_query_capped_clearance_m": {
+      "left": 0.02,
+      "right": 0.02
+    },
+    "peak_arm_speed_rad_s": 0.29766443371772766,
+    "peak_arm_motor": 18,
+    "hand_frame_note": "wrist_yaw_link body origin; not calibrated grasp TCP",
+    "physics_samples": 424,
+    "hold": {
+      "duration_s": 3.020278159994632,
+      "hand_pose": {
+        "left": {
+          "pelvis": {
+            "max_position_drift_mm": 3.50845218697417,
+            "max_orientation_drift_deg": 0.5365586094951792
+          },
+          "world": {
+            "max_position_drift_mm": 4.68333426831351,
+            "max_orientation_drift_deg": 0.9798686959689797
+          }
+        },
+        "right": {
+          "pelvis": {
+            "max_position_drift_mm": 4.382916054784002,
+            "max_orientation_drift_deg": 1.420237980320047
+          },
+          "world": {
+            "max_position_drift_mm": 4.199401682947124,
+            "max_orientation_drift_deg": 1.7592000313759686
+          }
+        }
+      },
+      "maximum_joint_drift_rad_by_motor_15_to_28": [
+        0.0030993223190307617,
+        0.007500588893890381,
+        0.019195973873138428,
+        0.0034202933311462402,
+        0.010494109243154526,
+        0.004648290574550629,
+        0.006989557296037674,
+        0.0026178299449384212,
+        0.00801938772201538,
+        0.001333773136138916,
+        0.01049494743347168,
+        0.013440286740660667,
+        0.0045209527015686035,
+        0.0026332437992095947
+      ]
+    },
+    "return_hand_pose_error": {
+      "left": {
+        "pelvis": {
+          "position_m": 0.021548424510160896,
+          "orientation_deg": 7.098470001279842
+        },
+        "world": {
+          "position_m": 0.017589684829951036,
+          "orientation_deg": 6.583866712497067
+        }
+      },
+      "right": {
+        "pelvis": {
+          "position_m": 0.0036440032583768918,
+          "orientation_deg": 3.3165736636343834
+        },
+        "world": {
+          "position_m": 0.005476022495378485,
+          "orientation_deg": 3.713015337676049
+        }
+      }
+    },
+    "all_clearance_checks_passed": true
+  },
+  {
+    "trial": "cycle03",
+    "outcome": "SUCCEEDED",
+    "trial_status": "hold_return_trial_completed",
+    "trial_error": null,
+    "duration_s": 11.222392985015176,
+    "existing_cycle_audit": {
+      "run": "cycle03",
+      "scenario": "cycle",
+      "outcome": "SUCCEEDED",
+      "terminal_stage": "RETURNING",
+      "required_outcome_met": true,
+      "fault_injected": false,
+      "evidence_checks_passed": true,
+      "checks": {
+        "isolated": true,
+        "trial_completed": true,
+        "clean_exit": true,
+        "feedback_stale_after_exit": true,
+        "reference_indices_increase": true,
+        "no_reference_after_terminal": true,
+        "original_receipts": true,
+        "measured_error": true,
+        "armed_during_cycle": true,
+        "encoded_bounds": true,
+        "reference_slew_and_continuity": true,
+        "upright_without_support_or_reset": true,
+        "reported_handback_settling": true,
+        "reach_qualification": true,
+        "full_hold_before_return": true,
+        "return_goal_is_original_measured_pose": true,
+        "success_requires_return": true
+      },
+      "duration_s": 11.222392985015176,
+      "reach_dwell": {
+        "samples": 27,
+        "duration_s": 0.5204800490755588,
+        "max_gap_s": 0.02119708899408579,
+        "max_error_rad": 0.004722571372985818,
+        "max_elbow_speed_rad_s": 0.09733802080154419,
+        "max_arm_speed_rad_s": 0.09733802080154419,
+        "max_body_speed_rad_s": 0.09733802080154419,
+        "worst_speed_motor_index": 18
+      },
+      "hold": {
+        "samples": 151,
+        "duration_s": 3.00008229597006,
+        "max_gap_s": 0.021326749003492296,
+        "max_error_rad": 0.0056773781776428,
+        "max_elbow_speed_rad_s": 0.0016353324754163623,
+        "max_arm_speed_rad_s": 0.004473682027310133,
+        "max_body_speed_rad_s": 0.007154668681323528,
+        "worst_speed_motor_index": 8,
+        "all_samples_qualified": true,
+        "max_left_arm_joint_drift_rad": 0.007972955703735352,
+        "max_other_left_arm_joint_drift_rad": 0.007972955703735352,
+        "max_either_arm_joint_drift_rad": 0.007972955703735352
+      },
+      "return_dwell": {
+        "samples": 26,
+        "duration_s": 0.5000066349748522,
+        "max_gap_s": 0.021205957047641277,
+        "max_error_rad": 0.019983291625976562,
+        "max_elbow_speed_rad_s": 0.005665095057338476,
+        "max_arm_speed_rad_s": 0.10038682818412781,
+        "max_body_speed_rad_s": 0.10038682818412781,
+        "worst_speed_motor_index": 25
+      },
+      "violation": null,
+      "last_error_rad": -0.01953786611557007,
+      "handback_latency_s": 0.12196468899492174,
+      "settling": {
+        "window_start": 551338.872979227,
+        "window_end": 551339.49266896,
+        "duration_s": 0.6196897330228239,
+        "feedback_samples": 32,
+        "physics_samples": 32,
+        "max_body_speed_rad_s": 0.13541105389595032,
+        "max_arm_speed_rad_s": 0.13541105389595032,
+        "max_tilt_deg": 2.500979952036486,
+        "minimum_pelvis_height_m": 0.7865097514734847
+      },
+      "max_trial_tilt_deg": 3.9188701737157685,
+      "reference_rate_hz": 49.99662794653435,
+      "peak_motion_elbow_speed_rad_s": 0.19187644124031067,
+      "peak_motion_arm_speed_rad_s": 0.2305692434310913,
+      "peak_motion_body_speed_rad_s": 0.2305692434310913,
+      "peak_motion_speed_motor_index": 19
+    },
+    "clearance_checks": {
+      "ready_interval_at_least_half_second": true,
+      "ready_recorded_coverage_and_gaps": true,
+      "ready_all_physics_clear": true,
+      "ready_all_feedback_qualified": true,
+      "cycle_all_recorded_clearance_above_10mm": true,
+      "geometry_sample_gaps_below_80ms": true,
+      "distance_query_cap_recorded": true
+    },
+    "minimum_query_capped_clearance_m": {
+      "left": 0.02,
+      "right": 0.02
+    },
+    "peak_arm_speed_rad_s": 0.2305692434310913,
+    "peak_arm_motor": 19,
+    "hand_frame_note": "wrist_yaw_link body origin; not calibrated grasp TCP",
+    "physics_samples": 540,
+    "hold": {
+      "duration_s": 3.00008229597006,
+      "hand_pose": {
+        "left": {
+          "pelvis": {
+            "max_position_drift_mm": 0.9673238914692209,
+            "max_orientation_drift_deg": 0.3049409455022499
+          },
+          "world": {
+            "max_position_drift_mm": 1.2178423905036724,
+            "max_orientation_drift_deg": 0.30563825244631315
+          }
+        },
+        "right": {
+          "pelvis": {
+            "max_position_drift_mm": 0.4379120446931027,
+            "max_orientation_drift_deg": 0.06878007423882807
+          },
+          "world": {
+            "max_position_drift_mm": 0.6206214770948842,
+            "max_orientation_drift_deg": 0.15121411846814703
+          }
+        }
+      },
+      "maximum_joint_drift_rad_by_motor_15_to_28": [
+        0.0008110813796520233,
+        0.0010703206062316895,
+        0.007937848567962646,
+        0.0009548068046569824,
+        0.002494506537914276,
+        0.0034155547618865967,
+        0.001666884869337082,
+        0.000656020907626953,
+        0.0006693601608276367,
+        0.002375483512878418,
+        0.0011209845542907715,
+        0.0020775897428393364,
+        0.0027090758085250854,
+        0.0027725249528884888
+      ]
+    },
+    "return_hand_pose_error": {
+      "left": {
+        "pelvis": {
+          "position_m": 0.021712413047894556,
+          "orientation_deg": 8.552588609457125
+        },
+        "world": {
+          "position_m": 0.01699105887645635,
+          "orientation_deg": 8.204174372590245
+        }
+      },
+      "right": {
+        "pelvis": {
+          "position_m": 0.00556923720839012,
+          "orientation_deg": 2.1841986359876504
+        },
+        "world": {
+          "position_m": 0.0038764099250530246,
+          "orientation_deg": 2.5973691961450602
+        }
+      }
+    },
+    "all_clearance_checks_passed": true
+  },
+  {
+    "trial": "cycle04",
+    "outcome": "SUCCEEDED",
+    "trial_status": "hold_return_trial_completed",
+    "trial_error": null,
+    "duration_s": 11.66225037095137,
+    "existing_cycle_audit": {
+      "run": "cycle04",
+      "scenario": "cycle",
+      "outcome": "SUCCEEDED",
+      "terminal_stage": "RETURNING",
+      "required_outcome_met": true,
+      "fault_injected": false,
+      "evidence_checks_passed": true,
+      "checks": {
+        "isolated": true,
+        "trial_completed": true,
+        "clean_exit": true,
+        "feedback_stale_after_exit": true,
+        "reference_indices_increase": true,
+        "no_reference_after_terminal": true,
+        "original_receipts": true,
+        "measured_error": true,
+        "armed_during_cycle": true,
+        "encoded_bounds": true,
+        "reference_slew_and_continuity": true,
+        "upright_without_support_or_reset": true,
+        "reported_handback_settling": true,
+        "reach_qualification": true,
+        "full_hold_before_return": true,
+        "return_goal_is_original_measured_pose": true,
+        "success_requires_return": true
+      },
+      "duration_s": 11.66225037095137,
+      "reach_dwell": {
+        "samples": 27,
+        "duration_s": 0.5197542388923466,
+        "max_gap_s": 0.020696823950856924,
+        "max_error_rad": 0.009844636917114236,
+        "max_elbow_speed_rad_s": 0.0781223475933075,
+        "max_arm_speed_rad_s": 0.0781223475933075,
+        "max_body_speed_rad_s": 0.0781223475933075,
+        "worst_speed_motor_index": 18
+      },
+      "hold": {
+        "samples": 151,
+        "duration_s": 3.00000944302883,
+        "max_gap_s": 0.020835727103985846,
+        "max_error_rad": 0.0036855697631835715,
+        "max_elbow_speed_rad_s": 0.014967148192226887,
+        "max_arm_speed_rad_s": 0.049219146370887756,
+        "max_body_speed_rad_s": 0.049219146370887756,
+        "worst_speed_motor_index": 25,
+        "all_samples_qualified": true,
+        "max_left_arm_joint_drift_rad": 0.005275756120681763,
+        "max_other_left_arm_joint_drift_rad": 0.005275756120681763,
+        "max_either_arm_joint_drift_rad": 0.006583690643310547
+      },
+      "return_dwell": {
+        "samples": 27,
+        "duration_s": 0.5197636940283701,
+        "max_gap_s": 0.021663816994987428,
+        "max_error_rad": 0.006996750831604004,
+        "max_elbow_speed_rad_s": 0.08696360141038895,
+        "max_arm_speed_rad_s": 0.09288804233074188,
+        "max_body_speed_rad_s": 0.09288804233074188,
+        "worst_speed_motor_index": 20
+      },
+      "violation": null,
+      "last_error_rad": -0.00618821382522583,
+      "handback_latency_s": 0.12217728001996875,
+      "settling": {
+        "window_start": 551447.219496588,
+        "window_end": 551447.830090292,
+        "duration_s": 0.6105937040410936,
+        "feedback_samples": 32,
+        "physics_samples": 31,
+        "max_body_speed_rad_s": 0.1398525983095169,
+        "max_arm_speed_rad_s": 0.1398525983095169,
+        "max_tilt_deg": 2.9440285860920437,
+        "minimum_pelvis_height_m": 0.786616586158208
+      },
+      "max_trial_tilt_deg": 4.070423779770816,
+      "reference_rate_hz": 49.99556707250698,
+      "peak_motion_elbow_speed_rad_s": 0.28664982318878174,
+      "peak_motion_arm_speed_rad_s": 0.28664982318878174,
+      "peak_motion_body_speed_rad_s": 0.28664982318878174,
+      "peak_motion_speed_motor_index": 18
+    },
+    "clearance_checks": {
+      "ready_interval_at_least_half_second": true,
+      "ready_recorded_coverage_and_gaps": true,
+      "ready_all_physics_clear": true,
+      "ready_all_feedback_qualified": true,
+      "cycle_all_recorded_clearance_above_10mm": true,
+      "geometry_sample_gaps_below_80ms": true,
+      "distance_query_cap_recorded": true
+    },
+    "minimum_query_capped_clearance_m": {
+      "left": 0.02,
+      "right": 0.02
+    },
+    "peak_arm_speed_rad_s": 0.28664982318878174,
+    "peak_arm_motor": 18,
+    "hand_frame_note": "wrist_yaw_link body origin; not calibrated grasp TCP",
+    "physics_samples": 561,
+    "hold": {
+      "duration_s": 3.00000944302883,
+      "hand_pose": {
+        "left": {
+          "pelvis": {
+            "max_position_drift_mm": 1.2538797816416865,
+            "max_orientation_drift_deg": 0.3943159760554037
+          },
+          "world": {
+            "max_position_drift_mm": 0.7850279034510718,
+            "max_orientation_drift_deg": 0.41181340188526405
+          }
+        },
+        "right": {
+          "pelvis": {
+            "max_position_drift_mm": 2.2409826607412517,
+            "max_orientation_drift_deg": 0.5254420723431376
+          },
+          "world": {
+            "max_position_drift_mm": 1.3789767701755828,
+            "max_orientation_drift_deg": 0.4986524034582164
+          }
+        }
+      },
+      "maximum_joint_drift_rad_by_motor_15_to_28": [
+        0.003336247056722641,
+        0.0014762282371520996,
+        0.0012156963348388672,
+        0.0028919577598571777,
+        0.0029774770082440227,
+        0.005230993032455444,
+        0.0010499320924282074,
+        0.004465494304895401,
+        0.00245821475982666,
+        0.0032321810722351074,
+        0.006583690643310547,
+        0.0023315437138080597,
+        0.0026417076587677,
+        0.001615479588508606
+      ]
+    },
+    "return_hand_pose_error": {
+      "left": {
+        "pelvis": {
+          "position_m": 0.013295814567636774,
+          "orientation_deg": 4.517595933889467
+        },
+        "world": {
+          "position_m": 0.011761047765716287,
+          "orientation_deg": 4.206883888914822
+        }
+      },
+      "right": {
+        "pelvis": {
+          "position_m": 0.0037105796146167393,
+          "orientation_deg": 1.4075991227227098
+        },
+        "world": {
+          "position_m": 0.003217811120961004,
+          "orientation_deg": 1.181890209435925
+        }
+      }
+    },
+    "all_clearance_checks_passed": true
+  }
+]

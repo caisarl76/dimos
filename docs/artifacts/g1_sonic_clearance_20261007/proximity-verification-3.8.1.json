@@ -1,0 +1,62 @@
+{
+  "mujoco_version": "3.8.1",
+  "query_cap_m": 0.02,
+  "unbounded_zero_count": 71,
+  "ready_samples": 290,
+  "corrected_minimum_m": [
+    0.02,
+    0.02
+  ],
+  "mesh_sweep": [
+    {
+      "shoulder_roll_delta_rad": -0.03,
+      "proximity_m": [
+        -0.0007504071381922934,
+        -0.0031599122377238063
+      ]
+    },
+    {
+      "shoulder_roll_delta_rad": 0.0,
+      "proximity_m": [
+        -5.2577011575051195e-05,
+        -0.00035088529915263165
+      ]
+    },
+    {
+      "shoulder_roll_delta_rad": 0.02,
+      "proximity_m": [
+        0.001391307369801143,
+        0.0009089296929763707
+      ]
+    },
+    {
+      "shoulder_roll_delta_rad": 0.04,
+      "proximity_m": [
+        0.0043967721813263794,
+        0.003500596541597752
+      ]
+    },
+    {
+      "shoulder_roll_delta_rad": 0.06,
+      "proximity_m": [
+        0.009072739233069773,
+        0.007822375809105251
+      ]
+    },
+    {
+      "shoulder_roll_delta_rad": 0.1,
+      "proximity_m": [
+        0.02,
+        0.02
+      ]
+    },
+    {
+      "shoulder_roll_delta_rad": 0.2,
+      "proximity_m": [
+        0.02,
+        0.02
+      ]
+    }
+  ],
+  "scope": "offline recorded poses; no dynamics or solver configuration changed"
+}

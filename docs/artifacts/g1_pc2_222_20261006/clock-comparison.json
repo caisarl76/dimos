@@ -1,0 +1,8 @@
+{
+  "workstation_before_epoch": 1791268362.8311841,
+  "workstation_after_epoch": 1791268363.045074,
+  "robot_epoch_seconds": 1791267813,
+  "round_trip_monotonic_seconds": 0.2138911969959736,
+  "robot_minus_workstation_midpoint_seconds": -549.9381289482117,
+  "method": "One read-only SSH date query bracketed by workstation wall-clock samples; robot date has one-second resolution. No clock settings changed."
+}

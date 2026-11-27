@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-07",
+  "scope": "Workstation MuJoCo only; no hardware contact",
+  "checks": {
+    "pytest": {
+      "command": ".venv/bin/python -m pytest docs/artifacts/g1_sonic_feedback_reach_20261007/test_elbow_servo.py -q --no-cov",
+      "result": "28 passed in 0.06s",
+      "exit_code": 0
+    },
+    "review": "Read-only integration review; send-time revalidation and active-hold fault handback findings fixed and re-reviewed.",
+    "recorded_trials": {
+      "reach01": {
+        "outcome": "SUCCEEDED",
+        "audit_passed": true
+      },
+      "reach02": {
+        "outcome": "SUCCEEDED",
+        "audit_passed": true
+      },
+      "reach03": {
+        "outcome": "SUCCEEDED",
+        "audit_passed": true
+      },
+      "cancel01": {
+        "outcome": "CANCELLED",
+        "audit_passed": true
+      },
+      "stale01": {
+        "outcome": "STALE_FEEDBACK",
+        "audit_passed": true
+      }
+    },
+    "lint": "ruff check and ruff format --check: passed for all five Python files",
+    "process_cleanup": "Scoped pgrep returned no matching simulation probe or controller processes",
+    "git_diff_check": "passed; checks tracked-file whitespace only",
+    "evidence_review": "No blockers; separate raw completion/reference/physics audit from runner-reported post-handback settling"
+  },
+  "sha256": {
+    "docs/artifacts/g1_sonic_feedback_reach_20261007/demo_elbow_servo.py": "51591749e3b67bc48ae67125d330672b48c596a3ad060ea48a289328c8bfd4ab",
+    "docs/artifacts/g1_sonic_feedback_reach_20261007/demo_arm_encoder.py": "2f3eba29953f021cef70ca9d909c4dd1e52e77cdb87f90ea30222f50c9c75f04",
+    "docs/artifacts/g1_sonic_feedback_reach_20261007/demo_feedback_reach_sim.py": "23226401a424bbf39e97d3cf675a18b87e837fb9b0b5b95ed94ccdbbde320c7b",
+    "docs/artifacts/g1_sonic_feedback_reach_20261007/test_elbow_servo.py": "3cc6f5401de317f556c751ec7237d98f432f7bac244cc0d537140c729f5e3836",
+    "/tmp/dimos-sonic-sim-assets-20261006/model_encoder.onnx": "fb97de22819b2057b41459802128d91723d91a25f0ad73e7bfc41a9cf8365bae",
+    "/tmp/dimos-sonic-sim-assets-20261006/model_decoder.onnx": "34bae8570d4a4421a5391a5c2befd745d4a02d182ec539e5f9da44c091c67509",
+    "/tmp/dimos-sonic-sim-assets-20261006/observation_config.yaml": "4a67713b310932e50aca81f19188c8d76013148e98b15c8b5bbea995f12e59f0",
+    "/tmp/dimos-sonic-sim-assets-20261006/planner/target_vel/V2/planner_sonic.onnx": "39b553e197f62f077975ba38512bc04781a3fc37c2af7c6756e04629f760edea",
+    "docs/artifacts/g1_sonic_feedback_reach_20261007/demo_audit_reach.py": "31542f4e252c1fe670d6df4ba670e6d56de618c26a1354a2a498a2abae023a7e",
+    "docs/artifacts/g1_sonic_feedback_reach_20261007/audit.json": "af1bcff139472e65b8e3965a0615dfc6daf2ba58218085ded1bc8bb11fec5e8b",
+    "docs/platforms/humanoid/g1/sonic-feedback-reach.md": "e2c5ac960dfc31b9aec67cbc63f74fdaa69b12ec28769df21d980092727b53cd"
+  }
+}

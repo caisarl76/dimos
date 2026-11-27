@@ -1,0 +1,3 @@
+    PID                  STARTED COMMAND
+1170822 Thu Oct  8 13:27:48 2026 /home/jihun/work/lerobot/.venv/bin/python3 -u sonic_policy_server.py --policy-path /mnt/data/jihun/g1_models/he_xr1_sonic78sonicstate_ho5_nostate_full/pretrained_model --port 5560 --noise-scale 0
+1212423 Thu Oct  8 13:50:11 2026 /home/jihun/work/lerobot/.venv/bin/python3 -u sonic_policy_server.py --policy-path /mnt/data/jihun/g1_models/wbt_pi05_he_full/pretrained_model_ema --port 5561 --noise-scale 0

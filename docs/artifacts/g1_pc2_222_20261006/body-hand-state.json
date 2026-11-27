@@ -1,0 +1,187 @@
+{
+  "started_utc": "2026-10-06T04:57:18.046261+00:00",
+  "interface": "enP8p1s0",
+  "dds_domain": 0,
+  "observation_seconds": 8,
+  "probe_creates_command_writers": false,
+  "topics": {
+    "rt/lowstate": {
+      "messages": 5350,
+      "observed_hz": 668.8,
+      "motor_state_array_length": 35,
+      "inspected_joint_count": 29,
+      "positions_rad": [
+        0.11240670084953308,
+        0.11254305392503738,
+        0.039372172206640244,
+        0.5336122512817383,
+        -0.681856632232666,
+        -0.029713541269302368,
+        0.03857961669564247,
+        -0.05088555067777634,
+        -0.46634599566459656,
+        0.626349925994873,
+        -0.6538533568382263,
+        -0.05418366193771362,
+        0.540282666683197,
+        -0.006019449792802334,
+        -0.03544042259454727,
+        0.024220118299126625,
+        0.26296985149383545,
+        -1.7059544324874878,
+        1.329422116279602,
+        -1.911759614944458,
+        0.0015459650894626975,
+        0.12996892631053925,
+        0.005249090492725372,
+        0.0517478846013546,
+        0.09679658710956573,
+        1.4114181995391846,
+        -0.0677228569984436,
+        -0.09649698436260223,
+        -0.13313275575637817
+      ],
+      "positions_all_finite": true,
+      "temperature_raw_min_max": [
+        35,
+        47
+      ],
+      "motor_mode_values_raw": [
+        1
+      ],
+      "nonzero_motorstate_raw": {},
+      "tick": 1174971,
+      "version_raw": [
+        0,
+        0
+      ],
+      "mode_pr_raw": 0,
+      "mode_machine_raw": 5,
+      "imu_rpy_rad": [
+        -0.035553183406591415,
+        -0.015435224398970604,
+        0.34239014983177185
+      ]
+    },
+    "rt/dex3/left/state": {
+      "messages": 2731,
+      "observed_hz": 345.2,
+      "motor_state_array_length": 7,
+      "inspected_joint_count": 7,
+      "positions_rad": [
+        -0.0272184107452631,
+        0.9472667574882507,
+        1.604994535446167,
+        -1.571390151977539,
+        -1.726425290107727,
+        -1.573651671409607,
+        -1.7230232954025269
+      ],
+      "positions_all_finite": true,
+      "temperature_raw_min_max": [
+        29,
+        45
+      ],
+      "motor_mode_values_raw": [
+        1
+      ],
+      "nonzero_motorstate_raw": {},
+      "error_raw": [
+        0,
+        0
+      ],
+      "power_v": 0,
+      "power_a": 0
+    },
+    "rt/dex3/right/state": {
+      "messages": 2722,
+      "observed_hz": 344.1,
+      "motor_state_array_length": 7,
+      "inspected_joint_count": 7,
+      "positions_rad": [
+        -0.00014716910663992167,
+        -0.9811366200447083,
+        -1.6486992835998535,
+        1.540145993232727,
+        1.6502282619476318,
+        1.5384248495101929,
+        1.7099958658218384
+      ],
+      "positions_all_finite": true,
+      "temperature_raw_min_max": [
+        29,
+        38
+      ],
+      "motor_mode_values_raw": [
+        1
+      ],
+      "nonzero_motorstate_raw": {},
+      "error_raw": [
+        0,
+        0
+      ],
+      "power_v": 0,
+      "power_a": 0
+    },
+    "rt/lf/dex3/left/state": {
+      "messages": 47,
+      "observed_hz": 5.9,
+      "motor_state_array_length": 7,
+      "inspected_joint_count": 7,
+      "positions_rad": [
+        -0.02721892111003399,
+        0.9472703337669373,
+        1.60500168800354,
+        -1.5713857412338257,
+        -1.726413607597351,
+        -1.5736534595489502,
+        -1.7230322360992432
+      ],
+      "positions_all_finite": true,
+      "temperature_raw_min_max": [
+        29,
+        45
+      ],
+      "motor_mode_values_raw": [
+        1
+      ],
+      "nonzero_motorstate_raw": {},
+      "error_raw": [
+        0,
+        0
+      ],
+      "power_v": 0,
+      "power_a": 0
+    },
+    "rt/lf/dex3/right/state": {
+      "messages": 47,
+      "observed_hz": 5.9,
+      "motor_state_array_length": 7,
+      "inspected_joint_count": 7,
+      "positions_rad": [
+        -0.00014716910663992167,
+        -0.9811258912086487,
+        -1.6486859321594238,
+        1.540134310722351,
+        1.6502362489700317,
+        1.538427472114563,
+        1.709999442100525
+      ],
+      "positions_all_finite": true,
+      "temperature_raw_min_max": [
+        29,
+        38
+      ],
+      "motor_mode_values_raw": [
+        1
+      ],
+      "nonzero_motorstate_raw": {},
+      "error_raw": [
+        0,
+        0
+      ],
+      "power_v": 0,
+      "power_a": 0
+    }
+  }
+}

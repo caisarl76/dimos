@@ -1,0 +1,46 @@
+{
+  "verified_at_utc": "2026-10-08T00:56:33.131853+00:00",
+  "focused_tests_passed": 16,
+  "final_trials": [
+    "cycle03",
+    "cycle04"
+  ],
+  "final_trial_audits_passed": true,
+  "final_trial_code_matches_manifests": {
+    "cycle03": {
+      "demo_hold_return_sim.py": true,
+      "demo_elbow_cycle.py": true,
+      "demo_arm_encoder.py": true,
+      "demo_clearance.py": true,
+      "demo_sim_host.py": true
+    },
+    "cycle04": {
+      "demo_hold_return_sim.py": true,
+      "demo_elbow_cycle.py": true,
+      "demo_arm_encoder.py": true,
+      "demo_clearance.py": true,
+      "demo_sim_host.py": true
+    }
+  },
+  "unsuccessful_attempts_retained": [
+    "cycle01",
+    "cycle02"
+  ],
+  "video_full_decode_exit_code": 0,
+  "remaining_experiment_processes": false,
+  "production_code_changed": false,
+  "real_robot_commands": false,
+  "audit_sha256": "f3098b3bf59e2832e4c32a0817c8edf05a7791a574e576e6171da6aa1657c6fb",
+  "source_sha256": {
+    "demo_sim_host.py": "210b88da8bbcb7ea0f0b6b448bb91d09b0b347831c5b3c47f545737714e52c35",
+    "demo_verify_proximity.py": "879ca763d1824dde9dcbe75aa7406f7b3a1e375cd8b7958878559e4915a7f540",
+    "demo_clearance.py": "415796f7f5303b599f3ed8e4a04bd7cdd0b3b954ef057fc4a95f80d7a05a8a74",
+    "demo_elbow_cycle.py": "980236abff4d63befee8fec43f84d095496f370681efbbd659a9ff7bdd68d10a",
+    "test_clearance.py": "3b00c81ce5b5cd8764405670bb3216af596f13f2b7823c11d39c0d0d260ed240",
+    "demo_assess_clearance.py": "afccc8f043637129488c4e108fd366c5d2c9c1073ad8cae0a1c96bfdd70ddfdd",
+    "demo_hold_return_sim.py": "23334487f1e51e319528be3666c5599ec12a65882c7c17bc6202e06c61cdb478",
+    "test_assess_clearance.py": "d22a13a0aa90fb3ea947a361e0b2d64bd73c625d3892f004ddfbfff892ae5eda",
+    "demo_arm_encoder.py": "2f3eba29953f021cef70ca9d909c4dd1e52e77cdb87f90ea30222f50c9c75f04",
+    "mujoco_replay/demo_render_recording.py": "e3515bc9db0d218fae62b395f596a4e7bbca751e9744ddaed0f7705b19c9aa1a"
+  }
+}

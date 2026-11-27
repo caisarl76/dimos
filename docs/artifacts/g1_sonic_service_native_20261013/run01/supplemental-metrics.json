@@ -1,0 +1,35 @@
+[
+  {
+    "scenario": "live",
+    "minimum_hand_lower_body_clearance_m": -0.0035877853297857296,
+    "closest_pair": [
+      "right_hand_index_1_link",
+      "right_hip_roll_link"
+    ],
+    "at_s_since_request": 8.869091832078993,
+    "injection_to_confirmation_s": null,
+    "last_observation_age_at_handback_s": 0.7585559600265697
+  },
+  {
+    "scenario": "cancel",
+    "minimum_hand_lower_body_clearance_m": -0.002616098356709426,
+    "closest_pair": [
+      "right_hand_middle_1_link",
+      "right_hip_roll_link"
+    ],
+    "at_s_since_request": 3.716107983957045,
+    "injection_to_confirmation_s": 0.23140768508892506,
+    "last_observation_age_at_handback_s": 0.5055358010577038
+  },
+  {
+    "scenario": "camera_loss",
+    "minimum_hand_lower_body_clearance_m": -0.0016686845100022905,
+    "closest_pair": [
+      "right_hand_index_1_link",
+      "right_hip_roll_link"
+    ],
+    "at_s_since_request": 4.9979244080604985,
+    "injection_to_confirmation_s": 0.8048022900475189,
+    "last_observation_age_at_handback_s": 0.8529293979518116
+  }
+]

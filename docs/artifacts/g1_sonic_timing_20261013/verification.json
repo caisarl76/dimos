@@ -1,0 +1,114 @@
+{
+  "date": "2026-10-13",
+  "milestone": "Read-only G1 body/Dex3 timestamp provenance and DDS reader timing audit",
+  "status": "diagnostics verified; no hardware acquisition-time producer implemented",
+  "checks": {
+    "focused_tests": 43,
+    "new_tests": 12,
+    "existing_observation_tests": 31,
+    "pytest_log": "pytest.log",
+    "red_log": "pytest-red.log",
+    "ruff_check": "ruff-check.log",
+    "ruff_format": "ruff-format.log",
+    "mypy": {
+      "log": "mypy.log",
+      "files": 2,
+      "options": [
+        "--follow-imports=silent"
+      ]
+    },
+    "full_repository_suite": "not run",
+    "known_warning": "Existing pytest startup subprocess ResourceWarning"
+  },
+  "hardware": {
+    "host": "pc2_222",
+    "ip": "192.168.0.222",
+    "interface": "enP8p1s0",
+    "domain": 0,
+    "latest_capture_exit_code": 0,
+    "history_capture_exit_code": 0,
+    "latest_summary": "pc2-summary.json",
+    "history_summary": "history-pc2-summary.json",
+    "raw_data": [
+      "pc2-capture.json.gz",
+      "history-pc2-capture.json.gz"
+    ],
+    "cleanup": "pc2-cleanup.json",
+    "current_clock_and_processes": "pc2-clock-and-processes.log",
+    "scope": "State/discovery readers only; no command writers, controller start/stop/signals, mode changes, camera acquisition or inference",
+    "installation": "Temporary import overlays removed; no installed source changes",
+    "latest_sample_counts": {
+      "body": 681,
+      "left_hand": 678,
+      "right_hand": 678
+    },
+    "history_sample_counts": {
+      "body": 6736,
+      "left_hand": 6074,
+      "right_hand": 6164
+    },
+    "raw_summary_recomputed_locally": true,
+    "compressed_data_verified_lossless": true,
+    "both_bootstrap_source_manifests_verified": true,
+    "acquisition_alignment_verified": false
+  },
+  "review": {
+    "agent": "observation_adapter_review",
+    "scope": "Design and final source review; no tests or hardware actions",
+    "result": "No material issues found"
+  },
+  "findings": [
+    "Installed HandState_ and MotorState_ expose no named acquisition timestamp/counter; LowState_ exposes uint32 tick with unverified timing semantics",
+    "Native DataBuffer stamps buffer updates using steady_clock::now, not verified motor acquisition",
+    "History capture caused reader backlog; latest-only capture avoids reporting it as sensor latency",
+    "Latest DDS source timestamps typically ahead of PC2 take-end wall clock by about six milliseconds; no correction inferred",
+    "State publishers advertise the internal robot computer; pc2 NTP sync to it alone does not establish acquisition alignment",
+    "Controller process changed externally: first advertised 42699, later process inspection found 48536; no lifecycle actions taken",
+    "Existing external D435 publisher has different timestamp configuration; camera not opened during this audit"
+  ],
+  "limits": [
+    "No source acquisition time, end-to-end delay bound, physical finger mapping or camera calibration verified",
+    "Zero DDS counters are not a no-loss guarantee; latest history intentionally replaces older samples",
+    "Publication handles identify writers only within each capture",
+    "Short-trace statistics do not establish worst-case bounds",
+    "No service observations, policy predictions or real manipulation were generated"
+  ],
+  "next_step": "Establish acquisition provenance or defensible intervals at the state producer, then adapt the observation contract and validate before supervised service commissioning",
+  "primary_sources": [
+    "https://raw.githubusercontent.com/unitreerobotics/unitree_ros2/master/cyclonedds_ws/src/unitree/unitree_hg/msg/HandState.msg",
+    "https://raw.githubusercontent.com/unitreerobotics/unitree_ros2/master/cyclonedds_ws/src/unitree/unitree_hg/msg/LowState.msg",
+    "https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/0.10.5/src/core/ddsc/src/dds_write.c"
+  ],
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_dds_timing.py": "6e03dc376d477dda50d9ad96c38f17bcecdb4d55100ed0eb33d67a86a4800a09",
+    "dimos/robot/unitree/g1/test_sonic_dds_timing.py": "bc01a61ecccd7873ffaf27dbe93d8d75271536980916cfab8d6ab5ddec326d1b",
+    "scripts/demo_g1_sonic_dds_timing.py": "75fdfd9e05237f989b06a53d7efb9585184eb7c1b7b5d3baef0aee1e2734cb3d",
+    "docs/platforms/humanoid/g1/sonic-hardware-timing.md": "f7890a33cc4eca7dcff4773e070e472d03f31ec5371aa21dc3f8ecfe0cebbe35",
+    "docs/platforms/humanoid/g1/sonic-observation-adapter.md": "88fdf1e0a888a15ed4e18538d4ac11fd9b64bd9ccc763006d3e19232d76dcec1",
+    "docs/platforms/humanoid/g1/index.md": "e29f8d7f2f48ba300b618b2162cb13013e4048f10fd1cedc7ad6b4a1b96da299"
+  },
+  "inspected_native_sha256": {
+    "build/sonic-grasp-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/utils.hpp": "bf35c0c3160bd9c8eea53e85ee1a9a64ebad689d8ece5c6b2e0da97905a6b39b",
+    "build/sonic-grasp-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/include/dex3_hands.hpp": "cba9e3317ab7aca24e71f70abcd641377ed91a1612ac387c29d55192bb27ab47",
+    "build/sonic-grasp-runtime/source/gear_sonic_deploy/src/g1/g1_deploy_onnx_ref/src/g1_deploy_onnx_ref.cpp": "ef75d1c7aacff73c010f4b753ff19e1692eec096706de8eb3bddf1886e619e60"
+  },
+  "artifact_sha256": {
+    "pytest.log": "8393ad9b7a6302269c532b368b87a57183fbf4b32bc618c8b8bb0beef19eb75b",
+    "pytest-red.log": "a0a5326107177ae40991c55a89518bbf81e4d566429aa2bde669607b2c54ee19",
+    "pc2-capture.stderr.log": "fdb2850bcf522efe26f603f43d08122884b3ba98183a52007ca0fb8332369b0f",
+    "ruff-format.log": "eee76f865de5a9f2456950f710ae5d5f9b5bd0ea02aa54f614c5eed6642a0bfd",
+    "pc2-capture.json.gz": "6744a89b89084d3c69d4d971a96d94d01f7157c8fd664a9f0cb8c608f177a2bf",
+    "history-pc2-capture.json.gz": "e2834271385c1597814ed9011b2149473203e7800c400f5ea668044aa4fbde85",
+    "history-pc2-capture.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "history-pc2-summary.json": "0a406f89ee41d69a74f311804fa4e77a9e6b2ea0f40b0b7856e73ce4a24ff2fa",
+    "source-manifest.json": "85f07a3de53c30033cc997bba7bf789aa73fac271b1582e03b3c31f32e83fd58",
+    "pc2-bootstrap.py": "c77f63094d6bc9135ba66d528e480f50a91687bee52569499e300d7f69deb582",
+    "history-pc2-bootstrap.py": "38a672356b7fd9fb4b32b6ab6827499034075d5808989b705314346fe90c4724",
+    "history-source-manifest.json": "8437af1bb82293f0b342eb0a3925fbb446e7b18bc4a7f58e052ddbef737d3e28",
+    "mypy.log": "f9b031e5c45aa702cd4fef028d465551cb20a2c4698e0913c7b00766b20ac4d8",
+    "pc2-summary.json": "33b7c7a8f40a16317471d59174958644124691019c999fcda7a1633ed10d430e",
+    "ruff-check.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "pc2-clock-and-processes.log": "517f25f69e69147dab0263ea6a8c1be9a1e5b40c088af909705730f6f6e67d88",
+    "pc2-cleanup.json": "d0bfd20e63ec28c64feb50e2af007b41b3b49bc3faa97cab6fefe14ba921b4f2"
+  }
+}

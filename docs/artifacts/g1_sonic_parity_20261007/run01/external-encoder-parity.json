@@ -1,0 +1,9 @@
+{
+  "frames": 279,
+  "max_abs_token_error": 0.0,
+  "all_tokens_exactly_equal": true,
+  "distinct_tokens": 17,
+  "adjacent_token_changes": 30,
+  "native_replay_binary_sha256": "5155a4fcc8ecb576b1e39e099fa9685928026d065fc0eebf3fdf8a360f64b0e4",
+  "scope": "Actual saved synthetic moving-arm inputs; native EncoderEngine FP32 and CaptureGraph; no robot interface instantiated"
+}

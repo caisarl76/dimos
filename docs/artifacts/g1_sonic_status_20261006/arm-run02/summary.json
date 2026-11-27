@@ -1,0 +1,88 @@
+{
+  "status": "arm_trial_completed",
+  "tracking_within_0_05_rad": false,
+  "tracking_checks": {
+    "reach_absolute": true,
+    "reach_increment": false,
+    "return_absolute": true,
+    "return_to_measured_baseline": true
+  },
+  "reach": {
+    "target_rad": 1.1176626443862916,
+    "measured_rad": 1.068888545036316,
+    "absolute_error_rad": -0.048774099349975675,
+    "measured_delta_rad": 0.03141343593597412,
+    "delta_error_rad": -0.06858656406402588
+  },
+  "return": {
+    "target_rad": 1.0176626443862915,
+    "measured_rad": 1.0363457202911377,
+    "absolute_error_rad": 0.01868307590484619,
+    "change_from_measured_baseline_rad": -0.0011293888092041016
+  },
+  "reach_reference_comparison": {
+    "samples": 150,
+    "max_absolute_error_rad": 0.05894263123586163,
+    "rms_error_rad": 0.0411707427419455,
+    "pairing": "Latest sent first-frame goal at telemetry receipt; no latency correction"
+  },
+  "handover": {
+    "publisher_close_monotonic": 518592.439685872,
+    "last_send_to_close_ms": 17.537588020786643,
+    "last_observed_elbow_speed_rad_s": 0.12215953320264816,
+    "last_requested_elbow_speed_rad_s": 0.07137329416889023,
+    "first_expired_after_close_ms": 199.71820199862123,
+    "first_expired_reference_age_ms": 216.672324,
+    "planner_confirmed_after_close_ms": 299.8966600280255,
+    "settling_window_end_after_close_s": 2.423079008993227
+  },
+  "sampled_settling": {
+    "window_start": 518594.295168309,
+    "window_end": 518594.862764881,
+    "duration_s": 0.5675965719856322,
+    "feedback_samples": 33,
+    "physics_samples": 12,
+    "max_body_speed_rad_s": 0.12745840847492218,
+    "max_arm_speed_rad_s": 0.12745840847492218,
+    "max_tilt_deg": 2.463698667792766,
+    "minimum_pelvis_height_m": 0.7857404176171893
+  },
+  "pre_shutdown_physics": {
+    "samples": 212,
+    "pelvis_height_range_m": [
+      0.7846546598043813,
+      0.7861355637890106
+    ],
+    "max_tilt_deg": 3.2417317500243374,
+    "max_automatic_resets": 0,
+    "support_enabled": false
+  },
+  "feedback_at_handback": {
+    "state": "fresh",
+    "endpoint": "tcp://127.0.0.1:15557",
+    "age_s": 0.022854950977489352,
+    "stale_after_s": 0.2,
+    "accepted_packets": 1074,
+    "invalid_packets": 0,
+    "rejected_indices": 0,
+    "error": null,
+    "reference_guard": {
+      "armed": false,
+      "expired": true,
+      "planner_selected": true,
+      "planner_confirmed": true,
+      "rearm_requires_planner": true,
+      "accepted_index": 379,
+      "applied_index": 379,
+      "rejected": 0,
+      "epoch": 1,
+      "age_ms": 2476.848561
+    }
+  },
+  "controller_exit": 0,
+  "limits": [
+    "One unloaded simulation trial; no end-effector, collision or grasp validation",
+    "Sampled receiver timing and measured velocities; no guaranteed deadlines or DDS capture ages",
+    "Intentional controller shutdown excluded from posture interval; shutdown applies damping"
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "started_utc": "2026-10-06T04:57:20.256724+00:00",
+  "requested_fps": 15,
+  "name": "Intel RealSense D435I",
+  "firmware": "5.15.1.55",
+  "usb_type": "2.1",
+  "depth_scale_m": 0.0010000000474974513,
+  "depth_intrinsics": {
+    "width": 640,
+    "height": 480,
+    "fx": 392.4102478027344,
+    "fy": 392.4102478027344,
+    "ppx": 321.0450134277344,
+    "ppy": 238.95510864257812,
+    "model": "distortion.brown_conrady",
+    "coeffs": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "color_intrinsics": {
+    "width": 640,
+    "height": 480,
+    "fx": 604.1785888671875,
+    "fy": 603.9077758789062,
+    "ppx": 316.75347900390625,
+    "ppy": 255.6288299560547,
+    "model": "distortion.inverse_brown_conrady",
+    "coeffs": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "depth_to_color": {
+    "rotation": [
+      0.9999721050262451,
+      -0.007309342734515667,
+      -0.001530499430373311,
+      0.0073188417591154575,
+      0.9999533891677856,
+      0.006295608356595039,
+      0.0014844113029539585,
+      -0.006306634284555912,
+      0.9999790191650391
+    ],
+    "translation_m": [
+      0.01482914574444294,
+      4.55001718364656e-05,
+      0.0002834392071235925
+    ]
+  },
+  "paired_frames": 20,
+  "wall_seconds": 1.267,
+  "observed_pair_hz": 14.99,
+  "distinct_depth_frame_numbers": 20,
+  "distinct_color_frame_numbers": 20,
+  "depth_timestamp_domain": "timestamp_domain.global_time",
+  "color_timestamp_domain": "timestamp_domain.global_time",
+  "raw_depth": {
+    "width": 640,
+    "height": 480,
+    "nonzero_fraction": 0.9452,
+    "median_nonzero_raw": 1125
+  },
+  "color": {
+    "width": 640,
+    "height": 480,
+    "format": "format.rgb8",
+    "bytes": 921600
+  },
+  "depth_aligned_to_color": {
+    "width": 640,
+    "height": 480,
+    "nonzero_fraction": 0.9962,
+    "median_nonzero_raw": 1248
+  }
+}

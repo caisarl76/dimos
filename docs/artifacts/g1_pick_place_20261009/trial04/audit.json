@@ -1,0 +1,57 @@
+{
+  "audit_passed": true,
+  "camera_frames": 286,
+  "renderer": "NVIDIA GeForce RTX 3060/PCIe/SSE2",
+  "camera_render_median_s": 0.001961813948582858,
+  "cases": [
+    {
+      "scenario": "live",
+      "task_success": false,
+      "task_status": "waiting_lift",
+      "task_metrics": {
+        "maximum_bottle_bottom_m": 0.6999410697258335,
+        "minimum_hand_bottle_distance_m": 0.02441145517547059,
+        "opposed_finger_contact_samples": 0,
+        "tray_support_samples": 0,
+        "bottle_contact_bodies": [
+          "world"
+        ]
+      },
+      "maximum_bottle_displacement_m": 1.8947235135475607e-06,
+      "maximum_measured_hand_joint_limit_excess_rad": 0.008042436810569598,
+      "outcome": "finished",
+      "predictions": 34,
+      "unique_rgb": 34,
+      "unique_states": 34,
+      "roundtrip_range_s": [
+        0.2889153059804812,
+        0.3303208880824968
+      ],
+      "arrival_age_range_s": [
+        0.3331810120726004,
+        0.4622657330473885
+      ],
+      "handback_confirmed_s": 0.1411511480109766,
+      "freeze_to_handback_s": null,
+      "arm_peak_rad_s": 5.8942461013793945,
+      "pose_timing": {
+        "packets": 648,
+        "median_gap_s": 0.020163564011454582,
+        "maximum_gap_s": 0.024668827070854604
+      },
+      "physics": {
+        "samples": 785,
+        "minimum_pelvis_height_m": 0.7781170696600023,
+        "maximum_tilt_deg": 10.30472229763975,
+        "automatic_resets": 0,
+        "support_disabled": true
+      }
+    }
+  ],
+  "limits": [
+    "nominal MJCF camera, not calibrated D435i",
+    "approximate cylinder bottle, provisional table/tray dimensions and contact parameters",
+    "no successful grasp or placement in this bounded trial",
+    "handover checkpoint evaluated outside training scene"
+  ]
+}

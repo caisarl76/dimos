@@ -1,6 +1,30 @@
 # Unitree G1
 
+## Implementation logs
+
+The [G1 SONIC service implementation log](/docs/platforms/humanoid/g1/implementation-log.md) records progress on the external-controller integration. The [2026-10-07 checkpoint](/docs/platforms/humanoid/g1/implementation-log-2026-10-07.md) distinguishes local implementation, simulation results, prior hardware observations and work still unverified.
+
 ## Requirements
+
+For the local external-controller service integration, see the
+[SONIC execution module](/docs/platforms/humanoid/g1/sonic-execution-module.md): configuration, RPCs,
+LeRobot action-source boundary and verification scope. The
+[native module validation](/docs/platforms/humanoid/g1/sonic-execution-native-validation.md) records the
+MuJoCo/Pi0.5 streaming, cancellation and camera-loss checks, with a replay.
+The [service coordinator](/docs/platforms/humanoid/g1/sonic-service-coordinator.md) adds policy selection,
+paired observations, request/progress/cancel RPCs and separate outcome reports.
+Its [native service validation](/docs/platforms/humanoid/g1/sonic-service-native-validation.md) records
+the two-worker stack's execution and recovery results, replay and remaining
+hardware-integration work.
+The [D435i observation adapter](/docs/platforms/humanoid/g1/sonic-observation-adapter.md) covers camera and
+joint diagnostics, timestamped pairing and the remaining native acquisition-time gap.
+The [hardware timing audit](/docs/platforms/humanoid/g1/sonic-hardware-timing.md) records passive body/Dex3
+measurements, clock differences and the source contract still needed on PC2.
+The selected [delivery-freshness prototype](/docs/platforms/humanoid/g1/sonic-delivery-observations.md)
+checks each input's local receipt while reporting acquisition timing as unknown;
+it includes a bounded read-only probe and hardware commissioning steps.
+Its first [live pairing validation](/docs/platforms/humanoid/g1/sonic-delivery-live-validation.md) passed
+with the existing camera and independent body/hand streams on 2026-10-14.
 
 - Unitree G1 EDU (need SDK/SSH access)
 - Laptop/Desktop with Ubuntu 22.04/24.04/26.04 with CUDA GPU (recommended), or macOS (experimental)

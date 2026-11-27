@@ -1,0 +1,31 @@
+{
+  "result": "insufficient_data",
+  "valid_recorded_sonic_samples": 0,
+  "invalid_recorded_sonic_samples": 0,
+  "rejected_indices": 0,
+  "max_allowed_receive_gap_s": 0.05,
+  "groups": {
+    "body": {
+      "paired_samples": 0,
+      "unpaired_samples": 0,
+      "max_receive_gap_s": null,
+      "max_position_error_rad_by_joint": [],
+      "max_velocity_error_rad_s_by_joint": []
+    },
+    "left_hand": {
+      "paired_samples": 0,
+      "unpaired_samples": 0,
+      "max_receive_gap_s": null,
+      "max_position_error_rad_by_joint": [],
+      "max_velocity_error_rad_s_by_joint": []
+    },
+    "right_hand": {
+      "paired_samples": 0,
+      "unpaired_samples": 0,
+      "max_receive_gap_s": null,
+      "max_position_error_rad_by_joint": [],
+      "max_velocity_error_rad_s_by_joint": []
+    }
+  },
+  "limitation": "Matches local read times, not sensor capture times. Numerical agreement in these poses does not prove anatomical mapping, source freshness or motion readiness."
+}

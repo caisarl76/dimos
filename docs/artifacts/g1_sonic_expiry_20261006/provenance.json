@@ -1,0 +1,28 @@
+{
+  "base_commit": "7c6d710b783a984ede504d24a65bc70e486b3b1d",
+  "worktree": "/tmp/dimos-sonic-expiry-20261006",
+  "branch": "jihun/fix/sonic-reference-expiry",
+  "binary_sha256": "b9a95ae89b4ce328526715b0cee30689d06dbf5c23f23479dc64ddbfce19750e",
+  "patch_sha256": "5fc11f83035f39199be9abdbcbdbdc7bb680f67f4db69128834a5038565303e5",
+  "sources": {
+    "include/input_interface/reference_lease.hpp": "8bbf9060d84d7d060bba9a6380c842ac6f6572371e069d4f8aa9fe854b163279",
+    "include/input_interface/reference_validation.hpp": "5ba184f8c08c0da1b5a8ddf8d2033bd237c6c7813f266fc1d047ce301cfd8670",
+    "include/input_interface/zmq_endpoint_interface.hpp": "af6910c1518e168e6d127d64a150a454035c1678a2c7991e058cb28d00a89988",
+    "include/input_interface/zmq_manager.hpp": "857c050b0d416e1b032814d27e9033fbb6af1db317d3faaed86e353c0dde9ace",
+    "include/localmotion_kplanner.hpp": "d1e8bf164a42bf6e88e5f706c2694134693b9052b24b83b9fa1e47ef0550c4cd",
+    "include/output_interface/zmq_output_handler.hpp": "e9ce4a3399b810df38e2bc0ba8c795fe4492ab4c6fa744e0150c3247893428b5",
+    "src/g1_deploy_onnx_ref.cpp": "df5807a22db0ba7f892b8b3904a0bdb0a5432b966a425c5ae2eb022253706c77",
+    "unit_tests/test_reference_lease.cpp": "e09ed9d5df72b43979a153e007fbdddf8133f42e16067df87d40e779dafb4db1",
+    "unit_tests/test_reference_validation.cpp": "18f22f31bc4766ca7c5226153569a0c6f8ba3b18ad75f7fe2e20d1986847c36e"
+  },
+  "scripts": {
+    "demo_sim_host.py": "25a07422d5349da76760136a0e552999ee362d2386aab5ca08e6331784a21c7f",
+    "demo_summary.py": "401f978c9f4af5f269986013abe6ac5578d1d670f6140a752f1efe880087f1d4",
+    "demo_expiry.py": "7ca5d1443867bf56fd4838fd5e1c59fe63e19c05818d99af4a1a1145f74fa8e0"
+  },
+  "cleanup": {
+    "targeted_process_check_matches": 0,
+    "host_netns": "net:[4026531840]"
+  },
+  "review": "Design and code review by gpt-6-astra high; keyboard bypass, effective encoder-mode confirmation, and shared lifecycle flags corrected before run02."
+}

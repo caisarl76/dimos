@@ -1,0 +1,1885 @@
+{
+  "status": "native_service_cases_recorded_pending_audit",
+  "cases": [
+    {
+      "scenario": "live",
+      "started": 1037879.456877157,
+      "running_started": 1037880.827440006,
+      "ended": 1037886.963722832,
+      "injection": null,
+      "handback_time": 1037886.828315265,
+      "status": {
+        "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+        "phase": "done",
+        "outcome": "finished",
+        "reason": "finish requested",
+        "handback_confirmed": true,
+        "last_frame_index": 344,
+        "last_chunk_sequence": 16
+      },
+      "service": {
+        "service_id": "e0a1ce083d184c67b2dbd3fd2ebde04f",
+        "policy_name": "pi05",
+        "instruction": "pick drink bottle from the table and handover",
+        "duration_seconds": 6.0,
+        "phase": "done",
+        "outcome": "finished",
+        "reason": "finish requested",
+        "execution_task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+        "execution": {
+          "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+          "phase": "done",
+          "outcome": "finished",
+          "reason": "finish requested",
+          "handback_confirmed": true,
+          "last_frame_index": 344,
+          "last_chunk_sequence": 16
+        },
+        "handback_confirmed": true,
+        "task_success": null,
+        "outcome_evidence": null,
+        "accepted_predictions": 17,
+        "discarded_predictions": 1,
+        "progress": 1.0,
+        "running_started": 1037880.827440006,
+        "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/e0a1ce083d184c67b2dbd3fd2ebde04f.jsonl"
+      },
+      "service_module_status": {
+        "state": "running",
+        "accepting_requests": true,
+        "policies": [
+          "pi05"
+        ],
+        "service": {
+          "service_id": "e0a1ce083d184c67b2dbd3fd2ebde04f",
+          "policy_name": "pi05",
+          "instruction": "pick drink bottle from the table and handover",
+          "duration_seconds": 6.0,
+          "phase": "done",
+          "outcome": "finished",
+          "reason": "finish requested",
+          "execution_task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+          "execution": {
+            "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+            "phase": "done",
+            "outcome": "finished",
+            "reason": "finish requested",
+            "handback_confirmed": true,
+            "last_frame_index": 344,
+            "last_chunk_sequence": 16
+          },
+          "handback_confirmed": true,
+          "task_success": null,
+          "outcome_evidence": null,
+          "accepted_predictions": 17,
+          "discarded_predictions": 1,
+          "progress": 1.0,
+          "running_started": 1037880.827440006,
+          "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/e0a1ce083d184c67b2dbd3fd2ebde04f.jsonl"
+        },
+        "error": null,
+        "observation_age_s": 0.07855590502731502
+      },
+      "module_status": {
+        "state": "running",
+        "accepting_requests": true,
+        "reference_endpoint": "tcp://127.0.0.1:15556",
+        "feedback_endpoint": "tcp://127.0.0.1:15557",
+        "profile": {
+          "name": "pi05-wbt-sonic78-50hz-live-sim-observations",
+          "source_fps": 50,
+          "right_hand_order": "mujoco_swap",
+          "handback_policy": "native_planner",
+          "seed_seconds": 1.0,
+          "arm_timeout": 1.0,
+          "first_chunk_timeout": 2.0,
+          "handback_timeout": 2.0,
+          "feedback_timeout": 0.2,
+          "max_tick_gap": 0.1,
+          "max_duration": 25.0,
+          "max_observation_age": 0.85,
+          "blend_seconds": 0.3,
+          "token_bound": 1.25,
+          "token_step_limit": 0.05
+        },
+        "subscriptions_ready": true,
+        "task": {
+          "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+          "phase": "done",
+          "outcome": "finished",
+          "reason": "finish requested",
+          "handback_confirmed": true,
+          "last_frame_index": 344,
+          "last_chunk_sequence": 16
+        },
+        "task_success": null,
+        "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/sessions/e9dd868206964fac88ebe67c5a01d8a2.jsonl",
+        "invalid_packets": 0,
+        "error": null,
+        "feedback_age_s": 0.01742750301491469,
+        "feedback_fresh": true,
+        "ready": true
+      },
+      "post_handback_physics": {
+        "monotonic": 1037889.948712336,
+        "sim_time": 19.72000000000036,
+        "pelvis": [
+          0.005779918625748864,
+          0.006645674872387296,
+          0.7870809300579746
+        ],
+        "tilt_deg": 2.359004322897501,
+        "band": false,
+        "automatic_resets": 0,
+        "kp": [
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          40.179237365722656,
+          28.501245498657227,
+          28.501245498657227,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453
+        ],
+        "kd": [
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          2.557889699935913,
+          1.8144457340240479,
+          1.8144457340240479,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012
+        ],
+        "qpos": [
+          0.005779918625748864,
+          0.006645674872387296,
+          0.7870809300579746,
+          0.976001935315326,
+          0.004672600508732466,
+          -0.02004740426029474,
+          0.21678674001803752,
+          0.041456143870259615,
+          0.03635266032125764,
+          0.09603545485619976,
+          0.168441412488657,
+          -0.1631705305106468,
+          -0.023057760819732424,
+          0.043270690513435184,
+          -0.07309694754787531,
+          -0.36381249944893,
+          0.18407105335724308,
+          -0.17136018190179872,
+          0.008078967773065602,
+          -0.022123192257840117,
+          0.02219962495775919,
+          0.13686900035594313,
+          -0.052894370092625785,
+          0.2708808075427819,
+          -0.6377564818761414,
+          1.0274830270602593,
+          -0.15788007626936207,
+          -0.08784492591450004,
+          0.042946223445632065,
+          0.0782036686609793,
+          -0.309161197634826,
+          1.699290310026782,
+          -1.5174837539879895,
+          -1.7155055138136897,
+          -1.519128808322453,
+          -1.7174023395284168,
+          -0.01837627503487167,
+          -0.28944993862380597,
+          0.682164872002491,
+          1.0950891785783243,
+          -0.1346142787173824,
+          0.2562028262062592,
+          -0.14891684199101887,
+          0.0027298883955689194,
+          -0.032826458833506364,
+          -1.719755122341907,
+          1.5381042408665457,
+          1.7191776110968577,
+          1.5708746354028302,
+          1.7457695869059695
+        ],
+        "max_abs_qvel": 0.6068650558067655,
+        "geometry": {
+          "left": {
+            "clearance_m": -2.0577557455308642e-05,
+            "distance_cap_m": 0.02,
+            "closest_pair": [
+              "left_hand_thumb_2_link",
+              "left_hip_roll_link"
+            ],
+            "closest_geoms": [
+              59,
+              7
+            ],
+            "frame": "left_wrist_yaw_link",
+            "position_world_m": [
+              0.017135820441973863,
+              0.20932041577129754,
+              0.728735371863343
+            ],
+            "rotation_world": [
+              [
+                0.4465984321390427,
+                0.09273179673106896,
+                0.8899160939582885
+              ],
+              [
+                0.13077564469997102,
+                0.977168032860371,
+                -0.16745257928470583
+              ],
+              [
+                -0.885125737488328,
+                0.19116341028246345,
+                0.42427465091014194
+              ]
+            ],
+            "position_pelvis_m": [
+              0.09360558857230984,
+              0.17878327455253376,
+              -0.062327728932218114
+            ],
+            "rotation_pelvis": [
+              [
+                0.4231475088918747,
+                0.5051328409734954,
+                0.7521881404865718
+              ],
+              [
+                -0.07097178144399689,
+                0.8461018654906289,
+                -0.5282751550583689
+              ],
+              [
+                -0.9032769187559632,
+                0.17015418356103815,
+                0.39387607424088383
+              ]
+            ]
+          },
+          "right": {
+            "clearance_m": -0.00042856390738511157,
+            "distance_cap_m": 0.02,
+            "closest_pair": [
+              "right_hand_index_1_link",
+              "right_hip_roll_link"
+            ],
+            "closest_geoms": [
+              97,
+              19
+            ],
+            "frame": "right_wrist_yaw_link",
+            "position_world_m": [
+              0.1389379192806479,
+              -0.1525125612705072,
+              0.7127547874522203
+            ],
+            "rotation_world": [
+              [
+                0.30352690565919566,
+                -0.9025530710817897,
+                0.30540034613893796
+              ],
+              [
+                -0.12968796546265454,
+                0.27840561974319117,
+                0.9516676638982575
+              ],
+              [
+                -0.9439557453372011,
+                -0.32846349078130294,
+                -0.03254667523188655
+              ]
+            ],
+            "position_pelvis_m": [
+              0.05015495362829039,
+              -0.2005966340587066,
+              -0.0763691284226798
+            ],
+            "rotation_pelvis": [
+              [
+                0.18104613311347584,
+                -0.7127526755819188,
+                0.6776473427495107
+              ],
+              [
+                -0.24639732449165302,
+                0.634185576901723,
+                0.7328690282261785
+              ],
+              [
+                -0.952108531716848,
+                -0.29965359584133816,
+                -0.06080350591325626
+              ]
+            ]
+          }
+        },
+        "mujoco_version": "3.8.1"
+      },
+      "passive_planner_confirmed": true,
+      "max_arm_speed_rad_s": 3.517691135406494,
+      "max_hand_speed_rad_s": 2.142885684967041,
+      "pose_timing": {
+        "packets": 345,
+        "median_gap_s": 0.021127861051354557,
+        "maximum_gap_s": 0.03356754197739065
+      },
+      "settling_window": {
+        "duration_s": 0.49446252698544413,
+        "samples": 26,
+        "max_gap_s": 0.02659940510056913,
+        "max_body_speed_rad_s": 0.14990116655826569
+      },
+      "physics_envelope": {
+        "samples": 499,
+        "minimum_pelvis_height_m": 0.7798367238020326,
+        "maximum_tilt_deg": 8.227222117472206,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "accepted_predictions": 17,
+      "injection_verified": true,
+      "preliminary_passed": true
+    },
+    {
+      "scenario": "cancel",
+      "started": 1037890.502459781,
+      "running_started": 1037891.852319648,
+      "ended": 1037893.661869954,
+      "injection": 1037893.356548662,
+      "handback_time": 1037893.369432833,
+      "status": {
+        "task_id": "69917b4d88794c48a117043e11b8ee9b",
+        "phase": "done",
+        "outcome": "cancelled",
+        "reason": "cancel requested",
+        "handback_confirmed": true,
+        "last_frame_index": 479,
+        "last_chunk_sequence": 4
+      },
+      "service": {
+        "service_id": "43ef4774c4e84dcd847fd3df916e43a8",
+        "policy_name": "pi05",
+        "instruction": "pick drink bottle from the table and handover",
+        "duration_seconds": 6.0,
+        "phase": "done",
+        "outcome": "cancelled",
+        "reason": "cancel requested",
+        "execution_task_id": "69917b4d88794c48a117043e11b8ee9b",
+        "execution": {
+          "task_id": "69917b4d88794c48a117043e11b8ee9b",
+          "phase": "done",
+          "outcome": "cancelled",
+          "reason": "cancel requested",
+          "handback_confirmed": true,
+          "last_frame_index": 479,
+          "last_chunk_sequence": 4
+        },
+        "handback_confirmed": true,
+        "task_success": null,
+        "outcome_evidence": null,
+        "accepted_predictions": 5,
+        "discarded_predictions": 1,
+        "progress": 0.2507628473298003,
+        "running_started": 1037891.852319648,
+        "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/43ef4774c4e84dcd847fd3df916e43a8.jsonl"
+      },
+      "service_module_status": {
+        "state": "running",
+        "accepting_requests": true,
+        "policies": [
+          "pi05"
+        ],
+        "service": {
+          "service_id": "43ef4774c4e84dcd847fd3df916e43a8",
+          "policy_name": "pi05",
+          "instruction": "pick drink bottle from the table and handover",
+          "duration_seconds": 6.0,
+          "phase": "done",
+          "outcome": "cancelled",
+          "reason": "cancel requested",
+          "execution_task_id": "69917b4d88794c48a117043e11b8ee9b",
+          "execution": {
+            "task_id": "69917b4d88794c48a117043e11b8ee9b",
+            "phase": "done",
+            "outcome": "cancelled",
+            "reason": "cancel requested",
+            "handback_confirmed": true,
+            "last_frame_index": 479,
+            "last_chunk_sequence": 4
+          },
+          "handback_confirmed": true,
+          "task_success": null,
+          "outcome_evidence": null,
+          "accepted_predictions": 5,
+          "discarded_predictions": 1,
+          "progress": 0.2507628473298003,
+          "running_started": 1037891.852319648,
+          "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/43ef4774c4e84dcd847fd3df916e43a8.jsonl"
+        },
+        "error": null,
+        "observation_age_s": 0.09555842296686023
+      },
+      "module_status": {
+        "state": "running",
+        "accepting_requests": true,
+        "reference_endpoint": "tcp://127.0.0.1:15556",
+        "feedback_endpoint": "tcp://127.0.0.1:15557",
+        "profile": {
+          "name": "pi05-wbt-sonic78-50hz-live-sim-observations",
+          "source_fps": 50,
+          "right_hand_order": "mujoco_swap",
+          "handback_policy": "native_planner",
+          "seed_seconds": 1.0,
+          "arm_timeout": 1.0,
+          "first_chunk_timeout": 2.0,
+          "handback_timeout": 2.0,
+          "feedback_timeout": 0.2,
+          "max_tick_gap": 0.1,
+          "max_duration": 25.0,
+          "max_observation_age": 0.85,
+          "blend_seconds": 0.3,
+          "token_bound": 1.25,
+          "token_step_limit": 0.05
+        },
+        "subscriptions_ready": true,
+        "task": {
+          "task_id": "69917b4d88794c48a117043e11b8ee9b",
+          "phase": "done",
+          "outcome": "cancelled",
+          "reason": "cancel requested",
+          "handback_confirmed": true,
+          "last_frame_index": 479,
+          "last_chunk_sequence": 4
+        },
+        "task_success": null,
+        "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/sessions/69917b4d88794c48a117043e11b8ee9b.jsonl",
+        "invalid_packets": 0,
+        "error": null,
+        "feedback_age_s": 0.019320531049743295,
+        "feedback_fresh": true,
+        "ready": true
+      },
+      "post_handback_physics": {
+        "monotonic": 1037896.66502852,
+        "sim_time": 26.224999999999067,
+        "pelvis": [
+          0.006635435250915233,
+          0.002312085385631949,
+          0.7877116997179332
+        ],
+        "tilt_deg": 1.441423499032918,
+        "band": false,
+        "automatic_resets": 0,
+        "kp": [
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          40.179237365722656,
+          28.501245498657227,
+          28.501245498657227,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453
+        ],
+        "kd": [
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          2.557889699935913,
+          1.8144457340240479,
+          1.8144457340240479,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012
+        ],
+        "qpos": [
+          0.006635435250915233,
+          0.002312085385631949,
+          0.7877116997179332,
+          0.9813558172153027,
+          -0.0017411270258821262,
+          -0.012457373908781506,
+          0.19178775333597556,
+          0.026942619940403777,
+          0.06718865697752423,
+          0.15233725746132518,
+          0.17585632037902318,
+          -0.1694755219989203,
+          -0.03507272514609997,
+          0.03544575265688596,
+          -0.03538207973073737,
+          -0.3178343153273447,
+          0.12683413234039673,
+          -0.13219281443239542,
+          -0.007299394858252529,
+          -0.011692225298341699,
+          0.02994715836321349,
+          0.14051272793194242,
+          -0.03066096630929953,
+          0.29699764627884306,
+          -0.6584865032197892,
+          1.0000253403037458,
+          -0.17521699559424903,
+          -0.12009801393467812,
+          0.1288786648878223,
+          0.03445659466989161,
+          -0.010089181732881959,
+          1.717676581298243,
+          -1.5158628108796566,
+          -1.7081147727877757,
+          -1.5193848678056652,
+          -1.7175448790588814,
+          -0.04677153597897837,
+          -0.2919901204903224,
+          0.6486008307101637,
+          1.037046566636514,
+          0.29766900812924546,
+          -0.04403945445778653,
+          -0.263050572965995,
+          0.003918263123178483,
+          -0.03123976779671027,
+          -1.7169020980265144,
+          1.5156129729766543,
+          1.7026029831104663,
+          1.5193765046678067,
+          1.7174534040080252
+        ],
+        "max_abs_qvel": 0.00722418657398584,
+        "geometry": {
+          "left": {
+            "clearance_m": -5.78249501529153e-05,
+            "distance_cap_m": 0.02,
+            "closest_pair": [
+              "left_hand_thumb_2_link",
+              "left_hip_roll_link"
+            ],
+            "closest_geoms": [
+              59,
+              7
+            ],
+            "frame": "left_wrist_yaw_link",
+            "position_world_m": [
+              0.01916130406856026,
+              0.20598932504926026,
+              0.7287167767564408
+            ],
+            "rotation_world": [
+              [
+                0.46716698627825404,
+                0.10031299064914753,
+                0.8784601930871514
+              ],
+              [
+                0.1785828067551299,
+                0.9623610134558901,
+                -0.20486449402375645
+              ],
+              [
+                -0.8659464117733564,
+                0.2525838151726548,
+                0.43166911894374904
+              ]
+            ],
+            "position_pelvis_m": [
+              0.08687532280952119,
+              0.1844614795617748,
+              -0.059568088155376425
+            ],
+            "rotation_pelvis": [
+              [
+                0.4792911570122231,
+                0.46120694850191973,
+                0.7467048529796949
+              ],
+              [
+                -0.0032913466641575815,
+                0.851733043498185,
+                -0.5239656378527614
+              ],
+              [
+                -0.8776497899771963,
+                0.248674432274133,
+                0.4097461078352262
+              ]
+            ]
+          },
+          "right": {
+            "clearance_m": -0.000311257063604512,
+            "distance_cap_m": 0.02,
+            "closest_pair": [
+              "right_hand_thumb_2_link",
+              "right_hip_roll_link"
+            ],
+            "closest_geoms": [
+              89,
+              19
+            ],
+            "frame": "right_wrist_yaw_link",
+            "position_world_m": [
+              0.15383538752728043,
+              -0.13868222619422987,
+              0.7182334608247304
+            ],
+            "rotation_world": [
+              [
+                0.48860774032163906,
+                -0.5971225256856203,
+                0.6361659888870244
+              ],
+              [
+                0.02990723110015414,
+                0.7401607597347435,
+                0.6717645474992019
+              ],
+              [
+                -0.8719908449208065,
+                -0.3092033943340713,
+                0.3795065576595285
+              ]
+            ],
+            "position_pelvis_m": [
+              0.08159336395468375,
+              -0.18545499468467083,
+              -0.07296173951333298
+            ],
+            "rotation_pelvis": [
+              [
+                0.4430327020046155,
+                -0.28171699616659873,
+                0.8510919803554458
+              ],
+              [
+                -0.14904903686101767,
+                0.9129857926245257,
+                0.3797911624519005
+              ],
+              [
+                -0.8840285117377658,
+                -0.29511434485065513,
+                0.3624929156522593
+              ]
+            ]
+          }
+        },
+        "mujoco_version": "3.8.1"
+      },
+      "passive_planner_confirmed": true,
+      "max_arm_speed_rad_s": 5.980698108673096,
+      "max_hand_speed_rad_s": 1.9593350887298584,
+      "pose_timing": {
+        "packets": 135,
+        "median_gap_s": 0.020942747534718364,
+        "maximum_gap_s": 0.032281821011565626
+      },
+      "settling_window": {
+        "duration_s": 0.49961887497920543,
+        "samples": 26,
+        "max_gap_s": 0.02967846696265042,
+        "max_body_speed_rad_s": 0.008585615083575249
+      },
+      "physics_envelope": {
+        "samples": 292,
+        "minimum_pelvis_height_m": 0.7842464816361288,
+        "maximum_tilt_deg": 6.955596485033981,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "accepted_predictions": 5,
+      "injection_verified": true,
+      "preliminary_passed": true
+    },
+    {
+      "scenario": "camera_loss",
+      "started": 1037897.239702252,
+      "running_started": 1037898.610359899,
+      "ended": 1037900.946156388,
+      "injection": 1037900.125942256,
+      "handback_time": 1037900.804149988,
+      "status": {
+        "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "observation stale",
+        "handback_confirmed": true,
+        "last_frame_index": 646,
+        "last_chunk_sequence": 5
+      },
+      "service": {
+        "service_id": "074f629df2fe4a12badde6f65218b2d8",
+        "policy_name": "pi05",
+        "instruction": "pick drink bottle from the table and handover",
+        "duration_seconds": 6.0,
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "observation stale",
+        "execution_task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+        "execution": {
+          "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+          "phase": "done",
+          "outcome": "failed",
+          "reason": "observation stale",
+          "handback_confirmed": true,
+          "last_frame_index": 646,
+          "last_chunk_sequence": 5
+        },
+        "handback_confirmed": true,
+        "task_success": null,
+        "outcome_evidence": null,
+        "accepted_predictions": 6,
+        "discarded_predictions": 0,
+        "progress": 0.36597613332560286,
+        "running_started": 1037898.610359899,
+        "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/074f629df2fe4a12badde6f65218b2d8.jsonl"
+      },
+      "service_module_status": {
+        "state": "running",
+        "accepting_requests": true,
+        "policies": [
+          "pi05"
+        ],
+        "service": {
+          "service_id": "074f629df2fe4a12badde6f65218b2d8",
+          "policy_name": "pi05",
+          "instruction": "pick drink bottle from the table and handover",
+          "duration_seconds": 6.0,
+          "phase": "done",
+          "outcome": "failed",
+          "reason": "observation stale",
+          "execution_task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+          "execution": {
+            "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+            "phase": "done",
+            "outcome": "failed",
+            "reason": "observation stale",
+            "handback_confirmed": true,
+            "last_frame_index": 646,
+            "last_chunk_sequence": 5
+          },
+          "handback_confirmed": true,
+          "task_success": null,
+          "outcome_evidence": null,
+          "accepted_predictions": 6,
+          "discarded_predictions": 0,
+          "progress": 0.36597613332560286,
+          "running_started": 1037898.610359899,
+          "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/074f629df2fe4a12badde6f65218b2d8.jsonl"
+        },
+        "error": null,
+        "observation_age_s": 0.8912228120025247
+      },
+      "module_status": {
+        "state": "running",
+        "accepting_requests": true,
+        "reference_endpoint": "tcp://127.0.0.1:15556",
+        "feedback_endpoint": "tcp://127.0.0.1:15557",
+        "profile": {
+          "name": "pi05-wbt-sonic78-50hz-live-sim-observations",
+          "source_fps": 50,
+          "right_hand_order": "mujoco_swap",
+          "handback_policy": "native_planner",
+          "seed_seconds": 1.0,
+          "arm_timeout": 1.0,
+          "first_chunk_timeout": 2.0,
+          "handback_timeout": 2.0,
+          "feedback_timeout": 0.2,
+          "max_tick_gap": 0.1,
+          "max_duration": 25.0,
+          "max_observation_age": 0.85,
+          "blend_seconds": 0.3,
+          "token_bound": 1.25,
+          "token_step_limit": 0.05
+        },
+        "subscriptions_ready": true,
+        "task": {
+          "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+          "phase": "done",
+          "outcome": "failed",
+          "reason": "observation stale",
+          "handback_confirmed": true,
+          "last_frame_index": 646,
+          "last_chunk_sequence": 5
+        },
+        "task_success": null,
+        "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/sessions/a0b2bad13acb4b9688f40400cd564dd9.jsonl",
+        "invalid_packets": 0,
+        "error": null,
+        "feedback_age_s": 0.02012081304565072,
+        "feedback_fresh": true,
+        "ready": true
+      },
+      "post_handback_physics": {
+        "monotonic": 1037903.940475124,
+        "sim_time": 33.25999999999856,
+        "pelvis": [
+          0.0048827681259364765,
+          0.00444910370788945,
+          0.7870120688921994
+        ],
+        "tilt_deg": 2.223088178483317,
+        "band": false,
+        "automatic_resets": 0,
+        "kp": [
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          99.09842681884766,
+          99.09842681884766,
+          40.179237365722656,
+          99.09842681884766,
+          28.501245498657227,
+          28.501245498657227,
+          40.179237365722656,
+          28.501245498657227,
+          28.501245498657227,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          14.250622749328613,
+          16.77832794189453,
+          16.77832794189453
+        ],
+        "kd": [
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          6.308801651000977,
+          6.308801651000977,
+          2.557889699935913,
+          6.308801651000977,
+          1.8144457340240479,
+          1.8144457340240479,
+          2.557889699935913,
+          1.8144457340240479,
+          1.8144457340240479,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          0.9072228670120239,
+          1.0681414604187012,
+          1.0681414604187012
+        ],
+        "qpos": [
+          0.0048827681259364765,
+          0.00444910370788945,
+          0.7870120688921994,
+          0.9809196435990912,
+          0.0033174240904654284,
+          -0.019113124384092323,
+          0.19344336632491102,
+          0.04557916813633811,
+          0.051146349334838886,
+          0.1413125725311407,
+          0.16859275068901364,
+          -0.16728886019734487,
+          -0.029102682803640076,
+          0.02317516713341353,
+          -0.05725284212649711,
+          -0.3105466666254888,
+          0.1905904924206662,
+          -0.16597105070015264,
+          -0.001162521577772327,
+          -0.03110625759138738,
+          0.02985529938083777,
+          0.13820455809385582,
+          -0.03889910833277732,
+          0.30149662245571235,
+          -0.640615131711816,
+          1.0301972054550967,
+          -0.1766179360819117,
+          -0.11099924922612783,
+          0.04733172255791552,
+          0.02132539769139792,
+          -0.03557255451207141,
+          1.7124346759631057,
+          -1.5177943772343228,
+          -1.7164168457172078,
+          -1.5192220889734633,
+          -1.7171807394757783,
+          -0.014499449518342847,
+          -0.2891079856886831,
+          0.6496115768893286,
+          1.1016485275147667,
+          -0.1268192943326744,
+          0.23304482228316822,
+          -0.14039169058869871,
+          0.0014905515576427851,
+          -0.036802242399584705,
+          -1.716433067612334,
+          1.5197103146305193,
+          1.7165773191475318,
+          1.5597987193082874,
+          1.7457881230356287
+        ],
+        "max_abs_qvel": 0.013985487865048432,
+        "geometry": {
+          "left": {
+            "clearance_m": -0.00011862479506323074,
+            "distance_cap_m": 0.02,
+            "closest_pair": [
+              "left_hand_thumb_2_link",
+              "left_hip_roll_link"
+            ],
+            "closest_geoms": [
+              59,
+              7
+            ],
+            "frame": "left_wrist_yaw_link",
+            "position_world_m": [
+              0.019170522178788035,
+              0.21497175825266837,
+              0.730575399528014
+            ],
+            "rotation_world": [
+              [
+                0.445314422039065,
+                0.13357066105745324,
+                0.8853552643028038
+              ],
+              [
+                0.1331595029805297,
+                0.9679345139747259,
+                -0.21300545397357432
+              ],
+              [
+                -0.885417196743993,
+                0.21274786758316785,
+                0.41324899582312724
+              ]
+            ],
+            "position_pelvis_m": [
+              0.09088703653369953,
+              0.1893883041141107,
+              -0.05983847003626123
+            ],
+            "rotation_pelvis": [
+              [
+                0.42784243320733195,
+                0.4989400328823803,
+                0.7536641798138991
+              ],
+              [
+                -0.045079805419327594,
+                0.8445761233208964,
+                -0.5335344253744081
+              ],
+              [
+                -0.9027284550132357,
+                0.19429363217453488,
+                0.38383762322867887
+              ]
+            ]
+          },
+          "right": {
+            "clearance_m": -0.00039126371936480306,
+            "distance_cap_m": 0.02,
+            "closest_pair": [
+              "right_hand_index_1_link",
+              "right_hip_roll_link"
+            ],
+            "closest_geoms": [
+              97,
+              19
+            ],
+            "frame": "right_wrist_yaw_link",
+            "position_world_m": [
+              0.12884197606340922,
+              -0.16321709299830356,
+              0.7112259335475949
+            ],
+            "rotation_world": [
+              [
+                0.28655112224443285,
+                -0.8739696916419819,
+                0.3925116971908932
+              ],
+              [
+                -0.13358289859032618,
+                0.3692434580403809,
+                0.9196819438798332
+              ],
+              [
+                -0.9487065212934204,
+                -0.3159687433680756,
+                -0.010940277406743248
+              ]
+            ],
+            "position_pelvis_m": [
+              0.048043573978468694,
+              -0.2021059150550604,
+              -0.07788704102742772
+            ],
+            "rotation_pelvis": [
+              [
+                0.17742650534340187,
+                -0.6800932089187685,
+                0.7113318932707852
+              ],
+              [
+                -0.23152549116246343,
+                0.6736674846217879,
+                0.7018319365099687
+              ],
+              [
+                -0.9565123010937222,
+                -0.2892150538023997,
+                -0.03793244667125002
+              ]
+            ]
+          }
+        },
+        "mujoco_version": "3.8.1"
+      },
+      "passive_planner_confirmed": true,
+      "max_arm_speed_rad_s": 2.934393882751465,
+      "max_hand_speed_rad_s": 2.2302370071411133,
+      "pose_timing": {
+        "packets": 167,
+        "median_gap_s": 0.021204182994551957,
+        "maximum_gap_s": 0.031028802040964365
+      },
+      "settling_window": {
+        "duration_s": 0.4991133939474821,
+        "samples": 26,
+        "max_gap_s": 0.021837637992575765,
+        "max_body_speed_rad_s": 0.020353911444544792
+      },
+      "physics_envelope": {
+        "samples": 318,
+        "minimum_pelvis_height_m": 0.7843136635437177,
+        "maximum_tilt_deg": 8.104366557561407,
+        "automatic_resets": 0,
+        "support_disabled": true
+      },
+      "accepted_predictions": 6,
+      "frozen_camera": {
+        "last_source_time": 1037900.054676977,
+        "last_render_finished": 1037900.068036404,
+        "frames_after_injection": 0
+      },
+      "injection_verified": true,
+      "preliminary_passed": true
+    }
+  ],
+  "events": [
+    {
+      "event": "start_native_planner",
+      "monotonic": 1037865.986058221,
+      "elapsed": 31.98945252003614
+    },
+    {
+      "event": "service_start",
+      "monotonic": 1037879.459171932,
+      "elapsed": 45.462566239060834,
+      "scenario": "live",
+      "service_id": "e0a1ce083d184c67b2dbd3fd2ebde04f"
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037879.478311509,
+      "elapsed": 45.48170580598526,
+      "scenario": "live",
+      "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+      "phase": "seeding",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 0,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037880.469373973,
+      "elapsed": 46.47276832500938,
+      "scenario": "live",
+      "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+      "phase": "arming",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 47,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037880.505796414,
+      "elapsed": 46.50919068104122,
+      "scenario": "live",
+      "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+      "phase": "waiting_for_chunk",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 48,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037880.828538316,
+      "elapsed": 46.831932567059994,
+      "scenario": "live",
+      "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+      "phase": "running",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 64,
+      "last_chunk_sequence": 0
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037886.839689679,
+      "elapsed": 52.843083920073695,
+      "scenario": "live",
+      "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+      "phase": "handback",
+      "outcome": "finished",
+      "reason": "finish requested",
+      "handback_confirmed": false,
+      "last_frame_index": 344,
+      "last_chunk_sequence": 16
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037886.963701774,
+      "elapsed": 52.967096033040434,
+      "scenario": "live",
+      "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+      "phase": "done",
+      "outcome": "finished",
+      "reason": "finish requested",
+      "handback_confirmed": true,
+      "last_frame_index": 344,
+      "last_chunk_sequence": 16
+    },
+    {
+      "event": "case_complete",
+      "monotonic": 1037890.179304674,
+      "elapsed": 56.18269901198801,
+      "scenario": "live",
+      "preliminary_passed": true,
+      "status": {
+        "task_id": "e9dd868206964fac88ebe67c5a01d8a2",
+        "phase": "done",
+        "outcome": "finished",
+        "reason": "finish requested",
+        "handback_confirmed": true,
+        "last_frame_index": 344,
+        "last_chunk_sequence": 16
+      }
+    },
+    {
+      "event": "service_start",
+      "monotonic": 1037890.504377543,
+      "elapsed": 56.50777189596556,
+      "scenario": "cancel",
+      "service_id": "43ef4774c4e84dcd847fd3df916e43a8"
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037890.5247669,
+      "elapsed": 56.528161145048216,
+      "scenario": "cancel",
+      "task_id": "69917b4d88794c48a117043e11b8ee9b",
+      "phase": "seeding",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 345,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037891.534085271,
+      "elapsed": 57.53747955698054,
+      "scenario": "cancel",
+      "task_id": "69917b4d88794c48a117043e11b8ee9b",
+      "phase": "arming",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 393,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037891.554691493,
+      "elapsed": 57.55808574997354,
+      "scenario": "cancel",
+      "task_id": "69917b4d88794c48a117043e11b8ee9b",
+      "phase": "waiting_for_chunk",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 394,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037891.878630398,
+      "elapsed": 57.88202465104405,
+      "scenario": "cancel",
+      "task_id": "69917b4d88794c48a117043e11b8ee9b",
+      "phase": "running",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 409,
+      "last_chunk_sequence": 0
+    },
+    {
+      "event": "fault_injected",
+      "monotonic": 1037893.356550065,
+      "elapsed": 59.35994431003928,
+      "scenario": "cancel",
+      "run_elapsed": 1.5042252549901605,
+      "policy_outstanding": true
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037893.376144435,
+      "elapsed": 59.37953868298791,
+      "scenario": "cancel",
+      "task_id": "69917b4d88794c48a117043e11b8ee9b",
+      "phase": "handback",
+      "outcome": "cancelled",
+      "reason": "cancel requested",
+      "handback_confirmed": false,
+      "last_frame_index": 479,
+      "last_chunk_sequence": 4
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037893.607890575,
+      "elapsed": 59.6112848239718,
+      "scenario": "cancel",
+      "task_id": "69917b4d88794c48a117043e11b8ee9b",
+      "phase": "done",
+      "outcome": "cancelled",
+      "reason": "cancel requested",
+      "handback_confirmed": true,
+      "last_frame_index": 479,
+      "last_chunk_sequence": 4
+    },
+    {
+      "event": "case_complete",
+      "monotonic": 1037896.913642742,
+      "elapsed": 62.91703714104369,
+      "scenario": "cancel",
+      "preliminary_passed": true,
+      "status": {
+        "task_id": "69917b4d88794c48a117043e11b8ee9b",
+        "phase": "done",
+        "outcome": "cancelled",
+        "reason": "cancel requested",
+        "handback_confirmed": true,
+        "last_frame_index": 479,
+        "last_chunk_sequence": 4
+      }
+    },
+    {
+      "event": "service_start",
+      "monotonic": 1037897.24166948,
+      "elapsed": 63.24506385298446,
+      "scenario": "camera_loss",
+      "service_id": "074f629df2fe4a12badde6f65218b2d8"
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037897.25390794,
+      "elapsed": 63.257302202051505,
+      "scenario": "camera_loss",
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "seeding",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 479,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037898.268907911,
+      "elapsed": 64.27230215503369,
+      "scenario": "camera_loss",
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "arming",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 527,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037898.303963793,
+      "elapsed": 64.30735805199947,
+      "scenario": "camera_loss",
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "waiting_for_chunk",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 529,
+      "last_chunk_sequence": -1
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037898.614681145,
+      "elapsed": 64.61807540105656,
+      "scenario": "camera_loss",
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "running",
+      "outcome": null,
+      "reason": "",
+      "handback_confirmed": false,
+      "last_frame_index": 543,
+      "last_chunk_sequence": 0
+    },
+    {
+      "event": "fault_injected",
+      "monotonic": 1037900.125945369,
+      "elapsed": 66.12933966598939,
+      "scenario": "camera_loss",
+      "run_elapsed": 1.5155811209697276,
+      "policy_outstanding": true
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037900.815013709,
+      "elapsed": 66.81840796105098,
+      "scenario": "camera_loss",
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "handback",
+      "outcome": "failed",
+      "reason": "observation stale",
+      "handback_confirmed": false,
+      "last_frame_index": 646,
+      "last_chunk_sequence": 5
+    },
+    {
+      "event": "session_phase",
+      "monotonic": 1037900.94612728,
+      "elapsed": 66.9495215510251,
+      "scenario": "camera_loss",
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "done",
+      "outcome": "failed",
+      "reason": "observation stale",
+      "handback_confirmed": true,
+      "last_frame_index": 646,
+      "last_chunk_sequence": 5
+    },
+    {
+      "event": "case_complete",
+      "monotonic": 1037904.222955188,
+      "elapsed": 70.22634948696941,
+      "scenario": "camera_loss",
+      "preliminary_passed": true,
+      "status": {
+        "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "observation stale",
+        "handback_confirmed": true,
+        "last_frame_index": 646,
+        "last_chunk_sequence": 5
+      }
+    },
+    {
+      "event": "cleanup_publisher_reconnected",
+      "monotonic": 1037904.375555391,
+      "elapsed": 70.37894963403232
+    }
+  ],
+  "baseline_physics": {
+    "monotonic": 1037874.47499776,
+    "sim_time": 4.854999999999919,
+    "pelvis": [
+      -0.00756222819012363,
+      -0.00025978018244062254,
+      0.7797240003973862
+    ],
+    "tilt_deg": 3.4676258881440596,
+    "band": false,
+    "automatic_resets": 0,
+    "kp": [
+      99.09842681884766,
+      99.09842681884766,
+      40.179237365722656,
+      99.09842681884766,
+      28.501245498657227,
+      28.501245498657227,
+      99.09842681884766,
+      99.09842681884766,
+      40.179237365722656,
+      99.09842681884766,
+      28.501245498657227,
+      28.501245498657227,
+      40.179237365722656,
+      28.501245498657227,
+      28.501245498657227,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      16.77832794189453,
+      16.77832794189453,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      14.250622749328613,
+      16.77832794189453,
+      16.77832794189453
+    ],
+    "kd": [
+      6.308801651000977,
+      6.308801651000977,
+      2.557889699935913,
+      6.308801651000977,
+      1.8144457340240479,
+      1.8144457340240479,
+      6.308801651000977,
+      6.308801651000977,
+      2.557889699935913,
+      6.308801651000977,
+      1.8144457340240479,
+      1.8144457340240479,
+      2.557889699935913,
+      1.8144457340240479,
+      1.8144457340240479,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      1.0681414604187012,
+      1.0681414604187012,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      0.9072228670120239,
+      1.0681414604187012,
+      1.0681414604187012
+    ],
+    "qpos": [
+      -0.00756222819012363,
+      -0.00025978018244062254,
+      0.7797240003973862,
+      0.9994788182899207,
+      -0.009471985256753999,
+      -0.028735251460243184,
+      -0.011254270682493014,
+      0.13670541715193185,
+      0.11219925394446226,
+      0.26708863139392736,
+      0.2276012216405065,
+      -0.28323974004456026,
+      -0.06729064262670988,
+      -0.13969771927508634,
+      0.0686644965168764,
+      0.04295820088484528,
+      0.324204233555594,
+      -0.12471739385184269,
+      -0.027646657482153898,
+      -0.016585545129042457,
+      -0.0006281416708811552,
+      0.1634370121249326,
+      -0.02262047428543482,
+      0.31997280840188896,
+      -0.6584293166569669,
+      0.9863968682943072,
+      -0.17094136403595322,
+      -0.10286791074089562,
+      0.16212898618536356,
+      0.02205861316238292,
+      0.004220323821148768,
+      1.7255062693902685,
+      -1.52614261477523,
+      -1.7228945032164673,
+      -1.5285715543380312,
+      -1.725395621169244,
+      -0.04338867608078754,
+      -0.27292747272294376,
+      0.5597771337925159,
+      0.9886600311270437,
+      0.2975569183372133,
+      -0.015981543120468827,
+      -0.26146018160658413,
+      0.0011439251078986677,
+      -0.0030791003477641113,
+      -1.7222788518901258,
+      1.5258795113408434,
+      1.7221573220489308,
+      1.528710186395438,
+      1.7251382937493236
+    ],
+    "max_abs_qvel": 0.005574380273724554,
+    "geometry": {
+      "left": {
+        "clearance_m": -2.4873552968793504e-05,
+        "distance_cap_m": 0.02,
+        "closest_pair": [
+          "left_hand_thumb_2_link",
+          "left_hip_roll_link"
+        ],
+        "closest_geoms": [
+          59,
+          7
+        ],
+        "frame": "left_wrist_yaw_link",
+        "position_world_m": [
+          0.0839252660062117,
+          0.18448219303030894,
+          0.715065144192053
+        ],
+        "rotation_world": [
+          [
+            0.5141927244280097,
+            0.46624490342540836,
+            0.7198760533419135
+          ],
+          [
+            -0.011849012961263422,
+            0.8431162146450334,
+            -0.5376008272821676
+          ],
+          [
+            -0.8575928189048354,
+            0.26790061334841864,
+            0.43904876532157167
+          ]
+        ],
+        "position_pelvis_m": [
+          0.08352986908039435,
+          0.18795244071854367,
+          -0.06615864981996772
+        ],
+        "rotation_pelvis": [
+          [
+            0.4640299897013358,
+            0.4622938332518447,
+            0.7556193356413587
+          ],
+          [
+            0.01568678135670237,
+            0.8485949994507507,
+            -0.5288104119605079
+          ],
+          [
+            -0.8856805821222682,
+            0.2572371253230971,
+            0.3865216265709645
+          ]
+        ]
+      },
+      "right": {
+        "clearance_m": -0.0002586076434575291,
+        "distance_cap_m": 0.02,
+        "closest_pair": [
+          "right_hand_thumb_2_link",
+          "right_hip_roll_link"
+        ],
+        "closest_geoms": [
+          89,
+          19
+        ],
+        "frame": "right_wrist_yaw_link",
+        "position_world_m": [
+          0.0793124405841585,
+          -0.18851354971571269,
+          0.7212803607548979
+        ],
+        "rotation_world": [
+          [
+            0.4811392848756791,
+            -0.16071052871875724,
+            0.8617871631141041
+          ],
+          [
+            -0.2141771585142247,
+            0.9317122458230882,
+            0.2933265002587866
+          ],
+          [
+            -0.8500783101103631,
+            -0.3257060284094121,
+            0.41386283928093187
+          ]
+        ],
+        "position_pelvis_m": [
+          0.08747233107426458,
+          -0.18510183102211927,
+          -0.06699441977867632
+        ],
+        "rotation_pelvis": [
+          [
+            0.4359143468068047,
+            -0.19963595714516116,
+            0.8775671865234749
+          ],
+          [
+            -0.18745281590040816,
+            0.9335623714607159,
+            0.3054877090876936
+          ],
+          [
+            -0.88025003496677,
+            -0.29766891542009394,
+            0.36953090903687674
+          ]
+        ]
+      }
+    },
+    "mujoco_version": "3.8.1"
+  },
+  "warmups": [
+    0.3326717260060832,
+    0.31701418408192694,
+    0.31666257197503
+  ],
+  "module_initial_status": {
+    "state": "running",
+    "accepting_requests": true,
+    "reference_endpoint": "tcp://127.0.0.1:15556",
+    "feedback_endpoint": "tcp://127.0.0.1:15557",
+    "profile": {
+      "name": "pi05-wbt-sonic78-50hz-live-sim-observations",
+      "source_fps": 50,
+      "right_hand_order": "mujoco_swap",
+      "handback_policy": "native_planner",
+      "seed_seconds": 1.0,
+      "arm_timeout": 1.0,
+      "first_chunk_timeout": 2.0,
+      "handback_timeout": 2.0,
+      "feedback_timeout": 0.2,
+      "max_tick_gap": 0.1,
+      "max_duration": 25.0,
+      "max_observation_age": 0.85,
+      "blend_seconds": 0.3,
+      "token_bound": 1.25,
+      "token_step_limit": 0.05
+    },
+    "subscriptions_ready": true,
+    "task": null,
+    "task_success": null,
+    "journal_path": null,
+    "invalid_packets": 0,
+    "error": null,
+    "feedback_age_s": 0.00495405902620405,
+    "feedback_fresh": true,
+    "ready": true
+  },
+  "service_initial_status": {
+    "state": "running",
+    "accepting_requests": true,
+    "policies": [
+      "pi05"
+    ],
+    "service": null,
+    "error": null,
+    "observation_age_s": 0.07050008000805974
+  },
+  "service_pre_stop_status": {
+    "state": "running",
+    "accepting_requests": true,
+    "policies": [
+      "pi05"
+    ],
+    "service": {
+      "service_id": "074f629df2fe4a12badde6f65218b2d8",
+      "policy_name": "pi05",
+      "instruction": "pick drink bottle from the table and handover",
+      "duration_seconds": 6.0,
+      "phase": "done",
+      "outcome": "failed",
+      "reason": "observation stale",
+      "execution_task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "execution": {
+        "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+        "phase": "done",
+        "outcome": "failed",
+        "reason": "observation stale",
+        "handback_confirmed": true,
+        "last_frame_index": 646,
+        "last_chunk_sequence": 5
+      },
+      "handback_confirmed": true,
+      "task_success": null,
+      "outcome_evidence": null,
+      "accepted_predictions": 6,
+      "discarded_predictions": 0,
+      "progress": 0.36597613332560286,
+      "running_started": 1037898.610359899,
+      "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/services/074f629df2fe4a12badde6f65218b2d8.jsonl"
+    },
+    "error": null,
+    "observation_age_s": 4.170170099008828
+  },
+  "service_stop_returned": true,
+  "module_pre_stop_status": {
+    "state": "running",
+    "accepting_requests": true,
+    "reference_endpoint": "tcp://127.0.0.1:15556",
+    "feedback_endpoint": "tcp://127.0.0.1:15557",
+    "profile": {
+      "name": "pi05-wbt-sonic78-50hz-live-sim-observations",
+      "source_fps": 50,
+      "right_hand_order": "mujoco_swap",
+      "handback_policy": "native_planner",
+      "seed_seconds": 1.0,
+      "arm_timeout": 1.0,
+      "first_chunk_timeout": 2.0,
+      "handback_timeout": 2.0,
+      "feedback_timeout": 0.2,
+      "max_tick_gap": 0.1,
+      "max_duration": 25.0,
+      "max_observation_age": 0.85,
+      "blend_seconds": 0.3,
+      "token_bound": 1.25,
+      "token_step_limit": 0.05
+    },
+    "subscriptions_ready": true,
+    "task": {
+      "task_id": "a0b2bad13acb4b9688f40400cd564dd9",
+      "phase": "done",
+      "outcome": "failed",
+      "reason": "observation stale",
+      "handback_confirmed": true,
+      "last_frame_index": 646,
+      "last_chunk_sequence": 5
+    },
+    "task_success": null,
+    "journal_path": "/home/jihun/work/dimos_dev/docs/artifacts/g1_sonic_service_native_20261013/run01/sessions/a0b2bad13acb4b9688f40400cd564dd9.jsonl",
+    "invalid_packets": 0,
+    "error": null,
+    "feedback_age_s": 0.018050604034215212,
+    "feedback_fresh": true,
+    "ready": true
+  },
+  "module_stop_returned": true,
+  "coordinator_stopped": true,
+  "cleanup_endpoint_rebound": true,
+  "cleanup_planner_confirmed": true,
+  "child_exit_codes": [
+    0,
+    0,
+    0
+  ],
+  "children_reaped": true,
+  "policy_recorder_stopped": true,
+  "cleanup_passed": true
+}

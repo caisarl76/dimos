@@ -1,0 +1,6 @@
+{
+  "swapped_elbows_detectable_max_error": 0.09831327199935913,
+  "orientation_column_major_detectable_max_error": 1.0986324176192284,
+  "lost_velocity_detectable_max_error": 1.5194642543792725,
+  "wrong_future_frame_detectable_max_error": 0.10306476429104805
+}

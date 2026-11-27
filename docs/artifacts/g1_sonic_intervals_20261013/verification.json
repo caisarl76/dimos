@@ -1,0 +1,107 @@
+{
+  "date": "2026-10-13",
+  "milestone": "Per-component bounded acquisition-time estimates in the SONIC observation adapter",
+  "status": "Software extension verified; real acquisition estimates and bounds remain unestablished",
+  "changes": [
+    "SonicMeasuredState carries finite nonnegative absolute error bounds for body, left hand and right hand",
+    "Full acquisition intervals participate in freshness, skew and buffered-state expiry",
+    "Observations and measured-state status retain the oldest possible acquisition time",
+    "Invalid intervals cannot consume accepted-state sequence or timestamp markers",
+    "Exact-time callers retain zero-uncertainty behavior; zero does not represent unknown hardware uncertainty"
+  ],
+  "checks": {
+    "focused_tests": {
+      "passed": 53,
+      "exit_code": 0,
+      "log": "pytest-focused.log"
+    },
+    "sonic_regression_tests": {
+      "passed": 327,
+      "exit_code": 0,
+      "log": "pytest.log",
+      "command": ".venv/bin/python -m pytest -q dimos/robot/unitree/g1/test_sonic*.py --tb=short --color=no"
+    },
+    "new_tests": 22,
+    "initial_red_run": {
+      "failed": 20,
+      "passed": 31,
+      "exit_code": 1,
+      "log": "pytest-red.log",
+      "reason": "New acquisition_uncertainty_seconds field absent before implementation",
+      "note": "Two additional overflow/rejected-sequence cases were added after this red capture"
+    },
+    "ruff_check": {
+      "result": "All checks passed",
+      "files": [
+        "dimos/robot/unitree/g1/sonic_observation_pairing.py",
+        "dimos/robot/unitree/g1/sonic_observation_module.py",
+        "dimos/robot/unitree/g1/test_sonic_observation_pairing.py",
+        "dimos/robot/unitree/g1/test_sonic_observation_module.py"
+      ]
+    },
+    "ruff_format_check": {
+      "result": "4 files already formatted",
+      "files": [
+        "dimos/robot/unitree/g1/sonic_observation_pairing.py",
+        "dimos/robot/unitree/g1/sonic_observation_module.py",
+        "dimos/robot/unitree/g1/test_sonic_observation_pairing.py",
+        "dimos/robot/unitree/g1/test_sonic_observation_module.py"
+      ]
+    },
+    "mypy": {
+      "exit_code": 0,
+      "log": "mypy.log",
+      "files": [
+        "dimos/robot/unitree/g1/sonic_observation_pairing.py",
+        "dimos/robot/unitree/g1/sonic_observation_module.py"
+      ],
+      "options": [
+        "--follow-imports=silent"
+      ]
+    },
+    "full_repository_suite": "not run",
+    "known_warning": "Existing pytest startup subprocess ResourceWarning, retained in pytest.log"
+  },
+  "review": {
+    "agent": "observation_adapter_review",
+    "scope": "Design and final source review of four Python files; no tests or hardware actions",
+    "result": "No material issues found"
+  },
+  "hardware": {
+    "accessed_this_step": false,
+    "software_installed": false,
+    "controller_commands_sent": false,
+    "acquisition_alignment_verified": false
+  },
+  "lerobot_reference": {
+    "path": "/home/jihun/work/lerobot/examples/g1_dex3_training/sonic_policy_streamer.py",
+    "sha256": "e9e40f2e7e5c416b956bfe8a52941a5cf2258523e1972b24b866ccdef6dbb63d",
+    "findings": [
+      "StateSubscriber.latest records local receipt time; age() measures time since receipt",
+      "LiveImages._recv retains latest decoded images without propagating acquisition metadata into pairing"
+    ],
+    "edited": false
+  },
+  "limits": [
+    "Absolute bounds require producer provenance; short-trace statistics or arbitrary margins are insufficient",
+    "Increasing component estimates do not prove actual sample order when their intervals overlap",
+    "Producers must preserve estimates and bounds for cached samples; restamping is not detected from values alone",
+    "Camera and body/hand timing bounds, physical finger mapping and task framing remain uncommissioned",
+    "No live service observations, policy predictions or bottle-to-tray success established by this step"
+  ],
+  "next_step": "Establish body/hand acquisition provenance or defensible bounds at the real source, then connect and validate the measured-state producer",
+  "sha256": {
+    "dimos/robot/unitree/g1/sonic_observation_pairing.py": "cf43819e38072eb026ce6f4d997a792e70f179a1428a17214dd35748e14dc589",
+    "dimos/robot/unitree/g1/sonic_observation_module.py": "d0336492a2dd21a62a0733f34c12112e5e8255c91ff7eb3edab214d3cdd64e2e",
+    "dimos/robot/unitree/g1/test_sonic_observation_pairing.py": "66c8d2400485291c79d9f5cecde40b63badf3329dfe1aff1d52d9bd5ddaecbad",
+    "dimos/robot/unitree/g1/test_sonic_observation_module.py": "4dbdf8d35f7b1f2c10619ad6499d6cdb86e34a077ea5daf3f8a29bb90473a814",
+    "docs/platforms/humanoid/g1/sonic-observation-adapter.md": "ad4802d2961c7f2924731892ad54f2fee77477f1761018e63dbdd26cf7e1a410",
+    "docs/platforms/humanoid/g1/sonic-hardware-timing.md": "77bdce9a3163b00722999d5a00e90dd32300a4fd0520cd03cdfecbe8ccca5a81"
+  },
+  "artifact_sha256": {
+    "mypy.log": "f9b031e5c45aa702cd4fef028d465551cb20a2c4698e0913c7b00766b20ac4d8",
+    "pytest-focused.log": "de875c910d05536e4f0176be141e55b87911fedaca2b69ac77505b14d65084e1",
+    "pytest-red.log": "a34ec83fb9f860588cef731d63094d23ec0d470237e071c5f1fb29226e143140",
+    "pytest.log": "85b0f66fbde979a997aa41e78f4edd46751b508761d33de8c76335bbe57e817f"
+  }
+}
