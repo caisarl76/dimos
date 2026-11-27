@@ -81,7 +81,7 @@ and image layout. Instructions must match the selected policy's capabilities.
 The observation source publishes `observation: Out[SonicObservation]`:
 
 - One RGB `uint8[480,640,3]` image and 28 measured arm/hand joints in
-  [`POLICY_JOINT_NAMES`](../../../../dimos/robot/unitree/g1/sonic_observation.py) order.
+  [`POLICY_JOINT_NAMES`](/dimos/robot/unitree/g1/sonic_observation.py) order.
 - A strictly increasing sequence and an original timestamp on the coordinator
   host's monotonic clock: paired capture time for `time_basis="acquisition"`,
   or the oldest of four original receipts for `time_basis="delivery"`.

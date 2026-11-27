@@ -101,7 +101,7 @@ Producers must not fill a missing hand with zeroes or restamp cached values:
 preserve each measurement's original estimate and bound. Increasing estimates
 alone do not prove actual acquisition order when intervals overlap.
 Joint values are selected by
-[`POLICY_JOINT_NAMES`](../../../../dimos/robot/unitree/g1/sonic_observation.py)
+[`POLICY_JOINT_NAMES`](/dimos/robot/unitree/g1/sonic_observation.py)
 through `policy_joint_state()`, preserving the dataset's different left/right
 finger ordering.
 

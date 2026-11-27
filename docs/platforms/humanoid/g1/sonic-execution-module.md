@@ -20,7 +20,7 @@ flowchart LR
 
 ## What is implemented
 
-[`SonicExecutionModule`](../../../../dimos/robot/unitree/g1/sonic_execution_module.py)
+[`SonicExecutionModule`](/dimos/robot/unitree/g1/sonic_execution_module.py)
 wraps [`SonicTaskSession`](sonic-task-session.md) in the normal DimOS module
 lifecycle. One module event loop owns the ZMQ publisher, telemetry subscriber,
 session state and all mutating RPCs. Inference runs outside that loop.
